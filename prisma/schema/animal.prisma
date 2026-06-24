@@ -1,0 +1,40 @@
+enum AnimalStatus {
+  ALIVE
+  ARCHIVED
+  BURIED
+}
+
+enum AnimalSex {
+  MALE
+  FEMALE
+}
+
+enum BreedCategoryBadge {
+  BASE
+  SECONDARY
+  CUSTOM
+}
+
+model Species {
+  
+}
+
+model LifeStageDef {
+
+}
+
+model StatDef {
+
+}
+
+model Breed {
+
+}
+
+model BreedStatProfile {
+
+}
+
+model Animal {
+
+}
