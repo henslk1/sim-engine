@@ -1,0 +1,238 @@
+model Game {
+  id                String   @id @default(cuid())
+  name              String
+  slug              String   @unique
+  playerAccounts    PlayerAccount[]
+  subscriptionTiers SubscriptionTier[]
+  staffRoles        StaffRole[]
+  supportTickets    SupportTicket[]
+  bugReports        BugReport[]
+  adminActionLogs   AdminActionLog[]
+  gameConfig        GameConfig?
+  isActive          Boolean  @default(false)
+  createdAt         DateTime @default(now())
+}
+
+model User {
+  id                    String      @id @default(cuid())
+  email                 String      @unique
+  passwordHash          String
+  playerAccounts        PlayerAccount[]
+  purchaseRecords       PurchaseRecord[]
+  staffRoles            StaffRole[]
+  banRecords            BanRecord[] @relation("BannedUser")
+  issuedBans            BanRecord[] @relation("BanIssuedBy")
+  userIpLogs            UserIpLog[]
+  adminActionLogs       AdminActionLog[]
+  supportTicketMessages SupportTicketMessage[]
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+}
+
+model PlayerAccount {
+  id                  String @id @default(cuid())
+  userId              String
+  gameId              String
+  username            String
+  avatar              String?
+  playerSubscriptions PlayerSubscription[]
+  supportTickets      SupportTicket[]
+  bugReports          BugReport[]
+  bugReportUpvotes    BugReportUpvote[]
+  bugReportComments   BugReportComment[]
+  game                Game   @relation(fields: [gameId], references: [id])
+  user                User   @relation(fields: [userId], references: [id])
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  @@unique([userId, gameId])
+}
+
+model SubscriptionTier {
+  id                  String  @id @default(cuid())
+  name                String
+  cost                Int
+  gameId              String
+  game                Game    @relation(fields: [gameId], references: [id])
+  playerSubscriptions PlayerSubscription[]
+  isActive            Boolean @default(true)
+}
+
+model PlayerSubscription {
+  id                 String           @id @default(cuid())
+  playerAccountId    String
+  subscriptionTierId String
+  playerAccount      PlayerAccount    @relation(fields: [playerAccountId], references: [id])
+  subscriptionTier   SubscriptionTier @relation(fields: [subscriptionTierId], references: [id])
+  startedAt          DateTime         @default(now())
+  expiresAt          DateTime
+  pausedAt           DateTime?
+  resumesAt          DateTime?
+  isActive           Boolean          @default(true)
+}
+
+model PurchaseRecord {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  amount      Decimal
+  currency    String
+  description String
+  createdAt   DateTime @default(now())
+}
+
+enum StaffRoleType {
+  OWNER
+  ADMIN
+  MODERATOR
+}
+
+model StaffRole {
+  id          String   @id @default(cuid())
+  userId      String
+  gameId      String?
+  user        User     @relation(fields: [userId], references: [id])
+  game        Game?    @relation(fields: [gameId], references: [id])
+  role        StaffRoleType
+  createdAt   DateTime @default(now())
+}
+
+model BanRecord {
+  id             String   @id @default(cuid())
+  userId         String
+  reason         String
+  bannedAt       DateTime @default(now())
+  expiresAt      DateTime?
+  bannedByUserId String
+  user           User     @relation("BannedUser", fields: [userId], references: [id])
+  bannedBy       User     @relation("BanIssuedBy", fields: [bannedByUserId], references: [id])
+}
+
+model IpBan {
+  id        String @id @default(cuid())
+  ipAddress String @unique
+  reason    String
+  bannedAt  DateTime @default(now())
+  expiresAt DateTime?
+}
+
+model UserIpLog {
+  id        String   @id @default(cuid())
+  userId    String
+  ipAddress String
+  user      User     @relation(fields: [userId], references: [id])
+  seenAt    DateTime @default(now())
+}
+
+enum SupportTicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+model SupportTicket {
+  id              String        @id @default(cuid())
+  playerAccountId String
+  gameId          String
+  subject         String
+  body            String
+  status          SupportTicketStatus
+  messages        SupportTicketMessage[]
+  playerAccount   PlayerAccount @relation(fields: [playerAccountId], references: [id])
+  game            Game          @relation(fields: [gameId], references: [id])
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+model SupportTicketMessage {
+  id        String        @id @default(cuid())
+  ticketId  String
+  authorId  String
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id])
+  author    User          @relation(fields: [authorId], references: [id])
+  body      String
+  createdAt DateTime      @default(now())
+}
+
+enum BugSeverity {
+  MINOR
+  MAJOR
+  GAME_BREAKING
+}
+
+enum BugCategory {
+  ART 
+  TEXT
+  UI
+  MECHANIC
+}
+
+enum BugStatus {
+  OPEN
+  CONFIRMED
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+model BugReport {
+  id           String        @id @default(cuid())
+  gameId       String
+  authorId     String
+  title        String
+  body         String
+  severity     BugSeverity
+  category     BugCategory
+  isExploit    Boolean       @default(false)
+  status       BugStatus
+  upvotes      BugReportUpvote[]
+  comments     BugReportComment[]
+  game         Game          @relation(fields: [gameId], references: [id])
+  author       PlayerAccount @relation(fields: [authorId], references: [id])
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model BugReportUpvote {
+  id               String        @id @default(cuid())
+  bugReportId      String
+  playerAccountId  String
+  bugReport        BugReport     @relation(fields: [bugReportId], references: [id])
+  playerAccount    PlayerAccount @relation(fields: [playerAccountId], references: [id])
+  createdAt        DateTime      @default(now())
+  @@unique([bugReportId, playerAccountId])
+}
+
+model BugReportComment {
+  id           String @id @default(cuid())
+  bugReportId  String
+  authorId     String
+  body         String
+  author       PlayerAccount @relation(fields: [authorId], references: [id])
+  bugReport    BugReport     @relation(fields: [bugReportId], references: [id])
+  createdAt    DateTime      @default(now())
+}
+
+model AdminActionLog {
+  id          String   @id @default(cuid())
+  staffUserId String
+  gameId      String?
+  action      String
+  targetType  String
+  targetId    String
+  user        User     @relation(fields: [staffUserId], references: [id])
+  game        Game?    @relation(fields: [gameId], references: [id])
+  createdAt   DateTime @default(now())
+}
+
+model GameConfig {
+  id                              String  @id @default(cuid())
+  gameId                          String  @unique
+  crossFirstGenDefaultTotalInnate Int
+  trainingCeilingMultiplier       Float
+  pedigreeDisplayDepth            Int
+  predictorDailyLimitFree         Int
+  game                            Game     @relation(fields: [gameId], references: [id])
+  createdAt                       DateTime @default(now())
+  updatedAt                       DateTime @updatedAt
+}
