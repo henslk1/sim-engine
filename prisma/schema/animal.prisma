@@ -38,3 +38,39 @@ model BreedStatProfile {
 model Animal {
 
 }
+
+model AnimalStat {
+
+}
+
+model AnimalStatHistory {
+
+}
+
+model AnimalImage {
+
+}
+
+model AnimalAncestor {
+
+}
+
+model AnimalBreedComposition {
+
+}
+
+model GameInnateMax {
+
+}
+
+model PlayerBrand {
+
+}
+
+model AnimalBrand {
+
+}
+
+model AnimalDailyLog {
+
+}
