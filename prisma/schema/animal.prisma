@@ -16,61 +16,61 @@ enum BreedCategoryBadge {
 }
 
 model Species {
-  
+    id             String @id @default(cuid())
 }
 
 model LifeStageDef {
-
+  id             String @id @default(cuid())
 }
 
 model StatDef {
-
+  id             String @id @default(cuid())
 }
 
 model Breed {
-
+  id             String @id @default(cuid())
 }
 
 model BreedStatProfile {
-
+  id             String @id @default(cuid())
 }
 
 model Animal {
-
+  id             String @id @default(cuid())
 }
 
 model AnimalStat {
-
+  id             String @id @default(cuid())
 }
 
 model AnimalStatHistory {
-
+  id             String @id @default(cuid())
 }
 
 model AnimalImage {
-
+  id             String @id @default(cuid())
 }
 
 model AnimalAncestor {
-
+  id             String @id @default(cuid())
 }
 
 model AnimalBreedComposition {
-
+  id             String @id @default(cuid())
 }
 
 model GameInnateMax {
-
+  id             String @id @default(cuid())
 }
 
 model PlayerBrand {
-
+  id             String @id @default(cuid())
 }
 
 model AnimalBrand {
-
+  id             String @id @default(cuid())
 }
 
 model AnimalDailyLog {
-
+  id             String @id @default(cuid())
 }
