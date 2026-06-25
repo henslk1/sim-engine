@@ -54,21 +54,22 @@ model StatDef {
 }
 
 model Breed {
-  id                     String         @id @default(cuid())
-  gameId                 String
-  name                   String
-  speciesId              String
-  categoryBadge          BreedCategoryBadge
-  foundingPlayerId       String?
-  image                  String?
-  lore                   String?
-  isUnregistered         Boolean @default(false)
-  convergenceGenerations Int?
-  statProfile            BreedStatProfile[]
-  animals                Animal[]
-  game                   Game           @relation(fields: [gameId], references: [id])
-  species                Species        @relation(fields: [speciesId], references: [id])
-  foundingPlayer         PlayerAccount? @relation("BreedFounder", fields: [foundingPlayerId], references: [id])
+  id                      String         @id @default(cuid())
+  gameId                  String
+  name                    String
+  speciesId               String
+  categoryBadge           BreedCategoryBadge
+  foundingPlayerId        String?
+  image                   String?
+  lore                    String?
+  isUnregistered          Boolean @default(false)
+  convergenceGenerations  Int?
+  statProfile             BreedStatProfile[]
+  animals                 Animal[]
+  animalBreedCompositions AnimalBreedComposition[]
+  game                    Game           @relation(fields: [gameId], references: [id])
+  species                 Species        @relation(fields: [speciesId], references: [id])
+  foundingPlayer          PlayerAccount? @relation("BreedFounder", fields: [foundingPlayerId], references: [id])
   @@unique([gameId, name])
 }
 
@@ -200,6 +201,6 @@ model AnimalDailyLog {
   outcome         String?
   context         Json?
   animal          Animal   @relation("DailyLogAnimal", fields: [animalId], references: [id])
-  partner         Animal   @relation("DailyLogPartner", fields: [partnerAnimalId], references: [id])
+  partner         Animal?   @relation("DailyLogPartner", fields: [partnerAnimalId], references: [id])
   createdAt       DateTime @default(now())
 }
