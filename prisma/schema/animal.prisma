@@ -153,6 +153,12 @@ model AnimalAncestor {
 
 model AnimalBreedComposition {
   id             String @id @default(cuid())
+  animalId       String
+  breedId        String
+  percentage     Float
+  animal         Animal @relation(fields: [animalId], references: [id])
+  breed          Breed @relation(fields: [breedId], references: [id])
+
 }
 
 model GameInnateMax {
