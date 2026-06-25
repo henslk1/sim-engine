@@ -16,19 +16,54 @@ enum BreedCategoryBadge {
 }
 
 model Species {
-    id             String @id @default(cuid())
+    id     String @id @default(cuid())
+    gameId String
+    name   String
+    breeds Breed[]
+    game   Game   @relation(fields: [gameId], references: [id])
+    @@unique([gameId, name])
 }
 
 model LifeStageDef {
-  id             String @id @default(cuid())
+  id                 String  @id @default(cuid())
+  gameId             String
+  name               String
+  stageIndex         Int
+  minCycle           Int
+  maxCycle           Int
+  canCompete         Boolean
+  canBreed           Boolean
+  canTrain           Boolean
+  canReceiveCare     Boolean
+  hasUniqueActionSet Boolean @default(false)
+  profileLayout      String
+  game               Game    @relation(fields: [gameId], references: [id])
+  @@unique([gameId, stageIndex])
 }
 
 model StatDef {
-  id             String @id @default(cuid())
+  id     String @id @default(cuid())
+  gameId String
+  name   String
+  game   Game   @relation(fields: [gameId], references: [id])
+  @@unique([gameId, name])
 }
 
 model Breed {
-  id             String @id @default(cuid())
+  id                     String         @id @default(cuid())
+  gameId                 String
+  name                   String
+  speciesId              String
+  categoryBadge          BreedCategoryBadge
+  foundingPlayerId       String?
+  image                  String?
+  lore                   String?
+  isUnregistered         Boolean @default(false)
+  convergenceGenerations Int?
+  game                   Game           @relation(fields: [gameId], references: [id])
+  species                Species        @relation(fields: [speciesId], references: [id])
+  foundingPlayer         PlayerAccount? @relation("BreedFounder", fields: [foundingPlayerId], references: [id])
+  @@unique([breedId, statDefId])
 }
 
 model BreedStatProfile {
