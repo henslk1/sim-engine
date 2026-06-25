@@ -228,7 +228,7 @@ model AdminActionLog {
 model GameConfig {
   id                              String  @id @default(cuid())
   gameId                          String  @unique
-  crossFirstGenDefaultTotalInnate Int
+  defaultInnateRatio              Float
   trainingCeilingMultiplier       Float
   pedigreeDisplayDepth            Int
   predictorDailyLimitFree         Int
