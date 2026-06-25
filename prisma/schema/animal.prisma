@@ -42,10 +42,11 @@ model LifeStageDef {
 }
 
 model StatDef {
-  id     String @id @default(cuid())
-  gameId String
-  name   String
-  game   Game   @relation(fields: [gameId], references: [id])
+  id           String @id @default(cuid())
+  gameId       String
+  name         String
+  statProfiles BreedStatProfile[]
+  game         Game   @relation(fields: [gameId], references: [id])
   @@unique([gameId, name])
 }
 
@@ -60,14 +61,24 @@ model Breed {
   lore                   String?
   isUnregistered         Boolean @default(false)
   convergenceGenerations Int?
+  statProfile            BreedStatProfile[]
   game                   Game           @relation(fields: [gameId], references: [id])
   species                Species        @relation(fields: [speciesId], references: [id])
   foundingPlayer         PlayerAccount? @relation("BreedFounder", fields: [foundingPlayerId], references: [id])
-  @@unique([breedId, statDefId])
+  @@unique([gameId, name])
 }
 
 model BreedStatProfile {
-  id             String @id @default(cuid())
+  id             String  @id @default(cuid())
+  breedId        String
+  statDefId      String
+  weight         Float
+  naturalMin     Float
+  naturalMax     Float
+  baseline       Float
+  breed          Breed   @relation(fields: [breedId], references: [id])
+  statDef        StatDef @relation(fields: [statDefId], references: [id])
+  @@unique([breedId, statDefId])
 }
 
 model Animal {
