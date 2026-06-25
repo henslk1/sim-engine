@@ -73,15 +73,15 @@ model Breed {
 }
 
 model BreedStatProfile {
-  id             String  @id @default(cuid())
-  breedId        String
-  statDefId      String
-  weight         Float
-  naturalMin     Float
-  naturalMax     Float
-  baseline       Float
-  breed          Breed   @relation(fields: [breedId], references: [id])
-  statDef        StatDef @relation(fields: [statDefId], references: [id])
+  id         String  @id @default(cuid())
+  breedId    String
+  statDefId  String
+  weight     Float
+  naturalMin Float
+  naturalMax Float
+  baseline   Float
+  breed      Breed   @relation(fields: [breedId], references: [id])
+  statDef    StatDef @relation(fields: [statDefId], references: [id])
   @@unique([breedId, statDefId])
 }
 
@@ -111,6 +111,9 @@ model Animal {
   ancestors             AnimalAncestor[] @relation("AnimalLineage")
   offspring             AnimalAncestor[] @relation("AncestorAnimals")
   breedComposition      AnimalBreedComposition[]
+  brands                AnimalBrand[]
+  dailyLogs             AnimalDailyLog[] @relation("DailyLogAnimal")
+  partnerLogs           AnimalDailyLog[] @relation("DailyLogPartner")
   game                  Game             @relation(fields: [gameId], references: [id])
   playerAccount         PlayerAccount    @relation(fields: [playerAccountId], references: [id])
   breed                 Breed            @relation(fields: [breedId], references: [id])
@@ -120,59 +123,83 @@ model Animal {
 }
 
 model AnimalStat {
-  id             String @id @default(cuid())
-  animalId       String
-  statDefId      String
-  innateValue    Float
-  trainedValue   Float @default(0)
-  animal         Animal @relation(fields: [animalId], references: [id])
-  statDef        StatDef @relation(fields: [statDefId], references: [id])
+  id           String  @id @default(cuid())
+  animalId     String
+  statDefId    String
+  innateValue  Float
+  trainedValue Float   @default(0)
+  animal       Animal  @relation(fields: [animalId], references: [id])
+  statDef      StatDef @relation(fields: [statDefId], references: [id])
   @@unique([animalId, statDefId])
 }
 
 model AnimalStatHistory {
-  id             String @id @default(cuid())
-  animalId       String
-  statDefId      String
-  cycleNumber    Int
-  trainedValue   Float
-  animal         Animal @relation(fields: [animalId], references: [id])
-  statDef        StatDef @relation(fields: [statDefId], references: [id])
+  id           String  @id @default(cuid())
+  animalId     String
+  statDefId    String
+  cycleNumber  Int
+  trainedValue Float
+  animal       Animal  @relation(fields: [animalId], references: [id])
+  statDef      StatDef @relation(fields: [statDefId], references: [id])
   @@unique([animalId, statDefId, cycleNumber])
 }
 
 model AnimalAncestor {
-  id             String @id @default(cuid())
-  animalId       String
-  ancestorId     String
-  depth          Int
-  animal         Animal @relation("AnimalLineage", fields: [animalId], references: [id])
-  ancestor       Animal @relation("AncestorAnimals", fields: [ancestorId], references: [id])
+  id         String @id @default(cuid())
+  animalId   String
+  ancestorId String
+  depth      Int
+  animal     Animal @relation("AnimalLineage", fields: [animalId], references: [id])
+  ancestor   Animal @relation("AncestorAnimals", fields: [ancestorId], references: [id])
   @@unique([animalId, ancestorId])
 }
 
 model AnimalBreedComposition {
-  id             String @id @default(cuid())
-  animalId       String
-  breedId        String
-  percentage     Float
-  animal         Animal @relation(fields: [animalId], references: [id])
-  breed          Breed @relation(fields: [breedId], references: [id])
-
+  id         String @id @default(cuid())
+  animalId   String
+  breedId    String
+  percentage Float
+  animal     Animal @relation(fields: [animalId], references: [id])
+  breed      Breed  @relation(fields: [breedId], references: [id])
+  @@unique([animalId, breedId])
 }
 
 model GameInnateMax {
-  id             String @id @default(cuid())
+  id             String   @id @default(cuid())
+  gameId         String   @unique
+  maxTotalInnate Float
+  game           Game     @relation(fields: [gameId], references: [id])
+  updatedAt      DateTime @updatedAt
 }
 
 model PlayerBrand {
-  id             String @id @default(cuid())
+  id              String        @id @default(cuid())
+  playerAccountId String        @unique
+  path            String
+  playerAccount   PlayerAccount @relation(fields: [playerAccountId], references: [id])
+  animalBrands    AnimalBrand[]
+  createdAt       DateTime @default(now())
 }
 
 model AnimalBrand {
-  id             String @id @default(cuid())
+  id            String      @id @default(cuid())
+  animalId      String
+  playerBrandId String
+  appliedAt     DateTime    @default(now())
+  animal        Animal      @relation(fields: [animalId], references: [id])
+  playerBrand   PlayerBrand @relation(fields: [playerBrandId], references: [id])
+  @@unique([animalId, playerBrandId])
 }
 
 model AnimalDailyLog {
-  id             String @id @default(cuid())
+  id              String  @id @default(cuid())
+  cycleNumber     Int
+  animalId        String
+  eventType       String
+  partnerAnimalId String?
+  outcome         String?
+  context         Json?
+  animal          Animal   @relation("DailyLogAnimal", fields: [animalId], references: [id])
+  partner         Animal   @relation("DailyLogPartner", fields: [partnerAnimalId], references: [id])
+  createdAt       DateTime @default(now())
 }
