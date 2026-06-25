@@ -43,11 +43,13 @@ model LifeStageDef {
 }
 
 model StatDef {
-  id           String @id @default(cuid())
-  gameId       String
-  name         String
-  statProfiles BreedStatProfile[]
-  game         Game   @relation(fields: [gameId], references: [id])
+  id              String @id @default(cuid())
+  gameId          String
+  name            String
+  statProfiles    BreedStatProfile[]
+  animalStats     AnimalStat[]
+  statHistoryLogs AnimalStatHistory[]
+  game            Game   @relation(fields: [gameId], references: [id])
   @@unique([gameId, name])
 }
 
@@ -91,40 +93,62 @@ model Animal {
   name                  String
   sex                   AnimalSex
   lifeStageId           String
-  generation            Int           @default(1)
-  ageInCycles           Int           @default(0)
-  bornAt                DateTime      @default(now())
+  image                 String?
+  generation            Int              @default(1)
+  ageInCycles           Int              @default(0)
+  bornAt                DateTime         @default(now())
   diedAt                DateTime?
   causeOfDeath          String?
-  status                AnimalStatus  @default(ALIVE)
+  status                AnimalStatus     @default(ALIVE)
   deletedAt             DateTime?
-  isCastrated           Boolean       @default(false)
-  inbreedingCoefficient Float         @default(0)
+  isCastrated           Boolean          @default(false)
+  inbreedingCoefficient Float            @default(0)
   fertility             Float
-  isTutorialAnimal      Boolean       @default(false)
+  isTutorialAnimal      Boolean          @default(false)
   breedGeneration       Int?  
-  game                  Game          @relation(fields: [gameId], references: [id])
-  playerAccount         PlayerAccount @relation(fields: [playerAccountId], references: [id])
-  breed                 Breed         @relation(fields: [breedId], references: [id])
-  lifeStage             LifeStageDef  @relation(fields: [lifeStageId], references: [id])
-  createdAt             DateTime      @default(now())
-  updatedAt             DateTime      @updatedAt
+  stats                 AnimalStat[]
+  statHistory           AnimalStatHistory[]
+  ancestors             AnimalAncestor[] @relation("AnimalLineage")
+  offspring             AnimalAncestor[] @relation("AncestorAnimals")
+  breedComposition      AnimalBreedComposition[]
+  game                  Game             @relation(fields: [gameId], references: [id])
+  playerAccount         PlayerAccount    @relation(fields: [playerAccountId], references: [id])
+  breed                 Breed            @relation(fields: [breedId], references: [id])
+  lifeStage             LifeStageDef     @relation(fields: [lifeStageId], references: [id])
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
 }
 
 model AnimalStat {
   id             String @id @default(cuid())
+  animalId       String
+  statDefId      String
+  innateValue    Float
+  trainedValue   Float @default(0)
+  animal         Animal @relation(fields: [animalId], references: [id])
+  statDef        StatDef @relation(fields: [statDefId], references: [id])
+  @@unique([animalId, statDefId])
 }
 
 model AnimalStatHistory {
   id             String @id @default(cuid())
-}
-
-model AnimalImage {
-  id             String @id @default(cuid())
+  animalId       String
+  statDefId      String
+  cycleNumber    Int
+  trainedValue   Float
+  animal         Animal @relation(fields: [animalId], references: [id])
+  statDef        StatDef @relation(fields: [statDefId], references: [id])
+  @@unique([animalId, statDefId, cycleNumber])
 }
 
 model AnimalAncestor {
   id             String @id @default(cuid())
+  animalId       String
+  ancestorId     String
+  depth          Int
+  animal         Animal @relation("AnimalLineage", fields: [animalId], references: [id])
+  ancestor       Animal @relation("AncestorAnimals", fields: [ancestorId], references: [id])
+  @@unique([animalId, ancestorId])
 }
 
 model AnimalBreedComposition {
