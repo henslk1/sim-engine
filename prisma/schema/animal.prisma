@@ -37,6 +37,7 @@ model LifeStageDef {
   canReceiveCare     Boolean
   hasUniqueActionSet Boolean @default(false)
   profileLayout      String
+  animals            Animal[]
   game               Game    @relation(fields: [gameId], references: [id])
   @@unique([gameId, stageIndex])
 }
@@ -62,6 +63,7 @@ model Breed {
   isUnregistered         Boolean @default(false)
   convergenceGenerations Int?
   statProfile            BreedStatProfile[]
+  animals                Animal[]
   game                   Game           @relation(fields: [gameId], references: [id])
   species                Species        @relation(fields: [speciesId], references: [id])
   foundingPlayer         PlayerAccount? @relation("BreedFounder", fields: [foundingPlayerId], references: [id])
@@ -82,7 +84,31 @@ model BreedStatProfile {
 }
 
 model Animal {
-  id             String @id @default(cuid())
+  id                    String        @id @default(cuid())
+  gameId                String
+  playerAccountId       String
+  breedId               String
+  name                  String
+  sex                   AnimalSex
+  lifeStageId           String
+  generation            Int           @default(1)
+  ageInCycles           Int           @default(0)
+  bornAt                DateTime      @default(now())
+  diedAt                DateTime?
+  causeOfDeath          String?
+  status                AnimalStatus  @default(ALIVE)
+  deletedAt             DateTime?
+  isCastrated           Boolean       @default(false)
+  inbreedingCoefficient Float         @default(0)
+  fertility             Float
+  isTutorialAnimal      Boolean       @default(false)
+  breedGeneration       Int?  
+  game                  Game          @relation(fields: [gameId], references: [id])
+  playerAccount         PlayerAccount @relation(fields: [playerAccountId], references: [id])
+  breed                 Breed         @relation(fields: [breedId], references: [id])
+  lifeStage             LifeStageDef  @relation(fields: [lifeStageId], references: [id])
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
 }
 
 model AnimalStat {
