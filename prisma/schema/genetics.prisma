@@ -6,11 +6,11 @@ enum GeneticPanelType {
 model Locus {
   id               String @id @default(cuid())
   gameId           String
+  name             String
   displayGroup     String?
   alleles          Allele[]
   expressionRules  ExpressionRule[]
   panelEntries     GeneticPanelLocus[]
-  breedFrequencies BreedAlleleFrequency[]
   animalGenotypes  AnimalGenotype[]
   game             Game   @relation(fields: [gameId], references: [id])
   @@unique([gameId, name])
@@ -19,7 +19,6 @@ model Locus {
 model Allele {
   id                         String @id @default(cuid())
   locusId                    String
-  name                       String
   symbol                     String
   availabilityState          GeneAvailabilityState?
   expressionRulesAsAlleleOne ExpressionRule[]       @relation("AlleleOne")
