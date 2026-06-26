@@ -67,6 +67,8 @@ model Breed {
   statProfile             BreedStatProfile[]
   animals                 Animal[]
   animalBreedCompositions AnimalBreedComposition[]
+  alleleFrequencies       BreedAlleleFrequency[]
+  conformationScores      AnimalConformationScore[]
   game                    Game           @relation(fields: [gameId], references: [id])
   species                 Species        @relation(fields: [speciesId], references: [id])
   foundingPlayer          PlayerAccount? @relation("BreedFounder", fields: [foundingPlayerId], references: [id])
@@ -115,6 +117,8 @@ model Animal {
   brands                AnimalBrand[]
   dailyLogs             AnimalDailyLog[] @relation("DailyLogAnimal")
   partnerLogs           AnimalDailyLog[] @relation("DailyLogPartner")
+  genotypes             AnimalGenotype[]
+  conformationScores    AnimalConformationScore[]
   game                  Game             @relation(fields: [gameId], references: [id])
   playerAccount         PlayerAccount    @relation(fields: [playerAccountId], references: [id])
   breed                 Breed            @relation(fields: [breedId], references: [id])

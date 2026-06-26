@@ -15,6 +15,8 @@ model Game {
   statDefs          StatDef[]
   animals           Animal[]
   gameInnateMax     GameInnateMax?
+  locusDefs         Locus[]
+  geneticPanels     GeneticPanelDef[]
   isActive          Boolean  @default(false)
   createdAt         DateTime @default(now())
 }
