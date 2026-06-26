@@ -15,7 +15,7 @@ model CareActionDef {
   moodBoost      Float @default(0)
   items          CareActionItem[]
   careLogs       CareLog[]
-  game           Game  @relation(fields: [gameId], referencesL [id])
+  game           Game  @relation(fields: [gameId], references: [id])
   @@unique([gameId, name])
 }
 
@@ -36,7 +36,7 @@ model CareLog {
   performedByPlayerId String?
   animal              Animal         @relation(fields: [animalId], references: [id])
   careActionDef       CareActionDef  @relation(fields: [careActionDefId], references: [id])
-  performedBy         PlayerAccount? @relation(fields: [performedByPlayerId], references: [id])
+  performedBy         PlayerAccount? @relation("CarePerformedBy", fields: [performedByPlayerId], references: [id])
   createdAt           DateTime       @default(now())
 }
 
@@ -44,7 +44,7 @@ model AnimalCareScore {
   id         String   @id @default(cuid())
   animalId   String   @unique
   score      Float
-  animal     Anima    @relation(fields: [animalId], references: [id])
+  animal     Animal   @relation(fields: [animalId], references: [id])
   updatedAt  DateTime @updatedAt
 }
 
@@ -77,6 +77,6 @@ model AnimalBehaviorEvent {
   cycleNumber     Int
   symptomText     String
   animal          Animal         @relation(fields: [animalId], references: [id])
-  careActionDef   CareActionDef  @relation(fields: [careActionDefId], references: [id])
+  careActionDef   CareActionDef? @relation(fields: [careActionDefId], references: [id])
   createdAt       DateTime       @default(now())
 }

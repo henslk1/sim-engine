@@ -26,7 +26,12 @@ model Game {
 model User {
   id                    String      @id @default(cuid())
   email                 String      @unique
-  passwordHash          String
+  passwordHash          String?
+  stripeCustomerId      String?     @unique
+  emailVerified         Boolean     @default(false)
+  name                  String?
+  sessions              Session[]
+  oauthAccounts         Account[]
   playerAccounts        PlayerAccount[]
   purchaseRecords       PurchaseRecord[]
   staffRoles            StaffRole[]
@@ -37,6 +42,42 @@ model User {
   supportTicketMessages SupportTicketMessage[]
   createdAt             DateTime    @default(now())
   updatedAt             DateTime    @updatedAt
+}
+
+model Session {
+  id          String   @id @default(cuid())
+  userId      String
+  token       String   @unique
+  expiresAt   DateTime
+  ipAddress   String?
+  userAgent   String?
+  user        User     @relation(fields: [userId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+model Account {
+  id          String @id @default(cuid())
+  userId      String
+  accountId   String
+  providerId  String
+  accessToken String?
+  refreshToken String?
+  accessTokenExpiresAt DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  user                  User @relation(fields: [userId], references: [id])
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  @@unique([providerId, accountId])
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
 
 model PlayerAccount {
@@ -85,13 +126,14 @@ model PlayerSubscription {
 }
 
 model PurchaseRecord {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
-  amount      Decimal
-  currency    String
-  description String
-  createdAt   DateTime @default(now())
+  id                    String   @id @default(cuid())
+  userId                String
+  user                  User     @relation(fields: [userId], references: [id])
+  amount                Decimal
+  currency              String
+  description           String
+  stripePaymentIntentId String?
+  createdAt             DateTime @default(now())
 }
 
 enum StaffRoleType {

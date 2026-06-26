@@ -109,6 +109,8 @@ model Animal {
   fertility             Float
   isTutorialAnimal      Boolean          @default(false)
   breedGeneration       Int?  
+  disciplineDefId       String?
+  subContainerId        String?
   stats                 AnimalStat[]
   statHistory           AnimalStatHistory[]
   ancestors             AnimalAncestor[] @relation("AnimalLineage")
@@ -119,7 +121,7 @@ model Animal {
   partnerLogs           AnimalDailyLog[] @relation("DailyLogPartner")
   genotypes             AnimalGenotype[]
   conformationScores    AnimalConformationScore[]
-  careScore             AnimalCareScore[]
+  careScore             AnimalCareScore?
   longTermCareRecords   AnimalLongTermCareRecord[]
   behaviorEvents        AnimalBehaviorEvent[]
   careLogs              CareLog[]
@@ -208,6 +210,7 @@ model AnimalDailyLog {
   partnerAnimalId String?
   outcome         String?
   context         Json?
+  itemDefId       String?
   animal          Animal   @relation("DailyLogAnimal", fields: [animalId], references: [id])
   partner         Animal?   @relation("DailyLogPartner", fields: [partnerAnimalId], references: [id])
   createdAt       DateTime @default(now())
