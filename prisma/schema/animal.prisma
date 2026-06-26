@@ -16,16 +16,17 @@ enum BreedCategoryBadge {
 }
 
 model Species {
-    id     String @id @default(cuid())
-    gameId String
-    name   String
-    breeds Breed[]
-    game   Game   @relation(fields: [gameId], references: [id])
-    @@unique([gameId, name])
+  id     String  @id @default(cuid())
+  gameId String
+  name   String
+  breeds Breed[]
+  game   Game    @relation(fields: [gameId], references: [id])
+
+  @@unique([gameId, name])
 }
 
 model LifeStageDef {
-  id                 String  @id @default(cuid())
+  id                 String   @id @default(cuid())
   gameId             String
   name               String
   stageIndex         Int
@@ -35,26 +36,28 @@ model LifeStageDef {
   canBreed           Boolean
   canTrain           Boolean
   canReceiveCare     Boolean
-  hasUniqueActionSet Boolean @default(false)
+  hasUniqueActionSet Boolean  @default(false)
   profileLayout      String
   animals            Animal[]
-  game               Game    @relation(fields: [gameId], references: [id])
+  game               Game     @relation(fields: [gameId], references: [id])
+
   @@unique([gameId, stageIndex])
 }
 
 model StatDef {
-  id              String @id @default(cuid())
+  id              String              @id @default(cuid())
   gameId          String
   name            String
   statProfiles    BreedStatProfile[]
   animalStats     AnimalStat[]
   statHistoryLogs AnimalStatHistory[]
-  game            Game   @relation(fields: [gameId], references: [id])
+  game            Game                @relation(fields: [gameId], references: [id])
+
   @@unique([gameId, name])
 }
 
 model Breed {
-  id                      String         @id @default(cuid())
+  id                      String                    @id @default(cuid())
   gameId                  String
   name                    String
   speciesId               String
@@ -62,16 +65,17 @@ model Breed {
   foundingPlayerId        String?
   image                   String?
   lore                    String?
-  isUnregistered          Boolean @default(false)
+  isUnregistered          Boolean                   @default(false)
   convergenceGenerations  Int?
   statProfile             BreedStatProfile[]
   animals                 Animal[]
   animalBreedCompositions AnimalBreedComposition[]
   alleleFrequencies       BreedAlleleFrequency[]
   conformationScores      AnimalConformationScore[]
-  game                    Game           @relation(fields: [gameId], references: [id])
-  species                 Species        @relation(fields: [speciesId], references: [id])
-  foundingPlayer          PlayerAccount? @relation("BreedFounder", fields: [foundingPlayerId], references: [id])
+  game                    Game                      @relation(fields: [gameId], references: [id])
+  species                 Species                   @relation(fields: [speciesId], references: [id])
+  foundingPlayer          PlayerAccount?            @relation("BreedFounder", fields: [foundingPlayerId], references: [id])
+
   @@unique([gameId, name])
 }
 
@@ -85,11 +89,12 @@ model BreedStatProfile {
   baseline   Float
   breed      Breed   @relation(fields: [breedId], references: [id])
   statDef    StatDef @relation(fields: [statDefId], references: [id])
+
   @@unique([breedId, statDefId])
 }
 
 model Animal {
-  id                    String        @id @default(cuid())
+  id                    String                     @id @default(cuid())
   gameId                String
   playerAccountId       String
   breedId               String
@@ -97,40 +102,40 @@ model Animal {
   sex                   AnimalSex
   lifeStageId           String
   image                 String?
-  generation            Int              @default(1)
-  ageInCycles           Int              @default(0)
-  bornAt                DateTime         @default(now())
+  generation            Int                        @default(1)
+  ageInCycles           Int                        @default(0)
+  bornAt                DateTime                   @default(now())
   diedAt                DateTime?
   causeOfDeath          String?
-  status                AnimalStatus     @default(ALIVE)
+  status                AnimalStatus               @default(ALIVE)
   deletedAt             DateTime?
-  isCastrated           Boolean          @default(false)
-  inbreedingCoefficient Float            @default(0)
+  isCastrated           Boolean                    @default(false)
+  inbreedingCoefficient Float                      @default(0)
   fertility             Float
-  isTutorialAnimal      Boolean          @default(false)
-  breedGeneration       Int?  
+  isTutorialAnimal      Boolean                    @default(false)
+  breedGeneration       Int?
   disciplineDefId       String?
   subContainerId        String?
   stats                 AnimalStat[]
   statHistory           AnimalStatHistory[]
-  ancestors             AnimalAncestor[] @relation("AnimalLineage")
-  offspring             AnimalAncestor[] @relation("AncestorAnimals")
+  ancestors             AnimalAncestor[]           @relation("AnimalLineage")
+  offspring             AnimalAncestor[]           @relation("AncestorAnimals")
   breedComposition      AnimalBreedComposition[]
   brands                AnimalBrand[]
-  dailyLogs             AnimalDailyLog[] @relation("DailyLogAnimal")
-  partnerLogs           AnimalDailyLog[] @relation("DailyLogPartner")
+  dailyLogs             AnimalDailyLog[]           @relation("DailyLogAnimal")
+  partnerLogs           AnimalDailyLog[]           @relation("DailyLogPartner")
   genotypes             AnimalGenotype[]
   conformationScores    AnimalConformationScore[]
   careScore             AnimalCareScore?
   longTermCareRecords   AnimalLongTermCareRecord[]
   behaviorEvents        AnimalBehaviorEvent[]
   careLogs              CareLog[]
-  game                  Game             @relation(fields: [gameId], references: [id])
-  playerAccount         PlayerAccount    @relation(fields: [playerAccountId], references: [id])
-  breed                 Breed            @relation(fields: [breedId], references: [id])
-  lifeStage             LifeStageDef     @relation(fields: [lifeStageId], references: [id])
-  createdAt             DateTime         @default(now())
-  updatedAt             DateTime         @updatedAt
+  game                  Game                       @relation(fields: [gameId], references: [id])
+  playerAccount         PlayerAccount              @relation(fields: [playerAccountId], references: [id])
+  breed                 Breed                      @relation(fields: [breedId], references: [id])
+  lifeStage             LifeStageDef               @relation(fields: [lifeStageId], references: [id])
+  createdAt             DateTime                   @default(now())
+  updatedAt             DateTime                   @updatedAt
 }
 
 model AnimalStat {
@@ -141,6 +146,7 @@ model AnimalStat {
   trainedValue Float   @default(0)
   animal       Animal  @relation(fields: [animalId], references: [id])
   statDef      StatDef @relation(fields: [statDefId], references: [id])
+
   @@unique([animalId, statDefId])
 }
 
@@ -152,6 +158,7 @@ model AnimalStatHistory {
   trainedValue Float
   animal       Animal  @relation(fields: [animalId], references: [id])
   statDef      StatDef @relation(fields: [statDefId], references: [id])
+
   @@unique([animalId, statDefId, cycleNumber])
 }
 
@@ -162,6 +169,7 @@ model AnimalAncestor {
   depth      Int
   animal     Animal @relation("AnimalLineage", fields: [animalId], references: [id])
   ancestor   Animal @relation("AncestorAnimals", fields: [ancestorId], references: [id])
+
   @@unique([animalId, ancestorId])
 }
 
@@ -172,6 +180,7 @@ model AnimalBreedComposition {
   percentage Float
   animal     Animal @relation(fields: [animalId], references: [id])
   breed      Breed  @relation(fields: [breedId], references: [id])
+
   @@unique([animalId, breedId])
 }
 
@@ -189,7 +198,7 @@ model PlayerBrand {
   path            String
   playerAccount   PlayerAccount @relation(fields: [playerAccountId], references: [id])
   animalBrands    AnimalBrand[]
-  createdAt       DateTime @default(now())
+  createdAt       DateTime      @default(now())
 }
 
 model AnimalBrand {
@@ -199,11 +208,12 @@ model AnimalBrand {
   appliedAt     DateTime    @default(now())
   animal        Animal      @relation(fields: [animalId], references: [id])
   playerBrand   PlayerBrand @relation(fields: [playerBrandId], references: [id])
+
   @@unique([animalId, playerBrandId])
 }
 
 model AnimalDailyLog {
-  id              String  @id @default(cuid())
+  id              String   @id @default(cuid())
   cycleNumber     Int
   animalId        String
   eventType       String
@@ -212,6 +222,6 @@ model AnimalDailyLog {
   context         Json?
   itemDefId       String?
   animal          Animal   @relation("DailyLogAnimal", fields: [animalId], references: [id])
-  partner         Animal?   @relation("DailyLogPartner", fields: [partnerAnimalId], references: [id])
+  partner         Animal?  @relation("DailyLogPartner", fields: [partnerAnimalId], references: [id])
   createdAt       DateTime @default(now())
 }

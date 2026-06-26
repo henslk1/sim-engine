@@ -4,20 +4,21 @@ enum GeneticPanelType {
 }
 
 model Locus {
-  id               String @id @default(cuid())
-  gameId           String
-  name             String
-  displayGroup     String?
-  alleles          Allele[]
-  expressionRules  ExpressionRule[]
-  panelEntries     GeneticPanelLocus[]
-  animalGenotypes  AnimalGenotype[]
-  game             Game   @relation(fields: [gameId], references: [id])
+  id              String              @id @default(cuid())
+  gameId          String
+  name            String
+  displayGroup    String?
+  alleles         Allele[]
+  expressionRules ExpressionRule[]
+  panelEntries    GeneticPanelLocus[]
+  animalGenotypes AnimalGenotype[]
+  game            Game                @relation(fields: [gameId], references: [id])
+
   @@unique([gameId, name])
 }
 
 model Allele {
-  id                         String @id @default(cuid())
+  id                         String                 @id @default(cuid())
   locusId                    String
   symbol                     String
   availabilityState          GeneAvailabilityState?
@@ -26,7 +27,8 @@ model Allele {
   genotypesAsAlleleOne       AnimalGenotype[]       @relation("AlleleOne")
   genotypesAsAlleleTwo       AnimalGenotype[]       @relation("AlleleTwo")
   frequencies                BreedAlleleFrequency[]
-  locus                      Locus  @relation(fields: [locusId], references: [id])
+  locus                      Locus                  @relation(fields: [locusId], references: [id])
+
   @@unique([locusId, symbol])
 }
 
@@ -40,67 +42,73 @@ model ExpressionRule {
   locus           Locus  @relation(fields: [locusId], references: [id])
   alleleOne       Allele @relation("AlleleOne", fields: [alleleOneId], references: [id])
   alleleTwo       Allele @relation("AlleleTwo", fields: [alleleTwoId], references: [id])
-  @@unique        ([locusId, alleleOneId, alleleTwoId])
+
+  @@unique([locusId, alleleOneId, alleleTwoId])
 }
 
 model GeneAvailabilityState {
-  id              String  @id @default(cuid())
-  alleleId        String  @unique
-  isAvailable     Boolean @default(false)
+  id              String    @id @default(cuid())
+  alleleId        String    @unique
+  isAvailable     Boolean   @default(false)
   madeAvailableAt DateTime?
-  allele          Allele  @relation(fields: [alleleId], references: [id])
+  allele          Allele    @relation(fields: [alleleId], references: [id])
 }
 
 model GeneticPanelDef {
-  id           String @id @default(cuid())
-  gameId       String
-  name         String
-  panelType    GeneticPanelType
-  loci         GeneticPanelLocus[]
-  game         Game   @relation(fields: [gameId], references: [id])
+  id        String              @id @default(cuid())
+  gameId    String
+  name      String
+  panelType GeneticPanelType
+  loci      GeneticPanelLocus[]
+  game      Game                @relation(fields: [gameId], references: [id])
+
   @@unique([gameId, name])
 }
 
 model GeneticPanelLocus {
-  id           String          @id @default(cuid())
-  panelDefId   String
-  locusId      String
-  panelDef     GeneticPanelDef @relation(fields: [panelDefId], references: [id])
-  locus        Locus           @relation(fields: [locusId], references: [id])
+  id         String          @id @default(cuid())
+  panelDefId String
+  locusId    String
+  panelDef   GeneticPanelDef @relation(fields: [panelDefId], references: [id])
+  locus      Locus           @relation(fields: [locusId], references: [id])
+
   @@unique([panelDefId, locusId])
 }
 
 model BreedAlleleFrequency {
-  id           String @id @default(cuid())
-  alleleId     String
-  breedId      String
-  frequency    Float
-  allele       Allele @relation(fields: [alleleId], references: [id])
-  breed        Breed  @relation(fields: [breedId], references: [id])
+  id        String @id @default(cuid())
+  alleleId  String
+  breedId   String
+  frequency Float
+  allele    Allele @relation(fields: [alleleId], references: [id])
+  breed     Breed  @relation(fields: [breedId], references: [id])
+
   @@unique([breedId, alleleId])
 }
 
 model AnimalGenotype {
-  id           String @id @default(cuid())
-  animalId     String
-  locusId      String
-  alleleOneId  String
-  alleleTwoId  String
+  id              String  @id @default(cuid())
+  animalId        String
+  locusId         String
+  alleleOneId     String
+  alleleTwoId     String
   isTestedByOwner Boolean @default(false)
   animal          Animal  @relation(fields: [animalId], references: [id])
   locus           Locus   @relation(fields: [locusId], references: [id])
-  alleleOne       Allele @relation("AlleleOne", fields: [alleleOneId], references: [id])
-  alleleTwo       Allele @relation("AlleleTwo", fields: [alleleTwoId], references: [id])
+  alleleOne       Allele  @relation("AlleleOne", fields: [alleleOneId], references: [id])
+  alleleTwo       Allele  @relation("AlleleTwo", fields: [alleleTwoId], references: [id])
+
   @@unique([animalId, locusId])
-} 
+}
 
 model AnimalConformationScore {
-  id           String @id @default(cuid())
+  id           String   @id @default(cuid())
   animalId     String
   breedId      String
   score        Float
   calculatedAt DateTime @default(now())
   animal       Animal   @relation(fields: [animalId], references: [id])
   breed        Breed    @relation(fields: [breedId], references: [id])
+
   @@unique([animalId, breedId])
 }

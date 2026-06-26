@@ -1,7 +1,7 @@
 model Game {
-  id                     String   @id @default(cuid())
+  id                     String                  @id @default(cuid())
   name                   String
-  slug                   String   @unique
+  slug                   String                  @unique
   playerAccounts         PlayerAccount[]
   subscriptionTiers      SubscriptionTier[]
   staffRoles             StaffRole[]
@@ -19,55 +19,57 @@ model Game {
   geneticPanels          GeneticPanelDef[]
   careActionDefs         CareActionDef[]
   longTermCareActionDefs LongTermCareActionDef[]
-  isActive               Boolean  @default(false)
-  createdAt              DateTime @default(now())
+  isActive               Boolean                 @default(false)
+  createdAt              DateTime                @default(now())
 }
 
 model User {
-  id                    String      @id @default(cuid())
-  email                 String      @unique
+  id                    String                 @id @default(cuid())
+  email                 String                 @unique
   passwordHash          String?
-  stripeCustomerId      String?     @unique
-  emailVerified         Boolean     @default(false)
+  stripeCustomerId      String?                @unique
+  emailVerified         Boolean                @default(false)
   name                  String?
   sessions              Session[]
   oauthAccounts         Account[]
   playerAccounts        PlayerAccount[]
   purchaseRecords       PurchaseRecord[]
   staffRoles            StaffRole[]
-  banRecords            BanRecord[] @relation("BannedUser")
-  issuedBans            BanRecord[] @relation("BanIssuedBy")
+  banRecords            BanRecord[]            @relation("BannedUser")
+  issuedBans            BanRecord[]            @relation("BanIssuedBy")
   userIpLogs            UserIpLog[]
   adminActionLogs       AdminActionLog[]
   supportTicketMessages SupportTicketMessage[]
-  createdAt             DateTime    @default(now())
-  updatedAt             DateTime    @updatedAt
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
 }
 
 model Session {
-  id          String   @id @default(cuid())
-  userId      String
-  token       String   @unique
-  expiresAt   DateTime
-  ipAddress   String?
-  userAgent   String?
-  user        User     @relation(fields: [userId], references: [id])
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
+
 model Account {
-  id          String @id @default(cuid())
-  userId      String
-  accountId   String
-  providerId  String
-  accessToken String?
-  refreshToken String?
-  accessTokenExpiresAt DateTime?
+  id                    String    @id @default(cuid())
+  userId                String
+  accountId             String
+  providerId            String
+  accessToken           String?
+  refreshToken          String?
+  accessTokenExpiresAt  DateTime?
   refreshTokenExpiresAt DateTime?
   scope                 String?
-  user                  User @relation(fields: [userId], references: [id])
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  user                  User      @relation(fields: [userId], references: [id])
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
   @@unique([providerId, accountId])
 }
 
@@ -81,7 +83,7 @@ model Verification {
 }
 
 model PlayerAccount {
-  id                  String   @id @default(cuid())
+  id                  String               @id @default(cuid())
   userId              String
   gameId              String
   username            String
@@ -93,23 +95,24 @@ model PlayerAccount {
   bugReportComments   BugReportComment[]
   animals             Animal[]
   playerBrand         PlayerBrand?
-  foundedBreeds       Breed[]   @relation("BreedFounder")
-  performedCareLogs   CareLog[] @relation("CarePerformedBy")
-  game                Game      @relation(fields: [gameId], references: [id])
-  user                User      @relation(fields: [userId], references: [id])
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  foundedBreeds       Breed[]              @relation("BreedFounder")
+  performedCareLogs   CareLog[]            @relation("CarePerformedBy")
+  game                Game                 @relation(fields: [gameId], references: [id])
+  user                User                 @relation(fields: [userId], references: [id])
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
   @@unique([userId, gameId])
 }
 
 model SubscriptionTier {
-  id                  String  @id @default(cuid())
+  id                  String               @id @default(cuid())
   name                String
   cost                Int
   gameId              String
-  game                Game    @relation(fields: [gameId], references: [id])
+  game                Game                 @relation(fields: [gameId], references: [id])
   playerSubscriptions PlayerSubscription[]
-  isActive            Boolean @default(true)
+  isActive            Boolean              @default(true)
 }
 
 model PlayerSubscription {
@@ -143,31 +146,31 @@ enum StaffRoleType {
 }
 
 model StaffRole {
-  id          String   @id @default(cuid())
-  userId      String
-  gameId      String?
-  user        User     @relation(fields: [userId], references: [id])
-  game        Game?    @relation(fields: [gameId], references: [id])
-  role        StaffRoleType
-  createdAt   DateTime @default(now())
+  id        String        @id @default(cuid())
+  userId    String
+  gameId    String?
+  user      User          @relation(fields: [userId], references: [id])
+  game      Game?         @relation(fields: [gameId], references: [id])
+  role      StaffRoleType
+  createdAt DateTime      @default(now())
 }
 
 model BanRecord {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   userId         String
   reason         String
-  bannedAt       DateTime @default(now())
+  bannedAt       DateTime  @default(now())
   expiresAt      DateTime?
   bannedByUserId String
-  user           User     @relation("BannedUser", fields: [userId], references: [id])
-  bannedBy       User     @relation("BanIssuedBy", fields: [bannedByUserId], references: [id])
+  user           User      @relation("BannedUser", fields: [userId], references: [id])
+  bannedBy       User      @relation("BanIssuedBy", fields: [bannedByUserId], references: [id])
 }
 
 model IpBan {
-  id        String @id @default(cuid())
-  ipAddress String @unique
+  id        String    @id @default(cuid())
+  ipAddress String    @unique
   reason    String
-  bannedAt  DateTime @default(now())
+  bannedAt  DateTime  @default(now())
   expiresAt DateTime?
 }
 
@@ -187,17 +190,17 @@ enum SupportTicketStatus {
 }
 
 model SupportTicket {
-  id              String        @id @default(cuid())
+  id              String                 @id @default(cuid())
   playerAccountId String
   gameId          String
   subject         String
   body            String
   status          SupportTicketStatus
   messages        SupportTicketMessage[]
-  playerAccount   PlayerAccount @relation(fields: [playerAccountId], references: [id])
-  game            Game          @relation(fields: [gameId], references: [id])
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  playerAccount   PlayerAccount          @relation(fields: [playerAccountId], references: [id])
+  game            Game                   @relation(fields: [gameId], references: [id])
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
 }
 
 model SupportTicketMessage {
@@ -217,7 +220,7 @@ enum BugSeverity {
 }
 
 enum BugCategory {
-  ART 
+  ART
   TEXT
   UI
   MECHANIC
@@ -232,41 +235,42 @@ enum BugStatus {
 }
 
 model BugReport {
-  id           String        @id @default(cuid())
-  gameId       String
-  authorId     String
-  title        String
-  body         String
-  severity     BugSeverity
-  category     BugCategory
-  isExploit    Boolean       @default(false)
-  status       BugStatus
-  upvotes      BugReportUpvote[]
-  comments     BugReportComment[]
-  game         Game          @relation(fields: [gameId], references: [id])
-  author       PlayerAccount @relation(fields: [authorId], references: [id])
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  id        String             @id @default(cuid())
+  gameId    String
+  authorId  String
+  title     String
+  body      String
+  severity  BugSeverity
+  category  BugCategory
+  isExploit Boolean            @default(false)
+  status    BugStatus
+  upvotes   BugReportUpvote[]
+  comments  BugReportComment[]
+  game      Game               @relation(fields: [gameId], references: [id])
+  author    PlayerAccount      @relation(fields: [authorId], references: [id])
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
 }
 
 model BugReportUpvote {
-  id               String        @id @default(cuid())
-  bugReportId      String
-  playerAccountId  String
-  bugReport        BugReport     @relation(fields: [bugReportId], references: [id])
-  playerAccount    PlayerAccount @relation(fields: [playerAccountId], references: [id])
-  createdAt        DateTime      @default(now())
+  id              String        @id @default(cuid())
+  bugReportId     String
+  playerAccountId String
+  bugReport       BugReport     @relation(fields: [bugReportId], references: [id])
+  playerAccount   PlayerAccount @relation(fields: [playerAccountId], references: [id])
+  createdAt       DateTime      @default(now())
+
   @@unique([bugReportId, playerAccountId])
 }
 
 model BugReportComment {
-  id           String @id @default(cuid())
-  bugReportId  String
-  authorId     String
-  body         String
-  author       PlayerAccount @relation(fields: [authorId], references: [id])
-  bugReport    BugReport     @relation(fields: [bugReportId], references: [id])
-  createdAt    DateTime      @default(now())
+  id          String        @id @default(cuid())
+  bugReportId String
+  authorId    String
+  body        String
+  author      PlayerAccount @relation(fields: [authorId], references: [id])
+  bugReport   BugReport     @relation(fields: [bugReportId], references: [id])
+  createdAt   DateTime      @default(now())
 }
 
 model AdminActionLog {
@@ -282,13 +286,13 @@ model AdminActionLog {
 }
 
 model GameConfig {
-  id                              String  @id @default(cuid())
-  gameId                          String  @unique
-  defaultInnateRatio              Float
-  trainingCeilingMultiplier       Float
-  pedigreeDisplayDepth            Int
-  predictorDailyLimitFree         Int
-  game                            Game     @relation(fields: [gameId], references: [id])
-  createdAt                       DateTime @default(now())
-  updatedAt                       DateTime @updatedAt
+  id                        String   @id @default(cuid())
+  gameId                    String   @unique
+  defaultInnateRatio        Float
+  trainingCeilingMultiplier Float
+  pedigreeDisplayDepth      Int
+  predictorDailyLimitFree   Int
+  game                      Game     @relation(fields: [gameId], references: [id])
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
 }

@@ -5,26 +5,29 @@ enum CareActionCostType {
 }
 
 model CareActionDef {
-  id             String @id @default(cuid())
-  gameId         String
-  name           String
-  costType       CareActionCostType
-  currencyAmount Int?
-  careScoreGain  Float
-  energyRestore  Float @default(0)
-  moodBoost      Float @default(0)
-  items          CareActionItem[]
-  careLogs       CareLog[]
-  game           Game  @relation(fields: [gameId], references: [id])
+  id                   String                @id @default(cuid())
+  gameId               String
+  name                 String
+  costType             CareActionCostType
+  currencyAmount       Int?
+  careScoreGain        Float
+  energyRestore        Float                 @default(0)
+  moodBoost            Float                 @default(0)
+  items                CareActionItem[]
+  careLogs             CareLog[]
+  game                 Game                  @relation(fields: [gameId], references: [id])
+  animalBehaviorEvents AnimalBehaviorEvent[]
+
   @@unique([gameId, name])
 }
 
 model CareActionItem {
-  id              String @id @default(cuid())
+  id              String        @id @default(cuid())
   careActionDefId String
   itemDefId       String
-  quantity        Int    @default(1)
+  quantity        Int           @default(1)
   careActionDef   CareActionDef @relation(fields: [careActionDefId], references: [id])
+
   @@unique([careActionDefId, itemDefId])
 }
 
@@ -41,37 +44,39 @@ model CareLog {
 }
 
 model AnimalCareScore {
-  id         String   @id @default(cuid())
-  animalId   String   @unique
-  score      Float
-  animal     Animal   @relation(fields: [animalId], references: [id])
-  updatedAt  DateTime @updatedAt
+  id        String   @id @default(cuid())
+  animalId  String   @unique
+  score     Float
+  animal    Animal   @relation(fields: [animalId], references: [id])
+  updatedAt DateTime @updatedAt
 }
 
 model LongTermCareActionDef {
-  id                String @id @default(cuid())
+  id                String                     @id @default(cuid())
   gameId            String
   name              String
   intervalCycles    Int
-  gracePeriodCycles Int    @default(0)
+  gracePeriodCycles Int                        @default(0)
   records           AnimalLongTermCareRecord[]
-  game              Game   @relation(fields: [gameId], references: [id])
+  game              Game                       @relation(fields: [gameId], references: [id])
+
   @@unique([gameId, name])
 }
 
 model AnimalLongTermCareRecord {
-  id                      String               @id @default(cuid())
+  id                      String                @id @default(cuid())
   animalId                String
   longTermCareActionDefId String
   lastPerformedCycle      Int?
   nextDueCycle            Int
   animal                  Animal                @relation(fields: [animalId], references: [id])
   longTermCareActionDef   LongTermCareActionDef @relation(fields: [longTermCareActionDefId], references: [id])
+
   @@unique([animalId, longTermCareActionDefId])
 }
 
 model AnimalBehaviorEvent {
-  id              String @id @default(cuid())
+  id              String         @id @default(cuid())
   animalId        String
   careActionDefId String?
   cycleNumber     Int
