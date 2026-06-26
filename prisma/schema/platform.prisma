@@ -1,24 +1,26 @@
 model Game {
-  id                String   @id @default(cuid())
-  name              String
-  slug              String   @unique
-  playerAccounts    PlayerAccount[]
-  subscriptionTiers SubscriptionTier[]
-  staffRoles        StaffRole[]
-  supportTickets    SupportTicket[]
-  bugReports        BugReport[]
-  adminActionLogs   AdminActionLog[]
-  gameConfig        GameConfig?
-  species           Species[]
-  breeds            Breed[]
-  lifeStageDefs     LifeStageDef[]
-  statDefs          StatDef[]
-  animals           Animal[]
-  gameInnateMax     GameInnateMax?
-  locusDefs         Locus[]
-  geneticPanels     GeneticPanelDef[]
-  isActive          Boolean  @default(false)
-  createdAt         DateTime @default(now())
+  id                     String   @id @default(cuid())
+  name                   String
+  slug                   String   @unique
+  playerAccounts         PlayerAccount[]
+  subscriptionTiers      SubscriptionTier[]
+  staffRoles             StaffRole[]
+  supportTickets         SupportTicket[]
+  bugReports             BugReport[]
+  adminActionLogs        AdminActionLog[]
+  gameConfig             GameConfig?
+  species                Species[]
+  breeds                 Breed[]
+  lifeStageDefs          LifeStageDef[]
+  statDefs               StatDef[]
+  animals                Animal[]
+  gameInnateMax          GameInnateMax?
+  locusDefs              Locus[]
+  geneticPanels          GeneticPanelDef[]
+  careActionDefs         CareActionDef[]
+  longTermCareActionDefs LongTermCareActionDef[]
+  isActive               Boolean  @default(false)
+  createdAt              DateTime @default(now())
 }
 
 model User {
@@ -38,7 +40,7 @@ model User {
 }
 
 model PlayerAccount {
-  id                  String  @id @default(cuid())
+  id                  String   @id @default(cuid())
   userId              String
   gameId              String
   username            String
@@ -50,11 +52,12 @@ model PlayerAccount {
   bugReportComments   BugReportComment[]
   animals             Animal[]
   playerBrand         PlayerBrand?
-  foundedBreeds       Breed[]  @relation("BreedFounder")
-  game                Game     @relation(fields: [gameId], references: [id])
-  user                User     @relation(fields: [userId], references: [id])
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  foundedBreeds       Breed[]   @relation("BreedFounder")
+  performedCareLogs   CareLog[] @relation("CarePerformedBy")
+  game                Game      @relation(fields: [gameId], references: [id])
+  user                User      @relation(fields: [userId], references: [id])
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
   @@unique([userId, gameId])
 }
 

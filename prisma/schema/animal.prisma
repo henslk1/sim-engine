@@ -119,6 +119,10 @@ model Animal {
   partnerLogs           AnimalDailyLog[] @relation("DailyLogPartner")
   genotypes             AnimalGenotype[]
   conformationScores    AnimalConformationScore[]
+  careScore             AnimalCareScore[]
+  longTermCareRecords   AnimalLongTermCareRecord[]
+  behaviorEvents        AnimalBehaviorEvent[]
+  careLogs              CareLog[]
   game                  Game             @relation(fields: [gameId], references: [id])
   playerAccount         PlayerAccount    @relation(fields: [playerAccountId], references: [id])
   breed                 Breed            @relation(fields: [breedId], references: [id])
