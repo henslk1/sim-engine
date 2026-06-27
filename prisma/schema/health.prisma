@@ -1,0 +1,64 @@
+enum TreatmentType {
+  OTC
+  PRESCRIPTION
+  VET_PROCEDURE
+  ACTIVITY_RESTRICTION
+  PLAYER_ACTION
+}
+
+enum ActivityRestrictionType {
+  TRAINING 
+  COMPETITION 
+  BREEDING
+  CARE_ACTION
+  ALL 
+}
+
+model HealthConditionBehavior {
+  id String @id @default(cuid())
+}
+
+model TreatmentDef {
+  id String @id @default(cuid())
+}
+
+model TreatmentItem {
+  id String @id @default(cuid())
+}
+
+model AnimalHealthRecord {
+  id String @id @default(cuid())
+}
+
+model AnimalTreatmentRecord {
+  id String @id @default(cuid())
+}
+
+model ActivityRestriction {
+  id String @id @default(cuid())
+}
+
+model AnimalTestResult {
+  id String @id @default(cuid())
+}
+
+model HealthCertificateDef {
+  id String @id @default(cuid())
+}
+
+model HealthCertificate {
+  id String @id @default(cuid())
+}
+
+model VetVisiting {
+  id String @id @default(cuid())
+  
+}
+
+model AnimalImmunity {
+  id String @id @default(cuid())
+  animalId String @unique
+  value Float
+  animal Animal @relation(fields: [animalId], references: [id])
+  updatedAt DateTime @updatedAt
+}
