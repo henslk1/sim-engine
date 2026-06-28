@@ -7,149 +7,154 @@ enum TreatmentType {
 }
 
 enum ActivityRestrictionType {
-  TRAINING 
-  COMPETITION 
+  TRAINING
+  COMPETITION
   BREEDING
   CARE_ACTION
-  ALL 
+  ALL
 }
 
 model HealthConditionDef {
-  id String @id @default(cuid())
-  gameId String
-  name String
-  isGenetic Boolean @default(false)
-  isFatal Boolean @default(false)
-  behaviors HealthConditionBehavior[]
-  treatments TreatmentDef[]
+  id            String                    @id @default(cuid())
+  gameId        String
+  name          String
+  isGenetic     Boolean                   @default(false)
+  isFatal       Boolean                   @default(false)
+  behaviors     HealthConditionBehavior[]
+  treatments    TreatmentDef[]
   healthRecords AnimalHealthRecord[]
-  testResults AnimalTestResult[]
-  game Game @relation(fields: [gameId], references: [id])
+  testResults   AnimalTestResult[]
+  game          Game                      @relation(fields: [gameId], references: [id])
+
   @@unique([gameId, name])
 }
 
 model HealthConditionBehavior {
-  id String @id @default(cuid())
-  conditionDefId String
+  id              String             @id @default(cuid())
+  conditionDefId  String
   careActionDefId String?
-  symptomText String
-  conditionDef HealthConditionDef @relation(fields: [conditionDefId], references: [id])
-  careActionDef CareActionDef? @relation(fields: [careActionDefId], references: [id])
+  symptomText     String
+  conditionDef    HealthConditionDef @relation(fields: [conditionDefId], references: [id])
+  careActionDef   CareActionDef?     @relation(fields: [careActionDefId], references: [id])
 }
 
 model TreatmentDef {
-  id String @id @default(cuid())
-  conditionDefId String
-  name String
-  treatmentType TreatmentType
-  durationCycles Int?
-  items TreatmentItem[]
+  id               String                  @id @default(cuid())
+  conditionDefId   String
+  name             String
+  treatmentType    TreatmentType
+  durationCycles   Int?
+  items            TreatmentItem[]
   treatmentRecords AnimalTreatmentRecord[]
-  conditionDef HealthConditionDef @relation(fields: [conditionDefId], references: [id])
+  conditionDef     HealthConditionDef      @relation(fields: [conditionDefId], references: [id])
 }
 
 model TreatmentItem {
-  id String @id @default(cuid())
+  id             String       @id @default(cuid())
   treatmentDefId String
-  itemDefId String
-  quantity Int @default(1)
-  treatmentDef TreatmentDef @relation(fields: [treatmentDefId], references: [id])
+  itemDefId      String
+  quantity       Int          @default(1)
+  treatmentDef   TreatmentDef @relation(fields: [treatmentDefId], references: [id])
+
   @@unique([treatmentDefId, itemDefId])
 }
 
 model AnimalHealthRecord {
-  id String @id @default(cuid())
-  animalId String
-  conditionDefId String
-  diagnosedCycle Int
-  diagnosedAt DateTime @default(now())
-  resolvedCycle Int?
-  resolvedAt DateTime?
-  isActive Boolean @default(true)
+  id               String                  @id @default(cuid())
+  animalId         String
+  conditionDefId   String
+  diagnosedCycle   Int
+  diagnosedAt      DateTime                @default(now())
+  resolvedCycle    Int?
+  resolvedAt       DateTime?
+  isActive         Boolean                 @default(true)
   treatmentRecords AnimalTreatmentRecord[]
-  animal Animal @relation(fields: [animalId], references: [id])
-  conditionDef HealthConditionDef @relation(fields: [conditionDefId], references: [id])
+  animal           Animal                  @relation(fields: [animalId], references: [id])
+  conditionDef     HealthConditionDef      @relation(fields: [conditionDefId], references: [id])
 }
 
 model AnimalTreatmentRecord {
-  id String @id @default(cuid())
-  animalId String
-  treatmentDefId String
-  healthRecordId String
-  startedCycle Int
-  startedAt DateTime @default(now())
-  completedCycle Int?
-  completedAt DateTime?
-  isActive Boolean @default(true)
+  id                  String                @id @default(cuid())
+  animalId            String
+  treatmentDefId      String
+  healthRecordId      String
+  startedCycle        Int
+  startedAt           DateTime              @default(now())
+  completedCycle      Int?
+  completedAt         DateTime?
+  isActive            Boolean               @default(true)
   activityRestriction ActivityRestriction[]
-  animal Animal @relation(fields: [animalId], references: [id])
-  treatmentDef TreatmentDef @relation(fields: [treatmentDefId], references: [id])
-  healthRecord AnimalHealthRecord @relation(fields: [healthRecordId], references: [id])
+  animal              Animal                @relation(fields: [animalId], references: [id])
+  treatmentDef        TreatmentDef          @relation(fields: [treatmentDefId], references: [id])
+  healthRecord        AnimalHealthRecord    @relation(fields: [healthRecordId], references: [id])
 }
 
 model ActivityRestriction {
-  id String @id @default(cuid())
-  animalId String
+  id                String                  @id @default(cuid())
+  animalId          String
   treatmentRecordId String?
-  restrictionType ActivityRestrictionType
-  maxIntensityTier Int?
-  remainingCycles Int
-  isActive Boolean @default(true)
-  animal Animal @relation(fields: [animalId], references: [id])
-  treatmentRecord AnimalTreatmentRecord? @relation(fields: [treatmentRecordId], references: [id])
+  restrictionType   ActivityRestrictionType
+  maxIntensityTier  Int?
+  remainingCycles   Int
+  isActive          Boolean                 @default(true)
+  animal            Animal                  @relation(fields: [animalId], references: [id])
+  treatmentRecord   AnimalTreatmentRecord?  @relation(fields: [treatmentRecordId], references: [id])
 }
 
 model AnimalTestResult {
-  id String @id @default(cuid())
-  animalId String
+  id             String             @id @default(cuid())
+  animalId       String
   conditionDefId String
-  result String
-  testedCycle Int
-  testedAt DateTime @default(now())
-  animal Animal @relation(fields: [animalId], references: [id])
-  conditionDef HealthConditionDef @relation(fields: [conditionDefId], references: [id])
+  result         String
+  testedCycle    Int
+  testedAt       DateTime           @default(now())
+  animal         Animal             @relation(fields: [animalId], references: [id])
+  conditionDef   HealthConditionDef @relation(fields: [conditionDefId], references: [id])
+
   @@unique([animalId, conditionDefId])
 }
 
 model HealthCertificateDef {
-  id String @id @default(cuid())
-  gameId String
-  name String
-  validForCycles Int
-  requiredForCompetition Boolean @default(false)
-  certificates HealthCertificate[]
-  game Game @relation(fields: [gameId], references: [id])
+  id                     String              @id @default(cuid())
+  gameId                 String
+  name                   String
+  validForCycles         Int
+  requiredForCompetition Boolean             @default(false)
+  certificates           HealthCertificate[]
+  game                   Game                @relation(fields: [gameId], references: [id])
+
   @@unique([gameId, name])
 }
 
 model HealthCertificate {
-  id String @id @default(cuid())
-  animalId String
-  certDefId String
-  issuedCycle Int
-  issuedAt DateTime @default(now())
+  id             String               @id @default(cuid())
+  animalId       String
+  certDefId      String
+  issuedCycle    Int
+  issuedAt       DateTime             @default(now())
   expiresAtCycle Int
-  isValid Boolean @default(true)
-  animal Animal @relation(fields: [animalId], references: [id])
-  certDef HealthCertificateDef @relation(fields: [certDefId], references: [id])
+  isValid        Boolean              @default(true)
+  animal         Animal               @relation(fields: [animalId], references: [id])
+  certDef        HealthCertificateDef @relation(fields: [certDefId], references: [id])
+
   @@unique([animalId, certDefId])
 }
 
 model VetVisitLog {
-  id String @id @default(cuid())
-  animalId String
+  id              String        @id @default(cuid())
+  animalId        String
   playerAccountId String
-  visitCycle Int
-  notes String?
-  visitedAt DateTime @default(now())
-  animal Animal @relation(fields: [animalId], references: [id])
-  playerAccount PlayerAccount @relation(fields: [playerAccountId], references: [id])
+  visitCycle      Int
+  notes           String?
+  visitedAt       DateTime      @default(now())
+  animal          Animal        @relation(fields: [animalId], references: [id])
+  playerAccount   PlayerAccount @relation(fields: [playerAccountId], references: [id])
 }
 
 model AnimalImmunity {
-  id String @id @default(cuid())
-  animalId String @unique
-  value Float
-  animal Animal @relation(fields: [animalId], references: [id])
+  id        String   @id @default(cuid())
+  animalId  String   @unique
+  value     Float
+  animal    Animal   @relation(fields: [animalId], references: [id])
   updatedAt DateTime @updatedAt
 }

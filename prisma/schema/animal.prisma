@@ -26,7 +26,7 @@ model Species {
 }
 
 model LifeStageDef {
-  id                 String   @id @default(cuid())
+  id                 String             @id @default(cuid())
   gameId             String
   name               String
   stageIndex         Int
@@ -36,22 +36,24 @@ model LifeStageDef {
   canBreed           Boolean
   canTrain           Boolean
   canReceiveCare     Boolean
-  hasUniqueActionSet Boolean  @default(false)
+  hasUniqueActionSet Boolean            @default(false)
   profileLayout      String
   animals            Animal[]
-  game               Game     @relation(fields: [gameId], references: [id])
+  stageActivityDefs  StageActivityDef[]
+  game               Game               @relation(fields: [gameId], references: [id])
 
   @@unique([gameId, stageIndex])
 }
 
 model StatDef {
-  id              String              @id @default(cuid())
-  gameId          String
-  name            String
-  statProfiles    BreedStatProfile[]
-  animalStats     AnimalStat[]
-  statHistoryLogs AnimalStatHistory[]
-  game            Game                @relation(fields: [gameId], references: [id])
+  id                 String              @id @default(cuid())
+  gameId             String
+  name               String
+  statProfiles       BreedStatProfile[]
+  animalStats        AnimalStat[]
+  statHistoryLogs    AnimalStatHistory[]
+  trainingActionDefs TrainingActionDef[]
+  game               Game                @relation(fields: [gameId], references: [id])
 
   @@unique([gameId, name])
 }
@@ -137,6 +139,15 @@ model Animal {
   vetVisitLogs          VetVisitLog[]
   immunity              AnimalImmunity?
   careLogs              CareLog[]
+  trainingLogs          TrainingLog[]
+  energy                AnimalEnergy?
+  condition             AnimalCondition?
+  mood                  AnimalMood?
+  personality           AnimalPersonality?
+  stageActivityLogs     StageActivityLog[]
+  clinicEntries         ClinicEntry[]
+  titles                AnimalTitle[]
+  equipment             AnimalEquipment[]
   game                  Game                       @relation(fields: [gameId], references: [id])
   playerAccount         PlayerAccount              @relation(fields: [playerAccountId], references: [id])
   breed                 Breed                      @relation(fields: [breedId], references: [id])

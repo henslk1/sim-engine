@@ -5,19 +5,20 @@ enum CareActionCostType {
 }
 
 model CareActionDef {
-  id                   String                @id @default(cuid())
+  id                   String                    @id @default(cuid())
   gameId               String
   name                 String
   costType             CareActionCostType
   currencyAmount       Int?
   careScoreGain        Float
-  energyRestore        Float                 @default(0)
-  moodBoost            Float                 @default(0)
+  energyRestore        Float                     @default(0)
+  moodBoost            Float                     @default(0)
   items                CareActionItem[]
   careLogs             CareLog[]
-  game                 Game                  @relation(fields: [gameId], references: [id])
+  game                 Game                      @relation(fields: [gameId], references: [id])
   animalBehaviorEvents AnimalBehaviorEvent[]
   conditionBehaviors   HealthConditionBehavior[]
+
   @@unique([gameId, name])
 }
 
