@@ -1,0 +1,68 @@
+enum BreedingSlotStatus {
+  AVAILABLE
+  PURCHASED
+  USED
+  EXPIRED
+}
+
+enum GeneticMaterialType {
+  SPERM
+  EGG
+  EMBRYO
+}
+
+enum GeneticStorageType {
+  PERSONAL
+  VET
+  GROUP
+}
+
+model BreedingListing {
+  id                String        @id @default(cuid())
+  gameId            String
+  ownerPlayerId     String
+  animalId          String
+  description       String?
+  currencyDefId     String
+  pricePerSlot      Int
+  maxSlots          Int
+  breedRestrictions BreedingListingBreedRestriction[]
+  statMinimums      BreedingListingStatMinimum[]
+  slots             BreedingSlot[]
+  isActive          Boolean       @default(true)
+  animal            Animal        @relation(fields: [animalId], references: [id])
+  ownerPlayer       PlayerAccount @relation(fields: [ownerPlayerId], references: [id])
+  game              Game          @relation(fields: [gameId], references: [id])
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+}
+
+model BreedingListingBreedRestriction {
+  id String @id @default(cuid())
+  listingId String
+  breedId String
+  breed Breed @relation(fields: [breedId], references: [id])
+  listing BreedingListing @relation(fields: [listingId], references: [id])
+  @@unique([listingId, breedId])
+}
+
+model BreedingListingStatMinimum {
+  id        String          @id @default(cuid())
+  listingId String
+  statDefId String
+  minValue  Float
+  statDef   StatDef         @relation(fields: [statDefId], references: [id])
+  listing   BreedingListing @relation(fields: [listingId], references: [id])
+  @@unique([listingId, statDefId])
+}
+
+model BreedingSlot {
+  id                  String          @id @default(cuid())
+  listingId           String
+  purchasedByPlayerId String?
+  status              BreedingSlotStatus[]
+  purchasedAt         DateTime?       @default(now())
+  listing             BreedingListing @relation(fields: [listingId], references: [id])
+  purchasedByPlayer   PlayerAccount?  @relation(fields: [purchasedByPlayerId], references: [id])
+  createdAt           DateTime        @default(now())
+}
