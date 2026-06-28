@@ -46,37 +46,39 @@ model LifeStageDef {
 }
 
 model StatDef {
-  id                 String              @id @default(cuid())
-  gameId             String
-  name               String
-  statProfiles       BreedStatProfile[]
-  animalStats        AnimalStat[]
-  statHistoryLogs    AnimalStatHistory[]
-  trainingActionDefs TrainingActionDef[]
-  game               Game                @relation(fields: [gameId], references: [id])
+  id                          String              @id @default(cuid())
+  gameId                      String
+  name                        String
+  statProfiles                BreedStatProfile[]
+  animalStats                 AnimalStat[]
+  statHistoryLogs             AnimalStatHistory[]
+  trainingActionDefs          TrainingActionDef[]
+  breedingListingStatMinimums BreedingListingStatMinimum[]
+  game                        Game                @relation(fields: [gameId], references: [id])
 
   @@unique([gameId, name])
 }
 
 model Breed {
-  id                      String                    @id @default(cuid())
-  gameId                  String
-  name                    String
-  speciesId               String
-  categoryBadge           BreedCategoryBadge
-  foundingPlayerId        String?
-  image                   String?
-  lore                    String?
-  isUnregistered          Boolean                   @default(false)
-  convergenceGenerations  Int?
-  statProfile             BreedStatProfile[]
-  animals                 Animal[]
-  animalBreedCompositions AnimalBreedComposition[]
-  alleleFrequencies       BreedAlleleFrequency[]
-  conformationScores      AnimalConformationScore[]
-  game                    Game                      @relation(fields: [gameId], references: [id])
-  species                 Species                   @relation(fields: [speciesId], references: [id])
-  foundingPlayer          PlayerAccount?            @relation("BreedFounder", fields: [foundingPlayerId], references: [id])
+  id                          String                    @id @default(cuid())
+  gameId                      String
+  name                        String
+  speciesId                   String
+  categoryBadge               BreedCategoryBadge
+  foundingPlayerId            String?
+  image                       String?
+  lore                        String?
+  isUnregistered              Boolean                   @default(false)
+  convergenceGenerations      Int?
+  statProfile                 BreedStatProfile[]
+  animals                     Animal[]
+  animalBreedCompositions     AnimalBreedComposition[]
+  alleleFrequencies           BreedAlleleFrequency[]
+  conformationScores          AnimalConformationScore[]
+  breedingListingRestrictions BreedingListingBreedRestriction[]
+  game                        Game                      @relation(fields: [gameId], references: [id])
+  species                     Species                   @relation(fields: [speciesId], references: [id])
+  foundingPlayer              PlayerAccount?            @relation("BreedFounder", fields: [foundingPlayerId], references: [id])
 
   @@unique([gameId, name])
 }
@@ -96,64 +98,71 @@ model BreedStatProfile {
 }
 
 model Animal {
-  id                    String                     @id @default(cuid())
-  gameId                String
-  playerAccountId       String
-  breedId               String
-  name                  String
-  sex                   AnimalSex
-  lifeStageId           String
-  image                 String?
-  generation            Int                        @default(1)
-  ageInCycles           Int                        @default(0)
-  bornAt                DateTime                   @default(now())
-  diedAt                DateTime?
-  causeOfDeath          String?
-  status                AnimalStatus               @default(ALIVE)
-  deletedAt             DateTime?
-  isCastrated           Boolean                    @default(false)
-  inbreedingCoefficient Float                      @default(0)
-  fertility             Float
-  isTutorialAnimal      Boolean                    @default(false)
-  breedGeneration       Int?
-  disciplineDefId       String?
-  subContainerId        String?
-  stats                 AnimalStat[]
-  statHistory           AnimalStatHistory[]
-  ancestors             AnimalAncestor[]           @relation("AnimalLineage")
-  offspring             AnimalAncestor[]           @relation("AncestorAnimals")
-  breedComposition      AnimalBreedComposition[]
-  brands                AnimalBrand[]
-  dailyLogs             AnimalDailyLog[]           @relation("DailyLogAnimal")
-  partnerLogs           AnimalDailyLog[]           @relation("DailyLogPartner")
-  genotypes             AnimalGenotype[]
-  conformationScores    AnimalConformationScore[]
-  careScore             AnimalCareScore?
-  longTermCareRecords   AnimalLongTermCareRecord[]
-  behaviorEvents        AnimalBehaviorEvent[]
-  healthRecords         AnimalHealthRecord[]
-  treatmentRecords      AnimalTreatmentRecord[]
-  activityRestrictions  ActivityRestriction[]
-  testResults           AnimalTestResult[]
-  healthCertificates    HealthCertificate[]
-  vetVisitLogs          VetVisitLog[]
-  immunity              AnimalImmunity?
-  careLogs              CareLog[]
-  trainingLogs          TrainingLog[]
-  energy                AnimalEnergy?
-  condition             AnimalCondition?
-  mood                  AnimalMood?
-  personality           AnimalPersonality?
-  stageActivityLogs     StageActivityLog[]
-  clinicEntries         ClinicEntry[]
-  titles                AnimalTitle[]
-  equipment             AnimalEquipment[]
-  game                  Game                       @relation(fields: [gameId], references: [id])
-  playerAccount         PlayerAccount              @relation(fields: [playerAccountId], references: [id])
-  breed                 Breed                      @relation(fields: [breedId], references: [id])
-  lifeStage             LifeStageDef               @relation(fields: [lifeStageId], references: [id])
-  createdAt             DateTime                   @default(now())
-  updatedAt             DateTime                   @updatedAt
+  id                              String                     @id @default(cuid())
+  gameId                          String
+  playerAccountId                 String
+  breedId                         String
+  name                            String
+  sex                             AnimalSex
+  lifeStageId                     String
+  image                           String?
+  generation                      Int                        @default(1)
+  ageInCycles                     Int                        @default(0)
+  bornAt                          DateTime                   @default(now())
+  diedAt                          DateTime?
+  causeOfDeath                    String?
+  status                          AnimalStatus               @default(ALIVE)
+  deletedAt                       DateTime?
+  isCastrated                     Boolean                    @default(false)
+  inbreedingCoefficient           Float                      @default(0)
+  fertility                       Float
+  isTutorialAnimal                Boolean                    @default(false)
+  breedGeneration                 Int?
+  disciplineDefId                 String?
+  subContainerId                  String?
+  stats                           AnimalStat[]
+  statHistory                     AnimalStatHistory[]
+  ancestors                       AnimalAncestor[]           @relation("AnimalLineage")
+  offspring                       AnimalAncestor[]           @relation("AncestorAnimals")
+  breedComposition                AnimalBreedComposition[]
+  brands                          AnimalBrand[]
+  dailyLogs                       AnimalDailyLog[]           @relation("DailyLogAnimal")
+  partnerLogs                     AnimalDailyLog[]           @relation("DailyLogPartner")
+  genotypes                       AnimalGenotype[]
+  conformationScores              AnimalConformationScore[]
+  careScore                       AnimalCareScore?
+  longTermCareRecords             AnimalLongTermCareRecord[]
+  behaviorEvents                  AnimalBehaviorEvent[]
+  healthRecords                   AnimalHealthRecord[]
+  treatmentRecords                AnimalTreatmentRecord[]
+  activityRestrictions            ActivityRestriction[]
+  testResults                     AnimalTestResult[]
+  healthCertificates              HealthCertificate[]
+  vetVisitLogs                    VetVisitLog[]
+  immunity                        AnimalImmunity?
+  careLogs                        CareLog[]
+  trainingLogs                    TrainingLog[]
+  energy                          AnimalEnergy?
+  condition                       AnimalCondition?
+  mood                            AnimalMood?
+  personality                     AnimalPersonality?
+  stageActivityLogs               StageActivityLog[]
+  clinicEntries                   ClinicEntry[]
+  titles                          AnimalTitle[]
+  equipment                       AnimalEquipment[]
+  breedingListings                BreedingListing[]
+  breedingRecordsAsSire           BreedingRecord[]           @relation("BreedingSire")
+  breedingRecordsAsDam            BreedingRecord[]           @relation("BreedingDam")
+  pregnancies                     Pregnancy[]
+  pregnancyOffspring              PregnancyOffspring[]
+  geneticMaterials                GeneticMaterial[]
+  surrogacyRecordsAsBiologicalDam SurrogacyRecord[]
+  game                            Game                       @relation(fields: [gameId], references: [id])
+  playerAccount                   PlayerAccount              @relation(fields: [playerAccountId], references: [id])
+  breed                           Breed                      @relation(fields: [breedId], references: [id])
+  lifeStage                       LifeStageDef               @relation(fields: [lifeStageId], references: [id])
+  createdAt                       DateTime                   @default(now())
+  updatedAt                       DateTime                   @updatedAt
 }
 
 model AnimalStat {

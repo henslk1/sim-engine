@@ -139,7 +139,7 @@ model SurrogacyRecord {
   id                String           @id @default(cuid())
   pregnancyId       String           @unique
   biologicalDamId   String
-  geneticMaterialId String?
+  geneticMaterialId String?          @unique
   implantedAt       DateTime         @default(now())
   geneticMaterial   GeneticMaterial? @relation(fields: [geneticMaterialId], references: [id])
   biologicalDam     Animal           @relation(fields: [biologicalDamId], references: [id])

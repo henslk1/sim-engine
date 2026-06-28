@@ -26,6 +26,9 @@ model Game {
   stageActivityDefs      StageActivityDef[]
   titleDefs              TitleDef[]
   clinics                Clinic[]
+  breedingRecords        BreedingRecord[]
+  breedingListings       BreedingListing[]
+  geneticMaterials       GeneticMaterial[]
   isActive               Boolean                 @default(false)
   createdAt              DateTime                @default(now())
 }
@@ -111,6 +114,9 @@ model PlayerAccount {
   trainerAssignments         HiredTrainer[]       @relation("Trainer")
   hiresAsClient              HiredTrainer[]       @relation("HiredBy")
   stageActivityLogsPerformed StageActivityLog[]
+  breedingListings           BreedingListing[]
+  purchasedBreedingSlots     BreedingSlot[]
+  ownedGeneticMaterials      GeneticMaterial[]
   game                       Game                 @relation(fields: [gameId], references: [id])
   user                       User                 @relation(fields: [userId], references: [id])
   createdAt                  DateTime             @default(now())
