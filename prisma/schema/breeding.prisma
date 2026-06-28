@@ -69,20 +69,56 @@ model BreedingSlot {
 }
 
 model BreedingRecord {
-  id String @id @default(cuid())
-  gameId String
-  sireId String
-  damId String
-  breedingSlotId String? @unique
-  geneticMaterialId String? @unique
-  sireSnapshot Json
-  damSnapshot Json
-  pregnancy   Pregnancy?
-  geneticMaterial GeneticMaterial? @relation("UsedMaterial", fields: [geneticMaterialId], references: [id])
-  producedEmbryo  GeneticMaterial? @relation("ProducedBy")
-  breedingSlot BreedingSlot? @relation(fields: [breedingSlotId], references: [id])
-  dam Animal @relation("BreedingDam", fields: [damId], references: [id])
-  sire Animal @relation("BreedingSire", fields: [sireId], references: [id])
-  game Game @relation(fields: [gameId], references: [id])
-  createdAt DateTime @default(now())
+  id                String           @id @default(cuid())
+  gameId            String
+  sireId            String
+  damId             String
+  breedingSlotId    String?          @unique
+  geneticMaterialId String?          @unique
+  sireSnapshot      Json
+  damSnapshot       Json
+  pregnancy         Pregnancy?
+  geneticMaterial   GeneticMaterial? @relation("UsedMaterial", fields: [geneticMaterialId], references: [id])
+  producedEmbryo    GeneticMaterial? @relation("ProducedBy")
+  breedingSlot      BreedingSlot?    @relation(fields: [breedingSlotId], references: [id])
+  dam               Animal           @relation("BreedingDam", fields: [damId], references: [id])
+  sire              Animal           @relation("BreedingSire", fields: [sireId], references: [id])
+  game              Game             @relation(fields: [gameId], references: [id])
+  createdAt         DateTime         @default(now())
+}
+
+model GeneticMaterial {
+  id                         String         @id @default(cuid())
+  gameId                     String
+  animalId                   String
+  ownerPlayerId              String
+  groupId                    String?
+  donorSnapshot              Json?
+  offspringSnapshot          Json?
+  inbreedingCoefficient      Float?
+  producedByBreedingRecordId String?        @unique
+  breedingRecord             BreedingRecord @relation(fields: [breedingRecordId], references: [id])
+  materialType               GeneticMaterialType
+  storageType                GeneticStorageType
+  ownerPlayer                PlayerAccount  @relation(fields: [ownerPlayerId], references: [id])
+  animal                     Animal         @relation(fields: [animalId], references: [id])
+  game                       Game           @relation(fields: [gameId], references: [id])
+  expiresAt                  DateTime?
+  isUsed                     Boolean        @default(false)
+  collectedAt                DateTime       @default(now())
+}
+
+model Pregnancy {
+  id                 String         @id @default(cuid())
+  animalId           String
+  breedingRecordId   String         @unique
+  isSurrogate        Boolean        @default(false)
+  gestationStartedAt DateTime       @default(now())
+  dueAt              DateTime
+  isCompleted        Boolean        @default(false)
+  completedAt        DateTime?
+  offspring          PregnancyOffspring[] 
+  surrogacyRecord    SurrogacyRecord?
+  breedingRecord     BreedingRecord @relation(fields: [breedingRecordId], references: [id]) 
+  animal             Animal         @relation(fields: [animalId], references: [id])
 }
