@@ -23,7 +23,7 @@ model BreedingListing {
   ownerPlayerId     String
   animalId          String
   description       String?
-  currencyDefId     String
+  currencyDefId     String?
   pricePerSlot      Int
   maxSlots          Int
   breedRestrictions BreedingListingBreedRestriction[]
@@ -60,9 +60,29 @@ model BreedingSlot {
   id                  String          @id @default(cuid())
   listingId           String
   purchasedByPlayerId String?
-  status              BreedingSlotStatus[]
-  purchasedAt         DateTime?       @default(now())
+  status              BreedingSlotStatus
+  purchasedAt         DateTime?       
+  breedingRecord      BreedingRecord?
   listing             BreedingListing @relation(fields: [listingId], references: [id])
   purchasedByPlayer   PlayerAccount?  @relation(fields: [purchasedByPlayerId], references: [id])
   createdAt           DateTime        @default(now())
+}
+
+model BreedingRecord {
+  id String @id @default(cuid())
+  gameId String
+  sireId String
+  damId String
+  breedingSlotId String? @unique
+  geneticMaterialId String? @unique
+  sireSnapshot Json
+  damSnapshot Json
+  pregnancy   Pregnancy?
+  geneticMaterial GeneticMaterial? @relation("UsedMaterial", fields: [geneticMaterialId], references: [id])
+  producedEmbryo  GeneticMaterial? @relation("ProducedBy")
+  breedingSlot BreedingSlot? @relation(fields: [breedingSlotId], references: [id])
+  dam Animal @relation("BreedingDam", fields: [damId], references: [id])
+  sire Animal @relation("BreedingSire", fields: [sireId], references: [id])
+  game Game @relation(fields: [gameId], references: [id])
+  createdAt DateTime @default(now())
 }
