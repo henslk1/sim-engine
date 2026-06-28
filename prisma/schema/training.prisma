@@ -28,7 +28,7 @@ model IntensityTierDef {
   trainingLogs   TrainingLog[]
   game           Game          @relation(fields: [gameId], references: [id])
 
-  @@unique([gameId, name])
+  @@unique([gameId, tierIndex])
 }
 
 model TrainingLog {
@@ -40,6 +40,7 @@ model TrainingLog {
   statGained          Float
   energyUsed          Float
   performedByPlayerId String?
+  createdAt           DateTime          @default(now())
   performedBy         PlayerAccount?    @relation(fields: [performedByPlayerId], references: [id])
   intensityTierDef    IntensityTierDef  @relation(fields: [intensityTierDefId], references: [id])
   trainingActionDef   TrainingActionDef @relation(fields: [trainingActionDefId], references: [id])
@@ -97,6 +98,7 @@ model StageActivityLog {
   stageActivityDefId  String
   cycleNumber         Int
   performedByPlayerId String?
+  createdAt           DateTime         @default(now())
   performedBy         PlayerAccount?   @relation(fields: [performedByPlayerId], references: [id])
   stageActivityDef    StageActivityDef @relation(fields: [stageActivityDefId], references: [id])
   animal              Animal           @relation(fields: [animalId], references: [id])
@@ -133,8 +135,8 @@ model ClinicEntry {
 
 model HiredTrainer {
   id              String        @id @default(cuid())
-  jobContractId   String
-  trainerPlayerId String        @unique
+  jobContractId   String        @unique
+  trainerPlayerId String        
   hiredByPlayerId String
   hiredByPlayer   PlayerAccount @relation("HiredBy", fields: [hiredByPlayerId], references: [id])
   trainerPlayer   PlayerAccount @relation("Trainer", fields: [trainerPlayerId], references: [id])
