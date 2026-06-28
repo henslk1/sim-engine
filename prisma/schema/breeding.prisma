@@ -122,3 +122,24 @@ model Pregnancy {
   breedingRecord     BreedingRecord @relation(fields: [breedingRecordId], references: [id]) 
   animal             Animal         @relation(fields: [animalId], references: [id])
 }
+
+model PregnancyOffspring {
+  id          String    @id @default(cuid())
+  animalId    String
+  pregnancyId String
+  birthOrder  Int?
+  pregnancy   Pregnancy @relation(fields: [pregnancyId], references: [id])
+  animal      Animal    @relation(fields: [animalId], references: [id])
+  @@unique([pregnancyId, animalId])
+}
+
+model SurrogacyRecord {
+  id                String           @id @default(cuid())
+  pregnancyId       String           @unique
+  biologicalDamId   String
+  geneticMaterialId String?
+  implantedAt       DateTime         @default(now())
+  geneticMaterial   GeneticMaterial? @relation(fields: [geneticMaterialId], references: [id])
+  biologicalDam     Animal           @relation(fields: [biologicalDamId], references: [id])
+  pregnancy         Pregnancy        @relation(fields: [pregnancyId], references: [id])
+}
