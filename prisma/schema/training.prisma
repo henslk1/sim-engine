@@ -1,0 +1,168 @@
+enum ClinicHostType {
+  PLAYER
+  GROUP
+}
+model TrainingActionDef {
+  id String @id @default(cuid())
+  gameId String
+  name String
+  statDefId String
+  baseGain Float
+  trainingLogs TrainingLog[]
+  statDef StatDef @relation(fields: [statDefId], references: [id])
+  game Game @relation(fields: [gameId], references: [id])
+  @@unique([gameId, name])
+}
+
+model IntensityTierDef {
+  id String @id @default(cuid())
+  gameId String
+  name String
+  tierIndex Int
+  energyCost Float
+  gainMultiplier Float
+  minMood Float?
+  minCondition Float?
+  trainingLogs TrainingLog[]
+  game Game @relation(fields: [gameId], references: [id])
+  @@unique([gameId, name])
+}
+
+model TrainingLog {
+  id String @id @default(cuid())
+  animalId String
+  trainingActionDefId String
+  intensityTierDefId String
+  cycleNumber Int
+  statGained Float
+  energyUsed Float
+  performedByPlayerId String?
+  performedBy PlayerAccount? @relation(fields: [performedByPlayerId], references: [id])
+  intensityTierDef IntensityTierDef @relation(fields: [intensityTierDefId], references: [id])
+  trainingActionDef TrainingActionDef @relation(fields: [trainingActionDefId], references: [id])
+  animal Animal @relation(fields: [animalId], references: [id])
+}
+
+model AnimalEnergy {
+  id String @id @default(cuid())
+  animalId String @unique
+  currentEnergy Float
+  maxEnergy Float
+  animal Animal @relation(fields: [animalId], references: [id])
+}
+
+model AnimalCondition {
+  id String @id @default(cuid())
+  animalId String @unique
+  value Float
+  animal Animal @relation(fields: [animalId], references: [id])
+}
+
+model AnimalMood {
+  id String @id @default(cuid())
+  animalId String @unique
+  value Float
+  animal Animal @relation(fields: [animalId], references: [id])
+}
+
+model AnimalPersonality {
+  id String @id @default(cuid())
+  animalId String @unique
+  value Float
+  traitLabel String?
+  animal Animal @relation(fields: [animalId], references: [id])
+}
+
+model StageActivityDef {
+  id String @id @default(cuid())
+  gameId String
+  lifeStageId String
+  name String
+  personalityEffect Float
+  description String?
+  energyCost Float?
+  stageActivityLogs StageActivityLog[]
+  lifeStage LifeStageDef @relation(fields: [lifeStageId], references: [id])
+  game Game @relation(fields: [gameId], references: [id])
+  @@unique([gameId, name])
+}
+
+model StageActivityLog {
+  id String @id @default(cuid())
+  animalId String
+  stageActivityDefId String
+  cycleNumber Int
+  performedByPlayerId String?
+  performedBy PlayerAccount? @relation(fields: [performedByPlayerId], references: [id])
+  stageActivityDef StageActivityDef  @relation(fields: [stageActivityDefId], references: [id])
+  animal Animal @relation(fields: [animalId], references: [id])
+}
+
+model Clinic {
+  id String @id @default(cuid())
+  gameId String
+  hostType ClinicHostType
+  hostPlayerId String?
+  hostGroupId String?
+  name String
+  description String?
+  startedAt DateTime @default(now())
+  endsAt DateTime?
+  maxEntries Int?
+  entries ClinicEntry[]
+  hostPlayer PlayerAccount? @relation(fields: [hostPlayerId], references: [id])
+  game Game @relation(fields: [gameId], references: [id])
+}
+
+model ClinicEntry {
+  id String @id @default(cuid())
+  clinicId String
+  animalId String
+  playerAccountId String
+  joinedAt DateTime @default(now())
+  playerAccount PlayerAccount @relation(fields: [playerAccountId], references: [id])
+  animal Animal @relation(fields: [animalId], references: [id])
+  clinic Clinic @relation(fields: [clinicId], references: [id])
+  @@unique([clinicId, animalId])
+}
+
+model HiredTrainer {
+  id String @id @default(cuid())
+  jobContractId String
+  trainerPlayerId String @unique
+  hiredByPlayerId String
+  hiredByPlayer PlayerAccount @relation("HiredBy", fields: [hiredByPlayerId], references: [id])
+  trainerPlayer PlayerAccount @relation("Trainer", fields: [trainerPlayerId], references: [id])
+}
+
+model TitleDef {
+  id              String @id @default(cuid())
+  gameId          String
+  name            String
+  description     String?
+  disciplineDefId String?
+  rankOrder       Int
+  animalTitles    AnimalTitle[]
+  game            Game @relation(fields: [gameId], references: [id])
+}
+
+model AnimalTitle {
+  id          String   @id @default(cuid())
+  animalId    String
+  titleDefId  String
+  earnedAt    DateTime @default(now())
+  cycleNumber Int
+  titleDef    TitleDef @relation(fields: [titleDefId], references: [id])
+  animal      Animal   @relation(fields: [animalId], references: [id])
+  @@unique([animalId, titleDefId])
+}
+
+model AnimalEquipment {
+  id         String   @id @default(cuid())
+  animalId   String
+  itemDefId  String
+  slot       String
+  equippedAt DateTime @default(now())
+  animal     Animal   @relation(fields: [animalId], references: [id])
+  @@unique([animalId, slot])
+}
