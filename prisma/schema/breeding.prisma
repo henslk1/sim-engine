@@ -88,7 +88,7 @@ model BreedingRecord {
 }
 
 model GeneticMaterial {
-  id                         String         @id @default(cuid())
+  id                         String          @id @default(cuid())
   gameId                     String
   animalId                   String
   ownerPlayerId              String
@@ -96,16 +96,18 @@ model GeneticMaterial {
   donorSnapshot              Json?
   offspringSnapshot          Json?
   inbreedingCoefficient      Float?
-  producedByBreedingRecordId String?        @unique
-  breedingRecord             BreedingRecord @relation(fields: [breedingRecordId], references: [id])
+  producedByBreedingRecordId String?         @unique
   materialType               GeneticMaterialType
   storageType                GeneticStorageType
-  ownerPlayer                PlayerAccount  @relation(fields: [ownerPlayerId], references: [id])
-  animal                     Animal         @relation(fields: [animalId], references: [id])
-  game                       Game           @relation(fields: [gameId], references: [id])
+  surrogacyRecord            SurrogacyRecord?
+  usedInRecord               BreedingRecord? @relation("UsedMaterial")
+  producedByRecord           BreedingRecord? @relation("ProducedBy", fields: [producedByBreedingRecordId], references: [id])
+  ownerPlayer                PlayerAccount   @relation(fields: [ownerPlayerId], references: [id])
+  animal                     Animal          @relation(fields: [animalId], references: [id])
+  game                       Game            @relation(fields: [gameId], references: [id])
   expiresAt                  DateTime?
-  isUsed                     Boolean        @default(false)
-  collectedAt                DateTime       @default(now())
+  isUsed                     Boolean         @default(false)
+  collectedAt                DateTime        @default(now())
 }
 
 model Pregnancy {
