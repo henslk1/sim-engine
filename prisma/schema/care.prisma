@@ -17,7 +17,7 @@ model CareActionDef {
   careLogs             CareLog[]
   game                 Game                  @relation(fields: [gameId], references: [id])
   animalBehaviorEvents AnimalBehaviorEvent[]
-
+  conditionBehaviors   HealthConditionBehavior[]
   @@unique([gameId, name])
 }
 

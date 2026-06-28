@@ -129,6 +129,13 @@ model Animal {
   careScore             AnimalCareScore?
   longTermCareRecords   AnimalLongTermCareRecord[]
   behaviorEvents        AnimalBehaviorEvent[]
+  healthRecords         AnimalHealthRecord[]
+  treatmentRecords      AnimalTreatmentRecord[]
+  activityRestrictions  ActivityRestriction[]
+  testResults           AnimalTestResult[]
+  healthCertificates    HealthCertificate[]
+  vetVisitLogs          VetVisitLog[]
+  immunity              AnimalImmunity?
   careLogs              CareLog[]
   game                  Game                       @relation(fields: [gameId], references: [id])
   playerAccount         PlayerAccount              @relation(fields: [playerAccountId], references: [id])

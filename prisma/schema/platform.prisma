@@ -19,6 +19,8 @@ model Game {
   geneticPanels          GeneticPanelDef[]
   careActionDefs         CareActionDef[]
   longTermCareActionDefs LongTermCareActionDef[]
+  healthConditionDefs    HealthConditionDef[]
+  healthCertificateDefs  HealthCertificateDef[]
   isActive               Boolean                 @default(false)
   createdAt              DateTime                @default(now())
 }
@@ -97,6 +99,7 @@ model PlayerAccount {
   playerBrand         PlayerBrand?
   foundedBreeds       Breed[]              @relation("BreedFounder")
   performedCareLogs   CareLog[]            @relation("CarePerformedBy")
+  vetVisitLogs        VetVisitLog[]
   game                Game                 @relation(fields: [gameId], references: [id])
   user                User                 @relation(fields: [userId], references: [id])
   createdAt           DateTime             @default(now())
