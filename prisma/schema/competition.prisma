@@ -1,4 +1,5 @@
 enum VenueClimate {
+  HOT
   WARM
   COLD
   TEMPERATE
@@ -30,22 +31,22 @@ enum RankSubjectType {
 }
 
 model DisciplineDef {
-  id String @id @default(cuid())
-  gameId String
-  name   String
-  description String?
-  isConformation Boolean @default(false)
+  id               String @id @default(cuid())
+  gameId           String
+  name             String
+  description      String?
+  isConformation   Boolean @default(false)
   statWeights      DisciplineStatWeight[]
-  compTierDefs CompTierDef[]
+  compTierDefs     CompetitionTierDef[]
   venueDisciplines VenueDiscipline[]
   competitions     Competition[]
-  animalCompTiers  CompetitionTierDef[]
-  weeklyPoints    
-  seasonCategories
-  recordDefs
-  titleDefs
-  animals
-  game Game @relation(fields: [gameId], references: [id])
+  animalCompTiers  AnimalCompetitionTier[]
+  weeklyPoints     AnimalWeeklyPoints[]
+  seasonCategories SeasonCategory[]
+  recordDefs       RecordDef[]
+  titleDefs        TitleDef[]
+  animals          Animal[]
+  game             Game @relation(fields: [gameId], references: [id])
   @@unique([gameId, name])
 }
 
@@ -81,7 +82,7 @@ model CompetitionTierDef {
   animalTiers          AnimalCompetitionTier[]
   disciplineDef        DisciplineDef @relation(fields: [disciplineDefId], references: [id])
   game                 Game          @relation(fields: [gameId], references: [id])
-  @@unique([gameId, disciplineDefId])
+  @@unique([disciplineDefId, tierIndex])
 }
 
 model Venue {
@@ -89,8 +90,103 @@ model Venue {
   gameId       String
   name         String
   climate      VenueClimate
+  terrain      VenueTerrain
   disciplines  VenueDiscipline[]
   competitions Competition[]
   game         Game  @relation(fields: [gameId], references: [id])
   @@unique([gameId, name])
+}
+
+model VenueDiscipline {
+  id              String        @id @default(cuid())
+  venueId         String
+  disciplineDefId String
+  disciplineDef   DisciplineDef @relation(fields: [disciplineDefId], references: [id])
+  venue           Venue         @relation(fields: [venueId], references: [id])
+  @@unique([venueId, disciplineDefId])
+}
+
+model ExpressionClimateModifier {
+  id               String @id @default(cuid())
+  expressionRuleId String
+  climate          VenueClimate
+  modifier         Float
+  expressionRule   ExpressionRule @relation(fields: [expressionRuleId], references: [id])
+  @@unique([expressionRuleId, climate])
+}
+
+model ExpressionTerrainModifier {
+  id               String         @id @default(cuid())
+  expressionRuleId String
+  terrain          VenueTerrain
+  modifier         Float
+  expressionRule   ExpressionRule @relation(fields: [expressionRuleId], references: [id])
+  @@unique([expressionRuleId, terrain])
+}
+
+model PrizeConfig {
+  id            String      @id @default(cuid())
+  competitionId String
+  placement     Int
+  currencyDefId String
+  amount        Int
+  competition   Competition @relation(fields: [competitionId], references: [id])
+  @@unique([competitionId, placement])
+}
+
+model Season {
+  id           String  @id @default(cuid())
+  gameId       String
+  name         String
+  startsAt     DateTime
+  endsAt       DateTime
+  isActive     Boolean @default(false)
+  categories   SeasonCategory[]
+  rankings     SeasonRanking[]
+  competitions Competition[]
+  game         Game    @relation(fields: [gameId], references: [id])
+}
+
+model SeasonCategory {
+  id              String         @id @default(cuid())
+  seasonId        String
+  name            String
+  categoryType    SeasonCategoryType
+  breedId         String?
+  disciplineDefId String?
+  rankings        SeasonRanking[]
+  disciplineDef   DisciplineDef? @relation(fields: [disciplineDefId], references: [id])
+  breed           Breed?         @relation(fields: [breedId], references: [id])
+  season          Season         @relation(fields: [seasonId], references: [id])
+  @@unique([seasonId, name])
+}
+
+model RecordDef {
+  id              String        @id @default(cuid())
+  gameId          String
+  name            String
+  description     String?
+  recordType      String
+  subjectType     String
+  disciplineDefId String?
+  breedId         String?
+  statDefId       String?
+  entries         RecordEntry[]
+  statDef         StatDef?       @relation(fields: [statDefId], references: [id])
+  breed           Breed?         @relation(fields: [breedId], references: [id])
+  disciplineDef   DisciplineDef? @relation(fields: [disciplineDefId], references: [id])
+  game            Game           @relation(fields: [gameId], references: [id])
+  @@unique([gameId, name])
+}
+
+model DirectoryFilterDef {
+  id           String  @id @default(cuid())
+  gameId       String
+  filterKey    String
+  displayLabel String
+  filterType   String
+  isEnabled    Boolean @default(true)
+  sortOrder    Int?
+  game         Game    @relation(fields: [gameId], references: [id])
+  @@unique([gameId, filterKey])
 }
