@@ -226,7 +226,7 @@ model CompetitionEntry {
 
 model CompetitionResult {
   id        String           @id @default(cuid())
-  entryId   String
+  entryId   String           @unique
   placement Int?
   score     Float
   entry     CompetitionEntry @relation(fields: [entryId], references: [id])
@@ -245,12 +245,12 @@ model AnimalCompetitionTier {
 
 model AnimalWeeklyPoints {
   id              String        @id @default(cuid())
-  amimalId        String
+  animalId        String
   disciplineDefId String
   weekStart       DateTime
   points          Float
   disciplineDef   DisciplineDef @relation(fields: [disciplineDefId], references: [id])
-  amimal          Amimal        @relation(fields: [amimalId], references: [id])
+  animal          Animal        @relation(fields: [amimalId], references: [id])
   @@unique([animalId, disciplineDefId, weekStart])
 }
 
@@ -264,7 +264,6 @@ model SeasonRanking {
   rank            Int
   score           Float
   playerAccount   PlayerAccount? @relation(fields: [playerAccountId], references: [id])
-  subjectType     SubjectType    @relation(fields: [subjectTypeId], references: [id])
   category        SeasonCategory       @relation(fields: [categoryId], references: [id])
   season          Season         @relation(fields: [seasonId], references: [id])
 }

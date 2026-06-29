@@ -161,6 +161,7 @@ model Animal {
   playerAccount                   PlayerAccount              @relation(fields: [playerAccountId], references: [id])
   breed                           Breed                      @relation(fields: [breedId], references: [id])
   lifeStage                       LifeStageDef               @relation(fields: [lifeStageId], references: [id])
+  disciplinedef                   DisciplineDef              @relation(fields: [disciplineDefId], references: [id])
   createdAt                       DateTime                   @default(now())
   updatedAt                       DateTime                   @updatedAt
 }
