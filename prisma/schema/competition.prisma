@@ -190,3 +190,31 @@ model DirectoryFilterDef {
   game         Game    @relation(fields: [gameId], references: [id])
   @@unique([gameId, filterKey])
 }
+
+model Competition {
+  id String @id @default(cuid())
+}
+
+model CompetitionEntry {
+  id String @id @default(cuid())
+}
+
+model CompetitionResult {
+  id String @id @default(cuid())
+}
+
+model AnimalCompetitionTier {
+  id String @id @default(cuid())
+}
+
+model AnimalWeeklyPoints {
+  id String @id @default(cuid())
+}
+
+model SeasonRanking {
+  id String @id @default(cuid())
+}
+
+model RecordEntry {
+    id String @id @default(cuid())
+}
