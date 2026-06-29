@@ -58,3 +58,39 @@ model DisciplineStatWeight {
   disciplineDef   DisciplineDef @relation(fields: [disciplineDefId], references: [id])
   @@unique([disciplineDefId, statDefId])
 }
+
+model BreedConformationStandard {
+  id                   String @id @default(cuid())
+  breedId              String
+  locusId              String
+  idealExpressionLabel String
+  weight               Float
+  locus                Locus  @relation(fields: [locusId], references: [id])
+  breed                Breed  @relation(fields: [breedId], references: [id])
+  @@unique([breedId, locusId])
+}
+
+model CompetitionTierDef {
+  id                   String        @id @default(cuid())
+  gameId               String
+  disciplineDefId      String
+  name                 String
+  tierIndex            Int
+  minScore             Float?
+  advancementThreshold Float?
+  animalTiers          AnimalCompetitionTier[]
+  disciplineDef        DisciplineDef @relation(fields: [disciplineDefId], references: [id])
+  game                 Game          @relation(fields: [gameId], references: [id])
+  @@unique([gameId, disciplineDefId])
+}
+
+model Venue {
+  id           String @id @default(cuid())
+  gameId       String
+  name         String
+  climate      VenueClimate
+  disciplines  VenueDiscipline[]
+  competitions Competition[]
+  game         Game  @relation(fields: [gameId], references: [id])
+  @@unique([gameId, name])
+}
