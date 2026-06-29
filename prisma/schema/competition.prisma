@@ -1,0 +1,30 @@
+enum VenueClimate {
+  WARM
+  COLD
+  TEMPERATE
+}
+
+enum VenueTerrain {
+  FLAT
+  COASTAL
+  HILLY
+  MOUNTAIN
+}
+
+enum CompetitionStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED 
+  CANCELLED
+}
+
+enum SeasonCategoryType {
+  OVERALL
+  PER_BREED
+  PER_DISCIPLINE
+}
+
+enum RankSubjectType {
+  PLAYER 
+  GROUP
+}

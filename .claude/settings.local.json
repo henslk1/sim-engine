@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Read(//c/Users/knhbj/.claude/projects/c--Users-knhbj-coding-work-ts-learning/memory/**)"
+      "Read(//c/Users/knhbj/.claude/projects/c--Users-knhbj-coding-work-ts-learning/memory/**)",
+      "WebFetch(domain:horsereality.wiki)",
+      "WebSearch",
+      "WebFetch(domain:niche-game.com)"
     ]
   }
 }
