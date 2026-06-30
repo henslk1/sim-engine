@@ -1,0 +1,76 @@
+enum RaffleHostType {
+  ADMIN 
+  PLAYER 
+  GROUP
+}
+
+model Raffle {
+  id String @id @default(cuid())
+}
+
+model RaffleEntry {
+  id String @id @default(cuid())
+}
+
+model RaffleItemConfig {
+  id String @id @default(cuid())
+}
+
+model RaffleItemSubmission {
+  id String @id @default(cuid())
+}
+
+model RafflePrize {
+  id String @id @default(cuid())
+}
+
+model RafflePrizeItem {
+  id            String      @id @default(cuid())
+  rafflePrizeId String
+  itemDefId     String
+  quantity      Int
+  itemDef       ItemDef     @relation(fields: [itemDefId], references: [id])
+  rafflePrize   RafflePrize @relation(fields: [rafflePrizeId], references: [id])
+  @@unique([rafflePrizeId, itemDefId])
+}
+
+model RafflePrizeAnimal {
+  id            String      @id @default(cuid())
+  rafflePrizeId String
+  animalId      String?
+  breedId       String?
+  quantity      Int         @default(1)
+  breed         Breed?      @relation(fields: [breedId], references: [id])
+  animal        Animal?     @relation(fields: [animalId], references: [id])
+  rafflePrize   RafflePrize @relation(fields: [rafflePrizeId], references: [id])
+}
+
+model RafflePrizeGeneticMaterial {
+  id                String          @id @default(cuid())
+  rafflePrizeId     String
+  geneticMaterialId String
+  geneticMaterial   GeneticMaterial @relation(fields: [geneticMaterialId], references: [id])
+  rafflePrize       RafflePrize     @relation(fields: [rafflePrizeId], references: [id])
+  @@unique([rafflePrizeId, geneticMaterialId])
+}
+
+model RafflePrizeCurrency {
+  id            String      @id @default(cuid())
+  rafflePrizeId String
+  currencyDefId String
+  amount        Int
+  currencyDef   CurrencyDef @relation(fields: [currencyDefId], references: [id])
+  rafflePrize   RafflePrize @relation(fields: [rafflePrizeId], references: [id])
+  @@unique([rafflePrizeId, currencyDefId])
+}
+
+model RaffleWinner {
+  id              String        @id @default(cuid())
+  raffleId        String
+  playerAccountId String
+  placement       Int
+  claimedAt       DateTime?
+  playerAccount   PlayerAccount @relation(fields: [playerAccountId], references: [id])
+  raffle          Raffle        @relation(fields: [raffleId], references: [id])
+  @@unique([raffleId, playerAccountId])
+}
