@@ -32,21 +32,61 @@ enum PermanentEffectType {
 }
 
 model ItemDef {
-  id String @id @default(cuid())
+  id            String  @id @default(cuid())
+  gameId        String
+  name          String
+  description   String?
+  itemType      ItemType
+  category      ItemCategory
+  effects       Json?
+  effectType    PermanentEffectType
+  prizeEligible Boolean @default(true)
+  isSellable    Boolean @default(true)
+  game          Game    @relation(fields: [gameId], references: [id])
+  @@unique([gameId, name])
 }
 
 model PlayerInventory {
   id String @id @default(cuid())
+  playerAccountId String
+  itemDefId String
+  quantity  Int   @default(1)
+  itemDef ItemDef @relation(fields: [itemDefId], references: [id])
+  playerAccount PlayerAccount @relation(fields: [playerAccountId], references: [id])
+  @@unique([playerAccountId, itemDefId])
 }
 
 model AnimalAppliedItem {
-  id String @id @default(cuid())
+  id                String        @id @default(cuid())
+  animalId          String
+  itemDefId         String
+  appliedByPlayerId String
+  appliedAt         DateTime      @default(now())
+  isConsumed        Boolean       @default(false)
+  consumerAt        DateTime?
+  appliedByPlayer   PlayerAccount @relation(fields: [appliedByPlayerId], references: [id])
+  itemDef           ItemDef       @relation(fields: [itemDefId], references: [id])
+  animal            Animal        @relation(fields: [animalId], references: [id])
 }
 
 model PlayerCapacity {
-  id String @id @default(cuid())
+  id                       String        @id @default(cuid())
+  playerAccountId          String        @unique
+  animalSlotBase           Int
+  animalSlotSubscription   Int           @default(0)
+  animalSlotPurchased      Int           @default(0)
+  subContainerBase         Int
+  subContainerSubscription Int           @default(0)
+  subContainerPurchased    Int           @default(0)
+  playerAccount            PlayerAccount @relation(fields: [playerAccountId], references: [id])
 }
 
 model SubContainer {
-  id String @id @default(cuid())
+  id              String        @id @default(cuid())
+  playerAccountId String
+  name            String
+  displayOrder    Int
+  sortDefault     String?
+  filterConfig    Json?
+  playerAccount   PlayerAccount @relation(fields: [playerAccountId], references: [id])
 }
