@@ -5,23 +5,75 @@ enum RaffleHostType {
 }
 
 model Raffle {
-  id String @id @default(cuid())
+  id               String        @id @default(cuid())
+  gameId           String
+  name             String
+  ticketPrice      Int?
+  currencyDefId    String?
+  maxTickets       Int?
+  ticketsPerPlayer Int?
+  hostType         RaffleHostType
+  hostPlayerId     String?
+  hostGroupId      String?
+  startsAt         DateTime 
+  endsAt           DateTime
+  isDrawn          Boolean       @default(false)
+  drawnAt          DateTime?
+  entries          RaffleEntry[]
+  prizes           RafflePrize[]
+  itemConfigs      RaffleItemConfig[]
+  itemSubmissions  RaffleItemSubmission[]
+  hostPlayer       PlayerAccount @relation(fields: [hostPlayerId], references: [id])
+  currencyDef      CurrencyDef   @relation(fields: [currencyDefId], references: [id])
+  game Game @relation(fields: [gameId], references: [id])
 }
 
 model RaffleEntry {
-  id String @id @default(cuid())
+  id              String        @id @default(cuid())
+  raffleId        String
+  playerAccountId String
+  ticketCount     Int
+  purchasedAt     DateTime      @default(now())
+  playerAccount   PlayerAccount @relation(fields: [playerAccountId], references: [id])
+  raffle          Raffle        @relation(fields: [raffleId], references: [id])
+  @@unique([raffleId, playerAccountId])
 }
 
 model RaffleItemConfig {
-  id String @id @default(cuid())
+  id             String  @id @default(cuid())
+  raffleId       String
+  itemDefId      String
+  ticketsPerItem Int
+  totalCap       Int?
+  perPlayerCap   Int?
+  itemDef        ItemDef @relation(fields: [itemDefId], references: [id])
+  raffle         Raffle  @relation(fields: [raffleId], references: [id])
+  @@unique([raffleId, itemDefId])
 }
 
 model RaffleItemSubmission {
-  id String @id @default(cuid())
+  id              String        @id @default(cuid())
+  raffleId        String
+  playerAccountId String
+  itemDefId       String
+  quantity        Int
+  ticketsEarned   Int
+  submittedAt     DateTime      @default(now())
+  itemDef         ItemDef       @relation(fields: [itemDefId], references: [id])
+  playerAccount   PlayerAccount @relation(fields: [playerAccountId], references: [id])
+  raffle          Raffle        @relation(fields: [raffleId], references: [id])
 }
 
 model RafflePrize {
-  id String @id @default(cuid())
+  id               String @id @default(cuid())
+  raffleId         String
+  placement        Int
+  items            RafflePrizeItem[]
+  animals          RafflePrizeAnimal[]
+  geneticMaterials RafflePrizeGeneticMaterial[]
+  currencies       RafflePrizeCurrency[]
+  raffle           Raffle @relation(fields: [raffleId], references: [id])
+  @@unique([raffleId, placement])
 }
 
 model RafflePrizeItem {
