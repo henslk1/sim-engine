@@ -1,0 +1,115 @@
+enum ShopType {
+  BASE 
+  PREMIUM 
+  GROUP 
+  VET
+}
+
+enum VetServiceType {
+  EXAM 
+  PANEL_TEST
+  GENETIC_COLLECTION
+  GENETIC_STORAGE
+}
+
+enum ListingType {
+  ANIMAL 
+  ITEM 
+  GENETIC_MATERIAL
+}
+
+enum ListingStatus {
+  ACTIVE 
+  SOLD 
+  CANCELLED 
+  EXPIRED
+}
+
+enum OfferStatus {
+  PENDING 
+  ACCEPTED 
+  REJECTED 
+  WITHDRAWN
+}
+
+enum EscrowStatus {
+  HELD 
+  RELEASED
+  REFUNDED
+}
+
+model StoreListing {
+  id String @id @default(cuid())
+}
+
+model VetServiceDef {
+  id String @id @default(cuid())
+}
+
+model Bundle {
+  id String @id @default(cuid())
+}
+
+model BundleItem {
+  id String @id @default(cuid())
+}
+
+model BundleCurrencyReward {
+  id String @id @default(cuid())
+}
+
+model BundleAnimal {
+  id String @id @default(cuid())
+}
+
+model GameShopBreedConfig {
+  id String @id @default(cuid())
+}
+
+model GameShopAnimal {
+  id String @id @default(cuid())
+}
+
+model MarketplaceListing {
+  id String @id @default(cuid())
+}
+
+model MarkeplaceListingAnimal {
+  id String @id @default(cuid())
+}
+
+model MarketplaceListingItem {
+  id String @id @default(cuid())
+}
+
+model MarketplaceListingGeneticMaterial {
+  id String @id @default(cuid())
+}
+
+model MarketplaceOffer {
+  id String @id @default(cuid())
+}
+
+model MarketplaceOfferAnimal {
+  id String @id @default(cuid())
+}
+
+model MarketplaceOfferItem {
+  id String @id @default(cuid())
+}
+
+model MarketplaceOfferGeneticMaterial {
+  id String @id @default(cuid())
+}
+
+model CurrencyExchangeOrder {
+  id String @id @default(cuid())
+}
+
+model Escrow {
+  id String @id @default(cuid())
+}
+
+model Gift {
+  id String @id @default(cuid())
+}
