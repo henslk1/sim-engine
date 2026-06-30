@@ -32,20 +32,28 @@ enum PermanentEffectType {
 }
 
 model ItemDef {
-  id            String  @id @default(cuid())
-  gameId        String
-  name          String
-  description   String?
-  itemType      ItemType
-  category      ItemCategory
-  effects       Json?
-  effectType    PermanentEffectType
-  playerInventory PlayerInventory[]
-  appliedItems    AnimalAppliedItem[]
-  dailyLogs       AnimalDailyLog[]
-  prizeEligible Boolean @default(true)
-  isSellable    Boolean @default(true)
-  game          Game    @relation(fields: [gameId], references: [id])
+  id                      String  @id @default(cuid())
+  gameId                  String
+  name                    String
+  description             String?
+  itemType                ItemType
+  category                ItemCategory
+  effects                 Json?
+  effectType              PermanentEffectType?
+  storeListings           StoreListing[]
+  bundleItems             BundleItem[]
+  marketPlaceListingItems MarketplaceListingItem[]
+  marketplaceOfferItems   MarketplaceOfferItem[]
+  gifts                   Gift[]
+  raffleItemConfigs       RaffleItemConfig[]
+  raffleItemSubmissions   RaffleItemSubmission[]
+  rafflePrizeItems        RafflePrizeItem[]
+  playerInventory         PlayerInventory[]
+  appliedItems            AnimalAppliedItem[]
+  dailyLogs               AnimalDailyLog[]
+  prizeEligible           Boolean @default(true)
+  isSellable              Boolean @default(true)
+  game                    Game    @relation(fields: [gameId], references: [id])
   @@unique([gameId, name])
 }
 
@@ -66,7 +74,7 @@ model AnimalAppliedItem {
   appliedByPlayerId String
   appliedAt         DateTime      @default(now())
   isConsumed        Boolean       @default(false)
-  consumerAt        DateTime?
+  consumedAt        DateTime?
   appliedByPlayer   PlayerAccount @relation(fields: [appliedByPlayerId], references: [id])
   itemDef           ItemDef       @relation(fields: [itemDefId], references: [id])
   animal            Animal        @relation(fields: [animalId], references: [id])
