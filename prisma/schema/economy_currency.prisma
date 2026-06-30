@@ -1,0 +1,42 @@
+enum CurrencyType {
+  BASE
+  PREMIUM
+  PRESTIGE
+}
+
+model CurrencyDef {
+  id           String @id @default(cuid())
+  gameId       String
+  name         String
+  currencyType CurrencyType
+  symbol       String?
+  game         Game   @relation(fields: [gameId], references: [id])
+
+  @@unique([gameId, name])
+}
+
+model PlayerBalance {
+  id String @id @default(cuid())
+  playerAccountId String
+  currencyDefId String
+  balance       Int
+  currencyDef CurrencyDef @relation(fields: [currencyDefId], references: [id])
+  playerAccount PlayerAccount @relation(fields: [playerAccountId], references: [id])
+
+  @@unique([playerAccountId, currencyDefId])
+}
+
+model Transaction {
+  id                    String @id @default(cuid())
+  gameId                String
+  fromPlayerAccountId   String?
+  toPlayerAccountId     String?
+  fromGroupId           String?
+  toGroupId             String?
+  actingPlayerAccountId String?
+  createdAt             DateTime       @default(now())
+  toPlayerAccount       PlayerAccount? @relation("TxnTo", fields: [toPlayerAccountId], references: [id])
+  fromPlayerAccount     PlayerAccount? @relation("TxnFrom", fields: [fromPlayerAccountId], references: [id])
+  actingPlayer          PlayerAccount? @relation("ActingPlayer", fields: [actingPlayerAccountId], references: [id])
+  game Game @relation(fields: [gameId], references: [id])
+}
