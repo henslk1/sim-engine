@@ -54,6 +54,8 @@ model StatDef {
   statHistoryLogs             AnimalStatHistory[]
   trainingActionDefs          TrainingActionDef[]
   breedingListingStatMinimums BreedingListingStatMinimum[]
+  disciplineStatWeights       DisciplineStatWeight[]
+  recordDefs                  RecordDef[]
   game                        Game                @relation(fields: [gameId], references: [id])
 
   @@unique([gameId, name])
@@ -76,6 +78,9 @@ model Breed {
   alleleFrequencies           BreedAlleleFrequency[]
   conformationScores          AnimalConformationScore[]
   breedingListingRestrictions BreedingListingBreedRestriction[]
+  conformationStandards       BreedConformationStandard[]
+  seasonCategories            SeasonCategory[]
+  recordDefs                  RecordDef[]
   game                        Game                      @relation(fields: [gameId], references: [id])
   species                     Species                   @relation(fields: [speciesId], references: [id])
   foundingPlayer              PlayerAccount?            @relation("BreedFounder", fields: [foundingPlayerId], references: [id])
@@ -157,11 +162,15 @@ model Animal {
   pregnancyOffspring              PregnancyOffspring[]
   geneticMaterials                GeneticMaterial[]
   surrogacyRecordsAsBiologicalDam SurrogacyRecord[]
+  compTiers                       AnimalCompetitionTier[]
+  weeklyPoints                    AnimalWeeklyPoints[]
+  competitionEntries              CompetitionEntry[]
+  recordEntries                   RecordEntry[]
   game                            Game                       @relation(fields: [gameId], references: [id])
   playerAccount                   PlayerAccount              @relation(fields: [playerAccountId], references: [id])
   breed                           Breed                      @relation(fields: [breedId], references: [id])
   lifeStage                       LifeStageDef               @relation(fields: [lifeStageId], references: [id])
-  disciplinedef                   DisciplineDef              @relation(fields: [disciplineDefId], references: [id])
+  disciplineDef                   DisciplineDef?             @relation(fields: [disciplineDefId], references: [id])
   createdAt                       DateTime                   @default(now())
   updatedAt                       DateTime                   @updatedAt
 }

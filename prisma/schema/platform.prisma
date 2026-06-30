@@ -29,6 +29,13 @@ model Game {
   breedingRecords        BreedingRecord[]
   breedingListings       BreedingListing[]
   geneticMaterials       GeneticMaterial[]
+  disciplineDefs         DisciplineDef[]
+  compTierDefs           CompetitionTierDef[]
+  venues                 Venue[]
+  competitions           Competition[]
+  seasons                Season[]
+  recordDefs             RecordDef[]
+  directoryFilterDefs    DirectoryFilterDef[]
   isActive               Boolean                 @default(false)
   createdAt              DateTime                @default(now())
 }
@@ -117,6 +124,9 @@ model PlayerAccount {
   breedingListings           BreedingListing[]
   purchasedBreedingSlots     BreedingSlot[]
   ownedGeneticMaterials      GeneticMaterial[]
+  competitionEntries         CompetitionEntry[]
+  seasonRankings             SeasonRanking[]
+  recordEntries              RecordEntry[]
   game                       Game                 @relation(fields: [gameId], references: [id])
   user                       User                 @relation(fields: [userId], references: [id])
   createdAt                  DateTime             @default(now())

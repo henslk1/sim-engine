@@ -250,7 +250,7 @@ model AnimalWeeklyPoints {
   weekStart       DateTime
   points          Float
   disciplineDef   DisciplineDef @relation(fields: [disciplineDefId], references: [id])
-  animal          Animal        @relation(fields: [amimalId], references: [id])
+  animal          Animal        @relation(fields: [animalId], references: [id])
   @@unique([animalId, disciplineDefId, weekStart])
 }
 

@@ -143,15 +143,15 @@ model HiredTrainer {
 }
 
 model TitleDef {
-  id              String        @id @default(cuid())
+  id              String         @id @default(cuid())
   gameId          String
   name            String
   description     String?
   disciplineDefId String?
   rankOrder       Int
   animalTitles    AnimalTitle[]
-  game            Game          @relation(fields: [gameId], references: [id])
-  disciplineDefs  DisciplineDef @relation(fields: [disciplineDefId], references: [id])   
+  game            Game           @relation(fields: [gameId], references: [id])
+  disciplineDef   DisciplineDef? @relation(fields: [disciplineDefId], references: [id])   
 }
 
 model AnimalTitle {
