@@ -115,11 +115,32 @@ model BundleAnimal {
 }
 
 model GameShopBreedConfig {
-  id String @id @default(cuid())
+  id               String      @id @default(cuid())
+  gameId           String
+  breedId          String
+  targetStock      Int
+  price            Int
+  currencyDefId    String
+  isActive         Boolean     @default(true)
+  rotationStartsAt DateTime?
+  rotationEndsAt   DateTime?
+  shopAnimals      GameShopAnimal[]
+  currencyDef      CurrencyDef @relation(fields: [currencyDefId], references: [id])
+  breed            Breed       @relation(fields: [breedId], references: [id])
+  game             Game        @relation(fields: [gameId], references: [id])
+  @@unique([gameId, breedId])
 }
 
 model GameShopAnimal {
-  id String @id @default(cuid())
+  id                String              @id @default(cuid())
+  gameId            String
+  animalId          String              @unique
+  shopBreedConfigId String
+  isAvailable       Boolean             @default(true)
+  purchasedAt       DateTime?
+  shopBreedConfig   GameShopBreedConfig @relation(fields: [shopBreedConfigId], references: [id])
+  animal            Animal              @relation(fields: [animalId], references: [id])
+  game              Game                @relation(fields: [gameId], references: [id])
 }
 
 model MarketplaceListing {
