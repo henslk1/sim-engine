@@ -32,17 +32,18 @@ model BreedingListing {
   isActive          Boolean       @default(true)
   animal            Animal        @relation(fields: [animalId], references: [id])
   ownerPlayer       PlayerAccount @relation(fields: [ownerPlayerId], references: [id])
+  currencyDef       CurrencyDef   @relation(fields: [currencyDefId], references: [id])
   game              Game          @relation(fields: [gameId], references: [id])
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 }
 
 model BreedingListingBreedRestriction {
-  id String @id @default(cuid())
+  id        String          @id @default(cuid())
   listingId String
-  breedId String
-  breed Breed @relation(fields: [breedId], references: [id])
-  listing BreedingListing @relation(fields: [listingId], references: [id])
+  breedId   String
+  breed     Breed           @relation(fields: [breedId], references: [id])
+  listing   BreedingListing @relation(fields: [listingId], references: [id])
   @@unique([listingId, breedId])
 }
 
@@ -100,6 +101,10 @@ model GeneticMaterial {
   materialType               GeneticMaterialType
   storageType                GeneticStorageType
   surrogacyRecord            SurrogacyRecord?
+  marketplaceListings        MarketplaceListingGeneticMaterial[]
+  marketplaceOffers          MarketplaceOfferGeneticMaterial[]
+  gifts                      Gift[]
+  rafflePrizes               RafflePrizeGeneticMaterial[]
   usedInRecord               BreedingRecord? @relation("UsedMaterial")
   producedByRecord           BreedingRecord? @relation("ProducedBy", fields: [producedByBreedingRecordId], references: [id])
   ownerPlayer                PlayerAccount   @relation(fields: [ownerPlayerId], references: [id])

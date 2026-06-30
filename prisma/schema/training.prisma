@@ -173,6 +173,7 @@ model AnimalEquipment {
   slot       String
   equippedAt DateTime @default(now())
   animal     Animal   @relation(fields: [animalId], references: [id])
+  itemDef    ItemDef  @relation(fields: [itemDefId], references: [id])
 
   @@unique([animalId, slot])
 }

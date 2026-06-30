@@ -81,6 +81,9 @@ model Breed {
   conformationStandards       BreedConformationStandard[]
   seasonCategories            SeasonCategory[]
   recordDefs                  RecordDef[]
+  bundleAnimals               BundleAnimal[]
+  shopBreedConfigs            GameShopBreedConfig[]
+  rafflePrizeAnimals          RafflePrizeAnimal[]
   game                        Game                      @relation(fields: [gameId], references: [id])
   species                     Species                   @relation(fields: [speciesId], references: [id])
   foundingPlayer              PlayerAccount?            @relation("BreedFounder", fields: [foundingPlayerId], references: [id])
@@ -166,6 +169,13 @@ model Animal {
   weeklyPoints                    AnimalWeeklyPoints[]
   competitionEntries              CompetitionEntry[]
   recordEntries                   RecordEntry[]
+  subContainer                    SubContainer?              @relation(fields: [subContainerId], references: [id])
+  appliedItems                    AnimalAppliedItem[]
+  marketplaceListings             MarketplaceListingAnimal[]
+  marketplaceOfferAnimals         MarketplaceOfferAnimal[]
+  gifts                           Gift[]
+  gameShopAnimal                  GameShopAnimal?
+  rafflePrizeAnimals              RafflePrizeAnimal[]
   game                            Game                       @relation(fields: [gameId], references: [id])
   playerAccount                   PlayerAccount              @relation(fields: [playerAccountId], references: [id])
   breed                           Breed                      @relation(fields: [breedId], references: [id])
@@ -258,6 +268,7 @@ model AnimalDailyLog {
   outcome         String?
   context         Json?
   itemDefId       String?
+  itemDef         ItemDef? @relation(fields: [itemDefId], references: [id])
   animal          Animal   @relation("DailyLogAnimal", fields: [animalId], references: [id])
   partner         Animal?  @relation("DailyLogPartner", fields: [partnerAnimalId], references: [id])
   createdAt       DateTime @default(now())

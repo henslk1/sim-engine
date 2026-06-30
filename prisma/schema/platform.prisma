@@ -36,6 +36,19 @@ model Game {
   seasons                Season[]
   recordDefs             RecordDef[]
   directoryFilterDefs    DirectoryFilterDef[]
+  currencyDefs            CurrencyDef[]
+  transactions            Transaction[]
+  itemDefs                ItemDef[]
+  storeListings           StoreListing[]
+  vetServiceDefs          VetServiceDef[]
+  bundles                 Bundle[]
+  shopBreedConfigs        GameShopBreedConfig[]
+  shopAnimals             GameShopAnimal[]
+  marketplaceListings     MarketplaceListing[]
+  currencyExchangeOrders  CurrencyExchangeOrder[]
+  escrows                 Escrow[]
+  gifts                   Gift[]
+  raffles                 Raffle[]
   isActive               Boolean                 @default(false)
   createdAt              DateTime                @default(now())
 }
@@ -127,6 +140,25 @@ model PlayerAccount {
   competitionEntries         CompetitionEntry[]
   seasonRankings             SeasonRanking[]
   recordEntries              RecordEntry[]
+  playerBalances             PlayerBalance[]
+  outgoingTransactions       Transaction[]        @relation("TxnFrom")
+  incomingTransactions       Transaction[]        @relation("TxnTo")
+  actingTransactions         Transaction[]        @relation("ActingPlayer")
+  playerInventory            PlayerInventory[]
+  playerCapacity             PlayerCapacity?
+  subContainers              SubContainer[]
+  appliedItems               AnimalAppliedItem[]
+  marketplaceListings        MarketplaceListing[]
+  marketplaceOffers          MarketplaceOffer[]
+  currencyExchangeOrders     CurrencyExchangeOrder[]
+  escrowsFrom                Escrow[]             @relation("EscrowFrom")
+  escrowsTo                  Escrow[]             @relation("EscrowTo")
+  giftsFrom                  Gift[]               @relation("GiftFrom")
+  giftsTo                    Gift[]               @relation("GiftTo")
+  raffleEntries              RaffleEntry[]
+  raffleItemSubmissions      RaffleItemSubmission[]
+  raffleWins                 RaffleWinner[]
+  hostedRaffles              Raffle[]
   game                       Game                 @relation(fields: [gameId], references: [id])
   user                       User                 @relation(fields: [userId], references: [id])
   createdAt                  DateTime             @default(now())
@@ -140,6 +172,7 @@ model SubscriptionTier {
   name                String
   cost                Int
   gameId              String
+  hasGeneReveal       Boolean              @default(false)
   game                Game                 @relation(fields: [gameId], references: [id])
   playerSubscriptions PlayerSubscription[]
   isActive            Boolean              @default(true)
@@ -322,6 +355,8 @@ model GameConfig {
   trainingCeilingMultiplier Float
   pedigreeDisplayDepth      Int
   predictorDailyLimitFree   Int
+  containerLabel            String?
+  subContainerLabel         String?
   game                      Game     @relation(fields: [gameId], references: [id])
   createdAt                 DateTime @default(now())
   updatedAt                 DateTime @updatedAt

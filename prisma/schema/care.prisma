@@ -28,6 +28,7 @@ model CareActionItem {
   itemDefId       String
   quantity        Int           @default(1)
   careActionDef   CareActionDef @relation(fields: [careActionDefId], references: [id])
+  itemDef         ItemDef       @relation(fields: [itemDefId], references: [id])
 
   @@unique([careActionDefId, itemDefId])
 }

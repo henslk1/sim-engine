@@ -55,6 +55,7 @@ model TreatmentItem {
   itemDefId      String
   quantity       Int          @default(1)
   treatmentDef   TreatmentDef @relation(fields: [treatmentDefId], references: [id])
+  itemDef        ItemDef      @relation(fields: [itemDefId], references: [id])
 
   @@unique([treatmentDefId, itemDefId])
 }
@@ -141,14 +142,16 @@ model HealthCertificate {
 }
 
 model VetVisitLog {
-  id              String        @id @default(cuid())
+  id              String         @id @default(cuid())
   animalId        String
   playerAccountId String
+  vetServiceDefId String?
   visitCycle      Int
   notes           String?
-  visitedAt       DateTime      @default(now())
-  animal          Animal        @relation(fields: [animalId], references: [id])
-  playerAccount   PlayerAccount @relation(fields: [playerAccountId], references: [id])
+  visitedAt       DateTime       @default(now())
+  vetServiceDefs  VetServiceDef? @relation(fields: [vetServiceDefId], references: [id])
+  animal          Animal         @relation(fields: [animalId], references: [id])
+  playerAccount   PlayerAccount  @relation(fields: [playerAccountId], references: [id])
 }
 
 model AnimalImmunity {

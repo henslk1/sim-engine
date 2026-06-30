@@ -49,6 +49,9 @@ model ItemDef {
   raffleItemSubmissions   RaffleItemSubmission[]
   rafflePrizeItems        RafflePrizeItem[]
   playerInventory         PlayerInventory[]
+  careActionItems         CareActionItem[]
+  treatmentItems          TreatmentItem[]
+  equipment               AnimalEquipment[]
   appliedItems            AnimalAppliedItem[]
   dailyLogs               AnimalDailyLog[]
   prizeEligible           Boolean @default(true)

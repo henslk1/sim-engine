@@ -41,7 +41,7 @@ model ExpressionRule {
   phenotype         String
   numericModifier   Float?
   climateModifiers  ExpressionClimateModifier[]
-  terrainModifiiers ExpressionTerrainModifier[]
+  terrainModifiers  ExpressionTerrainModifier[]
   locus             Locus  @relation(fields: [locusId], references: [id])
   alleleOne         Allele @relation("AlleleOne", fields: [alleleOneId], references: [id])
   alleleTwo         Allele @relation("AlleleTwo", fields: [alleleTwoId], references: [id])
@@ -58,12 +58,13 @@ model GeneAvailabilityState {
 }
 
 model GeneticPanelDef {
-  id        String              @id @default(cuid())
-  gameId    String
-  name      String
-  panelType GeneticPanelType
-  loci      GeneticPanelLocus[]
-  game      Game                @relation(fields: [gameId], references: [id])
+  id             String @id @default(cuid())
+  gameId         String
+  name           String
+  panelType      GeneticPanelType
+  loci           GeneticPanelLocus[]
+  verServiceDefs VetServiceDef[]
+  game           Game   @relation(fields: [gameId], references: [id])
 
   @@unique([gameId, name])
 }
