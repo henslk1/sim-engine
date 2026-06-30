@@ -236,13 +236,58 @@ model MarketplaceOfferGeneticMaterial {
 }
 
 model CurrencyExchangeOrder {
-  id String @id @default(cuid())
+  id                String       @id @default(cuid())
+  gameId            String
+  sellerPlayerId    String
+  fromCurrencyDefId String
+  toCurrencyDefId   String
+  exchangeRate      Float
+  amountOffered     Int
+  amountRemaining   Int
+  isFlagged         Boolean       @default(false)
+  isActive          Boolean       @default(true)
+  createdAt         DateTime      @default(now())
+  toCurrency        CurrencyDef   @relation("ToCurrency", fields: [toCurrencydefId], references: [id])
+  FromCurrency      CurrencyDef   @relation("FromCurrency", fields: [fromCurrencyDefId], references: [id])
+  sellerPlayer      PlayerAccount @relation(fields: [sellerPlayerId], references: [id])
+  game              Game          @relation(fields: [gameId], references: [id])
 }
 
 model Escrow {
-  id String @id @default(cuid())
+  id            String @id @default(cuid())
+  gameId        String
+  fromPlayerId  String
+  toPlayerId    String?
+  currencyDefId String
+  amount        Int
+  stats         EscrowStatus
+  jobContractId String? @unique
+  releasedAt    DateTime?
+  createdAt     DateTime @default(now())
+  currencyDef   CurrencyDef @relation(fields: [currencyDefId], references: [id])
+  toPlayer      PlayerAccount? @relation("EscrowTo", fields: [toPlayerId], references: [id])
+  fromPlayer    PlayerAccount @relation("EscrowFrom", fields: [fromPlayerId], references: [id])
+  game          Game @relation(fields: [gameId], references: [id])
 }
 
 model Gift {
-  id String @id @default(cuid())
+  id                String           @id @default(cuid())
+  gameId            String
+  fromPlayerId      String
+  toPlayerId        String
+  itemDefId         String?
+  itemQuantity      Int?
+  animalId          String?
+  currencyDefId     String?
+  currencyAmount    Int?
+  geneticMaterialId String?
+  message           String?
+  sentAt            DateTime         @default(now())
+  geneticMaterial   GeneticMaterial? @relation(fields: [geneticMaterialId], references: [id])
+  currencyDef       CurrencyDef?     @relation(fields: [currencyDefId], references: [id])
+  animal            Animal?          @relation(fields: [animalId], references: [id])
+  itemDef           ItemDef?         @relation(fields: [itemDefId], references: [id])
+  toPlayer          PlayerAccount    @relation("GiftTo", fields: [toPlayerId], references: [id])
+  fromPlayer        PlayerAccount    @relation("GiftFrom", fields: [fromPlayerId], references: [id])
+  game              Game             @relation(fields: [gameId], references: [id])
 }
