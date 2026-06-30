@@ -4,6 +4,29 @@ enum CurrencyType {
   PRESTIGE
 }
 
+enum TransactionType {
+  PURCHASE
+  PRIZE 
+  BREEDING_FEE
+  COMPETITION_ENTRY
+  MARKETPLACE_SALE
+  MARKETPLACE_PURCHASE
+  STORE_PURCHASE
+  CARE_FEE
+  VET_SERVICE_FEE
+  ESCROW_HOLD
+  ESCROW_RELEASE
+  ESCROW_REFUND
+  CURRENCY_EXCHANGE
+  RAFFLE_TICKET
+  GIFT
+  SUBSCRIPTION
+  ADMIN_ADJUSTMENT
+  GROUP_CONTRIBUTION
+  GROUP_TREASURY_PAYOUT
+  GROUP_CARE_CHARGE
+}
+
 model CurrencyDef {
   id           String @id @default(cuid())
   gameId       String
@@ -34,6 +57,7 @@ model Transaction {
   fromGroupId           String?
   toGroupId             String?
   actingPlayerAccountId String?
+  txnType               TransactionType
   createdAt             DateTime       @default(now())
   toPlayerAccount       PlayerAccount? @relation("TxnTo", fields: [toPlayerAccountId], references: [id])
   fromPlayerAccount     PlayerAccount? @relation("TxnFrom", fields: [fromPlayerAccountId], references: [id])

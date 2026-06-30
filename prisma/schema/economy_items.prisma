@@ -1,0 +1,52 @@
+enum ItemType {
+  AGING_BASE
+  AGING_PREMIUM
+  OTC_MEDICATION
+  CARE_CONSUMABLE
+  EQUIPMENT 
+  DIRECT_EFFECT
+  PERMANENT_APPLIED
+  ANIMAL_SLOT_EXPAND
+  SUBCONTAINER_EXPAND
+}
+
+enum ItemCategory {
+  AGING
+  CARE 
+  HEALTH
+  EQUIPMENT
+  BREEDING
+  STORAGE 
+  MISC
+}
+
+enum PermanentEffectType {
+  IMMORTALITY
+  SEX_CHANGE
+  FREE_AGING
+  BREEDING_SLOT_RAISE
+  ENERGY_MAX_RAISE
+  TWIN_CHANCE_RAISE
+  TWIN_GUARANTEE
+  STAGE_SKIP
+}
+
+model ItemDef {
+  id String @id @default(cuid())
+}
+
+model PlayerInventory {
+  id String @id @default(cuid())
+}
+
+model AnimalAppliedItem {
+  id String @id @default(cuid())
+}
+
+model PlayerCapacity {
+  id String @id @default(cuid())
+}
+
+model SubContainer {
+  id String @id @default(cuid())
+}
