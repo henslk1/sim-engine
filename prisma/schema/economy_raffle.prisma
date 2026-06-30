@@ -5,7 +5,7 @@ enum RaffleHostType {
 }
 
 model Raffle {
-  id               String        @id @default(cuid())
+  id               String         @id @default(cuid())
   gameId           String
   name             String
   ticketPrice      Int?
@@ -17,14 +17,14 @@ model Raffle {
   hostGroupId      String?
   startsAt         DateTime 
   endsAt           DateTime
-  isDrawn          Boolean       @default(false)
+  isDrawn          Boolean        @default(false)
   drawnAt          DateTime?
   entries          RaffleEntry[]
   prizes           RafflePrize[]
   itemConfigs      RaffleItemConfig[]
   itemSubmissions  RaffleItemSubmission[]
-  hostPlayer       PlayerAccount @relation(fields: [hostPlayerId], references: [id])
-  currencyDef      CurrencyDef   @relation(fields: [currencyDefId], references: [id])
+  hostPlayer       PlayerAccount? @relation(fields: [hostPlayerId], references: [id])
+  currencyDef      CurrencyDef?   @relation(fields: [currencyDefId], references: [id])
   game Game @relation(fields: [gameId], references: [id])
 }
 
@@ -124,5 +124,5 @@ model RaffleWinner {
   claimedAt       DateTime?
   playerAccount   PlayerAccount @relation(fields: [playerAccountId], references: [id])
   raffle          Raffle        @relation(fields: [raffleId], references: [id])
-  @@unique([raffleId, playerAccountId])
+  @@unique([raffleId, placement])
 }
