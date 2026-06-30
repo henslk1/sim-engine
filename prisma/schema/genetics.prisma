@@ -63,7 +63,7 @@ model GeneticPanelDef {
   name           String
   panelType      GeneticPanelType
   loci           GeneticPanelLocus[]
-  verServiceDefs VetServiceDef[]
+  vetServiceDefs VetServiceDef[]
   game           Game   @relation(fields: [gameId], references: [id])
 
   @@unique([gameId, name])

@@ -34,18 +34,21 @@ model CurrencyDef {
   currencyType          CurrencyType
   symbol                String?
   playerBalances        PlayerBalance[]
+  transactions          Transaction[]
+  breedingListings      BreedingListing[]
   storeListing          StoreListing[]
   vetServiceDefs        VetServiceDef[]
   bundleCurrencyRewards BundleCurrencyReward[]
   shopBreedConfigs      GameShopBreedConfig[]
+  marketplaceListings   MarketplaceListing[]
   marketplaceOffers     MarketplaceOffer[]
-  toCurrencyOrders      CurrencyExchangeOrder @relation("ToCurrency")
-  fromCurrencyOrders    CurrencyExchangeOrder @relation("FromCurrency")
+  toCurrencyOrders      CurrencyExchangeOrder[] @relation("ToCurrency")
+  fromCurrencyOrders    CurrencyExchangeOrder[] @relation("FromCurrency")
   escrows               Escrow[]
   gifts                 Gift[]
   rafflePrizeCurrencies RafflePrizeCurrency[]
   raffles               Raffle[]
-  game                  Game   @relation(fields: [gameId], references: [id])
+  game                  Game                    @relation(fields: [gameId], references: [id])
 
   @@unique([gameId, name])
 }

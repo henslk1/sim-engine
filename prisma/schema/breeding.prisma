@@ -32,7 +32,7 @@ model BreedingListing {
   isActive          Boolean       @default(true)
   animal            Animal        @relation(fields: [animalId], references: [id])
   ownerPlayer       PlayerAccount @relation(fields: [ownerPlayerId], references: [id])
-  currencyDef       CurrencyDef   @relation(fields: [currencyDefId], references: [id])
+  currencyDef       CurrencyDef?  @relation(fields: [currencyDefId], references: [id])
   game              Game          @relation(fields: [gameId], references: [id])
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt

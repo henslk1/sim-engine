@@ -149,7 +149,7 @@ model VetVisitLog {
   visitCycle      Int
   notes           String?
   visitedAt       DateTime       @default(now())
-  vetServiceDefs  VetServiceDef? @relation(fields: [vetServiceDefId], references: [id])
+  vetServiceDef   VetServiceDef? @relation(fields: [vetServiceDefId], references: [id])
   animal          Animal         @relation(fields: [animalId], references: [id])
   playerAccount   PlayerAccount  @relation(fields: [playerAccountId], references: [id])
 }

@@ -42,7 +42,7 @@ model ItemDef {
   effectType              PermanentEffectType?
   storeListings           StoreListing[]
   bundleItems             BundleItem[]
-  marketPlaceListingItems MarketplaceListingItem[]
+  marketplaceListingItems MarketplaceListingItem[]
   marketplaceOfferItems   MarketplaceOfferItem[]
   gifts                   Gift[]
   raffleItemConfigs       RaffleItemConfig[]
@@ -99,6 +99,7 @@ model SubContainer {
   id              String        @id @default(cuid())
   playerAccountId String
   name            String
+  animals         Animal[]
   displayOrder    Int
   sortDefault     String?
   filterConfig    Json?

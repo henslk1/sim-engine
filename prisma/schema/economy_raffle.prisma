@@ -23,6 +23,7 @@ model Raffle {
   prizes           RafflePrize[]
   itemConfigs      RaffleItemConfig[]
   itemSubmissions  RaffleItemSubmission[]
+  winners          RaffleWinner[]
   hostPlayer       PlayerAccount? @relation(fields: [hostPlayerId], references: [id])
   currencyDef      CurrencyDef?   @relation(fields: [currencyDefId], references: [id])
   game Game @relation(fields: [gameId], references: [id])
