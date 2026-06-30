@@ -39,27 +39,79 @@ enum EscrowStatus {
 }
 
 model StoreListing {
-  id String @id @default(cuid())
+  id               String      @id @default(cuid())
+  gameId           String
+  itemDefId        String
+  shopType         ShopType
+  price            Int
+  currencyDefId    String
+  isActive         Boolean     @default(true)
+  isRotating       Boolean     @default(false)
+  rotationStartsAt DateTime?
+  rotationEndsAt   DateTime?
+  currencyDef      CurrencyDef @relation(fields: [currencyDefId], references: [id])
+  itemDef          ItemDef     @relation(fields: [itemDefId], references: [id])
+  game             Game        @relation(fields: [gameId], references: [id])
 }
 
 model VetServiceDef {
-  id String @id @default(cuid())
+  id                    String           @id @default(cuid())
+  gameId                String
+  name                  String
+  serviceType           VetServiceType
+  baseCost              Int
+  currencyDefId         String
+  hasSubscriberDiscount Boolean          @default(false)
+  vetVisitLogs          VetVisitLog[]
+  panelDefId            String?
+  panelDef              GeneticPanelDef? @relation(fields: [panelDefId], references: [id])
+  currencyDef           CurrencyDef      @relation(fields: [currencyDefId], references: [id])
+  game                  Game             @relation(fields: [gameId], references: [id])
+  @@unique([gameId, name])
 }
 
 model Bundle {
-  id String @id @default(cuid())
+  id              String  @id @default(cuid())
+  gameId          String
+  name            String
+  priceUsd        Int
+  stripeProductId String?
+  isActive        Boolean @default(true)
+  items           BundleItem[]
+  currencies      BundleCurrencyReward[]
+  animals         BundleAnimal[]
+  game            Game    @relation(fields: [gameId], references: [id])
+  @@unique([gameId, name])
 }
 
 model BundleItem {
-  id String @id @default(cuid())
+  id        String  @id @default(cuid())
+  bundleId  String
+  itemDefId String
+  quantity  Int     @default(1)
+  itemDef   ItemDef @relation(fields: [itemDefId], references: [id])
+  bundle    Bundle  @relation(fields: [bundleId], references: [id])
+  @@unique([bundleId, itemDefId])
 }
 
 model BundleCurrencyReward {
-  id String @id @default(cuid())
+  id            String      @id @default(cuid())
+  bundleId      String
+  currencyDefId String
+  amount        Int
+  currencyDef   CurrencyDef @relation(fields: [currencyDefId], references: [id])
+  bundle        Bundle      @relation(fields: [bundleId], references: [id])
+  @@unique([bundleId, currencyDefId])
 }
 
 model BundleAnimal {
   id String @id @default(cuid())
+  bundleId String
+  breedId String
+  quantity Int @default(1)
+  breed Breed @relation(fields: [breedId], references: [id])
+  bundle Bundle @relation(fields: [bundleId], references: [id])
+  @@unique([bundleId, breedId])
 }
 
 model GameShopBreedConfig {
