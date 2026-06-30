@@ -144,35 +144,95 @@ model GameShopAnimal {
 }
 
 model MarketplaceListing {
-  id String @id @default(cuid())
+  id               String       @id @default(cuid())
+  gameId           String
+  sellerPlayerId   String
+  listingType      ListingType
+  currencyDefId    String
+  price            Int
+  status           ListingStatus
+  description      String?
+  expiresAt        DateTime?
+  createdAt        DateTime      @default(now())
+  animals          MarkeplaceListingAnimal[]
+  items            MarketplaceListingItem[]
+  geneticMaterials MarketplaceListingGeneticMaterial[]
+  offers           MarketplaceOffer[]
+  currencyDef      CurrencyDef   @relation(fields: [currencyDefId], references: [id])
+  sellerPlayer     PlayerAccount @relation(fields: [sellerPlayerId], references: [id])
+  game             Game          @relation(fields: [gameId], references: [id])
 }
 
 model MarkeplaceListingAnimal {
-  id String @id @default(cuid())
+  id        String             @id @default(cuid())
+  listingId String
+  animalId  String
+  animal    Animal             @relation(fields: [animalId], references: [id])
+  listing   MarketplaceListing @relation(fields: [listingId], references: [id])
+  @@unique([listingId, animalId])
 }
 
 model MarketplaceListingItem {
-  id String @id @default(cuid())
+  id         String             @id @default(cuid())
+  listingId  String
+  itemDefId  String
+  quantity   Int
+  itemDef    ItemDef            @relation(fields: [itemDefId], references: [id])
+  listing    MarketplaceListing @relation(fields: [listingId], references: [id])
+  @@unique([listingId, itemDefId])
 }
 
 model MarketplaceListingGeneticMaterial {
-  id String @id @default(cuid())
+  id                String             @id @default(cuid())
+  listingId         String
+  geneticMaterialId String
+  geneticMaterial   GeneticMaterial    @relation(fields: [geneticMaterialId], references: [id])
+  listing           MarketplaceListing @relation(fields: [listingId], references: [id])
+  @@unique([listingId, geneticMaterialId])
 }
 
 model MarketplaceOffer {
-  id String @id @default(cuid())
+  id               String             @id @default(cuid())
+  listingId        String
+  buyingPlayerId   String
+  amount           Int?
+  currencyDefId    String?
+  status           OfferStatus
+  createdAt        DateTime           @default(now())
+  animals          MarketplaceOfferAnimal[]
+  items            MarketplaceOfferItem[]
+  geneticMaterials MarketplaceOfferGeneticMaterial[]
+  currencyDef      CurrencyDef?       @relation(fields: [currencyDefId], references: [id])
+  buyingPlayer     PlayerAccount      @relation(fields: [buyingPlayerId], references: [id])
+  listing          MarketplaceListing @relation(fields: [listingId], references: [id])
 }
 
 model MarketplaceOfferAnimal {
-  id String @id @default(cuid())
+  id      String           @id @default(cuid())
+  offerId String
+  animalId String
+  animal Animal @relation(fields: [animalId], references: [id])
+  offer   MarketplaceOffer @relation(fields: [offerId], references: [id])
+  @@unique([offerId, animalId])
 }
 
 model MarketplaceOfferItem {
-  id String @id @default(cuid())
+  id        String           @id @default(cuid())
+  offerId   String
+  itemDefId String
+  quantity  Int
+  itemDef   ItemDef          @relation(fields: [itemDefId], references: [id])
+  offer     MarketplaceOffer @relation(fields: [offerId], references: [id])
+  @@unique([offerId, itemDefId])
 }
 
 model MarketplaceOfferGeneticMaterial {
-  id String @id @default(cuid())
+  id                String           @id @default(cuid())
+  offerId           String
+  geneticMaterialId String
+  geneticMaterial   GeneticMaterial  @relation(fields: [geneticMaterialId], references: [id])
+  offer             MarketplaceOffer @relation(fields: [offerId], references: [id])
+  @@unique([offerId, geneticMaterialId])
 }
 
 model CurrencyExchangeOrder {
