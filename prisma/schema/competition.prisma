@@ -15,7 +15,7 @@ enum VenueTerrain {
 enum CompetitionStatus {
   OPEN
   IN_PROGRESS
-  COMPLETED 
+  COMPLETED
   CANCELLED
 }
 
@@ -26,16 +26,16 @@ enum SeasonCategoryType {
 }
 
 enum RankSubjectType {
-  PLAYER 
+  PLAYER
   GROUP
 }
 
 model DisciplineDef {
-  id               String @id @default(cuid())
+  id               String                  @id @default(cuid())
   gameId           String
   name             String
   description      String?
-  isConformation   Boolean @default(false)
+  isConformation   Boolean                 @default(false)
   statWeights      DisciplineStatWeight[]
   compTierDefs     CompetitionTierDef[]
   venueDisciplines VenueDiscipline[]
@@ -46,7 +46,8 @@ model DisciplineDef {
   recordDefs       RecordDef[]
   titleDefs        TitleDef[]
   animals          Animal[]
-  game             Game @relation(fields: [gameId], references: [id])
+  game             Game                    @relation(fields: [gameId], references: [id])
+
   @@unique([gameId, name])
 }
 
@@ -57,6 +58,7 @@ model DisciplineStatWeight {
   weight          Float
   statDef         StatDef       @relation(fields: [statDefId], references: [id])
   disciplineDef   DisciplineDef @relation(fields: [disciplineDefId], references: [id])
+
   @@unique([disciplineDefId, statDefId])
 }
 
@@ -68,11 +70,12 @@ model BreedConformationStandard {
   weight               Float
   locus                Locus  @relation(fields: [locusId], references: [id])
   breed                Breed  @relation(fields: [breedId], references: [id])
+
   @@unique([breedId, locusId])
 }
 
 model CompetitionTierDef {
-  id                   String        @id @default(cuid())
+  id                   String                  @id @default(cuid())
   gameId               String
   disciplineDefId      String
   name                 String
@@ -80,20 +83,22 @@ model CompetitionTierDef {
   minScore             Float?
   advancementThreshold Float?
   animalTiers          AnimalCompetitionTier[]
-  disciplineDef        DisciplineDef @relation(fields: [disciplineDefId], references: [id])
-  game                 Game          @relation(fields: [gameId], references: [id])
+  disciplineDef        DisciplineDef           @relation(fields: [disciplineDefId], references: [id])
+  game                 Game                    @relation(fields: [gameId], references: [id])
+
   @@unique([disciplineDefId, tierIndex])
 }
 
 model Venue {
-  id           String @id @default(cuid())
+  id           String            @id @default(cuid())
   gameId       String
   name         String
   climate      VenueClimate
   terrain      VenueTerrain
   disciplines  VenueDiscipline[]
   competitions Competition[]
-  game         Game  @relation(fields: [gameId], references: [id])
+  game         Game              @relation(fields: [gameId], references: [id])
+
   @@unique([gameId, name])
 }
 
@@ -103,15 +108,17 @@ model VenueDiscipline {
   disciplineDefId String
   disciplineDef   DisciplineDef @relation(fields: [disciplineDefId], references: [id])
   venue           Venue         @relation(fields: [venueId], references: [id])
+
   @@unique([venueId, disciplineDefId])
 }
 
 model ExpressionClimateModifier {
-  id               String @id @default(cuid())
+  id               String         @id @default(cuid())
   expressionRuleId String
   climate          VenueClimate
   modifier         Float
   expressionRule   ExpressionRule @relation(fields: [expressionRuleId], references: [id])
+
   @@unique([expressionRuleId, climate])
 }
 
@@ -121,6 +128,7 @@ model ExpressionTerrainModifier {
   terrain          VenueTerrain
   modifier         Float
   expressionRule   ExpressionRule @relation(fields: [expressionRuleId], references: [id])
+
   @@unique([expressionRuleId, terrain])
 }
 
@@ -131,38 +139,40 @@ model PrizeConfig {
   currencyDefId String
   amount        Int
   competition   Competition @relation(fields: [competitionId], references: [id])
+
   @@unique([competitionId, placement])
 }
 
 model Season {
-  id           String  @id @default(cuid())
+  id           String           @id @default(cuid())
   gameId       String
   name         String
   startsAt     DateTime
   endsAt       DateTime
-  isActive     Boolean @default(false)
+  isActive     Boolean          @default(false)
   categories   SeasonCategory[]
   rankings     SeasonRanking[]
   competitions Competition[]
-  game         Game    @relation(fields: [gameId], references: [id])
+  game         Game             @relation(fields: [gameId], references: [id])
 }
 
 model SeasonCategory {
-  id              String         @id @default(cuid())
+  id              String             @id @default(cuid())
   seasonId        String
   name            String
   categoryType    SeasonCategoryType
   breedId         String?
   disciplineDefId String?
   rankings        SeasonRanking[]
-  disciplineDef   DisciplineDef? @relation(fields: [disciplineDefId], references: [id])
-  breed           Breed?         @relation(fields: [breedId], references: [id])
-  season          Season         @relation(fields: [seasonId], references: [id])
+  disciplineDef   DisciplineDef?     @relation(fields: [disciplineDefId], references: [id])
+  breed           Breed?             @relation(fields: [breedId], references: [id])
+  season          Season             @relation(fields: [seasonId], references: [id])
+
   @@unique([seasonId, name])
 }
 
 model RecordDef {
-  id              String        @id @default(cuid())
+  id              String         @id @default(cuid())
   gameId          String
   name            String
   description     String?
@@ -176,6 +186,7 @@ model RecordDef {
   breed           Breed?         @relation(fields: [breedId], references: [id])
   disciplineDef   DisciplineDef? @relation(fields: [disciplineDefId], references: [id])
   game            Game           @relation(fields: [gameId], references: [id])
+
   @@unique([gameId, name])
 }
 
@@ -188,11 +199,12 @@ model DirectoryFilterDef {
   isEnabled    Boolean @default(true)
   sortOrder    Int?
   game         Game    @relation(fields: [gameId], references: [id])
+
   @@unique([gameId, filterKey])
 }
 
 model Competition {
-  id              String        @id @default(cuid())
+  id              String             @id @default(cuid())
   gameId          String
   venueId         String
   disciplineDefId String
@@ -201,26 +213,27 @@ model Competition {
   minEntries      Int
   maxWaitHours    Int
   status          CompetitionStatus
-  isInvitational  Boolean       @default(false)
+  isInvitational  Boolean            @default(false)
   entries         CompetitionEntry[]
   prizeConfigs    PrizeConfig[]
-  season          Season?       @relation(fields: [seasonId], references: [id])
-  disciplineDef   DisciplineDef @relation(fields: [disciplineDefId], references: [id])
-  venue           Venue         @relation(fields: [venueId], references: [id])
-  game            Game          @relation(fields: [gameId], references: [id])
-  createdAt       DateTime      @default(now())
+  season          Season?            @relation(fields: [seasonId], references: [id])
+  disciplineDef   DisciplineDef      @relation(fields: [disciplineDefId], references: [id])
+  venue           Venue              @relation(fields: [venueId], references: [id])
+  game            Game               @relation(fields: [gameId], references: [id])
+  createdAt       DateTime           @default(now())
 }
 
 model CompetitionEntry {
-  id              String        @id @default(cuid())
+  id              String             @id @default(cuid())
   competitionId   String
   animalId        String
   playerAccountId String
-  enteredAt       DateTime      @default(now())
+  enteredAt       DateTime           @default(now())
   result          CompetitionResult?
-  playerAccount   PlayerAccount @relation(fields: [playerAccountId], references: [id])
-  animal          Animal        @relation(fields: [animalId], references: [id])
-  competition     Competition   @relation(fields: [competitionId], references: [id])
+  playerAccount   PlayerAccount      @relation(fields: [playerAccountId], references: [id])
+  animal          Animal             @relation(fields: [animalId], references: [id])
+  competition     Competition        @relation(fields: [competitionId], references: [id])
+
   @@unique([competitionId, animalId])
 }
 
@@ -233,13 +246,14 @@ model CompetitionResult {
 }
 
 model AnimalCompetitionTier {
-  id              String @id @default(cuid())
+  id              String             @id @default(cuid())
   animalId        String
   disciplineDefId String
   tierDefId       String
   tierDef         CompetitionTierDef @relation(fields: [tierDefId], references: [id])
-  disciplineDef   DisciplineDef @relation(fields: [disciplineDefId], references: [id])
-  animal          Animal @relation(fields: [animalId], references: [id])
+  disciplineDef   DisciplineDef      @relation(fields: [disciplineDefId], references: [id])
+  animal          Animal             @relation(fields: [animalId], references: [id])
+
   @@unique([animalId, disciplineDefId])
 }
 
@@ -251,11 +265,12 @@ model AnimalWeeklyPoints {
   points          Float
   disciplineDef   DisciplineDef @relation(fields: [disciplineDefId], references: [id])
   animal          Animal        @relation(fields: [animalId], references: [id])
+
   @@unique([animalId, disciplineDefId, weekStart])
 }
 
 model SeasonRanking {
-  id              String         @id @default(cuid())
+  id              String          @id @default(cuid())
   seasonId        String
   categoryId      String
   subjectTypeId   RankSubjectType
@@ -263,20 +278,20 @@ model SeasonRanking {
   groupId         String?
   rank            Int
   score           Float
-  playerAccount   PlayerAccount? @relation(fields: [playerAccountId], references: [id])
-  category        SeasonCategory       @relation(fields: [categoryId], references: [id])
-  season          Season         @relation(fields: [seasonId], references: [id])
+  playerAccount   PlayerAccount?  @relation(fields: [playerAccountId], references: [id])
+  category        SeasonCategory  @relation(fields: [categoryId], references: [id])
+  season          Season          @relation(fields: [seasonId], references: [id])
 }
 
 model RecordEntry {
-    id              String         @id @default(cuid())
-    recordDefId     String
-    playerAccountId String?
-    animalId        String?
-    groupId         String?
-    value           Float
-    setAt           DateTime       @default(now())
-    animal          Animal?        @relation(fields: [animalId], references: [id])
-    playerAccount   PlayerAccount? @relation(fields: [playerAccountId], references: [id])
-    recordDef       RecordDef      @relation(fields: [recordDefId], references: [id])
+  id              String         @id @default(cuid())
+  recordDefId     String
+  playerAccountId String?
+  animalId        String?
+  groupId         String?
+  value           Float
+  setAt           DateTime       @default(now())
+  animal          Animal?        @relation(fields: [animalId], references: [id])
+  playerAccount   PlayerAccount? @relation(fields: [playerAccountId], references: [id])
+  recordDef       RecordDef      @relation(fields: [recordDefId], references: [id])
 }

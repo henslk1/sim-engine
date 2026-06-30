@@ -3,7 +3,7 @@ enum ItemType {
   AGING_PREMIUM
   OTC_MEDICATION
   CARE_CONSUMABLE
-  EQUIPMENT 
+  EQUIPMENT
   DIRECT_EFFECT
   PERMANENT_APPLIED
   ANIMAL_SLOT_EXPAND
@@ -12,11 +12,11 @@ enum ItemType {
 
 enum ItemCategory {
   AGING
-  CARE 
+  CARE
   HEALTH
   EQUIPMENT
   BREEDING
-  STORAGE 
+  STORAGE
   MISC
 }
 
@@ -32,7 +32,7 @@ enum PermanentEffectType {
 }
 
 model ItemDef {
-  id                      String  @id @default(cuid())
+  id                      String                   @id @default(cuid())
   gameId                  String
   name                    String
   description             String?
@@ -54,19 +54,21 @@ model ItemDef {
   equipment               AnimalEquipment[]
   appliedItems            AnimalAppliedItem[]
   dailyLogs               AnimalDailyLog[]
-  prizeEligible           Boolean @default(true)
-  isSellable              Boolean @default(true)
-  game                    Game    @relation(fields: [gameId], references: [id])
+  prizeEligible           Boolean                  @default(true)
+  isSellable              Boolean                  @default(true)
+  game                    Game                     @relation(fields: [gameId], references: [id])
+
   @@unique([gameId, name])
 }
 
 model PlayerInventory {
-  id String @id @default(cuid())
+  id              String        @id @default(cuid())
   playerAccountId String
-  itemDefId String
-  quantity  Int   @default(1)
-  itemDef ItemDef @relation(fields: [itemDefId], references: [id])
-  playerAccount PlayerAccount @relation(fields: [playerAccountId], references: [id])
+  itemDefId       String
+  quantity        Int           @default(1)
+  itemDef         ItemDef       @relation(fields: [itemDefId], references: [id])
+  playerAccount   PlayerAccount @relation(fields: [playerAccountId], references: [id])
+
   @@unique([playerAccountId, itemDefId])
 }
 

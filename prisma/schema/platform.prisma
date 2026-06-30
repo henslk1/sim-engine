@@ -36,19 +36,19 @@ model Game {
   seasons                Season[]
   recordDefs             RecordDef[]
   directoryFilterDefs    DirectoryFilterDef[]
-  currencyDefs            CurrencyDef[]
-  transactions            Transaction[]
-  itemDefs                ItemDef[]
-  storeListings           StoreListing[]
-  vetServiceDefs          VetServiceDef[]
-  bundles                 Bundle[]
-  shopBreedConfigs        GameShopBreedConfig[]
-  shopAnimals             GameShopAnimal[]
-  marketplaceListings     MarketplaceListing[]
-  currencyExchangeOrders  CurrencyExchangeOrder[]
-  escrows                 Escrow[]
-  gifts                   Gift[]
-  raffles                 Raffle[]
+  currencyDefs           CurrencyDef[]
+  transactions           Transaction[]
+  itemDefs               ItemDef[]
+  storeListings          StoreListing[]
+  vetServiceDefs         VetServiceDef[]
+  bundles                Bundle[]
+  shopBreedConfigs       GameShopBreedConfig[]
+  shopAnimals            GameShopAnimal[]
+  marketplaceListings    MarketplaceListing[]
+  currencyExchangeOrders CurrencyExchangeOrder[]
+  escrows                Escrow[]
+  gifts                  Gift[]
+  raffles                Raffle[]
   isActive               Boolean                 @default(false)
   createdAt              DateTime                @default(now())
 }
@@ -113,7 +113,7 @@ model Verification {
 }
 
 model PlayerAccount {
-  id                         String               @id @default(cuid())
+  id                         String                  @id @default(cuid())
   userId                     String
   gameId                     String
   username                   String
@@ -125,14 +125,14 @@ model PlayerAccount {
   bugReportComments          BugReportComment[]
   animals                    Animal[]
   playerBrand                PlayerBrand?
-  foundedBreeds              Breed[]              @relation("BreedFounder")
-  performedCareLogs          CareLog[]            @relation("CarePerformedBy")
+  foundedBreeds              Breed[]                 @relation("BreedFounder")
+  performedCareLogs          CareLog[]               @relation("CarePerformedBy")
   vetVisitLogs               VetVisitLog[]
   trainingLogsPerformed      TrainingLog[]
   hostedClinics              Clinic[]
   clinicEntries              ClinicEntry[]
-  trainerAssignments         HiredTrainer[]       @relation("Trainer")
-  hiresAsClient              HiredTrainer[]       @relation("HiredBy")
+  trainerAssignments         HiredTrainer[]          @relation("Trainer")
+  hiresAsClient              HiredTrainer[]          @relation("HiredBy")
   stageActivityLogsPerformed StageActivityLog[]
   breedingListings           BreedingListing[]
   purchasedBreedingSlots     BreedingSlot[]
@@ -141,9 +141,9 @@ model PlayerAccount {
   seasonRankings             SeasonRanking[]
   recordEntries              RecordEntry[]
   playerBalances             PlayerBalance[]
-  outgoingTransactions       Transaction[]        @relation("TxnFrom")
-  incomingTransactions       Transaction[]        @relation("TxnTo")
-  actingTransactions         Transaction[]        @relation("ActingPlayer")
+  outgoingTransactions       Transaction[]           @relation("TxnFrom")
+  incomingTransactions       Transaction[]           @relation("TxnTo")
+  actingTransactions         Transaction[]           @relation("ActingPlayer")
   playerInventory            PlayerInventory[]
   playerCapacity             PlayerCapacity?
   subContainers              SubContainer[]
@@ -151,18 +151,18 @@ model PlayerAccount {
   marketplaceListings        MarketplaceListing[]
   marketplaceOffers          MarketplaceOffer[]
   currencyExchangeOrders     CurrencyExchangeOrder[]
-  escrowsFrom                Escrow[]             @relation("EscrowFrom")
-  escrowsTo                  Escrow[]             @relation("EscrowTo")
-  giftsFrom                  Gift[]               @relation("GiftFrom")
-  giftsTo                    Gift[]               @relation("GiftTo")
+  escrowsFrom                Escrow[]                @relation("EscrowFrom")
+  escrowsTo                  Escrow[]                @relation("EscrowTo")
+  giftsFrom                  Gift[]                  @relation("GiftFrom")
+  giftsTo                    Gift[]                  @relation("GiftTo")
   raffleEntries              RaffleEntry[]
   raffleItemSubmissions      RaffleItemSubmission[]
   raffleWins                 RaffleWinner[]
   hostedRaffles              Raffle[]
-  game                       Game                 @relation(fields: [gameId], references: [id])
-  user                       User                 @relation(fields: [userId], references: [id])
-  createdAt                  DateTime             @default(now())
-  updatedAt                  DateTime             @updatedAt
+  game                       Game                    @relation(fields: [gameId], references: [id])
+  user                       User                    @relation(fields: [userId], references: [id])
+  createdAt                  DateTime                @default(now())
+  updatedAt                  DateTime                @updatedAt
 
   @@unique([userId, gameId])
 }

@@ -46,7 +46,7 @@ model LifeStageDef {
 }
 
 model StatDef {
-  id                          String              @id @default(cuid())
+  id                          String                       @id @default(cuid())
   gameId                      String
   name                        String
   statProfiles                BreedStatProfile[]
@@ -56,13 +56,13 @@ model StatDef {
   breedingListingStatMinimums BreedingListingStatMinimum[]
   disciplineStatWeights       DisciplineStatWeight[]
   recordDefs                  RecordDef[]
-  game                        Game                @relation(fields: [gameId], references: [id])
+  game                        Game                         @relation(fields: [gameId], references: [id])
 
   @@unique([gameId, name])
 }
 
 model Breed {
-  id                          String                    @id @default(cuid())
+  id                          String                            @id @default(cuid())
   gameId                      String
   name                        String
   speciesId                   String
@@ -70,7 +70,7 @@ model Breed {
   foundingPlayerId            String?
   image                       String?
   lore                        String?
-  isUnregistered              Boolean                   @default(false)
+  isUnregistered              Boolean                           @default(false)
   convergenceGenerations      Int?
   statProfile                 BreedStatProfile[]
   animals                     Animal[]
@@ -84,9 +84,9 @@ model Breed {
   bundleAnimals               BundleAnimal[]
   shopBreedConfigs            GameShopBreedConfig[]
   rafflePrizeAnimals          RafflePrizeAnimal[]
-  game                        Game                      @relation(fields: [gameId], references: [id])
-  species                     Species                   @relation(fields: [speciesId], references: [id])
-  foundingPlayer              PlayerAccount?            @relation("BreedFounder", fields: [foundingPlayerId], references: [id])
+  game                        Game                              @relation(fields: [gameId], references: [id])
+  species                     Species                           @relation(fields: [speciesId], references: [id])
+  foundingPlayer              PlayerAccount?                    @relation("BreedFounder", fields: [foundingPlayerId], references: [id])
 
   @@unique([gameId, name])
 }

@@ -4,7 +4,7 @@ enum GeneticPanelType {
 }
 
 model Locus {
-  id                    String              @id @default(cuid())
+  id                    String                      @id @default(cuid())
   gameId                String
   name                  String
   displayGroup          String?
@@ -13,7 +13,7 @@ model Locus {
   panelEntries          GeneticPanelLocus[]
   animalGenotypes       AnimalGenotype[]
   conformationStandards BreedConformationStandard[]
-  game                  Game                @relation(fields: [gameId], references: [id])
+  game                  Game                        @relation(fields: [gameId], references: [id])
 
   @@unique([gameId, name])
 }
@@ -34,17 +34,17 @@ model Allele {
 }
 
 model ExpressionRule {
-  id                String @id @default(cuid())
-  locusId           String
-  alleleOneId       String
-  alleleTwoId       String
-  phenotype         String
-  numericModifier   Float?
-  climateModifiers  ExpressionClimateModifier[]
-  terrainModifiers  ExpressionTerrainModifier[]
-  locus             Locus  @relation(fields: [locusId], references: [id])
-  alleleOne         Allele @relation("AlleleOne", fields: [alleleOneId], references: [id])
-  alleleTwo         Allele @relation("AlleleTwo", fields: [alleleTwoId], references: [id])
+  id               String                      @id @default(cuid())
+  locusId          String
+  alleleOneId      String
+  alleleTwoId      String
+  phenotype        String
+  numericModifier  Float?
+  climateModifiers ExpressionClimateModifier[]
+  terrainModifiers ExpressionTerrainModifier[]
+  locus            Locus                       @relation(fields: [locusId], references: [id])
+  alleleOne        Allele                      @relation("AlleleOne", fields: [alleleOneId], references: [id])
+  alleleTwo        Allele                      @relation("AlleleTwo", fields: [alleleTwoId], references: [id])
 
   @@unique([locusId, alleleOneId, alleleTwoId])
 }
@@ -58,13 +58,13 @@ model GeneAvailabilityState {
 }
 
 model GeneticPanelDef {
-  id             String @id @default(cuid())
+  id             String              @id @default(cuid())
   gameId         String
   name           String
   panelType      GeneticPanelType
   loci           GeneticPanelLocus[]
   vetServiceDefs VetServiceDef[]
-  game           Game   @relation(fields: [gameId], references: [id])
+  game           Game                @relation(fields: [gameId], references: [id])
 
   @@unique([gameId, name])
 }

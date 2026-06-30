@@ -18,7 +18,7 @@ enum GeneticStorageType {
 }
 
 model BreedingListing {
-  id                String        @id @default(cuid())
+  id                String                            @id @default(cuid())
   gameId            String
   ownerPlayerId     String
   animalId          String
@@ -29,13 +29,13 @@ model BreedingListing {
   breedRestrictions BreedingListingBreedRestriction[]
   statMinimums      BreedingListingStatMinimum[]
   slots             BreedingSlot[]
-  isActive          Boolean       @default(true)
-  animal            Animal        @relation(fields: [animalId], references: [id])
-  ownerPlayer       PlayerAccount @relation(fields: [ownerPlayerId], references: [id])
-  currencyDef       CurrencyDef?  @relation(fields: [currencyDefId], references: [id])
-  game              Game          @relation(fields: [gameId], references: [id])
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  isActive          Boolean                           @default(true)
+  animal            Animal                            @relation(fields: [animalId], references: [id])
+  ownerPlayer       PlayerAccount                     @relation(fields: [ownerPlayerId], references: [id])
+  currencyDef       CurrencyDef?                      @relation(fields: [currencyDefId], references: [id])
+  game              Game                              @relation(fields: [gameId], references: [id])
+  createdAt         DateTime                          @default(now())
+  updatedAt         DateTime                          @updatedAt
 }
 
 model BreedingListingBreedRestriction {
@@ -44,6 +44,7 @@ model BreedingListingBreedRestriction {
   breedId   String
   breed     Breed           @relation(fields: [breedId], references: [id])
   listing   BreedingListing @relation(fields: [listingId], references: [id])
+
   @@unique([listingId, breedId])
 }
 
@@ -54,19 +55,20 @@ model BreedingListingStatMinimum {
   minValue  Float
   statDef   StatDef         @relation(fields: [statDefId], references: [id])
   listing   BreedingListing @relation(fields: [listingId], references: [id])
+
   @@unique([listingId, statDefId])
 }
 
 model BreedingSlot {
-  id                  String          @id @default(cuid())
+  id                  String             @id @default(cuid())
   listingId           String
   purchasedByPlayerId String?
   status              BreedingSlotStatus
-  purchasedAt         DateTime?       
+  purchasedAt         DateTime?
   breedingRecord      BreedingRecord?
-  listing             BreedingListing @relation(fields: [listingId], references: [id])
-  purchasedByPlayer   PlayerAccount?  @relation(fields: [purchasedByPlayerId], references: [id])
-  createdAt           DateTime        @default(now())
+  listing             BreedingListing    @relation(fields: [listingId], references: [id])
+  purchasedByPlayer   PlayerAccount?     @relation(fields: [purchasedByPlayerId], references: [id])
+  createdAt           DateTime           @default(now())
 }
 
 model BreedingRecord {
@@ -89,7 +91,7 @@ model BreedingRecord {
 }
 
 model GeneticMaterial {
-  id                         String          @id @default(cuid())
+  id                         String                              @id @default(cuid())
   gameId                     String
   animalId                   String
   ownerPlayerId              String
@@ -97,7 +99,7 @@ model GeneticMaterial {
   donorSnapshot              Json?
   offspringSnapshot          Json?
   inbreedingCoefficient      Float?
-  producedByBreedingRecordId String?         @unique
+  producedByBreedingRecordId String?                             @unique
   materialType               GeneticMaterialType
   storageType                GeneticStorageType
   surrogacyRecord            SurrogacyRecord?
@@ -105,29 +107,29 @@ model GeneticMaterial {
   marketplaceOffers          MarketplaceOfferGeneticMaterial[]
   gifts                      Gift[]
   rafflePrizes               RafflePrizeGeneticMaterial[]
-  usedInRecord               BreedingRecord? @relation("UsedMaterial")
-  producedByRecord           BreedingRecord? @relation("ProducedBy", fields: [producedByBreedingRecordId], references: [id])
-  ownerPlayer                PlayerAccount   @relation(fields: [ownerPlayerId], references: [id])
-  animal                     Animal          @relation(fields: [animalId], references: [id])
-  game                       Game            @relation(fields: [gameId], references: [id])
+  usedInRecord               BreedingRecord?                     @relation("UsedMaterial")
+  producedByRecord           BreedingRecord?                     @relation("ProducedBy", fields: [producedByBreedingRecordId], references: [id])
+  ownerPlayer                PlayerAccount                       @relation(fields: [ownerPlayerId], references: [id])
+  animal                     Animal                              @relation(fields: [animalId], references: [id])
+  game                       Game                                @relation(fields: [gameId], references: [id])
   expiresAt                  DateTime?
-  isUsed                     Boolean         @default(false)
-  collectedAt                DateTime        @default(now())
+  isUsed                     Boolean                             @default(false)
+  collectedAt                DateTime                            @default(now())
 }
 
 model Pregnancy {
-  id                 String         @id @default(cuid())
+  id                 String               @id @default(cuid())
   animalId           String
-  breedingRecordId   String         @unique
-  isSurrogate        Boolean        @default(false)
-  gestationStartedAt DateTime       @default(now())
+  breedingRecordId   String               @unique
+  isSurrogate        Boolean              @default(false)
+  gestationStartedAt DateTime             @default(now())
   dueAt              DateTime
-  isCompleted        Boolean        @default(false)
+  isCompleted        Boolean              @default(false)
   completedAt        DateTime?
-  offspring          PregnancyOffspring[] 
+  offspring          PregnancyOffspring[]
   surrogacyRecord    SurrogacyRecord?
-  breedingRecord     BreedingRecord @relation(fields: [breedingRecordId], references: [id]) 
-  animal             Animal         @relation(fields: [animalId], references: [id])
+  breedingRecord     BreedingRecord       @relation(fields: [breedingRecordId], references: [id])
+  animal             Animal               @relation(fields: [animalId], references: [id])
 }
 
 model PregnancyOffspring {
@@ -137,6 +139,7 @@ model PregnancyOffspring {
   birthOrder  Int?
   pregnancy   Pregnancy @relation(fields: [pregnancyId], references: [id])
   animal      Animal    @relation(fields: [animalId], references: [id])
+
   @@unique([pregnancyId, animalId])
 }
 

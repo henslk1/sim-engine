@@ -136,7 +136,7 @@ model ClinicEntry {
 model HiredTrainer {
   id              String        @id @default(cuid())
   jobContractId   String        @unique
-  trainerPlayerId String        
+  trainerPlayerId String
   hiredByPlayerId String
   hiredByPlayer   PlayerAccount @relation("HiredBy", fields: [hiredByPlayerId], references: [id])
   trainerPlayer   PlayerAccount @relation("Trainer", fields: [trainerPlayerId], references: [id])
@@ -151,7 +151,7 @@ model TitleDef {
   rankOrder       Int
   animalTitles    AnimalTitle[]
   game            Game           @relation(fields: [gameId], references: [id])
-  disciplineDef   DisciplineDef? @relation(fields: [disciplineDefId], references: [id])   
+  disciplineDef   DisciplineDef? @relation(fields: [disciplineDefId], references: [id])
 }
 
 model AnimalTitle {
