@@ -40,6 +40,9 @@ model ItemDef {
   category      ItemCategory
   effects       Json?
   effectType    PermanentEffectType
+  playerInventory PlayerInventory[]
+  appliedItems    AnimalAppliedItem[]
+  dailyLogs       AnimalDailyLog[]
   prizeEligible Boolean @default(true)
   isSellable    Boolean @default(true)
   game          Game    @relation(fields: [gameId], references: [id])
