@@ -154,7 +154,7 @@ model MarketplaceListing {
   description      String?
   expiresAt        DateTime?
   createdAt        DateTime      @default(now())
-  animals          MarkeplaceListingAnimal[]
+  animals          MarketplaceListingAnimal[]
   items            MarketplaceListingItem[]
   geneticMaterials MarketplaceListingGeneticMaterial[]
   offers           MarketplaceOffer[]
@@ -163,7 +163,7 @@ model MarketplaceListing {
   game             Game          @relation(fields: [gameId], references: [id])
 }
 
-model MarkeplaceListingAnimal {
+model MarketplaceListingAnimal {
   id        String             @id @default(cuid())
   listingId String
   animalId  String
@@ -247,8 +247,8 @@ model CurrencyExchangeOrder {
   isFlagged         Boolean       @default(false)
   isActive          Boolean       @default(true)
   createdAt         DateTime      @default(now())
-  toCurrency        CurrencyDef   @relation("ToCurrency", fields: [toCurrencydefId], references: [id])
-  FromCurrency      CurrencyDef   @relation("FromCurrency", fields: [fromCurrencyDefId], references: [id])
+  toCurrency        CurrencyDef   @relation("ToCurrency", fields: [toCurrencyDefId], references: [id])
+  fromCurrency      CurrencyDef   @relation("FromCurrency", fields: [fromCurrencyDefId], references: [id])
   sellerPlayer      PlayerAccount @relation(fields: [sellerPlayerId], references: [id])
   game              Game          @relation(fields: [gameId], references: [id])
 }
@@ -260,7 +260,7 @@ model Escrow {
   toPlayerId    String?
   currencyDefId String
   amount        Int
-  stats         EscrowStatus
+  status         EscrowStatus
   jobContractId String? @unique
   releasedAt    DateTime?
   createdAt     DateTime @default(now())
