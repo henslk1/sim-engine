@@ -1,0 +1,133 @@
+enum GroupMemberStatus {
+  PENDING 
+  ACTIVE 
+  BANNED
+  LEFT
+}
+
+enum GroupAnimalStatus {
+  PENDING_ENTRY
+  IN_CONTAINER
+  OUT_OF_CONTAINER 
+}
+ 
+enum GroupPermission {
+  MANAGE_MEMBERS
+  MANAGE_ROLES
+  MANAGE_ANIMALS
+  VIEW_FINANCES
+  MANAGE_FINANCES
+  MANAGE_STORE
+  HOST_EVENTS
+  MANAGE_ENTRY_REQUIREMENTS
+  MANAGE_INVENTORY
+  POST_ANNOUNCEMENT
+  MANAGE_CHANNELS
+}
+
+enum GroupActivityType {
+  MEMBER_JOINED
+  MEMBER_LEFT
+  MEMBER_INVITED
+  MEMBER_ROLE_CHANGED
+  MEMBER_BANNED
+  ANIMAL_GROUP_JOINED
+  ANIMAL_ENTERED_CONTAINER
+  ANIMAL_LEFT_CONTAINER
+  ANIMAL_SOLD
+  FINANCE_DEPOSIT
+  FINANCE_WITHDRAWAL
+  INVENTORY_ADDED
+  INVENTORY_REMOVED
+  ANNOUNCEMENT_POSTED
+  PRESTIGE_EARNED
+}
+
+enum GroupChannelType {
+  ANNOUNCEMENT 
+  GENERAL 
+  ROLE_RESTRICTED
+}
+
+enum GroupRequirementType {
+  CARE_SCORE 
+  COMPETITION_TIER
+  NO_ACTIVE_CONDITIONS
+  GENETIC_PANEL_TESTED
+  NO_ACTIVE_RESTRICTIONS
+  STAT_VALUE
+  CONFORMATION_SCORE
+  INBREEDING_COEFFICIENT
+}
+
+enum GroupSaleRule {
+  REQUIRE_APPROVAL
+  MIN_OFFER_AMOUNT
+  NO_SALE_DURING_SEASON
+  FIRST_REFUSAL
+}
+
+enum GroupSpendingCategory {
+  BREEDING 
+  TRAINING 
+  COMPETITION
+  VET 
+  ITEM_USE 
+  CARE
+}
+
+model Group {
+  id String @id @default(cuid())
+}
+
+model GroupMember {
+  id String @id @default(cuid())
+}
+
+model GroupRole {
+  id String @id @default(cuid())
+}
+
+model GroupRolePermission {
+  id String @id @default(cuid())
+}
+
+model GroupAnimalSpendingRule {
+  id String @id @default(cuid())
+}
+
+model GroupSaleProtectionRule {
+  id String @id @default(cuid())
+}
+
+model GroupEntryRequirement {
+  id String @id @default(cuid())
+}
+
+model GroupFinance {
+  id String @id @default(cuid())
+}
+
+model GroupInventory {
+  id String @id @default(cuid())
+}
+
+model GroupPrestige {
+  id String @id @default(cuid())
+}
+
+model GroupPresigeTierDef {
+  id String @id @default(cuid())
+}
+
+model GroupPrestigeLog {
+  id String @id @default(cuid())
+}
+
+model GroupChannel {
+  id String @id @default(cuid())
+}
+
+model GroupActivityLog {
+  id String @id @default(cuid())
+}
