@@ -117,6 +117,7 @@ model Clinic {
   maxEntries   Int?
   entries      ClinicEntry[]
   hostPlayer   PlayerAccount? @relation(fields: [hostPlayerId], references: [id])
+  hostGroup    Group?         @relation(fields: [hostGroupId], references: [id])
   game         Game           @relation(fields: [gameId], references: [id])
 }
 

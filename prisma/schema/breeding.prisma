@@ -110,6 +110,7 @@ model GeneticMaterial {
   usedInRecord               BreedingRecord?                     @relation("UsedMaterial")
   producedByRecord           BreedingRecord?                     @relation("ProducedBy", fields: [producedByBreedingRecordId], references: [id])
   ownerPlayer                PlayerAccount                       @relation(fields: [ownerPlayerId], references: [id])
+  group                      Group?                              @relation(fields: [groupId], references: [id])
   animal                     Animal                              @relation(fields: [animalId], references: [id])
   game                       Game                                @relation(fields: [gameId], references: [id])
   expiresAt                  DateTime?

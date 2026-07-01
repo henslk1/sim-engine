@@ -15,16 +15,17 @@ enum ActivityRestrictionType {
 }
 
 model HealthConditionDef {
-  id            String                    @id @default(cuid())
-  gameId        String
-  name          String
-  isGenetic     Boolean                   @default(false)
-  isFatal       Boolean                   @default(false)
-  behaviors     HealthConditionBehavior[]
-  treatments    TreatmentDef[]
-  healthRecords AnimalHealthRecord[]
-  testResults   AnimalTestResult[]
-  game          Game                      @relation(fields: [gameId], references: [id])
+  id                     String                    @id @default(cuid())
+  gameId                 String
+  name                   String
+  isGenetic              Boolean                   @default(false)
+  isFatal                Boolean                   @default(false)
+  behaviors              HealthConditionBehavior[]
+  treatments             TreatmentDef[]
+  healthRecords          AnimalHealthRecord[]
+  testResults            AnimalTestResult[]
+  groupEntryRequirements GroupEntryRequirement[]
+  game                   Game                      @relation(fields: [gameId], references: [id])
 
   @@unique([gameId, name])
 }

@@ -159,6 +159,11 @@ model PlayerAccount {
   raffleItemSubmissions      RaffleItemSubmission[]
   raffleWins                 RaffleWinner[]
   hostedRaffles              Raffle[]
+  groupMemberships           GroupMember[]           @relation("GroupMemberAccount")
+  groupInvites               GroupMember[]           @relation("GroupInvitedBy")
+  foundedGroups              Group[]
+  groupAnimalsAdded          GroupAnimal[]
+  groupActivityLogs          GroupActivityLog[]
   game                       Game                    @relation(fields: [gameId], references: [id])
   user                       User                    @relation(fields: [userId], references: [id])
   createdAt                  DateTime                @default(now())

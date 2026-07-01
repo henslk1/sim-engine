@@ -278,6 +278,7 @@ model SeasonRanking {
   groupId         String?
   rank            Int
   score           Float
+  group           Group?          @relation(fields: [groupId], references: [id])
   playerAccount   PlayerAccount?  @relation(fields: [playerAccountId], references: [id])
   category        SeasonCategory  @relation(fields: [categoryId], references: [id])
   season          Season          @relation(fields: [seasonId], references: [id])
@@ -291,6 +292,7 @@ model RecordEntry {
   groupId         String?
   value           Float
   setAt           DateTime       @default(now())
+  group           Group?         @relation(fields: [groupId], references: [id])
   animal          Animal?        @relation(fields: [animalId], references: [id])
   playerAccount   PlayerAccount? @relation(fields: [playerAccountId], references: [id])
   recordDef       RecordDef      @relation(fields: [recordDefId], references: [id])

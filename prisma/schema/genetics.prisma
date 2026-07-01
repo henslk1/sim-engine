@@ -58,13 +58,14 @@ model GeneAvailabilityState {
 }
 
 model GeneticPanelDef {
-  id             String              @id @default(cuid())
-  gameId         String
-  name           String
-  panelType      GeneticPanelType
-  loci           GeneticPanelLocus[]
-  vetServiceDefs VetServiceDef[]
-  game           Game                @relation(fields: [gameId], references: [id])
+  id                     String              @id @default(cuid())
+  gameId                 String
+  name                   String
+  panelType              GeneticPanelType
+  loci                   GeneticPanelLocus[]
+  vetServiceDefs         VetServiceDef[]
+  groupEntryRequirements GroupEntryRequirement[]
+  game                   Game                @relation(fields: [gameId], references: [id])
 
   @@unique([gameId, name])
 }

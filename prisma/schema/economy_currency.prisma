@@ -48,6 +48,7 @@ model CurrencyDef {
   gifts                 Gift[]
   rafflePrizeCurrencies RafflePrizeCurrency[]
   raffles               Raffle[]
+  groupFinances         GroupFinance[]
   game                  Game                    @relation(fields: [gameId], references: [id])
 
   @@unique([gameId, name])
@@ -78,6 +79,8 @@ model Transaction {
   createdAt             DateTime        @default(now())
   toPlayerAccount       PlayerAccount?  @relation("TxnTo", fields: [toPlayerAccountId], references: [id])
   fromPlayerAccount     PlayerAccount?  @relation("TxnFrom", fields: [fromPlayerAccountId], references: [id])
+  fromGroup             Group?          @relation("TxnFromGroup", fields: [fromGroupId], references: [id])
+  toGroup               Group?          @relation("TxnToGroup", fields: [toGroupId], references: [id])
   actingPlayer          PlayerAccount?  @relation("ActingPlayer", fields: [actingPlayerAccountId], references: [id])
   currencyDef           CurrencyDef     @relation(fields: [currencyDefId], references: [id])
   game                  Game            @relation(fields: [gameId], references: [id])
