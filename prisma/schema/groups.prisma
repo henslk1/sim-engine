@@ -113,21 +113,64 @@ model GroupInventory {
 }
 
 model GroupPrestige {
-  id String @id @default(cuid())
+  id        String               @id @default(cuid())
+  groupId   String               @unique
+  score     Float                @default(0)
+  tierDefId String?
+  tierDef   GroupPresigeTierDef? @relation(fields: [tierDefId], references: [id])
+  group     Group                @relation(fields: [groupId], references: [id])
 }
 
 model GroupPresigeTierDef {
-  id String @id @default(cuid())
+  id                     String @id @default(cuid())
+  gameId                 String
+  name                   String
+  tierIndex              Int
+  minScore               Float
+  maxMembers             Int
+  maxGroupAnimals        Int
+  maxHostedShowsPerCycle Int?
+  shopStatFloor          Float  @default(0)
+  shopAlleleQualityBias  Float  @default(0)
+  vetDiscountPercent     Float  @default(0)
+  prestigeLevels         GroupPrestige[]
+  game                   Game   @relation(fields: [gameId], references: [id])
+
+  @@unique([gameId, name])
 }
 
 model GroupPrestigeLog {
-  id String @id @default(cuid())
+  id        String   @id @default(cuid())
+  groupId   String
+  source    String
+  amount    Float
+  createdAt DateTime @default(now())
+  group     Group    @relation(fields: [groupId], references: [id])
 }
 
 model GroupChannel {
-  id String @id @default(cuid())
+  id             String @id @default(cuid())
+  groupId        String
+  name           String
+  channelType    GroupChannelType
+  requiredRoleId String?
+  isDefault      Boolean
+  displayOrder   Int?
+  requiredRole   GroupRole?
+  group          Group  @relation(fields: [groupId], references: [id])
+
+  @@unique([groupId, name])
 }
 
 model GroupActivityLog {
-  id String @id @default(cuid())
+  id              String         @id @default(cuid())
+  groupId         String
+  playerAccountId String?
+  activityType    GroupActivityType
+  targetType      String?
+  targetId        String?
+  metadata        Json?
+  createdAt       DateTime       @default(now())
+  playerAccount   PlayerAccount? @relation(fields: [playerAccountId], references: [id])
+  group           Group          @relation(fields: [groupId], references: [id])
 }
