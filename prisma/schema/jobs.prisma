@@ -1,17 +1,29 @@
 enum JobListingType {
-  
+  HIRER_POST
+  WORKER_POST
 }
 
 enum JobListingStatus {
-
+  OPEN
+  FILLED 
+  CLOSED 
+  EXPIRED
 }
 
 enum JobApplicationStatus {
-
+  PENDING 
+  ACCEPTED 
+  REJECTED 
+  WITHDRAWN
 }
 
 enum JobContractStatus {
-  
+  ACTIVE 
+  CLOSURE_REQUESTED
+  PENDING_REVIEW
+  COMPLETED 
+  SETTLED 
+  CANCELLED
 }
 
 model JobListing {
