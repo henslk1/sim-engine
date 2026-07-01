@@ -3,11 +3,18 @@ enum GeneticPanelType {
   CONFORMATION
 }
 
+enum LocusBiasTarget {
+  FAVORABILITY
+  RARITY
+  NONE
+}
+
 model Locus {
   id                    String                      @id @default(cuid())
   gameId                String
   name                  String
   displayGroup          String?
+  biasTarget            LocusBiasTarget             @default(NONE)
   alleles               Allele[]
   expressionRules       ExpressionRule[]
   panelEntries          GeneticPanelLocus[]
