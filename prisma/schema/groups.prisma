@@ -178,14 +178,14 @@ model GroupAnimal {
 }
 
 model GroupAnimalSpendingRule {
-  id                String                @id @default(cuid())
-  groupId           String
-  groupRoleId       String
-  spendingCategory  GroupSpendingCategory
-  requiresApproval  Boolean               @default(true)
-  maxAmountPerCycle Int?
-  groupRole         GroupRole             @relation(fields: [groupRoleId], references: [id])
-  group             Group                 @relation(fields: [groupId], references: [id])
+  id                 String                @id @default(cuid())
+  groupId            String
+  groupRoleId        String
+  spendingCategory   GroupSpendingCategory
+  requiresApproval   Boolean               @default(true)
+  maxAmountPerAnimal Int?
+  groupRole          GroupRole             @relation(fields: [groupRoleId], references: [id])
+  group              Group                 @relation(fields: [groupId], references: [id])
 
   @@unique([groupId, groupRoleId, spendingCategory])
 }
@@ -269,7 +269,7 @@ model GroupPrestigeTierDef {
   maxMembers                     Int
   maxGroupAnimals                Int
   maxHostedShowsPerDay           Int?
-  prestigeCurrencyRewardPerCycle Float           @default(0)
+  prestigeCurrencyRewardPerDay   Float           @default(0)
   vetDiscountPercent             Float           @default(0)
   prestigeLevels                 GroupPrestige[]
   game                           Game            @relation(fields: [gameId], references: [id])

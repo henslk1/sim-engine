@@ -1,7 +1,6 @@
 enum ShopType {
   BASE
   PREMIUM
-  GROUP
   VET
 }
 
@@ -135,21 +134,23 @@ model BundleAnimal {
 }
 
 model GameShopBreedConfig {
-  id               String           @id @default(cuid())
-  gameId           String
-  breedId          String
-  targetStock      Int
-  price            Int
-  currencyDefId    String
-  isActive         Boolean          @default(true)
-  rotationStartsAt DateTime?
-  rotationEndsAt   DateTime?
-  shopAnimals      GameShopAnimal[]
-  currencyDef      CurrencyDef      @relation(fields: [currencyDefId], references: [id])
-  breed            Breed            @relation(fields: [breedId], references: [id])
-  game             Game             @relation(fields: [gameId], references: [id])
+  id                    String           @id @default(cuid())
+  gameId                String
+  breedId               String
+  targetStock           Int
+  price                 Int
+  currencyDefId         String
+  gameShopFloor         Float            @default(0)
+  shopAlleleQualityBias Float            @default(0)
+  isActive              Boolean          @default(true)
+  rotationStartsAt      DateTime?
+  rotationEndsAt        DateTime?
+  shopAnimals           GameShopAnimal[]
+  currencyDef           CurrencyDef      @relation(fields: [currencyDefId], references: [id])
+  breed                 Breed            @relation(fields: [breedId], references: [id])
+  game                  Game             @relation(fields: [gameId], references: [id])
 
-  @@unique([gameId, breedId])
+  @@unique([gameId, breedId, currencyDefId])
 }
 
 model GameShopAnimal {
