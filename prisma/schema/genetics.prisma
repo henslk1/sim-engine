@@ -10,17 +10,18 @@ enum LocusBiasTarget {
 }
 
 model Locus {
-  id                    String                      @id @default(cuid())
-  gameId                String
-  name                  String
-  displayGroup          String?
-  biasTarget            LocusBiasTarget             @default(NONE)
-  alleles               Allele[]
-  expressionRules       ExpressionRule[]
-  panelEntries          GeneticPanelLocus[]
-  animalGenotypes       AnimalGenotype[]
-  conformationStandards BreedConformationStandard[]
-  game                  Game                        @relation(fields: [gameId], references: [id])
+  id                     String                      @id @default(cuid())
+  gameId                 String
+  name                   String
+  displayGroup           String?
+  biasTarget             LocusBiasTarget             @default(NONE)
+  alleles                Allele[]
+  expressionRules        ExpressionRule[]
+  panelEntries           GeneticPanelLocus[]
+  animalGenotypes        AnimalGenotype[]
+  conformationStandards  BreedConformationStandard[]
+  groupEntryRequirements GroupEntryRequirement[]
+  game                   Game                        @relation(fields: [gameId], references: [id])
 
   @@unique([gameId, name])
 }

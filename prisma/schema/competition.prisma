@@ -46,6 +46,7 @@ model DisciplineDef {
   recordDefs       RecordDef[]
   titleDefs        TitleDef[]
   animals          Animal[]
+  groups           Group[]
   game             Game                    @relation(fields: [gameId], references: [id])
 
   @@unique([gameId, name])
