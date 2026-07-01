@@ -35,7 +35,35 @@ model JobApplication {
 }
 
 model JobContract {
-  id String @id @default(cuid())
+  id                      String         @id @default(cuid())
+  gameId                  String
+  jobListingId            String
+  jobApplicationId        String
+  hirerPlayerId           String
+  workerPlayerId          String
+  durationDays            Int?
+  maxAgingCycles          Int?
+  agreedRatePerAnimal     Float          @default(0)
+  currencyDefId           String?
+  stats                   JobContractStatus
+  startedAt               DateTime       @default(now())
+  endsAt                  DateTime?
+  closureRequestedAt      DateTime?
+  completedAt             DateTime?
+  permitCare              Boolean        @default(false)  
+  permitTraining          Boolean        @default(false)        
+  permitCompetition       Boolean        @default(false)             
+  permitAging             Boolean        @default(false)       
+  resourceBaseItems       Boolean        @default(false)
+  resourcePremiumItems    Boolean        @default(false) 
+  resourceBaseCurrency    Boolean        @default(false)  
+  resourcePremiumCurrency Boolean        @default(false)  
+  currencyDef             CurrencyDef?   @relation(fields: [currencyDefId], references: [id])
+  workerPlayer            PlayerAccount  @relation("WorkerPlayer", fields: [workerPlayerId], references: [id])
+  hirerPlayer             PlayerAccount  @relation("HirerPlayer", fields: [hirerPlayerId], references: [id])
+  jobApplication          JobApplication @relation(fields: [jobApplicationId], references: [id])
+  jobListing              JobListing     @relation(fields: [jobListingId], references: [id])
+  game Game @relation(fields: [gameId], references: [id])
 }
 
 model JobContactAnimal {
