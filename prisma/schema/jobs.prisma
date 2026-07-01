@@ -40,12 +40,32 @@ model JobContract {
 
 model JobContactAnimal {
   id String @id @default(cuid())
+  contractId String
+  animalId String
+  animal Animal @relation(fields: [animalId], references: [id])
+  contract JobContract @relation(fields: [contractId], references: [id])
+
+  @@unique([contractId, animalId])
 }
 
 model JobCompletionRecord {
   id String @id @default(cuid())
+  contractId String
+  completionPercent Float @default(0)
+  lastCalculatedAt  DateTime @updatedAt
+  contract JobContract @relation(fields: [contractId], references: [id])
 }
 
 model JobRating {
   id String @id @default(cuid())
+  contractId String
+  raterPlayerId String
+  rateePlayerId String
+  score         Int
+  comment       String?
+  rateePlayer PlayerAccount @relation("RateePlayer", fields: [rateePlayerId], references: [id])
+  raterPlayer PlayerAccount @relation("RaterPlayer", fields: [raterPlayerId], references: [id])
+  contract JobContract @relation(fields: [contractId], references: [id])
+
+  @@unique([contractId, raterPlayerId])
 }
