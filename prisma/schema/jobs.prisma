@@ -1,0 +1,39 @@
+enum JobListingType {
+  
+}
+
+enum JobListingStatus {
+
+}
+
+enum JobApplicationStatus {
+
+}
+
+enum JobContractStatus {
+  
+}
+
+model JobListing {
+  id String @id @default(cuid())
+}
+
+model JobApplication {
+  id String @id @default(cuid())
+}
+
+model JobContract {
+  id String @id @default(cuid())
+}
+
+model JobContactAnimal {
+  id String @id @default(cuid())
+}
+
+model JobCompletionRecord {
+  id String @id @default(cuid())
+}
+
+model JobRating {
+  id String @id @default(cuid())
+}
