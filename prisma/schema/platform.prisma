@@ -134,8 +134,6 @@ model PlayerAccount {
   trainingLogsPerformed      TrainingLog[]
   hostedClinics              Clinic[]
   clinicEntries              ClinicEntry[]
-  trainerAssignments         HiredTrainer[]          @relation("Trainer")
-  hiresAsClient              HiredTrainer[]          @relation("HiredBy")
   stageActivityLogsPerformed StageActivityLog[]
   breedingListings           BreedingListing[]
   purchasedBreedingSlots     BreedingSlot[]

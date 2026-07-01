@@ -134,15 +134,6 @@ model ClinicEntry {
   @@unique([clinicId, animalId])
 }
 
-model HiredTrainer {
-  id              String        @id @default(cuid())
-  jobContractId   String        @unique
-  trainerPlayerId String
-  hiredByPlayerId String
-  hiredByPlayer   PlayerAccount @relation("HiredBy", fields: [hiredByPlayerId], references: [id])
-  trainerPlayer   PlayerAccount @relation("Trainer", fields: [trainerPlayerId], references: [id])
-}
-
 model TitleDef {
   id              String         @id @default(cuid())
   gameId          String
