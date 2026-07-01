@@ -28,36 +28,70 @@ enum JobContractStatus {
 
 model JobListing {
   id String @id @default(cuid())
-}
-
-model JobApplication {
-  id String @id @default(cuid())
-}
-
-model JobContract {
-  id                      String         @id @default(cuid())
-  gameId                  String
-  jobListingId            String
-  jobApplicationId        String
-  hirerPlayerId           String
-  workerPlayerId          String
-  durationDays            Int?
-  maxAgingCycles          Int?
-  agreedRatePerAnimal     Float          @default(0)
-  currencyDefId           String?
-  stats                   JobContractStatus
-  startedAt               DateTime       @default(now())
-  endsAt                  DateTime?
-  closureRequestedAt      DateTime?
-  completedAt             DateTime?
+  gameId String
+  postedByPlayerId String
+  listingType      JobListingType
+  description      String?
+  maxAnimals       Int?
+  minAnimals       Int?
+  durationDays     Int?
+  maxAgingCycles   Int?
+  ratePerAnimal    Float?
+  currencyDefId    String?
+  status           JobListingStatus
+  expiresAt        DateTime?
+  createdAt        DateTime @default(now())
   permitCare              Boolean        @default(false)  
-  permitTraining          Boolean        @default(false)        
+  permitTraining          Boolean        @default(false)  
+  permitBreeding          Boolean        @default(false)      
   permitCompetition       Boolean        @default(false)             
   permitAging             Boolean        @default(false)       
   resourceBaseItems       Boolean        @default(false)
   resourcePremiumItems    Boolean        @default(false) 
   resourceBaseCurrency    Boolean        @default(false)  
   resourcePremiumCurrency Boolean        @default(false)  
+  applications            JobApplication[]
+  contacts                JobContract[]
+  currencyDef CurrencyDef? @relation(fields: [currencyDefId], references: [id])
+  postedByPlayer PlayerAccount @relation(fields: [postedByPlayerId], references: [id])
+  game Game @relation(fields: [gameId], references: [id])
+}
+
+model JobApplication {
+  id                    String @id @default(cuid())
+  jobListingId          String
+  applicantPlayerId     String
+  proposedRatePerAnimal Float?
+  currencyDefId         String?
+  message               String?
+  status                JobApplicationStatus  
+  contract              JobContract?
+  createdAt             DateTime @default(now())
+  currencyDef           CurrencyDef? @relation(fields: [currencyDefId], references: [id])
+  applicantPlayer       PlayerAccount @relation(fields: [applicantPlayerId], references: [id])
+  jobListing            JobListing @relation(fields: [jobListingId], references: [id])
+}
+
+model JobContract {
+  id                      String         @id @default(cuid())
+  gameId                  String
+  jobListingId            String
+  jobApplicationId        String         @unique
+  hirerPlayerId           String
+  workerPlayerId          String
+  durationDays            Int?
+  maxAgingCycles          Int?
+  agreedRatePerAnimal     Float          @default(0)
+  currencyDefId           String?
+  status                   JobContractStatus
+  startedAt               DateTime       @default(now())
+  endsAt                  DateTime?
+  closureRequestedAt      DateTime?
+  completedAt             DateTime?
+  contractAnimals         JobContractAnimal[]
+  completionRecord        JobCompletionRecord?
+  ratings                 JobRating[]
+  escrow                  Escrow?
   currencyDef             CurrencyDef?   @relation(fields: [currencyDefId], references: [id])
   workerPlayer            PlayerAccount  @relation("WorkerPlayer", fields: [workerPlayerId], references: [id])
   hirerPlayer             PlayerAccount  @relation("HirerPlayer", fields: [hirerPlayerId], references: [id])
@@ -66,7 +100,7 @@ model JobContract {
   game Game @relation(fields: [gameId], references: [id])
 }
 
-model JobContactAnimal {
+model JobContractAnimal {
   id String @id @default(cuid())
   contractId String
   animalId String
@@ -78,7 +112,7 @@ model JobContactAnimal {
 
 model JobCompletionRecord {
   id String @id @default(cuid())
-  contractId String
+  contractId String @unique
   completionPercent Float @default(0)
   lastCalculatedAt  DateTime @updatedAt
   contract JobContract @relation(fields: [contractId], references: [id])
