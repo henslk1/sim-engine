@@ -31,23 +31,24 @@ enum RankSubjectType {
 }
 
 model DisciplineDef {
-  id               String                  @id @default(cuid())
-  gameId           String
-  name             String
-  description      String?
-  isConformation   Boolean                 @default(false)
-  statWeights      DisciplineStatWeight[]
-  compTierDefs     CompetitionTierDef[]
-  venueDisciplines VenueDiscipline[]
-  competitions     Competition[]
-  animalCompTiers  AnimalCompetitionTier[]
-  weeklyPoints     AnimalWeeklyPoints[]
-  seasonCategories SeasonCategory[]
-  recordDefs       RecordDef[]
-  titleDefs        TitleDef[]
-  animals          Animal[]
-  groups           Group[]
-  game             Game                    @relation(fields: [gameId], references: [id])
+  id                     String                  @id @default(cuid())
+  gameId                 String
+  name                   String
+  description            String?
+  isConformation         Boolean                 @default(false)
+  statWeights            DisciplineStatWeight[]
+  compTierDefs           CompetitionTierDef[]
+  venueDisciplines       VenueDiscipline[]
+  competitions           Competition[]
+  animalCompTiers        AnimalCompetitionTier[]
+  weeklyPoints           AnimalWeeklyPoints[]
+  seasonCategories       SeasonCategory[]
+  recordDefs             RecordDef[]
+  titleDefs              TitleDef[]
+  animals                Animal[]
+  groups                 Group[]
+  game                   Game                    @relation(fields: [gameId], references: [id])
+  groupEntryRequirements GroupEntryRequirement[]
 
   @@unique([gameId, name])
 }

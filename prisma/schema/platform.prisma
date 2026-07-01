@@ -49,8 +49,11 @@ model Game {
   escrows                Escrow[]
   gifts                  Gift[]
   raffles                Raffle[]
+  playerStores           PlayerStore[]
   isActive               Boolean                 @default(false)
   createdAt              DateTime                @default(now())
+  groups                 Group[]
+  groupPrestigeTierDefs  GroupPrestigeTierDef[]
 }
 
 model User {
@@ -164,6 +167,7 @@ model PlayerAccount {
   foundedGroups              Group[]
   groupAnimalsAdded          GroupAnimal[]
   groupActivityLogs          GroupActivityLog[]
+  playerStore                PlayerStore?
   game                       Game                    @relation(fields: [gameId], references: [id])
   user                       User                    @relation(fields: [userId], references: [id])
   createdAt                  DateTime                @default(now())
@@ -178,6 +182,7 @@ model SubscriptionTier {
   cost                Int
   gameId              String
   hasGeneReveal       Boolean              @default(false)
+  hasPlayerStore      Boolean              @default(false)
   game                Game                 @relation(fields: [gameId], references: [id])
   playerSubscriptions PlayerSubscription[]
   isActive            Boolean              @default(true)
