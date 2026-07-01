@@ -14,7 +14,8 @@ enum GroupAnimalStatus {
 enum GroupPermission {
   MANAGE_MEMBERS
   MANAGE_ROLES
-  MANAGE_ANIMALS
+  ADD_TO_CONTAINER
+  REMOVE_FROM_CONTAINER
   VIEW_FINANCES
   MANAGE_FINANCES
   MANAGE_STORE
@@ -77,15 +78,77 @@ enum GroupSpendingCategory {
 }
 
 model Group {
-  id String @id @default(cuid())
+  id                  String        @id @default(cuid())
+  gameId              String
+  name                String
+  tag                 String
+  description         String?
+  image               String?
+  breedId             String?
+  isOpen              Boolean       @default(true)
+  maxMembers          Int?
+  isActive            Boolean       @default(true)
+  disbandedAt         DateTime?
+  foundedByPlayerId   String?
+  members             GroupMember[]
+  roles               GroupRole[]
+  groupAnimals        GroupAnimal[]
+  spendingRules       GroupAnimalSpendingRule[]
+  saleProtectionRules GroupSaleProtectionRule[]
+  entryRequirements   GroupEntryRequirement[]
+  finance             GroupFinance[]
+  inventory           GroupInventory[]
+  prestige            GroupPrestige?
+  prestigeLogs        GroupPrestigeLog[]
+  channels            GroupChannel[]
+  activityLogs        GroupActivityLog[]
+  clinics             Clinic[]
+  storeListings       StoreListing[]
+  raffles             Raffle[]
+  seasonRankings      SeasonRanking[]
+  recordEntries       RecordEntry[]
+  transactionsFrom    Transaction[]  @relation("TxnFromGroup")
+  transactionsTo      Transaction[]  @relation("TxnToGroup")
+  geneticMaterials    GeneticMaterial[]
+  createdAt           DateTime       @default(now())
+  foundedBy           PlayerAccount? @relation(fields: [foundedByPlayerId], references: [id])
+  breed               Breed?         @relation(fields: [breedId], references: [id])
+  game                Game           @relation(fields: [gameId], references: [id])
 }
 
 model GroupMember {
-  id String @id @default(cuid())
+  id                String         @id @default(cuid())
+  groupId           String
+  playerAccountId   String
+  groupRoleId       String
+  status            GroupMemberStatus
+  invitedByPlayerId String?
+  createdAt         DateTime       @default(now())
+  joinedAt          DateTime?
+  leftAt            DateTime?
+  groupRole         GroupRole      @relation(fields: [groupRoleId], references: [id])
+  invitedByPlayer   PlayerAccount? @relation("GroupInvitedBy", fields: [invitedByPlayerId], references: [id])
+  playerAccount     PlayerAccount  @relation("GroupMemberAccount", fields: [playerAccountId], references: [id])
+  group             Group          @relation(fields: [groupId], references: [id])
+
+  @@unique([groupId, playerAccountId])
 }
 
 model GroupRole {
-  id String @id @default(cuid())
+  id                  String  @id @default(cuid())
+  groupId             String
+  name                String
+  displayOrder        Int?
+  isDefault           Boolean @default(false)
+  isOwner             Boolean @default(false)
+  permissions         GroupRolePermission[]
+  members             GroupMember[]
+  spendingRules       GroupAnimalSpendingRule[]
+  saleProtectionRules GroupSaleProtectionRule[]
+  restrictedChannels  GroupChannel[]
+  group               Group   @relation(fields: [groupId], references: [id])
+
+  @@unique([groupId, name])
 }
 
 model GroupRolePermission {
@@ -101,10 +164,10 @@ model GroupAnimal {
   id              String            @id @default(cuid())
   groupId         String
   animalId        String
-  status          GroupAnimalStatus @default("PENDING_ENTRY")
+  status          GroupAnimalStatus @default(PENDING_ENTRY)
   addedAt         DateTime          @default(now())
   addedByPlayerId String?
-  leftContainerat DateTime?
+  leftContainerAt DateTime?
   addedByPlayer   PlayerAccount?    @relation(fields: [addedByPlayerId], references: [id])
   animal          Animal            @relation(fields: [animalId], references: [id])
   group           Group             @relation(fields: [groupId], references: [id])
@@ -126,10 +189,10 @@ model GroupAnimalSpendingRule {
 }
 
 model GroupSaleProtectionRule {
-  id String @id @default(cuid())
-  groupId String
-  ruleType GroupSaleProtectionRule
-  minOfferAmount Int?
+  id                     String     @id @default(cuid())
+  groupId                String
+  ruleType               GroupSaleRule
+  minOfferAmount         Int?
   requiredApprovalRoleId String?
   conditionStatDefId     String?
   conditionBreedId       String?
@@ -138,24 +201,24 @@ model GroupSaleProtectionRule {
   requiredApprovalRole   GroupRole? @relation(fields: [requiredApprovalRoleId], references: [id])
   conditionStatDef       StatDef?   @relation(fields: [conditionStatDefId], references: [id])
   conditionBreed         Breed?     @relation(fields: [conditionBreedId], references: [id])
-  group Group @relation(fields: [groupId], references: [id])
+  group                  Group      @relation(fields: [groupId], references: [id])
 }
 
 model GroupEntryRequirement {
-  id                String           @id @default(cuid())
-  groupId           String
-  requirementType   GroupRequirementType
-  minValue          Float?
-  maxValue          Float?
-  statDefId         String?
-  breedId           String?
-  conditionDefId    String?
-  geneticPanelDefId String?
-  geneticPanelDef   GeneticPanelDef? @relation(fields: [geneticPanelDefId], references: [id])
-  conditionDef      ConditionDef?    @relation(fields: [conditionDefId], references: [id])
-  breed             Breed?           @relation(fields: [breedId], references: [id])
-  statDef           StatDef?         @relation(fields: [statDefId], references: [id])
-  group             Group            @relation(fields: [groupId], references: [id])
+  id                      String              @id @default(cuid())
+  groupId                 String
+  requirementType         GroupRequirementType
+  minValue                Float?
+  maxValue                Float?
+  statDefId               String?
+  breedId                 String?
+  healthConditionDefId    String?
+  geneticPanelDefId       String?
+  geneticPanelDef         GeneticPanelDef?    @relation(fields: [geneticPanelDefId], references: [id])
+  healthConditionDef      HealthConditionDef? @relation(fields: [healthConditionDefId], references: [id])
+  breed                   Breed?              @relation(fields: [breedId], references: [id])
+  statDef                 StatDef?            @relation(fields: [statDefId], references: [id])
+  group                   Group               @relation(fields: [groupId], references: [id])
 }
 
 model GroupFinance {
@@ -181,15 +244,16 @@ model GroupInventory {
 }
 
 model GroupPrestige {
-  id        String               @id @default(cuid())
-  groupId   String               @unique
-  score     Float                @default(0)
+  id        String                @id @default(cuid())
+  groupId   String                @unique
+  score     Float                 @default(0)
   tierDefId String?
-  tierDef   GroupPresigeTierDef? @relation(fields: [tierDefId], references: [id])
-  group     Group                @relation(fields: [groupId], references: [id])
+  tierDef   GroupPrestigeTierDef? @relation(fields: [tierDefId], references: [id])
+  group     Group                 @relation(fields: [groupId], references: [id])
+  updatedAt DateTime              @updatedAt
 }
 
-model GroupPresigeTierDef {
+model GroupPrestigeTierDef {
   id                     String @id @default(cuid())
   gameId                 String
   name                   String
@@ -205,6 +269,7 @@ model GroupPresigeTierDef {
   game                   Game   @relation(fields: [gameId], references: [id])
 
   @@unique([gameId, name])
+  @@unique([gameId, tierIndex])
 }
 
 model GroupPrestigeLog {
@@ -217,15 +282,15 @@ model GroupPrestigeLog {
 }
 
 model GroupChannel {
-  id             String @id @default(cuid())
+  id             String     @id @default(cuid())
   groupId        String
   name           String
   channelType    GroupChannelType
   requiredRoleId String?
-  isDefault      Boolean
+  isDefault      Boolean    @default(false)
   displayOrder   Int?
-  requiredRole   GroupRole?
-  group          Group  @relation(fields: [groupId], references: [id])
+  requiredRole   GroupRole? @relation(fields: [requiredRoleId], references: [id])
+  group          Group      @relation(fields: [groupId], references: [id])
 
   @@unique([groupId, name])
 }
