@@ -73,21 +73,62 @@ model AnimalTemplateGenotype {
 }
 
 model CampaignRewardTier {
-  id String @id @default(cuid())
+  id                   String          @id @default(cuid())
+  campaignId           String
+  tierName             String
+  tierIndex            String
+  minRank              Int
+  maxRank              Int?
+  animalTemplateId     String?
+  breedingSlotsAwarded Int             @default(0)
+  currencyRewards      CampaignRewardTierCurrency[]
+  itemRewards          CampaignRewardTierItem[]
+  rewardRecords        CampaignRewardRecord[]
+  animalTemplate       AnimalTemplate? @relation(fields: [animalTemplateId], references: [id])
+  campaign             BreedCampaign   @relation(fields: [campaignId], references: [id])
 }
 
 model CampaignRewardTierCurrency {
-  id String @id @default(cuid())
+  id            String      @id @default(cuid())
+  tierId        String
+  currencyDefId String
+  amount        Int
+  currencyDef   CurrencyDef @relation(fields: [currencyDefId], references: [id])
+  tier          Tier        @relation(fields: [tierId], references: [id])
+
+  @@unique([tierId, currencyDefId])
 }
 
 model CampaignRewardTierItem {
-  id String @id @default(cuid())
+  id        String             @id @default(cuid())
+  tierId    String
+  itemDefId String
+  quantity  Int
+  itemDef   ItemDef            @relation(fields: [itemDefId], references: [id])
+  tier      CampaignRewardTier @relation(fields: [tierId], references: [id])
+
+  @@unique([tierId, itemDefId])
 }
 
 model CampaignRewardRecord {
-  id String @id @default(cuid())
+  id                String               @id @default(cuid())
+  campaignId        String
+  tierId            String
+  recipientPlayerId String
+  status            CampaignRewardStatus @default(PENDING)
+  distributedAt     DateTime? 
+  recipientPlayer   PlayerAccount        @relation(fields: [recipientPlayerId], references: [id])
+  tier              CampaignRewardTier   @relation(fields: [tierId], references: [id])
+  campaign          BreedCampaign        @relation(fields: [campaignId], references: [id])
 }
 
 model BreedDqTrait {
-  id String @id @default(cuid())
+  id         String @id @default(cuid())
+  breedId    String
+  locusId    String
+  expression String
+  locus      Locus  @relation(fields: [locusId], references: [id])
+  breed      Breed  @relation(fields: [breedId], references: [id])
+
+  @@unique([breedId, locusId, expression])
 }
