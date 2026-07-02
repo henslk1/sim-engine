@@ -65,11 +65,33 @@ model FoundationAnimal {
 }
 
 model AnimalTemplate {
-  id String @id @default(cuid())
+  id              String  @id @default(cuid())
+  gameId          String
+  breedId         String
+  statMode        AnimalStatMode
+  statFloor       Float?
+  healthClear     Boolean @default(false)
+  personalityMode PersonalityMode
+  personalityMin  Float?
+  personalityMax  Float?
+  genotype        AnimalTemplateGenotype[]
+  rewardTiers     CampaignRewardTier[]
+  breed           Breed   @relation(fields: [breedId], references: [id])
+  game            Game    @relation(fields: [gameId], references: [id])
 }
 
 model AnimalTemplateGenotype {
-  id String @id @default(cuid())
+  id          String    @id @default(cuid())
+  templateId  String
+  locusId     String
+  alleleOneId String
+  alleleTwoId String
+  alleleTwo   AlleleTwo @relation("TemplateAlleleTwo", fields: [alleleTwoId], references: [id])
+  alleleOne   AlleleOne @relation("TemplateAlleleOne", fields: [alleleOneId], references: [id])
+  locus       Locus     @relation(fields: [locusId], references: [id])
+  template    Template  @relation(fields: [templateId], references: [id])
+
+  @@unique([templateId, locusId])
 }
 
 model CampaignRewardTier {
