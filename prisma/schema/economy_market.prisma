@@ -295,6 +295,7 @@ model Escrow {
   releasedAt    DateTime?
   createdAt     DateTime       @default(now())
   currencyDef   CurrencyDef    @relation(fields: [currencyDefId], references: [id])
+  jobContract   JobContract?   @relation(fields: [jobContractId], references: [id])
   toPlayer      PlayerAccount? @relation("EscrowTo", fields: [toPlayerId], references: [id])
   fromPlayer    PlayerAccount  @relation("EscrowFrom", fields: [fromPlayerId], references: [id])
   game          Game           @relation(fields: [gameId], references: [id])

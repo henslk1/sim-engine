@@ -49,6 +49,9 @@ model CurrencyDef {
   rafflePrizeCurrencies RafflePrizeCurrency[]
   raffles               Raffle[]
   groupFinances         GroupFinance[]
+  jobListings           JobListing[]
+  jobApplications       JobApplication[]
+  jobContracts          JobContract[]
   game                  Game                    @relation(fields: [gameId], references: [id])
 
   @@unique([gameId, name])

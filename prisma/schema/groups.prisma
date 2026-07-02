@@ -261,18 +261,18 @@ model GroupPrestige {
 }
 
 model GroupPrestigeTierDef {
-  id                             String          @id @default(cuid())
-  gameId                         String
-  name                           String
-  tierIndex                      Int
-  minScore                       Float
-  maxMembers                     Int
-  maxGroupAnimals                Int
-  maxHostedShowsPerDay           Int?
-  prestigeCurrencyRewardPerDay   Float           @default(0)
-  vetDiscountPercent             Float           @default(0)
-  prestigeLevels                 GroupPrestige[]
-  game                           Game            @relation(fields: [gameId], references: [id])
+  id                           String          @id @default(cuid())
+  gameId                       String
+  name                         String
+  tierIndex                    Int
+  minScore                     Float
+  maxMembers                   Int
+  maxGroupAnimals              Int
+  maxHostedShowsPerDay         Int?
+  prestigeCurrencyRewardPerDay Float           @default(0)
+  vetDiscountPercent           Float           @default(0)
+  prestigeLevels               GroupPrestige[]
+  game                         Game            @relation(fields: [gameId], references: [id])
 
   @@unique([gameId, name])
   @@unique([gameId, tierIndex])

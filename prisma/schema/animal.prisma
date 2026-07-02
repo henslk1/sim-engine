@@ -182,6 +182,7 @@ model Animal {
   gameShopAnimal                  GameShopAnimal?
   rafflePrizeAnimals              RafflePrizeAnimal[]
   groupAnimals                    GroupAnimal[]
+  jobContractAnimals              JobContractAnimal[]
   game                            Game                       @relation(fields: [gameId], references: [id])
   playerAccount                   PlayerAccount              @relation(fields: [playerAccountId], references: [id])
   breed                           Breed                      @relation(fields: [breedId], references: [id])

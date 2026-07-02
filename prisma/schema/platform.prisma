@@ -50,6 +50,8 @@ model Game {
   gifts                  Gift[]
   raffles                Raffle[]
   playerStores           PlayerStore[]
+  jobListings            JobListing[]
+  jobContracts           JobContract[]
   isActive               Boolean                 @default(false)
   createdAt              DateTime                @default(now())
   groups                 Group[]
@@ -166,6 +168,12 @@ model PlayerAccount {
   groupAnimalsAdded          GroupAnimal[]
   groupActivityLogs          GroupActivityLog[]
   playerStore                PlayerStore?
+  jobListings                JobListing[]
+  jobApplications            JobApplication[]
+  jobContractsAsHirer        JobContract[]           @relation("HirerPlayer")
+  jobContractsAsWorker       JobContract[]           @relation("WorkerPlayer")
+  jobRatingsGiven            JobRating[]             @relation("RaterPlayer")
+  jobRatingsReceived         JobRating[]             @relation("RateePlayer")
   game                       Game                    @relation(fields: [gameId], references: [id])
   user                       User                    @relation(fields: [userId], references: [id])
   createdAt                  DateTime                @default(now())
@@ -264,11 +272,13 @@ model SupportTicket {
   id              String                 @id @default(cuid())
   playerAccountId String
   gameId          String
+  jobContractId   String?
   subject         String
   body            String
   status          SupportTicketStatus
   messages        SupportTicketMessage[]
   playerAccount   PlayerAccount          @relation(fields: [playerAccountId], references: [id])
+  jobContract     JobContract?           @relation(fields: [jobContractId], references: [id])
   game            Game                   @relation(fields: [gameId], references: [id])
   createdAt       DateTime               @default(now())
   updatedAt       DateTime               @updatedAt
