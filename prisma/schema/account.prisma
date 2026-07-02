@@ -9,18 +9,51 @@ enum ProfileFieldKey {
   PLAYER_SHOP
 }
 
-model PlayerProfile
+model PlayerProfile {
+  id              String        @id @default(cuid())
+  playerAccountId String        @unique
+  bio             String?
+  bannerPath      String?
+  updatedAt       DateTime      @updatedAt
+  playerAccount   PlayerAccount @relation(fields: [playerAccountId], references: [id])
+}
 
-model ProfileVisibilitySetting
+model ProfileVisibilitySetting {
+  id String @id @default(cuid())
+  playerAccountId String
+  fieldKey        ProfileFieldKey
+  isVisible       Boolean       @default(true)
+  playerAccount   PlayerAccount @relation(fields: [playerAccountId], references: [id])
 
-model PlayerSeniority
+  @@unique([playerAccountId, fieldKey])
+}
 
-model TutorialStepDef
+model PlayerSeniority {
+  id                String        @id @default(cuid())
+  playerAccountId   String        @unique
+  activeDaysPlayed  Int           @default(0)
+  lastActiveDateAt  DateTime?
+  tutorialCompleted Boolean       @default(false)
+  gatesBypassesd    Boolean       @default(false)
+  playerAccount     PlayerAccount @relation(fields: [playerAccountId], references: [id])
+}
 
-model TutorialProgress
+model TutorialStepDef {
+  id String @id @default(cuid())
+}
 
-model AchievementDef
+model TutorialProgress {
+  id String @id @default(cuid())
+}
 
-model PlayerAchievement
+model AchievementDef {
+  id String @id @default(cuid())
+}
 
-model PlayerReputation
+model PlayerAchievement {
+  id String @id @default(cuid())
+}
+
+model PlayerReputation {
+  id String @id @default(cuid())
+}
