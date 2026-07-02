@@ -206,23 +206,25 @@ model DirectoryFilterDef {
 }
 
 model Competition {
-  id              String             @id @default(cuid())
-  gameId          String
-  venueId         String
-  disciplineDefId String
-  seasonId        String?
-  name            String
-  minEntries      Int
-  maxWaitHours    Int
-  status          CompetitionStatus
-  isInvitational  Boolean            @default(false)
-  entries         CompetitionEntry[]
-  prizeConfigs    PrizeConfig[]
-  season          Season?            @relation(fields: [seasonId], references: [id])
-  disciplineDef   DisciplineDef      @relation(fields: [disciplineDefId], references: [id])
-  venue           Venue              @relation(fields: [venueId], references: [id])
-  game            Game               @relation(fields: [gameId], references: [id])
-  createdAt       DateTime           @default(now())
+  id                 String             @id @default(cuid())
+  gameId             String
+  venueId            String
+  disciplineDefId    String
+  seasonId           String?
+  name               String
+  minEntries         Int
+  maxWaitHours       Int
+  status             CompetitionStatus
+  isInvitational     Boolean            @default(false)
+  entries            CompetitionEntry[]
+  prizeConfigs       PrizeConfig[]
+  campaignPhaseDefId String?
+  campaignPhase      CampaignPhaseDef? @relation(fields: [campaignPhaseDefId], references: [id])
+  season             Season?            @relation(fields: [seasonId], references: [id])
+  disciplineDef      DisciplineDef      @relation(fields: [disciplineDefId], references: [id])
+  venue              Venue              @relation(fields: [venueId], references: [id])
+  game               Game               @relation(fields: [gameId], references: [id])
+  createdAt          DateTime           @default(now())
 }
 
 model CompetitionEntry {

@@ -28,31 +28,32 @@ enum TransactionType {
 }
 
 model CurrencyDef {
-  id                    String                  @id @default(cuid())
-  gameId                String
-  name                  String
-  currencyType          CurrencyType
-  symbol                String?
-  playerBalances        PlayerBalance[]
-  transactions          Transaction[]
-  breedingListings      BreedingListing[]
-  storeListing          StoreListing[]
-  vetServiceDefs        VetServiceDef[]
-  bundleCurrencyRewards BundleCurrencyReward[]
-  shopBreedConfigs      GameShopBreedConfig[]
-  marketplaceListings   MarketplaceListing[]
-  marketplaceOffers     MarketplaceOffer[]
-  toCurrencyOrders      CurrencyExchangeOrder[] @relation("ToCurrency")
-  fromCurrencyOrders    CurrencyExchangeOrder[] @relation("FromCurrency")
-  escrows               Escrow[]
-  gifts                 Gift[]
-  rafflePrizeCurrencies RafflePrizeCurrency[]
-  raffles               Raffle[]
-  groupFinances         GroupFinance[]
-  jobListings           JobListing[]
-  jobApplications       JobApplication[]
-  jobContracts          JobContract[]
-  game                  Game                    @relation(fields: [gameId], references: [id])
+  id                           String                  @id @default(cuid())
+  gameId                       String
+  name                         String
+  currencyType                 CurrencyType
+  symbol                       String?
+  playerBalances               PlayerBalance[]
+  transactions                 Transaction[]
+  breedingListings             BreedingListing[]
+  storeListing                 StoreListing[]
+  vetServiceDefs               VetServiceDef[]
+  bundleCurrencyRewards        BundleCurrencyReward[]
+  shopBreedConfigs             GameShopBreedConfig[]
+  marketplaceListings          MarketplaceListing[]
+  marketplaceOffers            MarketplaceOffer[]
+  toCurrencyOrders             CurrencyExchangeOrder[] @relation("ToCurrency")
+  fromCurrencyOrders           CurrencyExchangeOrder[] @relation("FromCurrency")
+  escrows                      Escrow[]
+  gifts                        Gift[]
+  rafflePrizeCurrencies        RafflePrizeCurrency[]
+  raffles                      Raffle[]
+  groupFinances                GroupFinance[]
+  jobListings                  JobListing[]
+  jobApplications              JobApplication[]
+  jobContracts                 JobContract[]
+  campaignRewardTierCurrencies CampaignRewardTierCurrency[]
+  game                  Game                           @relation(fields: [gameId], references: [id])
 
   @@unique([gameId, name])
 }

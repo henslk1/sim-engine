@@ -25,7 +25,7 @@ model BreedingListing {
   description       String?
   currencyDefId     String?
   pricePerSlot      Int
-  maxSlots          Int
+  maxSlots          Int?
   breedRestrictions BreedingListingBreedRestriction[]
   statMinimums      BreedingListingStatMinimum[]
   slots             BreedingSlot[]

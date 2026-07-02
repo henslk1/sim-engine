@@ -89,6 +89,10 @@ model Breed {
   groups                      Group[]
   groupEntryRequirements      GroupEntryRequirement[]
   groupSaleConditions         GroupSaleProtectionRule[]
+  campaign                    BreedCampaign?
+  foundationAnimals           FoundationAnimal[]
+  dqTraits                    BreedDqTrait[]
+  animalTemplates             AnimalTemplate[]
   game                        Game                              @relation(fields: [gameId], references: [id])
   species                     Species                           @relation(fields: [speciesId], references: [id])
   foundingPlayer              PlayerAccount?                    @relation("BreedFounder", fields: [foundingPlayerId], references: [id])
@@ -183,6 +187,8 @@ model Animal {
   rafflePrizeAnimals              RafflePrizeAnimal[]
   groupAnimals                    GroupAnimal[]
   jobContractAnimals              JobContractAnimal[]
+  campaignContributions           CampaignContribution[]
+  foundationAnimalRecords         FoundationAnimal[]
   game                            Game                       @relation(fields: [gameId], references: [id])
   playerAccount                   PlayerAccount              @relation(fields: [playerAccountId], references: [id])
   breed                           Breed                      @relation(fields: [breedId], references: [id])

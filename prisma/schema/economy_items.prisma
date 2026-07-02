@@ -55,6 +55,7 @@ model ItemDef {
   appliedItems            AnimalAppliedItem[]
   dailyLogs               AnimalDailyLog[]
   groupInventory          GroupInventory[]
+  campaignRewardTierItems CampaignRewardTierItem[]
   prizeEligible           Boolean                  @default(true)
   isSellable              Boolean                  @default(true)
   game                    Game                     @relation(fields: [gameId], references: [id])

@@ -52,10 +52,14 @@ model Game {
   playerStores           PlayerStore[]
   jobListings            JobListing[]
   jobContracts           JobContract[]
-  isActive               Boolean                 @default(false)
-  createdAt              DateTime                @default(now())
+  breedProposals         BreedProposal[]
+  breedCampaigns         BreedCampaign[]
+  animalTemplates        AnimalTemplate[]
   groups                 Group[]
   groupPrestigeTierDefs  GroupPrestigeTierDef[]
+  isActive               Boolean                 @default(false)
+  createdAt              DateTime                @default(now())
+ 
 }
 
 model User {
@@ -170,6 +174,10 @@ model PlayerAccount {
   playerStore                PlayerStore?
   jobListings                JobListing[]
   jobApplications            JobApplication[]
+  breedProposals             BreedProposal[]
+  proposalVotes              BreedProposalVote[]
+  campaignContributions      CampaignContribution[]
+  campaignRewards            CampaignRewardRecord[]
   jobContractsAsHirer        JobContract[]           @relation("HirerPlayer")
   jobContractsAsWorker       JobContract[]           @relation("WorkerPlayer")
   jobRatingsGiven            JobRating[]             @relation("RaterPlayer")

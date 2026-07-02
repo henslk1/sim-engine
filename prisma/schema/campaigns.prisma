@@ -41,22 +41,76 @@ enum CampaignRewardStatus {
 }
 
 model BreedProposal {
-  id String @id @default(cuid())
+  id                String        @id @default(cuid())
+  gameId            String
+  proposingPlayerId String
+  name              String
+  lore              String?
+  ancestry          String?
+  geneticPool       String?
+  breedStandard     String?
+  status            BreedProposalStatus
+  adminFeedback     String?
+  createdAt         DateTime      @default(now())
+  reviewedAt        DateTime?
+  votingStartedAt   DateTime?
+  selectedAt        DateTime?
+  votes             BreedProposalVote[]
+  campaign          BreedCampaign?
+  proposingPlayer   PlayerAccount @relation(fields: [proposingPlayerId], references: [id])
+  game              Game          @relation(fields: [gameId], references: [id])
 }
 
 model BreedProposalVote {
-  id String @id @default(cuid())
+  id            String        @id @default(cuid())
+  proposalId    String
+  voterPlayerId String
+  createdAt     DateTime      @default(now())
+  proposal      BreedProposal @relation(fields: [proposalId], references: [id])
+  voterPlayer   PlayerAccount @relation(fields: [voterPlayerId], references: [id])
+
+  @@unique([proposalId, voterPlayerId])
 }
 
 model BreedCampaign {
-  id String @id @default(cuid())
+  id                String             @id @default(cuid())
+  gameId            String
+  breedId           String             @unique
+  proposalId        String?            @unique
+  currentPhaseId    String?            @unique
+  status            BreedCampaignStatus
+  startedAt         DateTime           @default(now())
+  completedAt       DateTime?
+  phases            CampaignPhaseDef[] @relation("CampaignPhases")
+  currentPhase      CampaignPhaseDef?  @relation("CurrentPhase", fields: [currentPhaseId], references: [id])
+  contributions     CampaignContribution[]
+  rewardTiers       CampaignRewardTier[]
+  rewardRecords     CampaignRewardRecord[]
+  foundationAnimals FoundationAnimal[]
+  proposal          BreedProposal?          @relation(fields: [proposalId], references: [id])
+  breed             Breed              @relation(fields: [breedId], references: [id])
+  game              Game               @relation(fields: [gameId], references: [id])
 }
 
 model CampaignPhaseDef {
   id String @id @default(cuid())
+  campaignId String
+  name       String
+  lore       String?
+  phaseType  CampaignPhaseType
+  triggerConditionType PhaseTriggerType
+  phaseIndex           Int
+  startsAt             DateTime?
+  endsAt               DateTime?
+  contributions        CampaignContribution[]
+  competitions         Competition[]
+  activeCampaign       BreedCampaign?   @relation("CurrentPhase")
+  campaign BreedCampaign @relation("CampaignPhases", fields: [campaignId], references: [id])
+
+  @@unique([campaignId, phaseIndex])
 }
 
-model campaignContribution {
+model CampaignContribution {
   id                  String           @id @default(cuid())
   campaignId          String
   phaseDefId          String
@@ -84,31 +138,32 @@ model FoundationAnimal {
 }
 
 model AnimalTemplate {
-  id              String  @id @default(cuid())
-  gameId          String
-  breedId         String
-  statMode        AnimalStatMode
-  statFloor       Float?
-  healthClear     Boolean @default(false)
-  personalityMode PersonalityMode
-  personalityMin  Float?
-  personalityMax  Float?
-  genotype        AnimalTemplateGenotype[]
-  rewardTiers     CampaignRewardTier[]
-  breed           Breed   @relation(fields: [breedId], references: [id])
-  game            Game    @relation(fields: [gameId], references: [id])
+  id                String  @id @default(cuid())
+  gameId            String
+  breedId           String
+  statMode          AnimalStatMode
+  statFloor         Float?
+  healthClear       Boolean @default(false)
+  personalityMode   PersonalityMode
+  personalityMin    Float?
+  personalityMax    Float?
+  alleleQualityBias Float?
+  genotype          AnimalTemplateGenotype[]
+  rewardTiers       CampaignRewardTier[]
+  breed             Breed   @relation(fields: [breedId], references: [id])
+  game              Game    @relation(fields: [gameId], references: [id])
 }
 
 model AnimalTemplateGenotype {
-  id          String    @id @default(cuid())
+  id          String          @id @default(cuid())
   templateId  String
   locusId     String
   alleleOneId String
   alleleTwoId String
-  alleleTwo   AlleleTwo @relation("TemplateAlleleTwo", fields: [alleleTwoId], references: [id])
-  alleleOne   AlleleOne @relation("TemplateAlleleOne", fields: [alleleOneId], references: [id])
-  locus       Locus     @relation(fields: [locusId], references: [id])
-  template    Template  @relation(fields: [templateId], references: [id])
+  alleleTwo   Allele          @relation("TemplateAlleleTwo", fields: [alleleTwoId], references: [id])
+  alleleOne   Allele          @relation("TemplateAlleleOne", fields: [alleleOneId], references: [id])
+  locus       Locus           @relation(fields: [locusId], references: [id])
+  template    AnimalTemplate  @relation(fields: [templateId], references: [id])
 
   @@unique([templateId, locusId])
 }
@@ -117,7 +172,7 @@ model CampaignRewardTier {
   id                   String          @id @default(cuid())
   campaignId           String
   tierName             String
-  tierIndex            String
+  tierIndex            Int
   minRank              Int
   maxRank              Int?
   animalTemplateId     String?
@@ -130,12 +185,12 @@ model CampaignRewardTier {
 }
 
 model CampaignRewardTierCurrency {
-  id            String      @id @default(cuid())
+  id            String             @id @default(cuid())
   tierId        String
   currencyDefId String
   amount        Int
-  currencyDef   CurrencyDef @relation(fields: [currencyDefId], references: [id])
-  tier          Tier        @relation(fields: [tierId], references: [id])
+  currencyDef   CurrencyDef        @relation(fields: [currencyDefId], references: [id])
+  tier          CampaignRewardTier @relation(fields: [tierId], references: [id])
 
   @@unique([tierId, currencyDefId])
 }
