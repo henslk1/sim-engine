@@ -69,6 +69,7 @@ model Game {
   userReports            UserReport[]
   tutorialStepDefs       TutorialStepDef[]
   achievementDefs        AchievementDef[]
+  nightlyUpdateLogs      NightlyUpdateLog[]
   isActive               Boolean                 @default(false)
   createdAt              DateTime                @default(now())
  
@@ -412,6 +413,25 @@ model AdminActionLog {
   user        User     @relation(fields: [staffUserId], references: [id])
   game        Game?    @relation(fields: [gameId], references: [id])
   createdAt   DateTime @default(now())
+}
+
+model NightlyUpdateLog {
+  id                       String   @id @default(cuid())
+  gameId                   String
+  startedAt                DateTime @default(now())
+  completedAt              DateTime?
+  success                  Boolean  @default(true)
+  errorMessage             String?
+  animalsAged              Int      @default(0) 
+  animalDeaths             Int      @default(0)
+  lifeStageTransitions     Int      @default(0)
+  storeRotationsProcessed  Int      @default(0)
+  rafflesDrawn             Int      @default(0)
+  jobContractsProcessed    Int      @default(0)
+  seasonRewardsDistributed Int      @default(0)
+  campaignPhaseTransitions Int      @default(0)
+  subscriptionsExpired     Int      @default(0)
+  game                     Game     @relation(fields: [gameId], references: [id])
 }
 
 model GameConfig {
