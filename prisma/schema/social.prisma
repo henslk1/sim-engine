@@ -57,11 +57,11 @@ model BlockedPlayer {
   gameId            String
   blockedPlayerId   String
   blockerPlayerId   String
-  blockerPlayer     PlayerAccount @relation("BlockerPlayer", fields: [blockerId], references: [id])
+  blockerPlayer     PlayerAccount @relation("BlockerPlayer", fields: [blockerPlayerId], references: [id])
   blockedPlayer     PlayerAccount @relation("BlockedPlayer", fields: [blockedPlayerId], references: [id])
   game              Game          @relation(fields: [gameId], references: [id])
 
-  @@unique([gameId, blockerPlayerId, blockerPlayerId])
+  @@unique([gameId, blockerPlayerId, blockedPlayerId])
 }
 
 model Follow {
@@ -128,6 +128,7 @@ model ChatChannel {
   messages          ChatMessage[]
   directMessage     DirectMessage?
   readStatuses      MessageReadStatus[]
+  groupChannel      GroupChannel?
   createdByPlayer   PlayerAccount? @relation(fields: [createdByPlayerId], references: [id])
   game              Game           @relation(fields: [gameId], references: [id])
 }
@@ -155,6 +156,7 @@ model ChatMessage {
   pinnedMessages     PinnedMessage[]
   createdAt          DateTime      @default(now())
   editedAt           DateTime?
+  userReports        UserReport[]
   isDeleted          Boolean       @default(false)
   authorPlayer       PlayerAccount @relation(fields: [authorPlayerId], references: [id])
   channel            ChatChannel   @relation(fields: [channelId], references: [id])
@@ -166,7 +168,7 @@ model MessageReadStatus {
   chatChannelId     String
   lastReadMessageId String?
   lastReadAt        DateTime?
-  lastReadMessage   ChatMessage   @relation(fields: [lastReadMessageId], references: [id])
+  lastReadMessage   ChatMessage?  @relation(fields: [lastReadMessageId], references: [id])
   chatChannel       ChatChannel   @relation(fields: [chatChannelId], references: [id])
   playerAccount     PlayerAccount @relation(fields: [playerAccountId], references: [id])
 
@@ -198,6 +200,7 @@ model ForumThread {
   posts            ForumPost[]
   followingPlayers ForumThreadFollow[]
   pinnedPosts      PinnedMessage[]
+  userReports      UserReport[]
   authorGroup      Group?         @relation(fields: [authorGroupId], references: [id])
   authorPlayer     PlayerAccount? @relation(fields: [authorPlayerId], references: [id])
   section          ForumSection   @relation(fields: [sectionId], references: [id])
@@ -213,6 +216,7 @@ model ForumPost {
   isDeleted      Boolean        @default(false)
   createdAt      DateTime       @default(now())
   editedAt       DateTime?
+  userReports    UserReport[]
   authorGroup    Group?         @relation(fields: [authorGroupId], references: [id])
   authorPlayer   PlayerAccount? @relation(fields: [authorPlayerId], references: [id])
   thread         ForumThread    @relation(fields: [threadId], references: [id])

@@ -110,6 +110,10 @@ model Group {
   transactionsFrom    Transaction[]             @relation("TxnFromGroup")
   transactionsTo      Transaction[]             @relation("TxnToGroup")
   geneticMaterials    GeneticMaterial[]
+  followers           Follow[]
+  forumThreadsAuthored ForumThread[]
+  forumPostsAuthored   ForumPost[]
+  userReports          UserReport[]
   createdAt           DateTime                  @default(now())
   foundedBy           PlayerAccount?            @relation(fields: [foundedByPlayerId], references: [id])
   breed               Breed?                    @relation(fields: [breedId], references: [id])
@@ -290,12 +294,14 @@ model GroupPrestigeLog {
 model GroupChannel {
   id             String           @id @default(cuid())
   groupId        String
+  chatChannelId  String?          @unique
   name           String
   channelType    GroupChannelType
   requiredRoleId String?
   isDefault      Boolean          @default(false)
   displayOrder   Int?
   requiredRole   GroupRole?       @relation(fields: [requiredRoleId], references: [id])
+  chatChannel    ChatChannel?     @relation(fields: [chatChannelId], references: [id])
   group          Group            @relation(fields: [groupId], references: [id])
 
   @@unique([groupId, name])

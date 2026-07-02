@@ -181,6 +181,7 @@ model MarketplaceListing {
   items            MarketplaceListingItem[]
   geneticMaterials MarketplaceListingGeneticMaterial[]
   offers           MarketplaceOffer[]
+  userReports      UserReport[]
   currencyDef      CurrencyDef                         @relation(fields: [currencyDefId], references: [id])
   sellerPlayer     PlayerAccount                       @relation(fields: [sellerPlayerId], references: [id])
   playerStore      PlayerStore?                        @relation(fields: [playerStoreId], references: [id])

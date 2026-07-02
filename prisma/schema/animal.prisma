@@ -189,6 +189,8 @@ model Animal {
   jobContractAnimals              JobContractAnimal[]
   campaignContributions           CampaignContribution[]
   foundationAnimalRecords         FoundationAnimal[]
+  followers                       Follow[]
+  userReports                     UserReport[]
   game                            Game                       @relation(fields: [gameId], references: [id])
   playerAccount                   PlayerAccount              @relation(fields: [playerAccountId], references: [id])
   breed                           Breed                      @relation(fields: [breedId], references: [id])

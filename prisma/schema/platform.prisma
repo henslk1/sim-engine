@@ -57,6 +57,16 @@ model Game {
   animalTemplates        AnimalTemplate[]
   groups                 Group[]
   groupPrestigeTierDefs  GroupPrestigeTierDef[]
+  friendships            Friendship[]
+  friendRequests         FriendRequest[]
+  blockedPlayers         BlockedPlayer[]
+  follows                Follow[]
+  notificationTopicDefs  NotificationTopicDef[]
+  notifications          Notification[]
+  chatChannels           ChatChannel[]
+  directMessages         DirectMessage[]
+  forumSections          ForumSection[]
+  userReports            UserReport[]
   isActive               Boolean                 @default(false)
   createdAt              DateTime                @default(now())
  
@@ -182,6 +192,28 @@ model PlayerAccount {
   jobContractsAsWorker       JobContract[]           @relation("WorkerPlayer")
   jobRatingsGiven            JobRating[]             @relation("RaterPlayer")
   jobRatingsReceived         JobRating[]             @relation("RateePlayer")
+  friendshipsAsPlayerOne     Friendship[]	           @relation("PlayerOne")
+  friendshipsAsPlayerTwo     Friendship[]	           @relation("PlayerTwo")
+  sentFriendRequests         FriendRequest[]	       @relation("FriendRequestSender")
+  receivedFriendRequests     FriendRequest[]	       @relation("FriendRequestRecipient")
+  blocksMade                 BlockedPlayer[]	       @relation("BlockerPlayer")
+  blocksReceived             BlockedPlayer[]	       @relation("BlockedPlayer")
+  following                  Follow[]	               @relation("FollowerPlayer")
+  followers                  Follow[]	               @relation("FollowedPlayer")
+  notificationSettings       NotificationSetting[]	
+  notifications              Notification[]	
+  createdChatChannels        ChatChannel[]	
+  dmConversationsAsPlayerOne DirectMessage[]       	@relation("DMPlayerOne")
+  dmConversationsAsPlayerTwo DirectMessage[]	      @relation("DMPlayerTwo")
+  chatMessages               ChatMessage[]	
+  messageReadStatuses        MessageReadStatus[]	
+  forumThreadsAuthored       ForumThread[]	
+  forumPostsAuthored         ForumPost[]	
+  forumThreadFollows         ForumThreadFollow[]	
+  pinnedMessages             PinnedMessage[]	
+  submittedReports           UserReport[]	           @relation("ReporterPlayer")
+  reportsAgainstMe           UserReport[]	           @relation("ReportedPlayer")
+  reviewedReports            UserReport[]	           @relation("ReviewingPlayer")
   game                       Game                    @relation(fields: [gameId], references: [id])
   user                       User                    @relation(fields: [userId], references: [id])
   createdAt                  DateTime                @default(now())
