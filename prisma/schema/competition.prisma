@@ -219,7 +219,7 @@ model Competition {
   entries            CompetitionEntry[]
   prizeConfigs       PrizeConfig[]
   campaignPhaseDefId String?
-  campaignPhase      CampaignPhaseDef? @relation(fields: [campaignPhaseDefId], references: [id])
+  campaignPhase      CampaignPhaseDef?  @relation(fields: [campaignPhaseDefId], references: [id])
   season             Season?            @relation(fields: [seasonId], references: [id])
   disciplineDef      DisciplineDef      @relation(fields: [disciplineDefId], references: [id])
   venue              Venue              @relation(fields: [venueId], references: [id])

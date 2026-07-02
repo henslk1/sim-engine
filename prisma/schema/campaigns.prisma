@@ -1,18 +1,18 @@
 enum BreedProposalStatus {
   PENDING_REVIEW
-  APPROVED 
-  REJECTED 
-  IN_VOTE 
+  APPROVED
+  REJECTED
+  IN_VOTE
   SELECTED
 }
 
 enum BreedCampaignStatus {
-  ACTIVE 
+  ACTIVE
   COMPLETED
 }
 
-enum  CampaignPhaseType {
-  ANNOUNCEMENT 
+enum CampaignPhaseType {
+  ANNOUNCEMENT
   FOUNDATION
   PROVING
   GROWTH
@@ -26,7 +26,7 @@ enum PhaseTriggerType {
 
 enum AnimalStatMode {
   BREED_MAX
-  FLOOR 
+  FLOOR
   EXACT
 }
 
@@ -36,12 +36,12 @@ enum PersonalityMode {
 }
 
 enum CampaignRewardStatus {
-  PENDING 
+  PENDING
   DISTRIBUTED
 }
 
 model BreedProposal {
-  id                String        @id @default(cuid())
+  id                String              @id @default(cuid())
   gameId            String
   proposingPlayerId String
   name              String
@@ -51,14 +51,14 @@ model BreedProposal {
   breedStandard     String?
   status            BreedProposalStatus
   adminFeedback     String?
-  createdAt         DateTime      @default(now())
+  createdAt         DateTime            @default(now())
   reviewedAt        DateTime?
   votingStartedAt   DateTime?
   selectedAt        DateTime?
   votes             BreedProposalVote[]
   campaign          BreedCampaign?
-  proposingPlayer   PlayerAccount @relation(fields: [proposingPlayerId], references: [id])
-  game              Game          @relation(fields: [gameId], references: [id])
+  proposingPlayer   PlayerAccount       @relation(fields: [proposingPlayerId], references: [id])
+  game              Game                @relation(fields: [gameId], references: [id])
 }
 
 model BreedProposalVote {
@@ -73,39 +73,39 @@ model BreedProposalVote {
 }
 
 model BreedCampaign {
-  id                String             @id @default(cuid())
+  id                String                 @id @default(cuid())
   gameId            String
-  breedId           String             @unique
-  proposalId        String?            @unique
-  currentPhaseId    String?            @unique
+  breedId           String                 @unique
+  proposalId        String?                @unique
+  currentPhaseId    String?                @unique
   status            BreedCampaignStatus
-  startedAt         DateTime           @default(now())
+  startedAt         DateTime               @default(now())
   completedAt       DateTime?
-  phases            CampaignPhaseDef[] @relation("CampaignPhases")
-  currentPhase      CampaignPhaseDef?  @relation("CurrentPhase", fields: [currentPhaseId], references: [id])
+  phases            CampaignPhaseDef[]     @relation("CampaignPhases")
+  currentPhase      CampaignPhaseDef?      @relation("CurrentPhase", fields: [currentPhaseId], references: [id])
   contributions     CampaignContribution[]
   rewardTiers       CampaignRewardTier[]
   rewardRecords     CampaignRewardRecord[]
   foundationAnimals FoundationAnimal[]
-  proposal          BreedProposal?          @relation(fields: [proposalId], references: [id])
-  breed             Breed              @relation(fields: [breedId], references: [id])
-  game              Game               @relation(fields: [gameId], references: [id])
+  proposal          BreedProposal?         @relation(fields: [proposalId], references: [id])
+  breed             Breed                  @relation(fields: [breedId], references: [id])
+  game              Game                   @relation(fields: [gameId], references: [id])
 }
 
 model CampaignPhaseDef {
-  id String @id @default(cuid())
-  campaignId String
-  name       String
-  lore       String?
-  phaseType  CampaignPhaseType
+  id                   String                 @id @default(cuid())
+  campaignId           String
+  name                 String
+  lore                 String?
+  phaseType            CampaignPhaseType
   triggerConditionType PhaseTriggerType
   phaseIndex           Int
   startsAt             DateTime?
   endsAt               DateTime?
   contributions        CampaignContribution[]
   competitions         Competition[]
-  activeCampaign       BreedCampaign?   @relation("CurrentPhase")
-  campaign BreedCampaign @relation("CampaignPhases", fields: [campaignId], references: [id])
+  activeCampaign       BreedCampaign?         @relation("CurrentPhase")
+  campaign             BreedCampaign          @relation("CampaignPhases", fields: [campaignId], references: [id])
 
   @@unique([campaignId, phaseIndex])
 }
@@ -138,50 +138,50 @@ model FoundationAnimal {
 }
 
 model AnimalTemplate {
-  id                String  @id @default(cuid())
+  id                String                   @id @default(cuid())
   gameId            String
   breedId           String
   statMode          AnimalStatMode
   statFloor         Float?
-  healthClear       Boolean @default(false)
+  healthClear       Boolean                  @default(false)
   personalityMode   PersonalityMode
   personalityMin    Float?
   personalityMax    Float?
   alleleQualityBias Float?
   genotype          AnimalTemplateGenotype[]
   rewardTiers       CampaignRewardTier[]
-  breed             Breed   @relation(fields: [breedId], references: [id])
-  game              Game    @relation(fields: [gameId], references: [id])
+  breed             Breed                    @relation(fields: [breedId], references: [id])
+  game              Game                     @relation(fields: [gameId], references: [id])
 }
 
 model AnimalTemplateGenotype {
-  id          String          @id @default(cuid())
+  id          String         @id @default(cuid())
   templateId  String
   locusId     String
   alleleOneId String
   alleleTwoId String
-  alleleTwo   Allele          @relation("TemplateAlleleTwo", fields: [alleleTwoId], references: [id])
-  alleleOne   Allele          @relation("TemplateAlleleOne", fields: [alleleOneId], references: [id])
-  locus       Locus           @relation(fields: [locusId], references: [id])
-  template    AnimalTemplate  @relation(fields: [templateId], references: [id])
+  alleleTwo   Allele         @relation("TemplateAlleleTwo", fields: [alleleTwoId], references: [id])
+  alleleOne   Allele         @relation("TemplateAlleleOne", fields: [alleleOneId], references: [id])
+  locus       Locus          @relation(fields: [locusId], references: [id])
+  template    AnimalTemplate @relation(fields: [templateId], references: [id])
 
   @@unique([templateId, locusId])
 }
 
 model CampaignRewardTier {
-  id                   String          @id @default(cuid())
+  id                   String                       @id @default(cuid())
   campaignId           String
   tierName             String
   tierIndex            Int
   minRank              Int
   maxRank              Int?
   animalTemplateId     String?
-  breedingSlotsAwarded Int             @default(0)
+  breedingSlotsAwarded Int                          @default(0)
   currencyRewards      CampaignRewardTierCurrency[]
   itemRewards          CampaignRewardTierItem[]
   rewardRecords        CampaignRewardRecord[]
-  animalTemplate       AnimalTemplate? @relation(fields: [animalTemplateId], references: [id])
-  campaign             BreedCampaign   @relation(fields: [campaignId], references: [id])
+  animalTemplate       AnimalTemplate?              @relation(fields: [animalTemplateId], references: [id])
+  campaign             BreedCampaign                @relation(fields: [campaignId], references: [id])
 }
 
 model CampaignRewardTierCurrency {
@@ -212,7 +212,7 @@ model CampaignRewardRecord {
   tierId            String
   recipientPlayerId String
   status            CampaignRewardStatus @default(PENDING)
-  distributedAt     DateTime? 
+  distributedAt     DateTime?
   recipientPlayer   PlayerAccount        @relation(fields: [recipientPlayerId], references: [id])
   tier              CampaignRewardTier   @relation(fields: [tierId], references: [id])
   campaign          BreedCampaign        @relation(fields: [campaignId], references: [id])

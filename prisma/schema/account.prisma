@@ -1,7 +1,7 @@
 enum ProfileFieldKey {
-  BIO 
-  GROUPS 
-  ACHIEVEMENTS 
+  BIO
+  GROUPS
+  ACHIEVEMENTS
   FORUM_ACTIVITY
   LEADERBOARD_PLACINGS
   MARKETPLACE_LISTINGS
@@ -19,11 +19,11 @@ model PlayerProfile {
 }
 
 model ProfileVisibilitySetting {
-  id String @id @default(cuid())
+  id              String          @id @default(cuid())
   playerAccountId String
   fieldKey        ProfileFieldKey
-  isVisible       Boolean       @default(true)
-  playerAccount   PlayerAccount @relation(fields: [playerAccountId], references: [id])
+  isVisible       Boolean         @default(true)
+  playerAccount   PlayerAccount   @relation(fields: [playerAccountId], references: [id])
 
   @@unique([playerAccountId, fieldKey])
 }
@@ -39,16 +39,16 @@ model PlayerSeniority {
 }
 
 model TutorialStepDef {
-  id                   String @id @default(cuid())
+  id                   String             @id @default(cuid())
   gameId               String
   stepKey              String
   name                 String
   description          String?
   stepIndex            Int
   tutorialProgressions TutorialProgress[]
-  game                 Game   @relation(fields: [gameId], references: [id])
+  game                 Game               @relation(fields: [gameId], references: [id])
 
-  @@unique([gameIdm stepKey])
+  @@unique([gameId, stepKey])
   @@unique([gameId, stepIndex])
 }
 
@@ -64,16 +64,16 @@ model TutorialProgress {
 }
 
 model AchievementDef {
-  id                 String  @id @default(cuid())
+  id                 String              @id @default(cuid())
   gameId             String
   achievementKey     String
   name               String
   description        String?
   iconPath           String?
-  isSecret           Boolean @default(false)
-  goalValue          Int     @default(1)
+  isSecret           Boolean             @default(false)
+  goalValue          Int                 @default(1)
   playerAchievements PlayerAchievement[]
-  game               Game    @relation(fields: [gameId], references: [id])
+  game               Game                @relation(fields: [gameId], references: [id])
 
   @@unique([gameId, achievementKey])
 }
@@ -90,7 +90,7 @@ model PlayerAchievement {
 
 model PlayerReputation {
   id              String        @id @default(cuid())
-  playerAccountId String
+  playerAccountId String        @unique
   averageRating   Float         @default(0)
   totalRatings    Int           @default(0)
   lastUpdatedAt   DateTime      @default(now())

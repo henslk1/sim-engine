@@ -41,7 +41,7 @@ model Allele {
   templateGenotypeAsAlleleOne AnimalTemplateGenotype[] @relation("TemplateAlleleOne")
   templateGenotypeAsAlleleTwo AnimalTemplateGenotype[] @relation("TemplateAlleleTwo")
 
-  locus                       Locus                    @relation(fields: [locusId], references: [id])
+  locus Locus @relation(fields: [locusId], references: [id])
 
   @@unique([locusId, symbol])
 }

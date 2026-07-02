@@ -72,7 +72,6 @@ model Game {
   nightlyUpdateLogs      NightlyUpdateLog[]
   isActive               Boolean                 @default(false)
   createdAt              DateTime                @default(now())
- 
 }
 
 model User {
@@ -135,7 +134,7 @@ model Verification {
 }
 
 model PlayerAccount {
-  id                         String                  @id @default(cuid())
+  id                         String                     @id @default(cuid())
   userId                     String
   gameId                     String
   username                   String
@@ -147,8 +146,8 @@ model PlayerAccount {
   bugReportComments          BugReportComment[]
   animals                    Animal[]
   playerBrand                PlayerBrand?
-  foundedBreeds              Breed[]                 @relation("BreedFounder")
-  performedCareLogs          CareLog[]               @relation("CarePerformedBy")
+  foundedBreeds              Breed[]                    @relation("BreedFounder")
+  performedCareLogs          CareLog[]                  @relation("CarePerformedBy")
   vetVisitLogs               VetVisitLog[]
   trainingLogsPerformed      TrainingLog[]
   hostedClinics              Clinic[]
@@ -161,9 +160,9 @@ model PlayerAccount {
   seasonRankings             SeasonRanking[]
   recordEntries              RecordEntry[]
   playerBalances             PlayerBalance[]
-  outgoingTransactions       Transaction[]           @relation("TxnFrom")
-  incomingTransactions       Transaction[]           @relation("TxnTo")
-  actingTransactions         Transaction[]           @relation("ActingPlayer")
+  outgoingTransactions       Transaction[]              @relation("TxnFrom")
+  incomingTransactions       Transaction[]              @relation("TxnTo")
+  actingTransactions         Transaction[]              @relation("ActingPlayer")
   playerInventory            PlayerInventory[]
   playerCapacity             PlayerCapacity?
   subContainers              SubContainer[]
@@ -171,16 +170,16 @@ model PlayerAccount {
   marketplaceListings        MarketplaceListing[]
   marketplaceOffers          MarketplaceOffer[]
   currencyExchangeOrders     CurrencyExchangeOrder[]
-  escrowsFrom                Escrow[]                @relation("EscrowFrom")
-  escrowsTo                  Escrow[]                @relation("EscrowTo")
-  giftsFrom                  Gift[]                  @relation("GiftFrom")
-  giftsTo                    Gift[]                  @relation("GiftTo")
+  escrowsFrom                Escrow[]                   @relation("EscrowFrom")
+  escrowsTo                  Escrow[]                   @relation("EscrowTo")
+  giftsFrom                  Gift[]                     @relation("GiftFrom")
+  giftsTo                    Gift[]                     @relation("GiftTo")
   raffleEntries              RaffleEntry[]
   raffleItemSubmissions      RaffleItemSubmission[]
   raffleWins                 RaffleWinner[]
   hostedRaffles              Raffle[]
-  groupMemberships           GroupMember[]           @relation("GroupMemberAccount")
-  groupInvites               GroupMember[]           @relation("GroupInvitedBy")
+  groupMemberships           GroupMember[]              @relation("GroupMemberAccount")
+  groupInvites               GroupMember[]              @relation("GroupInvitedBy")
   foundedGroups              Group[]
   groupAnimalsAdded          GroupAnimal[]
   groupActivityLogs          GroupActivityLog[]
@@ -191,42 +190,42 @@ model PlayerAccount {
   proposalVotes              BreedProposalVote[]
   campaignContributions      CampaignContribution[]
   campaignRewards            CampaignRewardRecord[]
-  jobContractsAsHirer        JobContract[]           @relation("HirerPlayer")
-  jobContractsAsWorker       JobContract[]           @relation("WorkerPlayer")
-  jobRatingsGiven            JobRating[]             @relation("RaterPlayer")
-  jobRatingsReceived         JobRating[]             @relation("RateePlayer")
-  friendshipsAsPlayerOne     Friendship[]	           @relation("PlayerOne")
-  friendshipsAsPlayerTwo     Friendship[]	           @relation("PlayerTwo")
-  sentFriendRequests         FriendRequest[]	       @relation("FriendRequestSender")
-  receivedFriendRequests     FriendRequest[]	       @relation("FriendRequestRecipient")
-  blocksMade                 BlockedPlayer[]	       @relation("BlockerPlayer")
-  blocksReceived             BlockedPlayer[]	       @relation("BlockedPlayer")
-  following                  Follow[]	               @relation("FollowerPlayer")
-  followers                  Follow[]	               @relation("FollowedPlayer")
-  notificationSettings       NotificationSetting[]	
-  notifications              Notification[]	
-  createdChatChannels        ChatChannel[]	
-  dmConversationsAsPlayerOne DirectMessage[]       	@relation("DMPlayerOne")
-  dmConversationsAsPlayerTwo DirectMessage[]	      @relation("DMPlayerTwo")
-  chatMessages               ChatMessage[]	
-  messageReadStatuses        MessageReadStatus[]	
-  forumThreadsAuthored       ForumThread[]	
-  forumPostsAuthored         ForumPost[]	
-  forumThreadFollows         ForumThreadFollow[]	
-  pinnedMessages             PinnedMessage[]	
-  submittedReports           UserReport[]	           @relation("ReporterPlayer")
-  reportsAgainstMe           UserReport[]	           @relation("ReportedPlayer")
-  reviewedReports            UserReport[]	           @relation("ReviewingPlayer")
+  jobContractsAsHirer        JobContract[]              @relation("HirerPlayer")
+  jobContractsAsWorker       JobContract[]              @relation("WorkerPlayer")
+  jobRatingsGiven            JobRating[]                @relation("RaterPlayer")
+  jobRatingsReceived         JobRating[]                @relation("RateePlayer")
+  friendshipsAsPlayerOne     Friendship[]               @relation("PlayerOne")
+  friendshipsAsPlayerTwo     Friendship[]               @relation("PlayerTwo")
+  sentFriendRequests         FriendRequest[]            @relation("FriendRequestSender")
+  receivedFriendRequests     FriendRequest[]            @relation("FriendRequestRecipient")
+  blocksMade                 BlockedPlayer[]            @relation("BlockerPlayer")
+  blocksReceived             BlockedPlayer[]            @relation("BlockedPlayer")
+  following                  Follow[]                   @relation("FollowerPlayer")
+  followers                  Follow[]                   @relation("FollowedPlayer")
+  notificationSettings       NotificationSetting[]
+  notifications              Notification[]
+  createdChatChannels        ChatChannel[]
+  dmConversationsAsPlayerOne DirectMessage[]            @relation("DMPlayerOne")
+  dmConversationsAsPlayerTwo DirectMessage[]            @relation("DMPlayerTwo")
+  chatMessages               ChatMessage[]
+  messageReadStatuses        MessageReadStatus[]
+  forumThreadsAuthored       ForumThread[]
+  forumPostsAuthored         ForumPost[]
+  forumThreadFollows         ForumThreadFollow[]
+  pinnedMessages             PinnedMessage[]
+  submittedReports           UserReport[]               @relation("ReporterPlayer")
+  reportsAgainstMe           UserReport[]               @relation("ReportedPlayer")
+  reviewedReports            UserReport[]               @relation("ReviewingPlayer")
   profile                    PlayerProfile?
   seniority                  PlayerSeniority?
   reputation                 PlayerReputation?
   tutorialProgress           TutorialProgress[]
   achievements               PlayerAchievement[]
   profileVisibilitySettings  ProfileVisibilitySetting[]
-  game                       Game                    @relation(fields: [gameId], references: [id])
-  user                       User                    @relation(fields: [userId], references: [id])
-  createdAt                  DateTime                @default(now())
-  updatedAt                  DateTime                @updatedAt
+  game                       Game                       @relation(fields: [gameId], references: [id])
+  user                       User                       @relation(fields: [userId], references: [id])
+  createdAt                  DateTime                   @default(now())
+  updatedAt                  DateTime                   @updatedAt
 
   @@unique([userId, gameId])
 }
@@ -416,22 +415,22 @@ model AdminActionLog {
 }
 
 model NightlyUpdateLog {
-  id                       String   @id @default(cuid())
+  id                       String    @id @default(cuid())
   gameId                   String
-  startedAt                DateTime @default(now())
+  startedAt                DateTime  @default(now())
   completedAt              DateTime?
-  success                  Boolean  @default(true)
+  success                  Boolean   @default(true)
   errorMessage             String?
-  animalsAged              Int      @default(0) 
-  animalDeaths             Int      @default(0)
-  lifeStageTransitions     Int      @default(0)
-  storeRotationsProcessed  Int      @default(0)
-  rafflesDrawn             Int      @default(0)
-  jobContractsProcessed    Int      @default(0)
-  seasonRewardsDistributed Int      @default(0)
-  campaignPhaseTransitions Int      @default(0)
-  subscriptionsExpired     Int      @default(0)
-  game                     Game     @relation(fields: [gameId], references: [id])
+  animalsAged              Int       @default(0)
+  animalDeaths             Int       @default(0)
+  lifeStageTransitions     Int       @default(0)
+  storeRotationsProcessed  Int       @default(0)
+  rafflesDrawn             Int       @default(0)
+  jobContractsProcessed    Int       @default(0)
+  seasonRewardsDistributed Int       @default(0)
+  campaignPhaseTransitions Int       @default(0)
+  subscriptionsExpired     Int       @default(0)
+  game                     Game      @relation(fields: [gameId], references: [id])
 }
 
 model GameConfig {

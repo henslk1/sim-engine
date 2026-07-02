@@ -28,7 +28,7 @@ enum TransactionType {
 }
 
 model CurrencyDef {
-  id                           String                  @id @default(cuid())
+  id                           String                       @id @default(cuid())
   gameId                       String
   name                         String
   currencyType                 CurrencyType
@@ -42,8 +42,8 @@ model CurrencyDef {
   shopBreedConfigs             GameShopBreedConfig[]
   marketplaceListings          MarketplaceListing[]
   marketplaceOffers            MarketplaceOffer[]
-  toCurrencyOrders             CurrencyExchangeOrder[] @relation("ToCurrency")
-  fromCurrencyOrders           CurrencyExchangeOrder[] @relation("FromCurrency")
+  toCurrencyOrders             CurrencyExchangeOrder[]      @relation("ToCurrency")
+  fromCurrencyOrders           CurrencyExchangeOrder[]      @relation("FromCurrency")
   escrows                      Escrow[]
   gifts                        Gift[]
   rafflePrizeCurrencies        RafflePrizeCurrency[]
@@ -53,7 +53,7 @@ model CurrencyDef {
   jobApplications              JobApplication[]
   jobContracts                 JobContract[]
   campaignRewardTierCurrencies CampaignRewardTierCurrency[]
-  game                  Game                           @relation(fields: [gameId], references: [id])
+  game                         Game                         @relation(fields: [gameId], references: [id])
 
   @@unique([gameId, name])
 }
