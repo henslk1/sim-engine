@@ -1,0 +1,26 @@
+enum ProfileFieldKey {
+  BIO 
+  GROUPS 
+  ACHIEVEMENTS 
+  FORUM_ACTIVITY
+  LEADERBOARD_PLACINGS
+  MARKETPLACE_LISTINGS
+  CLINICS
+  PLAYER_SHOP
+}
+
+model PlayerProfile
+
+model ProfileVisibilitySetting
+
+model PlayerSeniority
+
+model TutorialStepDef
+
+model TutorialProgress
+
+model AchievementDef
+
+model PlayerAchievement
+
+model PlayerReputation
