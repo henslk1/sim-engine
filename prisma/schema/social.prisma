@@ -117,19 +117,60 @@ model Notification {
 }
 
 model ChatChannel {
-  id String @id @default(cuid())
+  id                String         @id @default(cuid())
+  gameId            String
+  channelType       ChannelType
+  name              String?
+  description       String?
+  isArchived        Boolean        @default(false)
+  createdAt         DateTime       @default(now())
+  createdByPlayerId String?
+  messages          ChatMessage[]
+  directMessage     DirectMessage?
+  readStatuses      MessageReadStatus[]
+  createdByPlayer   PlayerAccount? @relation(fields: [createdByPlayerId], references: [id])
+  game              Game           @relation(fields: [gameId], references: [id])
 }
 
 model DirectMessage {
-  id String @id @default(cuid())
+  id            String        @id @default(cuid())
+  gameId        String
+  chatChannelId String
+  playerOneId   String
+  playerTwoId   String
+  playerTwo     PlayerAccount @relation("DMPlayerTwo", fields: [playerTwoId], references: [id])
+  playerOne     PlayerAccount @relation("DMPlayerOne", fields: [playerOneId], references: [id])
+  chatChannel   ChatChannel   @relation(fields: [chatChannelId], references: [id])
+  game          Game          @relation(fields: [gameId], references: [id])
+  
+  @@unique([playerOneId, playerTwoId])
 }
 
 model ChatMessage {
-  id String @id @default(cuid())
+  id                 String        @id @default(cuid())
+  channelId          String
+  authorPlayerId     String
+  content            String
+  readStatusPointers MessageReadStatus[]
+  pinnedMessages     PinnedMessage[]
+  createdAt          DateTime      @default(now())
+  editedAt           DateTime?
+  isDeleted          Boolean       @default(false)
+  authorPlayer       PlayerAccount @relation(fields: [authorPlayerId], references: [id])
+  channel            ChatChannel   @relation(fields: [channelId], references: [id])
 }
 
 model MessageReadStatus {
-  id String @id @default(cuid())
+  id                String        @id @default(cuid())
+  playerAccountId   String
+  chatChannelId     String
+  lastReadMessageId String
+  lastReadAt        DateTime?
+  lastReadMessage   ChatMessage   @relation(fields: [lastReadMessageId], references: [id])
+  chatChannel       ChatChannel   @relation(fields: [chatChannelId], references: [id])
+  playerAccount     PlayerAccount @relation(fields: [playerAccountId], references: [id])
+
+  @@unique([playerAccountId, chatChannelId])
 }
 
 model ForumSection {
