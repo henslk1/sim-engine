@@ -39,13 +39,14 @@ model PlayerSeniority {
 }
 
 model TutorialStepDef {
-  id          String @id @default(cuid())
-  gameId      String
-  stepKey     String
-  name        String
-  description String?
-  stepIndex   Int
-  game        Game   @relation(fields: [gameId], references: [id])
+  id                   String @id @default(cuid())
+  gameId               String
+  stepKey              String
+  name                 String
+  description          String?
+  stepIndex            Int
+  tutorialProgressions TutorialProgress[]
+  game                 Game   @relation(fields: [gameId], references: [id])
 
   @@unique([gameIdm stepKey])
   @@unique([gameId, stepIndex])
@@ -63,13 +64,35 @@ model TutorialProgress {
 }
 
 model AchievementDef {
-  id String @id @default(cuid())
+  id                 String  @id @default(cuid())
+  gameId             String
+  achievementKey     String
+  name               String
+  description        String?
+  iconPath           String?
+  isSecret           Boolean @default(false)
+  goalValue          Int     @default(1)
+  playerAchievements PlayerAchievement[]
+  game               Game    @relation(fields: [gameId], references: [id])
+
+  @@unique([gameId, achievementKey])
 }
 
 model PlayerAchievement {
-  id String @id @default(cuid())
+  id               String         @id @default(cuid())
+  playerAccountId  String
+  achievementDefId String
+  progress         Int            @default(0)
+  earnedAt         DateTime?
+  achievementDef   AchievementDef @relation(fields: [achievementDefId], references: [id])
+  playerAccount    PlayerAccount  @relation(fields: [playerAccountId], references: [id])
 }
 
 model PlayerReputation {
-  id String @id @default(cuid())
+  id              String        @id @default(cuid())
+  playerAccountId String
+  averageRating   Float         @default(0)
+  totalRatings    Int           @default(0)
+  lastUpdatedAt   DateTime      @default(now())
+  playerAccount   PlayerAccount @relation(fields: [playerAccountId], references: [id])
 }
