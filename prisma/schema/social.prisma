@@ -174,19 +174,70 @@ model MessageReadStatus {
 }
 
 model ForumSection {
-  id String @id @default(cuid())
+  id           String  @id @default(cuid())
+  gameId       String
+  name         String
+  description  String?
+  threads      ForumThread[]
+  displayOrder Int?
+  isArchived   Boolean @default(false)
+  game         Game    @relation(fields: [gameId], references: [id])
 }
 
 model ForumThread {
-  id String @id @default(cuid())
+  id               String         @id @default(cuid())
+  sectionId        String
+  authorPlayerId   String?
+  authorGroupId    String?
+  authorType       ForumAuthorType
+  title            String
+  isLocked         Boolean        @default(false)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  lastPostAt       DateTime
+  posts            ForumPost[]
+  followingPlayers ForumThreadFollow[]
+  pinnedPosts      PinnedMessage[]
+  authorGroup      Group?         @relation(fields: [authorGroupId], references: [id])
+  authorPlayer     PlayerAccount? @relation(fields: [authorPlayerId], references: [id])
+  section          ForumSection   @relation(fields: [sectionId], references: [id])
 }
 
 model ForumPost {
-  id String @id @default(cuid())
+  id             String         @id @default(cuid())
+  threadId       String
+  authorPlayerId String
+  authorGroupId  String 
+  authorType     ForumAuthorType
+  content        String
+  isDeleted      Boolean        @default(false)
+  createdAt      DateTime       @default(now())
+  edotedAt       DateTime?
+  authorGroup    Group?         @relation(fields: [authorGroupId], references: [id])
+  authorPlayer   PlayerAccount? @relation(fields: [authorPlayerId], references: [id])
+  thread         ForumThread    @relation(fields: [threadId], references: [id])
+}
+
+model ForumThreadFollow {
+  id              String        @id @default(cuid())
+  threadId        String
+  thread          ForumThread   @relation(fields: [threadId], references: [id])
+  playerAccountId String
+  followedAt      DateTime      @default(now())
+  playerAccount   PlayerAccount @relation(fields: [playerAccountId], references: [id])
+
+  @@unique([threadId, playerAccountId])
 }
 
 model PinnedMessage {
-  id String @id @default(cuid())
+  id               String        @id @default(cuid())
+  pinnedByPlayerId String
+  chatMessageId    String
+  forumThreadId    String
+  pinnedAt         DateTime      @default(now())
+  forumThread      ForumThread   @relation(fields: [forumThreadId], references: [id])
+  chatMessage      ChatMessage   @relation(fields: [chatMessageId], references: [id])
+  pinnedByPlayer   PlayerAccount @relation(fields: [pinnedByPlayerId], references: [id])
 }
 
 model UserReport {
