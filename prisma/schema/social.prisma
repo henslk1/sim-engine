@@ -241,5 +241,32 @@ model PinnedMessage {
 }
 
 model UserReport {
-  id String @id @default(cuid())
+  id                           String              @id @default(cuid())
+  gameId                       String
+  reporterPlayerId             String
+  reportType                   ReportType
+  reason                       String
+  status                       ReportStatus        @default(PENDING)
+  reportedPlayerId             String?
+  reportedAnimalId             String?
+  reportedGroupId              String
+  reportedForumPostId          String?
+  reportedForumThreadId        String?
+  reportedChatMessageId        String?
+  reportedMarketplaceListingId String?
+  reviedByPlayerId             String?
+  reviewedAt                   DateTime?
+  adminNote                    String?
+  createdAt                    DateTime            @default(now())
+  reportedMarketplaceListing   MarketplaceListing? @relation(fields: [reportedMarketplaceListingId], references: [id])
+  reportedChatMessage          ChatMessage?        @relation(fields: [reportedChatMessageId], references: [id])
+  reportedForumThread          ForumThread?        @relation(fields: [reportedForumThreadId], references: [id])
+  reportedForumPost            ForumPost?          @relation(fields: [reportedForumPostId], references: [id])
+  reportedGroup                Group?              @relation(fields: [reportedGroupId], references: [id])
+  reportedAnimal               Animal?             @relation(fields: [reportedAnimalId], references: [id])
+  reportedPlayer               PlayerAccount?      @relation("ReportedPlayer", fields: [reportedPlayerId], references: [id])
+  reporterPlayer               PlayerAccount       @relation("ReporterPlayer", fields: [reporterPlayerId], references: [id])
+  reviedByPlayer               PlayerAccount?      @relation("ReviewingPlayer", fields: [reviedByPlayerId], references: [id])
+
+  game                         Game                @relation(fields: [gameId], references: [id])
 }
