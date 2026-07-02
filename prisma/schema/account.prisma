@@ -39,11 +39,27 @@ model PlayerSeniority {
 }
 
 model TutorialStepDef {
-  id String @id @default(cuid())
+  id          String @id @default(cuid())
+  gameId      String
+  stepKey     String
+  name        String
+  description String?
+  stepIndex   Int
+  game        Game   @relation(fields: [gameId], references: [id])
+
+  @@unique([gameIdm stepKey])
+  @@unique([gameId, stepIndex])
 }
 
 model TutorialProgress {
-  id String @id @default(cuid())
+  id              String          @id @default(cuid())
+  playerAccountId String
+  stepDefId       String
+  completedAt     DateTime?
+  stepDef         TutorialStepDef @relation(fields: [stepDefId], references: [id])
+  playerAccount   PlayerAccount   @relation(fields: [playerAccountId], references: [id])
+
+  @@unique([playerAccountId, stepDefId])
 }
 
 model AchievementDef {
