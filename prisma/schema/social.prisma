@@ -78,16 +78,42 @@ model Follow {
   game             Game           @relation(fields: [gameId], references: [id])
 }
 
-model Notification {
-  id String @id @default(cuid())
-}
-
 model NotificationTopicDef {
-  id String @id @default(cuid())
+  id                     String @id @default(cuid())
+  gameId               String
+  topicKey             String
+  name                 String
+  isDefaultEnabled     Boolean  @default(true)
+  notificationSettings NotificationSetting[]
+  notifications        Notification[]
+  game                 Game     @relation(fields: [gameId], references: [id])
+  
+  @@unique([gameId, topicKey])
 }
 
 model NotificationSetting {
-  id String @id @default(cuid())
+  id              String               @id @default(cuid())
+  playerAccountId String
+  topicDefId      String
+  isEnabled       Boolean              @default(true)
+  topicDef        NotificationTopicDef @relation(fields: [topicDefId], references: [id])
+  playerAccount   PlayerAccount        @relation(fields: [playerAccountId], references: [id])
+
+  @@unique([playerAccountId, topicDefId])
+}
+
+model Notification {
+  id                String               @id @default(cuid())
+  gameId            String
+  topicDefId        String?
+  recipientPlayerId String
+  content           String
+  link              String?
+  isRead            Boolean              @default(false)
+  createdAt         DateTime             @default(now())
+  recipientPlayer   PlayerAccount        @relation(fields: [recipientPlayerId], references: [id])
+  topicDef          NotificationTopicDef @relation(fields: [topicDefId], references: [id])
+  game              Game                 @relation(fields: [gameId], references: [id])
 }
 
 model ChatChannel {
