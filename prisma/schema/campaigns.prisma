@@ -57,11 +57,30 @@ model CampaignPhaseDef {
 }
 
 model campaignContribution {
-  id String @id @default(cuid())
+  id                  String           @id @default(cuid())
+  campaignId          String
+  phaseDefId          String
+  contributorPlayerId String
+  animalId            String
+  conformationScore   Float
+  submittedAt         DateTime         @default(now())
+  animal              Animal           @relation(fields: [animalId], references: [id])
+  contributorPlayer   PlayerAccount    @relation(fields: [contributorPlayerId], references: [id])
+  phaseDef            CampaignPhaseDef @relation(fields: [phaseDefId], references: [id])
+  campaign            BreedCampaign    @relation(fields: [campaignId], references: [id])
 }
 
 model FoundationAnimal {
-  id String @id @default(cuid())
+  id           String        @id @default(cuid())
+  campaignId   String
+  breedId      String
+  animalId     String
+  registeredAt DateTime      @default(now())
+  animal       Animal        @relation(fields: [animalId], references: [id])
+  breed        Breed         @relation(fields: [breedId], references: [id])
+  campaign     BreedCampaign @relation(fields: [campaignId], references: [id])
+
+  @@unique([campaignId, animalId])
 }
 
 model AnimalTemplate {
