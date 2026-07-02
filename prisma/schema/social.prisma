@@ -1,0 +1,91 @@
+enum ChannelType {
+  GLOBAL 
+  GROUP 
+  DM
+}
+
+enum ForumAuthorType {
+  PLAYER 
+  GROUP
+}
+
+enum ReportType {
+  PLAYER 
+  ANIMAL
+  GROUP 
+  FORUM_POST
+  FORUM_THREAD
+  CHAT_MESSAGE
+  DIRECT_MESSAGE
+  MARKETPLACE_LISTING
+}
+
+enum ReportStatus {
+  PENDING 
+  REVIEWED 
+  DISMISSED
+}
+
+model Friendship {
+  id String @id @default(cuid())
+}
+
+model FriendRequest {
+  id String @id @default(cuid())
+}
+
+model BlockedPlayer {
+  id String @id @default(cuid())
+}
+
+model Follow {
+  id String @id @default(cuid())
+}
+
+model Notification {
+  id String @id @default(cuid())
+}
+
+model NotificationTopicDef {
+  id String @id @default(cuid())
+}
+
+model NotificationSetting {
+  id String @id @default(cuid())
+}
+
+model ChatChannel {
+  id String @id @default(cuid())
+}
+
+model DirectMessage {
+  id String @id @default(cuid())
+}
+
+model ChatMessage {
+  id String @id @default(cuid())
+}
+
+model MessageReadStatus {
+  id String @id @default(cuid())
+}
+
+model ForumSection {
+  id String @id @default(cuid())
+}
+
+model ForumThread {
+  id String @id @default(cuid())
+}
+
+model ForumPost {
+  id String @id @default(cuid())
+}
+
+model PinnedMessage {
+  id String @id @default(cuid())
+}
+
+model UserReport {
+  id String @id @default(cuid())
+}
