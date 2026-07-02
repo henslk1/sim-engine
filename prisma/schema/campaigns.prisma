@@ -1,0 +1,93 @@
+enum BreedProposalStatus {
+  PENDING_REVIEW
+  APPROVED 
+  REJECTED 
+  IN_VOTE 
+  SELECTED
+}
+
+enum BreedCampaignStatus {
+  ACTIVE 
+  COMPLETED
+}
+
+enum  CampaignPhaseType {
+  ANNOUNCEMENT 
+  FOUNDATION
+  PROVING
+  GROWTH
+  RECOGNITION
+}
+
+enum PhaseTriggerType {
+  TIME
+  ADMIN_MANUAL
+}
+
+enum AnimalStatMode {
+  BREED_MAX
+  FLOOR 
+  EXACT
+}
+
+enum PersonalityMode {
+  RANDOM
+  RANGE
+}
+
+enum CampaignRewardStatus {
+  PENDING 
+  DISTRIBUTED
+}
+
+model BreedProposal {
+  id String @id @default(cuid())
+}
+
+model BreedProposalVote {
+  id String @id @default(cuid())
+}
+
+model BreedCampaign {
+  id String @id @default(cuid())
+}
+
+model CampaignPhaseDef {
+  id String @id @default(cuid())
+}
+
+model campaignContribution {
+  id String @id @default(cuid())
+}
+
+model FoundationAnimal {
+  id String @id @default(cuid())
+}
+
+model AnimalTemplate {
+  id String @id @default(cuid())
+}
+
+model AnimalTemplateGenotype {
+  id String @id @default(cuid())
+}
+
+model CampaignRewardTier {
+  id String @id @default(cuid())
+}
+
+model CampaignRewardTierCurrency {
+  id String @id @default(cuid())
+}
+
+model CampaignRewardTierItem {
+  id String @id @default(cuid())
+}
+
+model CampaignRewardRecord {
+  id String @id @default(cuid())
+}
+
+model BreedDqTrait {
+  id String @id @default(cuid())
+}
