@@ -57,11 +57,11 @@ model BlockedPlayer {
   gameId            String
   blockedPlayerId   String
   blockerPlayerId   String
-  blockerPlayer     PlayerAccount @relation("BlockerPlayer", fields: [blockedByPlayerId], references: [id])
+  blockerPlayer     PlayerAccount @relation("BlockerPlayer", fields: [blockerId], references: [id])
   blockedPlayer     PlayerAccount @relation("BlockedPlayer", fields: [blockedPlayerId], references: [id])
   game              Game          @relation(fields: [gameId], references: [id])
 
-  @@unique([gameId, blockedByPlayerId, blockerPlayerId])
+  @@unique([gameId, blockerPlayerId, blockerPlayerId])
 }
 
 model Follow {
@@ -103,17 +103,17 @@ model NotificationSetting {
 }
 
 model Notification {
-  id                String               @id @default(cuid())
+  id                String                @id @default(cuid())
   gameId            String
   topicDefId        String?
   recipientPlayerId String
   content           String
   link              String?
-  isRead            Boolean              @default(false)
-  createdAt         DateTime             @default(now())
-  recipientPlayer   PlayerAccount        @relation(fields: [recipientPlayerId], references: [id])
-  topicDef          NotificationTopicDef @relation(fields: [topicDefId], references: [id])
-  game              Game                 @relation(fields: [gameId], references: [id])
+  isRead            Boolean               @default(false)
+  createdAt         DateTime              @default(now())
+  recipientPlayer   PlayerAccount         @relation(fields: [recipientPlayerId], references: [id])
+  topicDef          NotificationTopicDef? @relation(fields: [topicDefId], references: [id])
+  game              Game                  @relation(fields: [gameId], references: [id])
 }
 
 model ChatChannel {
@@ -135,7 +135,7 @@ model ChatChannel {
 model DirectMessage {
   id            String        @id @default(cuid())
   gameId        String
-  chatChannelId String
+  chatChannelId String        @unique
   playerOneId   String
   playerTwoId   String
   playerTwo     PlayerAccount @relation("DMPlayerTwo", fields: [playerTwoId], references: [id])
@@ -164,7 +164,7 @@ model MessageReadStatus {
   id                String        @id @default(cuid())
   playerAccountId   String
   chatChannelId     String
-  lastReadMessageId String
+  lastReadMessageId String?
   lastReadAt        DateTime?
   lastReadMessage   ChatMessage   @relation(fields: [lastReadMessageId], references: [id])
   chatChannel       ChatChannel   @relation(fields: [chatChannelId], references: [id])
@@ -194,7 +194,7 @@ model ForumThread {
   isLocked         Boolean        @default(false)
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
-  lastPostAt       DateTime
+  lastPostAt       DateTime?
   posts            ForumPost[]
   followingPlayers ForumThreadFollow[]
   pinnedPosts      PinnedMessage[]
@@ -206,13 +206,13 @@ model ForumThread {
 model ForumPost {
   id             String         @id @default(cuid())
   threadId       String
-  authorPlayerId String
-  authorGroupId  String 
+  authorPlayerId String?
+  authorGroupId  String?
   authorType     ForumAuthorType
   content        String
   isDeleted      Boolean        @default(false)
   createdAt      DateTime       @default(now())
-  edotedAt       DateTime?
+  editedAt       DateTime?
   authorGroup    Group?         @relation(fields: [authorGroupId], references: [id])
   authorPlayer   PlayerAccount? @relation(fields: [authorPlayerId], references: [id])
   thread         ForumThread    @relation(fields: [threadId], references: [id])
@@ -230,14 +230,14 @@ model ForumThreadFollow {
 }
 
 model PinnedMessage {
-  id               String        @id @default(cuid())
-  pinnedByPlayerId String
-  chatMessageId    String
+  id               String         @id @default(cuid())
+  pinnedByPlayerId String?
+  chatMessageId    String?
   forumThreadId    String
-  pinnedAt         DateTime      @default(now())
-  forumThread      ForumThread   @relation(fields: [forumThreadId], references: [id])
-  chatMessage      ChatMessage   @relation(fields: [chatMessageId], references: [id])
-  pinnedByPlayer   PlayerAccount @relation(fields: [pinnedByPlayerId], references: [id])
+  pinnedAt         DateTime       @default(now())
+  forumThread      ForumThread    @relation(fields: [forumThreadId], references: [id])
+  chatMessage      ChatMessage?   @relation(fields: [chatMessageId], references: [id])
+  pinnedByPlayer   PlayerAccount? @relation(fields: [pinnedByPlayerId], references: [id])
 }
 
 model UserReport {
@@ -249,12 +249,12 @@ model UserReport {
   status                       ReportStatus        @default(PENDING)
   reportedPlayerId             String?
   reportedAnimalId             String?
-  reportedGroupId              String
+  reportedGroupId              String?
   reportedForumPostId          String?
   reportedForumThreadId        String?
   reportedChatMessageId        String?
   reportedMarketplaceListingId String?
-  reviedByPlayerId             String?
+  reviewedByPlayerId             String?
   reviewedAt                   DateTime?
   adminNote                    String?
   createdAt                    DateTime            @default(now())
@@ -266,7 +266,7 @@ model UserReport {
   reportedAnimal               Animal?             @relation(fields: [reportedAnimalId], references: [id])
   reportedPlayer               PlayerAccount?      @relation("ReportedPlayer", fields: [reportedPlayerId], references: [id])
   reporterPlayer               PlayerAccount       @relation("ReporterPlayer", fields: [reporterPlayerId], references: [id])
-  reviedByPlayer               PlayerAccount?      @relation("ReviewingPlayer", fields: [reviedByPlayerId], references: [id])
+  reviewedByPlayer               PlayerAccount?      @relation("ReviewingPlayer", fields: [reviewedByPlayerId], references: [id])
 
   game                         Game                @relation(fields: [gameId], references: [id])
 }
