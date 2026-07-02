@@ -67,6 +67,8 @@ model Game {
   directMessages         DirectMessage[]
   forumSections          ForumSection[]
   userReports            UserReport[]
+  tutorialStepDefs       TutorialStepDef[]
+  achievementDefs        AchievementDef[]
   isActive               Boolean                 @default(false)
   createdAt              DateTime                @default(now())
  
@@ -214,6 +216,12 @@ model PlayerAccount {
   submittedReports           UserReport[]	           @relation("ReporterPlayer")
   reportsAgainstMe           UserReport[]	           @relation("ReportedPlayer")
   reviewedReports            UserReport[]	           @relation("ReviewingPlayer")
+  profile                    PlayerProfile?
+  seniority                  PlayerSeniority?
+  reputation                 PlayerReputation?
+  tutorialProgress           TutorialProgress[]
+  achievements               PlayerAchievement[]
+  profileVisibilitySettings  ProfileVisibilitySetting[]
   game                       Game                    @relation(fields: [gameId], references: [id])
   user                       User                    @relation(fields: [userId], references: [id])
   createdAt                  DateTime                @default(now())
