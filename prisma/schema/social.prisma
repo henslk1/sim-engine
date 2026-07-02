@@ -27,19 +27,55 @@ enum ReportStatus {
 }
 
 model Friendship {
-  id String @id @default(cuid())
+  id          String        @id @default(cuid())
+  gameId      String
+  playerOneId String
+  playerTwoId String
+  createdAt   DateTime      @default(now())
+  playerTwo   PlayerAccount @relation("PlayerTwo", fields: [playerTwoId], references: [id])
+  playerOne   PlayerAccount @relation("PlayerOne", fields: [playerOneId], references: [id])
+  game        Game          @relation(fields: [gameId], references: [id])
+
+  @@unique([gameId, playerOneId, playerTwoId])
 }
 
 model FriendRequest {
-  id String @id @default(cuid())
+  id                String        @id @default(cuid())
+  gameId            String
+  senderPlayerId    String
+  recipientPlayerId String
+  createdAt         DateTime      @default(now())
+  recipientPlayer   PlayerAccount @relation("FriendRequestRecipient", fields: [recipientPlayerId], references: [id])
+  senderPlayer      PlayerAccount @relation("FriendRequestSender", fields: [senderPlayerId], references: [id])
+  game              Game          @relation(fields: [gameId], references: [id])
+
+  @@unique([gameId, senderPlayerId, recipientPlayerId])
 }
 
 model BlockedPlayer {
-  id String @id @default(cuid())
+  id                String        @id @default(cuid())
+  gameId            String
+  blockedPlayerId   String
+  blockerPlayerId   String
+  blockerPlayer     PlayerAccount @relation("BlockerPlayer", fields: [blockedByPlayerId], references: [id])
+  blockedPlayer     PlayerAccount @relation("BlockedPlayer", fields: [blockedPlayerId], references: [id])
+  game              Game          @relation(fields: [gameId], references: [id])
+
+  @@unique([gameId, blockedByPlayerId, blockerPlayerId])
 }
 
 model Follow {
-  id String @id @default(cuid())
+  id               String         @id @default(cuid())
+  gameId           String
+  followerPlayerId String
+  followedPlayerId String?
+  followedGroupId  String?
+  followedAnimalId String?
+  followedAnimal   Animal?        @relation(fields: [followedAnimalId], references: [id])
+  followedGroup    Group?         @relation(fields: [followedGroupId], references: [id])
+  followedPlayer   PlayerAccount? @relation("FollowedPlayer", fields: [followedPlayerId], references: [id])
+  followerPlayer   PlayerAccount  @relation("FollowerPlayer", fields: [followerPlayerId], references: [id])
+  game             Game           @relation(fields: [gameId], references: [id])
 }
 
 model Notification {
