@@ -1,0 +1,19 @@
+{
+  "name": "@sim-engine/server",
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@hono/node-server": "latest",
+    "@sim-engine/db": "workspace:*",
+    "hono": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.0",
+    "tsx": "latest",
+    "typescript": "^6.0.3"
+  }
+}
