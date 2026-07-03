@@ -8,7 +8,9 @@
   },
   "dependencies": {
     "@hono/node-server": "latest",
+    "@hono/trpc-server": "^0.4.2",
     "@sim-engine/db": "workspace:*",
+    "@trpc/server": "^11.18.0",
     "hono": "latest"
   },
   "devDependencies": {
