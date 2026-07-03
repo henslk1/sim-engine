@@ -1,22 +1,12 @@
 {
   "name": "sim-engine",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "private": true,
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "turbo run dev",
+    "build": "turbo run build"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "module",
   "devDependencies": {
-    "@types/node": "^26.0.0",
-    "prisma": "^7.8.0",
+    "turbo": "latest",
     "typescript": "^6.0.3"
-  },
-  "dependencies": {
-    "@prisma/client": "^7.8.0",
-    "dotenv": "^17.4.2"
   }
 }
