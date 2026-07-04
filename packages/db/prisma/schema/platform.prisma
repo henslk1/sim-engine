@@ -77,7 +77,6 @@ model Game {
 model User {
   id                    String                 @id @default(cuid())
   email                 String                 @unique
-  passwordHash          String?
   stripeCustomerId      String?                @unique
   emailVerified         Boolean                @default(false)
   name                  String?
@@ -117,6 +116,7 @@ model Account {
   accessTokenExpiresAt  DateTime?
   refreshTokenExpiresAt DateTime?
   scope                 String?
+  password              String?
   user                  User      @relation(fields: [userId], references: [id])
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt

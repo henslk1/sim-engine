@@ -25,6 +25,12 @@ function SignUp() {
     setPending(true)
     setError(null)
 
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters")
+      setPending(false)
+      return
+    }
+
     const { error } = await authClient.signUp.email({ name, email, password })
 
     if (error) {
