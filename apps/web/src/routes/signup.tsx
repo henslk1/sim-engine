@@ -4,15 +4,17 @@ import { authClient } from "@/lib/auth-client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
-export const Route = createFileRoute("/login")({
+
+export const Route = createFileRoute("/signup")({
   beforeLoad: ({ context }) => {
     if (context.session) throw redirect({ to: "/" })
   },
-  component: LoginPage,
+  component: SignUp,
 })
 
-function LoginPage() {
+function SignUp() {
   const router = useRouter()
+  const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
@@ -23,10 +25,10 @@ function LoginPage() {
     setPending(true)
     setError(null)
 
-    const { error } = await authClient.signIn.email({ email, password })
+    const { error } = await authClient.signUp.email({ name, email, password })
 
     if (error) {
-      setError(error.message ?? "Sign in failed")
+      setError(error.message ?? "Sign up failed")
       setPending(false)
       return
     }
@@ -38,8 +40,18 @@ function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background">
       <div className="w-full max-w-sm rounded-lg border border-border bg-card p-6 shadow-sm">
-        <h1 className="mb-6 font-serif text-2xl font-semibold text-foreground">Sign in</h1>
+        <h1 className="mb-6 font-serif text-2xl font-semibold text-foreground">Sign Up</h1>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-foreground">Name</label>
+            <Input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium text-foreground">Email</label>
             <Input
@@ -66,18 +78,16 @@ function LoginPage() {
             disabled={pending}
             className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
           >
-            {pending ? "Signing in…" : "Sign in"}
+            {pending ? "Creating account…" : "Create Account"}
           </Button>
         </form>
         <p className="mt-4 text-center text-sm text-muted-foreground">
-          Don't have an account?{" "}
-          <Link to="/signup" className="font-medium text-primary hover:underline">
-            Create one
+          Already have an account?{" "}
+          <Link to="/login" className="font-medium text-primary hover:underline">
+            Sign in
           </Link>
         </p>
       </div>
     </div>
-)
-
-
+  )
 }
