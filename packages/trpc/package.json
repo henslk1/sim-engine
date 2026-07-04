@@ -1,0 +1,9 @@
+{
+  "name": "@sim-engine/trpc",
+  "version": "0.0.1",
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@trpc/server": "^11.18.0"
+  }
+}

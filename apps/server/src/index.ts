@@ -1,7 +1,7 @@
 import { serve } from "@hono/node-server"
 import { Hono } from "hono"
 import { trpcServer } from "@hono/trpc-server"
-import { appRouter } from "./router.js"
+import { appRouter } from "@sim-engine/trpc"
 import { auth } from "./auth.js"
 
 const app = new Hono()
