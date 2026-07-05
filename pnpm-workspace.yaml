@@ -5,3 +5,5 @@ allowBuilds:
   '@prisma/engines': false
   esbuild: false
   prisma: false
+overrides:
+  '@tiptap/core': '2.27.2'
