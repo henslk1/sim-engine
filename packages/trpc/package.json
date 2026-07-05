@@ -4,6 +4,8 @@
   "type": "module",
   "exports": { ".": "./src/index.ts" },
   "dependencies": {
-    "@trpc/server": "^11.18.0"
+    "@sim-engine/db": "workspace:*",
+    "@trpc/server": "^11.18.0",
+    "zod": "^3.23.0"
   }
 }

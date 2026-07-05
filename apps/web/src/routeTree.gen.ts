@@ -15,6 +15,7 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
+import { Route as AuthenticatedAdminGameConfigRouteImport } from './routes/_authenticated/admin/game-config'
 
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
@@ -45,18 +46,26 @@ const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedAdminRoute,
 } as any)
+const AuthenticatedAdminGameConfigRoute =
+  AuthenticatedAdminGameConfigRouteImport.update({
+    id: '/game-config',
+    path: '/game-config',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/admin/game-config': typeof AuthenticatedAdminGameConfigRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
   '/': typeof AuthenticatedIndexRoute
+  '/admin/game-config': typeof AuthenticatedAdminGameConfigRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
 }
 export interface FileRoutesById {
@@ -66,13 +75,15 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/_authenticated/admin/game-config': typeof AuthenticatedAdminGameConfigRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/signup' | '/admin' | '/admin/'
+  fullPaths:
+    '/' | '/login' | '/signup' | '/admin' | '/admin/game-config' | '/admin/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/login' | '/signup' | '/' | '/admin'
+  to: '/login' | '/signup' | '/' | '/admin/game-config' | '/admin'
   id:
     | '__root__'
     | '/_authenticated'
@@ -80,6 +91,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/_authenticated/admin'
     | '/_authenticated/'
+    | '/_authenticated/admin/game-config'
     | '/_authenticated/admin/'
   fileRoutesById: FileRoutesById
 }
@@ -133,14 +145,23 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/game-config': {
+      id: '/_authenticated/admin/game-config'
+      path: '/game-config'
+      fullPath: '/admin/game-config'
+      preLoaderRoute: typeof AuthenticatedAdminGameConfigRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
   }
 }
 
 interface AuthenticatedAdminRouteChildren {
+  AuthenticatedAdminGameConfigRoute: typeof AuthenticatedAdminGameConfigRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
+  AuthenticatedAdminGameConfigRoute: AuthenticatedAdminGameConfigRoute,
   AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
 }
 

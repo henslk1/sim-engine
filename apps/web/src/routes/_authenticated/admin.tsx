@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet, Link } from '@tanstack/react-router'
+import { createFileRoute, Outlet, Link } from "@tanstack/react-router"
 
 const navGroups = [
   {
@@ -69,7 +69,7 @@ const navGroups = [
   },
 ]
 
-export const Route = createFileRoute('/_authenticated/admin')({
+export const Route = createFileRoute("/_authenticated/admin")({
   component: AdminLayout,
 })
 
@@ -78,23 +78,23 @@ function AdminLayout() {
   return (
     <div className="flex min-h-screen">
       <aside className="w-56 shrink-0 border-r border-border bg-card flex flex-col">
-        <div className='flex items-center justify-between border-b border-border px-4 p-y3'>
-          <span className='font-serif text-sm font-semibold text-foreground'>Admin Console</span>
-          <Link to="/" className='text-xs text-muted-foreground hover:text-foreground'>
+        <div className="flex items-center justify-between border-b border-border px-4 p-y3">
+          <span className="font-serif text-sm font-semibold text-foreground">Admin Console</span>
+          <Link to="/" className="text-xs text-muted-foreground hover:text-foreground">
             ← Game
           </Link>
         </div>
-        <nav className='flex-1 overflow-y-auto p-2 space-y-4'>
+        <nav className="flex-1 overflow-y-auto p-2 space-y-4">
           {navGroups.map((group) => (
             <div key={group.label}>
-              <p className='px-2 pb-1 text-sm font-bold uppercase tracking-wider text-muted-foreground'>
+              <p className="px-2 pb-1 text-sm font-bold uppercase tracking-wider text-muted-foreground">
                 {group.label}
               </p>
               {group.links.map((link) => (
                 <Link
                   key={link.to}
                   to={link.to}
-                  className='block rounded-md px-2 py-1.5 text-sm text-foreground hover:bg-muted'
+                  className="block rounded-md px-2 py-1.5 text-sm text-foreground hover:bg-muted"
                   activeProps={{ className: "block rounded-md px-2 py-1.5 text-sm bg-primary/10 text-primary font-medium"}}
                 >
                   {link.label}
@@ -104,7 +104,7 @@ function AdminLayout() {
           ))}
         </nav>
       </aside>
-      <main className='flex-1 overflow-auto'>
+      <main className="flex-1 overflow-auto">
         <Outlet />
       </main>
     </div>
