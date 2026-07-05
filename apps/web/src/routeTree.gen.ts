@@ -16,6 +16,7 @@ import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
 import { Route as AuthenticatedAdminSpeciesRouteImport } from './routes/_authenticated/admin/species'
+import { Route as AuthenticatedAdminLifeStagesRouteImport } from './routes/_authenticated/admin/life-stages'
 import { Route as AuthenticatedAdminGameConfigRouteImport } from './routes/_authenticated/admin/game-config'
 
 const SignupRoute = SignupRouteImport.update({
@@ -53,6 +54,12 @@ const AuthenticatedAdminSpeciesRoute =
     path: '/species',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminLifeStagesRoute =
+  AuthenticatedAdminLifeStagesRouteImport.update({
+    id: '/life-stages',
+    path: '/life-stages',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedAdminGameConfigRoute =
   AuthenticatedAdminGameConfigRouteImport.update({
     id: '/game-config',
@@ -66,6 +73,7 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/admin/game-config': typeof AuthenticatedAdminGameConfigRoute
+  '/admin/life-stages': typeof AuthenticatedAdminLifeStagesRoute
   '/admin/species': typeof AuthenticatedAdminSpeciesRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
 }
@@ -74,6 +82,7 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/': typeof AuthenticatedIndexRoute
   '/admin/game-config': typeof AuthenticatedAdminGameConfigRoute
+  '/admin/life-stages': typeof AuthenticatedAdminLifeStagesRoute
   '/admin/species': typeof AuthenticatedAdminSpeciesRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
 }
@@ -85,6 +94,7 @@ export interface FileRoutesById {
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/admin/game-config': typeof AuthenticatedAdminGameConfigRoute
+  '/_authenticated/admin/life-stages': typeof AuthenticatedAdminLifeStagesRoute
   '/_authenticated/admin/species': typeof AuthenticatedAdminSpeciesRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
 }
@@ -96,6 +106,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/admin'
     | '/admin/game-config'
+    | '/admin/life-stages'
     | '/admin/species'
     | '/admin/'
   fileRoutesByTo: FileRoutesByTo
@@ -104,6 +115,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/'
     | '/admin/game-config'
+    | '/admin/life-stages'
     | '/admin/species'
     | '/admin'
   id:
@@ -114,6 +126,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin'
     | '/_authenticated/'
     | '/_authenticated/admin/game-config'
+    | '/_authenticated/admin/life-stages'
     | '/_authenticated/admin/species'
     | '/_authenticated/admin/'
   fileRoutesById: FileRoutesById
@@ -175,6 +188,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminSpeciesRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/life-stages': {
+      id: '/_authenticated/admin/life-stages'
+      path: '/life-stages'
+      fullPath: '/admin/life-stages'
+      preLoaderRoute: typeof AuthenticatedAdminLifeStagesRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/game-config': {
       id: '/_authenticated/admin/game-config'
       path: '/game-config'
@@ -187,12 +207,14 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminGameConfigRoute: typeof AuthenticatedAdminGameConfigRoute
+  AuthenticatedAdminLifeStagesRoute: typeof AuthenticatedAdminLifeStagesRoute
   AuthenticatedAdminSpeciesRoute: typeof AuthenticatedAdminSpeciesRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminGameConfigRoute: AuthenticatedAdminGameConfigRoute,
+  AuthenticatedAdminLifeStagesRoute: AuthenticatedAdminLifeStagesRoute,
   AuthenticatedAdminSpeciesRoute: AuthenticatedAdminSpeciesRoute,
   AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
 }
