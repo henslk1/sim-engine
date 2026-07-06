@@ -18,6 +18,14 @@ import { intensityTierAdminRouter } from "./admin.intensitytier.js";
 import { stageActivityAdminRouter } from "./admin.stageactivity.js";
 import { titleAdminRouter } from "./admin.title.js";
 import { disciplineAdminRouter } from "./admin.discipline.js";
+import { competitionTierAdminRouter } from "./admin.competitiontier.js";
+import { seasonAdminRouter } from "./admin.season.js";
+import { recordAdminRouter } from "./admin.record.js";
+import { currencyAdminRouter } from "./admin.currency.js";
+import { vetServiceAdminRouter } from "./admin.vetservice.js";
+import { notificationTopicAdminRouter } from "./admin.notificationtopic.js";
+import { directoryFilterAdminRouter } from "./admin.directoryfilter.js";
+import { tutorialStepAdminRouter } from "./admin.tutorialstep.js";
 
 export const adminRouter = router({
   game: gameAdminRouter,
@@ -39,4 +47,12 @@ export const adminRouter = router({
   stageActivity: stageActivityAdminRouter,
   title: titleAdminRouter,
   discipline: disciplineAdminRouter,
+  competitionTier: competitionTierAdminRouter,
+  season: seasonAdminRouter,
+  record: recordAdminRouter,
+  currency: currencyAdminRouter,
+  vetService: vetServiceAdminRouter,
+  notificationTopic: notificationTopicAdminRouter,
+  directoryFilter: directoryFilterAdminRouter,
+  tutorialStep: tutorialStepAdminRouter,
 })

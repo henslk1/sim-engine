@@ -70,6 +70,9 @@ const emptyPersonalityProfile: PersonalityProfileForm = {
   baseline: 0,
 }
 
+type AlleleFreqForm = { alleleId: string; frequency: string }
+const emptyAlleleFreq = (): AlleleFreqForm => ({ alleleId: "", frequency: "" })
+
 function BreedsPage() {
   const { data: gameData } = trpc.admin.game.get.useQuery()
   const gameId = gameData?.id
@@ -85,6 +88,9 @@ function BreedsPage() {
   const [editingPersonalityProfileId, setEditingPersonalityProfileId] = useState<string | null>(null)
   const [editingPersonalityProfile, setEditingPersonalityProfile] = useState<PersonalityProfileForm | null>(null)
   const [newPersonalityProfile, setNewPersonalityProfile] = useState<PersonalityProfileForm>({ ...emptyPersonalityProfile })
+  const [editingAlleleFreqId, setEditingAlleleFreqId] = useState<string | null>(null)
+  const [editingAlleleFreqValue, setEditingAlleleFreqValue] = useState("")
+  const [newAlleleFreq, setNewAlleleFreq] = useState<AlleleFreqForm>(emptyAlleleFreq())
 
   const { data: breeds } = trpc.admin.breed.list.useQuery(
     { gameId: gameId! }, { enabled: !!gameId }
@@ -108,6 +114,12 @@ function BreedsPage() {
     { breedId: editing?.id! }, { enabled: !!editing?.id }
   )
   const { data: personalityProfiles } = trpc.admin.breed.listPersonalityProfiles.useQuery(
+    { breedId: editing?.id! }, { enabled: !!editing?.id }
+  )
+  const { data: alleles } = trpc.admin.breed.listAlleles.useQuery(
+    { gameId: gameId! }, { enabled: !!gameId }
+  )
+  const { data: alleleFrequencies } = trpc.admin.breed.listAlleleFrequencies.useQuery(
     { breedId: editing?.id! }, { enabled: !!editing?.id }
   )
 
@@ -155,6 +167,17 @@ function BreedsPage() {
   })
   const removePersonalityProfile = trpc.admin.breed.removePersonalityProfile.useMutation({
     onSuccess: () => utils.admin.breed.listPersonalityProfiles.invalidate(),
+  })
+  const saveAlleleFreq = trpc.admin.breed.saveAlleleFrequency.useMutation({
+    onSuccess: () => {
+      utils.admin.breed.listAlleleFrequencies.invalidate({ breedId: editing?.id })
+      setNewAlleleFreq(emptyAlleleFreq())
+      setEditingAlleleFreqId(null)
+      setEditingAlleleFreqValue("")
+    },
+  })
+  const removeAlleleFreq = trpc.admin.breed.removeAlleleFrequency.useMutation({
+    onSuccess: () => utils.admin.breed.listAlleleFrequencies.invalidate({ breedId: editing?.id }),
   })
 
   function openEdit(breed: BreedForm) {
@@ -216,6 +239,34 @@ function BreedsPage() {
     if (!confirm("Remove this personality profile entry?")) return
     removePersonalityProfile.mutate({ id })
   }
+
+  function handleSaveAlleleFreq(id?: string) {
+    if (!editing?.id) return
+    if (id) {
+      if (!editingAlleleFreqValue) return
+      const existing = alleleFrequencies?.find((af) => af.id === id)
+      if (!existing) return
+      saveAlleleFreq.mutate({ id, breedId: editing.id, alleleId: existing.alleleId, frequency: parseFloat(editingAlleleFreqValue), isDq: existing.isDq })
+    } else {
+      if (!newAlleleFreq.alleleId || !newAlleleFreq.frequency) return
+      saveAlleleFreq.mutate({ breedId: editing.id, alleleId: newAlleleFreq.alleleId, frequency: parseFloat(newAlleleFreq.frequency) })
+    }
+  }
+
+  function handleRemoveAlleleFreq(id: string) {
+    if (!confirm("Remove this allele frequency?")) return
+    removeAlleleFreq.mutate({ id })
+  }
+
+  const usedAlleleIds = new Set(alleleFrequencies?.map((af) => af.alleleId) ?? [])
+  const locusAlleleGroups = (() => {
+    const map = new Map<string, { locusName: string; items: NonNullable<typeof alleles> }>()
+    for (const a of alleles ?? []) {
+      if (!map.has(a.locus.id)) map.set(a.locus.id, { locusName: a.locus.name, items: [] })
+      map.get(a.locus.id)!.items.push(a)
+    }
+    return Array.from(map.values())
+  })()
 
   if (!gameId) return <p className="p-6 text-sm text-muted-foreground">No game configured yet. Set up Game Config first.</p>
 
@@ -635,6 +686,105 @@ function BreedsPage() {
               </tbody>
             </table>
           )}
+        </section>
+      )}
+      {/* Allele Frequencies */}
+      {editing.id && (
+        <section className="rounded-lg border border-border bg-card shadow-sm">
+          <header className="border-b border-border bg-secondary/40 px-4 py-2.5">
+            <h2 className="text-sm font-semibold text-foreground">Allele Frequencies</h2>
+          </header>
+          {!alleles?.length ? (
+            <p className="px-4 py-4 text-sm text-muted-foreground">Configure loci and alleles in the Genetics section before setting allele frequencies.</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Locus</th>
+                  <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Allele</th>
+                  <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Frequency</th>
+                  <th className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">DQ</th>
+                  <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {alleleFrequencies?.map((af) => (
+                  <tr key={af.id} className="border-b border-border last:border-0">
+                    {editingAlleleFreqId === af.id ? (
+                      <>
+                        <td className="px-3 py-2 text-foreground">{af.allele.locus.name}</td>
+                        <td className="px-3 py-2 text-foreground">{af.allele.symbol}</td>
+                        <td className="px-3 py-2">
+                          <Input className="h-7 text-xs" type="number" min="0" max="1" step="0.01"
+                            value={editingAlleleFreqValue}
+                            onChange={(e) => setEditingAlleleFreqValue(e.target.value)} />
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <input type="checkbox" checked={af.isDq}
+                            onChange={() => saveAlleleFreq.mutate({ id: af.id, breedId: editing.id!, alleleId: af.alleleId, frequency: af.frequency, isDq: !af.isDq })} />
+                        </td>
+                        <td className="px-3 py-2 text-right space-x-2">
+                          <Button size="sm" onClick={() => handleSaveAlleleFreq(af.id)} disabled={saveAlleleFreq.isPending}>Save</Button>
+                          <Button size="sm" variant="ghost" onClick={() => { setEditingAlleleFreqId(null); setEditingAlleleFreqValue("") }}>Cancel</Button>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="px-3 py-2 text-muted-foreground">{af.allele.locus.name}</td>
+                        <td className="px-3 py-2 font-medium text-foreground">{af.allele.symbol}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{af.frequency}</td>
+                        <td className="px-3 py-2 text-center">
+                          <input type="checkbox" checked={af.isDq}
+                            onChange={() => saveAlleleFreq.mutate({ id: af.id, breedId: editing.id!, alleleId: af.alleleId, frequency: af.frequency, isDq: !af.isDq })} />
+                        </td>
+                        <td className="px-3 py-2 text-right space-x-2">
+                          <Button size="sm" variant="ghost" onClick={() => {
+                            setEditingAlleleFreqId(af.id)
+                            setEditingAlleleFreqValue(af.frequency.toString())
+                          }}>Edit</Button>
+                          <Button size="sm" variant="ghost" onClick={() => handleRemoveAlleleFreq(af.id)} className="text-destructive hover:text-destructive">Delete</Button>
+                        </td>
+                      </>
+                    )}
+                  </tr>
+                ))}
+                <tr>
+                  <td className="px-3 py-2" colSpan={2}>
+                    <select
+                      value={newAlleleFreq.alleleId}
+                      onChange={(e) => setNewAlleleFreq((p) => ({ ...p, alleleId: e.target.value }))}
+                      className="h-7 rounded border border-input bg-background px-2 text-xs w-full"
+                    >
+                      <option value="">Select allele…</option>
+                      {locusAlleleGroups.map(({ locusName, items }) => {
+                        const available = items.filter((a) => !usedAlleleIds.has(a.id))
+                        if (!available.length) return null
+                        return (
+                          <optgroup key={locusName} label={locusName}>
+                            {available.map((a) => <option key={a.id} value={a.id}>{a.symbol}</option>)}
+                          </optgroup>
+                        )
+                      })}
+                    </select>
+                  </td>
+                  <td className="px-3 py-2">
+                    <Input className="h-7 text-xs" type="number" min="0" max="1" step="0.01"
+                      value={newAlleleFreq.frequency}
+                      onChange={(e) => setNewAlleleFreq((p) => ({ ...p, frequency: e.target.value }))}
+                      placeholder="0.00"
+                    />
+                  </td>
+                  <td className="px-3 py-2 text-center">
+                    <input type="checkbox" checked={false} disabled title="Save the row first, then toggle DQ" />
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    <Button size="sm" onClick={() => handleSaveAlleleFreq()} disabled={!newAlleleFreq.alleleId || !newAlleleFreq.frequency || saveAlleleFreq.isPending}>Add</Button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          )}
+          {removeAlleleFreq.error && <p className="px-4 pb-3 text-sm text-destructive">{removeAlleleFreq.error.message}</p>}
         </section>
       )}
     </div>

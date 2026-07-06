@@ -94,12 +94,13 @@ model GeneticPanelLocus {
 }
 
 model BreedAlleleFrequency {
-  id        String @id @default(cuid())
+  id        String  @id @default(cuid())
   alleleId  String
   breedId   String
   frequency Float
-  allele    Allele @relation(fields: [alleleId], references: [id])
-  breed     Breed  @relation(fields: [breedId], references: [id])
+  isDq      Boolean @default(false)
+  allele    Allele  @relation(fields: [alleleId], references: [id])
+  breed     Breed   @relation(fields: [breedId], references: [id])
 
   @@unique([breedId, alleleId])
 }

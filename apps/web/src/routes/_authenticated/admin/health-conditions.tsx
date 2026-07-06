@@ -9,9 +9,10 @@ type ConditionForm = {
   name: string
   isGenetic: boolean
   isFatal: boolean
+  moodEffect: string
 }
 
-const emptyCondition = (): ConditionForm => ({ name: "", isGenetic: false, isFatal: false })
+const emptyCondition = (): ConditionForm => ({ name: "", isGenetic: false, isFatal: false, moodEffect: "" })
 
 type BehaviorRow = { symptomText: string; careActionDefId: string }
 const emptyBehavior = (): BehaviorRow => ({ symptomText: "", careActionDefId: "" })
@@ -69,7 +70,7 @@ function HealthConditionsPage() {
   const [newBehavior, setNewBehavior] = useState<BehaviorRow>(emptyBehavior())
 
   function openEdit(condition: NonNullable<typeof conditions>[number]) {
-    setEditing({ id: condition.id, name: condition.name, isGenetic: condition.isGenetic, isFatal: condition.isFatal })
+    setEditing({ id: condition.id, name: condition.name, isGenetic: condition.isGenetic, isFatal: condition.isFatal, moodEffect: condition.moodEffect?.toString() ?? "" })
     setFormExpanded(false)
     setEditingBehaviorId(null)
     setEditingBehavior(null)
@@ -79,7 +80,7 @@ function HealthConditionsPage() {
   function submitCondition() {
     if (!editing || !gameId) return
     saveCondition.mutate(
-      { id: editing.id, gameId, name: editing.name, isGenetic: editing.isGenetic, isFatal: editing.isFatal },
+      { id: editing.id, gameId, name: editing.name, isGenetic: editing.isGenetic, isFatal: editing.isFatal, moodEffect: editing.moodEffect !== "" ? parseFloat(editing.moodEffect) : null },
       {
         onSuccess: (saved) => {
           setEditing((prev) => (prev ? { ...prev, id: saved.id } : null))
@@ -148,6 +149,17 @@ function HealthConditionsPage() {
                   />
                   Fatal
                 </label>
+              </div>
+              <div className="max-w-xs">
+                <label className="text-xs font-medium text-muted-foreground">Mood Effect <span className="font-normal">(optional)</span></label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={editing.moodEffect}
+                  onChange={(e) => setEditing({ ...editing, moodEffect: e.target.value })}
+                  placeholder="e.g. -0.2"
+                  className="mt-1"
+                />
               </div>
               <div className="flex gap-2 pt-1">
                 <Button onClick={submitCondition} disabled={saveCondition.isPending || !editing.name.trim()}>Save</Button>

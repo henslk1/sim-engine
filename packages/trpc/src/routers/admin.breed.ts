@@ -39,8 +39,11 @@ export const breedAdminRouter = router({
     .input(z.object({ id: z.string() }))
     .mutation(({ input }) =>
       db.$transaction(async (tx) => {
+        await tx.breedAlleleFrequency.deleteMany({ where: { breedId: input.id } })
+        await tx.breedPersonalityProfile.deleteMany({ where: { breedId: input.id } })
         await tx.breedStatProfile.deleteMany({ where: { breedId: input.id } })
         await tx.breedConformationStandard.deleteMany({ where: { breedId: input.id } })
+        await tx.breedDqTrait.deleteMany({ where: { breedId: input.id } })
         return tx.breed.delete({ where: { id: input.id } })
       })
     ),
@@ -134,4 +137,46 @@ export const breedAdminRouter = router({
         select: { id: true, name: true },
       })
     ),
+
+  listAlleles: publicProcedure
+    .input(z.object({ gameId: z.string() }))
+    .query(({ input }) =>
+      db.allele.findMany({
+        where: { locus: { gameId: input.gameId } },
+        orderBy: [{ locus: { name: "asc" } }, { symbol: "asc" }],
+        select: { id: true, symbol: true, locus: { select: { id: true, name: true } } },
+      })
+    ),
+
+  listAlleleFrequencies: publicProcedure
+    .input(z.object({ breedId: z.string() }))
+    .query(({ input }) =>
+      db.breedAlleleFrequency.findMany({
+        where: { breedId: input.breedId },
+        orderBy: { allele: { symbol: "asc" } },
+        include: {
+          allele: {
+            select: { id: true, symbol: true, locus: { select: { id: true, name: true } } },
+          },
+        },
+      })
+    ),
+
+  saveAlleleFrequency: publicProcedure
+    .input(z.object({
+      id: z.string().optional(),
+      breedId: z.string(),
+      alleleId: z.string(),
+      frequency: z.number().min(0).max(1),
+      isDq: z.boolean().default(false),
+    }))
+    .mutation(({ input }) => {
+      const { id, breedId, alleleId, frequency, isDq } = input
+      if (id) return db.breedAlleleFrequency.update({ where: { id }, data: { frequency, isDq } })
+      return db.breedAlleleFrequency.create({ data: { breedId, alleleId, frequency, isDq } })
+    }),
+
+  removeAlleleFrequency: publicProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(({ input }) => db.breedAlleleFrequency.delete({ where: { id: input.id } })),
 })

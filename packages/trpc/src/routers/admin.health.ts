@@ -20,9 +20,11 @@ export const healthAdminRouter = router({
       name: z.string().min(1),
       isGenetic: z.boolean(),
       isFatal: z.boolean(),
+      moodEffect: z.number().nullish(),
     }))
     .mutation(({ input }) => {
-      const { id, gameId, ...data } = input
+      const { id, gameId, moodEffect, ...rest } = input
+      const data = { ...rest, moodEffect: moodEffect ?? null }
       if (id) return db.healthConditionDef.update({ where: { id }, data })
       return db.healthConditionDef.create({ data: { gameId, ...data } })
     }),

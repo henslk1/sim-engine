@@ -18,6 +18,7 @@ function GameConfigPage() {
     trainingCeilingMultiplier: 0,
     pedigreeDisplayDepth: 0,
     predictorDailyLimitFree: 0,
+    breedingEnergyCost: 0,
     containerLabel: "",
     subContainerLabel: "",
   })
@@ -31,6 +32,7 @@ function GameConfigPage() {
           trainingCeilingMultiplier: data.gameConfig.trainingCeilingMultiplier,
           pedigreeDisplayDepth: data.gameConfig.pedigreeDisplayDepth,
           predictorDailyLimitFree: data.gameConfig.predictorDailyLimitFree,
+          breedingEnergyCost: data.gameConfig.breedingEnergyCost,
           containerLabel: data.gameConfig.containerLabel ?? "",
           subContainerLabel: data.gameConfig.subContainerLabel ?? "",
         })
@@ -115,6 +117,13 @@ function GameConfigPage() {
                 <Input type="number" step="1" min="0"
                   value={configForm.predictorDailyLimitFree}
                   onChange={(e) => setConfigForm(f => ({ ...f, predictorDailyLimitFree: parseInt(e.target.value) }))} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Breeding Energy Cost</label>
+                <p className="text-[11px] text-muted-foreground">Energy deducted from each animal when breeding</p>
+                <Input type="number" step="0.1" min="0"
+                  value={configForm.breedingEnergyCost}
+                  onChange={(e) => setConfigForm(f => ({ ...f, breedingEnergyCost: parseFloat(e.target.value) }))} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
