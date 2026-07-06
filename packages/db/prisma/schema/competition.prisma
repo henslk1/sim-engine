@@ -37,6 +37,7 @@ model DisciplineDef {
   description            String?
   isConformation         Boolean                 @default(false)
   statWeights            DisciplineStatWeight[]
+  personalityWeights     DisciplinePersonalityWeight[]
   compTierDefs           CompetitionTierDef[]
   venueDisciplines       VenueDiscipline[]
   competitions           Competition[]
@@ -84,6 +85,7 @@ model CompetitionTierDef {
   tierIndex            Int
   minScore             Float?
   advancementThreshold Float?
+  energyCost           Float                   @default(0)
   animalTiers          AnimalCompetitionTier[]
   disciplineDef        DisciplineDef           @relation(fields: [disciplineDefId], references: [id])
   game                 Game                    @relation(fields: [gameId], references: [id])
@@ -300,4 +302,15 @@ model RecordEntry {
   animal          Animal?        @relation(fields: [animalId], references: [id])
   playerAccount   PlayerAccount? @relation(fields: [playerAccountId], references: [id])
   recordDef       RecordDef      @relation(fields: [recordDefId], references: [id])
+}
+
+model DisciplinePersonalityWeight {
+  id              String              @id @default(cuid())
+  disciplineDefId String
+  traitDefId      String
+  weight          Float
+  disciplineDef   DisciplineDef       @relation(fields: [disciplineDefId], references: [id])
+  traitDef        PersonalityTraitDef @relation(fields: [traitDefId], references: [id])
+
+  @@unique([disciplineDefId, traitDefId])
 }

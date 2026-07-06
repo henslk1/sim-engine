@@ -110,8 +110,9 @@ model AnimalGenotype {
   locusId         String
   alleleOneId     String
   alleleTwoId     String
-  isTestedByOwner Boolean @default(false)
-  animal          Animal  @relation(fields: [animalId], references: [id])
+  isTestedByOwner Boolean   @default(false)
+  testedAt        DateTime?
+  animal          Animal    @relation(fields: [animalId], references: [id])
   locus           Locus   @relation(fields: [locusId], references: [id])
   alleleOne       Allele  @relation("AlleleOne", fields: [alleleOneId], references: [id])
   alleleTwo       Allele  @relation("AlleleTwo", fields: [alleleTwoId], references: [id])

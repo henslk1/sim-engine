@@ -5,6 +5,13 @@ enum GroupMemberStatus {
   LEFT
 }
 
+enum PrestigeSource {
+  COMPETITION_PLACEMENT
+  COMPETITION_HOSTED
+  CLINIC_HOSTED
+  SEASON_RANKING
+}
+
 enum GroupAnimalStatus {
   PENDING_ENTRY
   IN_CONTAINER
@@ -261,6 +268,7 @@ model GroupPrestige {
   tierDefId String?
   tierDef   GroupPrestigeTierDef? @relation(fields: [tierDefId], references: [id])
   group     Group                 @relation(fields: [groupId], references: [id])
+  createdAt DateTime              @default(now())
   updatedAt DateTime              @updatedAt
 }
 
@@ -285,7 +293,7 @@ model GroupPrestigeTierDef {
 model GroupPrestigeLog {
   id        String   @id @default(cuid())
   groupId   String
-  source    String
+  source    PrestigeSource
   amount    Float
   createdAt DateTime @default(now())
   group     Group    @relation(fields: [groupId], references: [id])

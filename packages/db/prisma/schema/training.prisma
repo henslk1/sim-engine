@@ -48,36 +48,44 @@ model TrainingLog {
 }
 
 model AnimalEnergy {
-  id            String @id @default(cuid())
-  animalId      String @unique
+  id            String   @id @default(cuid())
+  animalId      String   @unique
   currentEnergy Float
   maxEnergy     Float
-  animal        Animal @relation(fields: [animalId], references: [id])
+  updatedAt     DateTime @updatedAt
+  animal        Animal   @relation(fields: [animalId], references: [id])
 }
 
 model AnimalCondition {
-  id       String @id @default(cuid())
-  animalId String @unique
-  value    Float
-  animal   Animal @relation(fields: [animalId], references: [id])
+  id        String   @id @default(cuid())
+  animalId  String   @unique
+  value     Float
+  updatedAt DateTime @updatedAt
+  animal    Animal   @relation(fields: [animalId], references: [id])
 }
 
 model AnimalMood {
-  id       String @id @default(cuid())
-  animalId String @unique
-  value    Float
-  animal   Animal @relation(fields: [animalId], references: [id])
+  id        String   @id @default(cuid())
+  animalId  String   @unique
+  value     Float
+  updatedAt DateTime @updatedAt
+  animal    Animal   @relation(fields: [animalId], references: [id])
 }
 
 model PersonalityTraitDef {
-  id                  String                   @id @default(cuid())
+  id                  String                        @id @default(cuid())
   gameId              String
   name                String
   description         String?
+  trainingModifier    Float                         @default(0)
+  moodModifier        Float                         @default(0)
+  conceptionModifier  Float                         @default(0)
   labelRanges         PersonalityLabelRange[]
   breedProfiles       BreedPersonalityProfile[]
   animalPersonalities AnimalPersonality[]
-  game                Game                     @relation(fields: [gameId], references: [id])
+  stageActivities     StageActivityDef[]
+  disciplineWeights   DisciplinePersonalityWeight[]
+  game                Game                          @relation(fields: [gameId], references: [id])
 
   @@unique([gameId, name])
 }
@@ -104,16 +112,18 @@ model AnimalPersonality {
 }
 
 model StageActivityDef {
-  id                String             @id @default(cuid())
+  id                String              @id @default(cuid())
   gameId            String
   lifeStageId       String
+  traitDefId        String
   name              String
-  personalityEffect Float
+  traitEffect       Float
+  energyCost        Float
   description       String?
-  energyCost        Float?
   stageActivityLogs StageActivityLog[]
-  lifeStage         LifeStageDef       @relation(fields: [lifeStageId], references: [id])
-  game              Game               @relation(fields: [gameId], references: [id])
+  lifeStage         LifeStageDef        @relation(fields: [lifeStageId], references: [id])
+  traitDef          PersonalityTraitDef @relation(fields: [traitDefId], references: [id])
+  game              Game                @relation(fields: [gameId], references: [id])
 
   @@unique([gameId, name])
 }
@@ -138,6 +148,7 @@ model Clinic {
   hostGroupId  String?
   name         String
   description  String?
+  energyCost   Float?
   startedAt    DateTime       @default(now())
   endsAt       DateTime?
   maxEntries   Int?

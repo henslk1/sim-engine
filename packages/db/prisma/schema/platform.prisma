@@ -443,6 +443,7 @@ model GameConfig {
   predictorDailyLimitFree   Int
   containerLabel            String?
   subContainerLabel         String?
+  breedingEnergyCost        Float    @default(0)
   game                      Game     @relation(fields: [gameId], references: [id])
   createdAt                 DateTime @default(now())
   updatedAt                 DateTime @updatedAt

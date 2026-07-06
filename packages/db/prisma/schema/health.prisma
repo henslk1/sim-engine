@@ -14,12 +14,19 @@ enum ActivityRestrictionType {
   ALL
 }
 
+enum TestResultOutcome {
+  POSITIVE
+  NEGATIVE
+  INCONCLUSIVE
+}
+
 model HealthConditionDef {
   id                     String                    @id @default(cuid())
   gameId                 String
   name                   String
   isGenetic              Boolean                   @default(false)
   isFatal                Boolean                   @default(false)
+  moodEffect             Float?
   behaviors              HealthConditionBehavior[]
   treatments             TreatmentDef[]
   healthRecords          AnimalHealthRecord[]
@@ -107,13 +114,11 @@ model AnimalTestResult {
   id             String             @id @default(cuid())
   animalId       String
   conditionDefId String
-  result         String
+  result         TestResultOutcome
   testedCycle    Int
   testedAt       DateTime           @default(now())
   animal         Animal             @relation(fields: [animalId], references: [id])
   conditionDef   HealthConditionDef @relation(fields: [conditionDefId], references: [id])
-
-  @@unique([animalId, conditionDefId])
 }
 
 model HealthCertificateDef {

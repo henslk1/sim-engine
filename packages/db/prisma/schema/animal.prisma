@@ -261,11 +261,12 @@ model AnimalBreedComposition {
 }
 
 model GameInnateMax {
-  id             String   @id @default(cuid())
-  gameId         String   @unique
-  maxTotalInnate Float
-  game           Game     @relation(fields: [gameId], references: [id])
-  updatedAt      DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  gameId             String   @unique
+  maxTotalInnate     Float
+  averageTotalInnate Float
+  game               Game     @relation(fields: [gameId], references: [id])
+  updatedAt          DateTime @updatedAt
 }
 
 model PlayerBrand {
