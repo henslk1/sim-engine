@@ -8,6 +8,11 @@ import { locusAdminRouter } from "./admin.locus.js";
 import { expressionAdminRouter } from "./admin.expression.js";
 import { panelAdminRouter } from "./admin.panel.js";
 import { personalityAdminRouter } from "./admin.personality.js";
+import { itemAdminRouter } from "./admin.item.js";
+import { careAdminRouter } from "./admin.care.js";
+import { healthAdminRouter } from "./admin.health.js";
+import { treatmentAdminRouter } from "./admin.treatment.js";
+import { healthCertAdminRouter } from "./admin.healthcert.js";
 
 export const adminRouter = router({
   game: gameAdminRouter,
@@ -19,4 +24,9 @@ export const adminRouter = router({
   expression: expressionAdminRouter,
   panel: panelAdminRouter,
   personality: personalityAdminRouter,
+  item: itemAdminRouter,
+  care: careAdminRouter,
+  health: healthAdminRouter,
+  treatment: treatmentAdminRouter,
+  healthCert: healthCertAdminRouter,
 })

@@ -15,14 +15,18 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
+import { Route as AuthenticatedAdminTreatmentsRouteImport } from './routes/_authenticated/admin/treatments'
 import { Route as AuthenticatedAdminStatsRouteImport } from './routes/_authenticated/admin/stats'
 import { Route as AuthenticatedAdminSpeciesRouteImport } from './routes/_authenticated/admin/species'
 import { Route as AuthenticatedAdminPersonalityTraitsRouteImport } from './routes/_authenticated/admin/personality-traits'
 import { Route as AuthenticatedAdminLociRouteImport } from './routes/_authenticated/admin/loci'
 import { Route as AuthenticatedAdminLifeStagesRouteImport } from './routes/_authenticated/admin/life-stages'
+import { Route as AuthenticatedAdminHealthConditionsRouteImport } from './routes/_authenticated/admin/health-conditions'
+import { Route as AuthenticatedAdminHealthCertificatesRouteImport } from './routes/_authenticated/admin/health-certificates'
 import { Route as AuthenticatedAdminGeneticPanelsRouteImport } from './routes/_authenticated/admin/genetic-panels'
 import { Route as AuthenticatedAdminGameConfigRouteImport } from './routes/_authenticated/admin/game-config'
 import { Route as AuthenticatedAdminExpressionRulesRouteImport } from './routes/_authenticated/admin/expression-rules'
+import { Route as AuthenticatedAdminCareActionsRouteImport } from './routes/_authenticated/admin/care-actions'
 import { Route as AuthenticatedAdminBreedsRouteImport } from './routes/_authenticated/admin/breeds'
 
 const SignupRoute = SignupRouteImport.update({
@@ -54,6 +58,12 @@ const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedAdminRoute,
 } as any)
+const AuthenticatedAdminTreatmentsRoute =
+  AuthenticatedAdminTreatmentsRouteImport.update({
+    id: '/treatments',
+    path: '/treatments',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedAdminStatsRoute = AuthenticatedAdminStatsRouteImport.update({
   id: '/stats',
   path: '/stats',
@@ -82,6 +92,18 @@ const AuthenticatedAdminLifeStagesRoute =
     path: '/life-stages',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminHealthConditionsRoute =
+  AuthenticatedAdminHealthConditionsRouteImport.update({
+    id: '/health-conditions',
+    path: '/health-conditions',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminHealthCertificatesRoute =
+  AuthenticatedAdminHealthCertificatesRouteImport.update({
+    id: '/health-certificates',
+    path: '/health-certificates',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedAdminGeneticPanelsRoute =
   AuthenticatedAdminGeneticPanelsRouteImport.update({
     id: '/genetic-panels',
@@ -100,6 +122,12 @@ const AuthenticatedAdminExpressionRulesRoute =
     path: '/expression-rules',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminCareActionsRoute =
+  AuthenticatedAdminCareActionsRouteImport.update({
+    id: '/care-actions',
+    path: '/care-actions',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedAdminBreedsRoute =
   AuthenticatedAdminBreedsRouteImport.update({
     id: '/breeds',
@@ -113,14 +141,18 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/admin/breeds': typeof AuthenticatedAdminBreedsRoute
+  '/admin/care-actions': typeof AuthenticatedAdminCareActionsRoute
   '/admin/expression-rules': typeof AuthenticatedAdminExpressionRulesRoute
   '/admin/game-config': typeof AuthenticatedAdminGameConfigRoute
   '/admin/genetic-panels': typeof AuthenticatedAdminGeneticPanelsRoute
+  '/admin/health-certificates': typeof AuthenticatedAdminHealthCertificatesRoute
+  '/admin/health-conditions': typeof AuthenticatedAdminHealthConditionsRoute
   '/admin/life-stages': typeof AuthenticatedAdminLifeStagesRoute
   '/admin/loci': typeof AuthenticatedAdminLociRoute
   '/admin/personality-traits': typeof AuthenticatedAdminPersonalityTraitsRoute
   '/admin/species': typeof AuthenticatedAdminSpeciesRoute
   '/admin/stats': typeof AuthenticatedAdminStatsRoute
+  '/admin/treatments': typeof AuthenticatedAdminTreatmentsRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
 }
 export interface FileRoutesByTo {
@@ -128,14 +160,18 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/': typeof AuthenticatedIndexRoute
   '/admin/breeds': typeof AuthenticatedAdminBreedsRoute
+  '/admin/care-actions': typeof AuthenticatedAdminCareActionsRoute
   '/admin/expression-rules': typeof AuthenticatedAdminExpressionRulesRoute
   '/admin/game-config': typeof AuthenticatedAdminGameConfigRoute
   '/admin/genetic-panels': typeof AuthenticatedAdminGeneticPanelsRoute
+  '/admin/health-certificates': typeof AuthenticatedAdminHealthCertificatesRoute
+  '/admin/health-conditions': typeof AuthenticatedAdminHealthConditionsRoute
   '/admin/life-stages': typeof AuthenticatedAdminLifeStagesRoute
   '/admin/loci': typeof AuthenticatedAdminLociRoute
   '/admin/personality-traits': typeof AuthenticatedAdminPersonalityTraitsRoute
   '/admin/species': typeof AuthenticatedAdminSpeciesRoute
   '/admin/stats': typeof AuthenticatedAdminStatsRoute
+  '/admin/treatments': typeof AuthenticatedAdminTreatmentsRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
 }
 export interface FileRoutesById {
@@ -146,14 +182,18 @@ export interface FileRoutesById {
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/admin/breeds': typeof AuthenticatedAdminBreedsRoute
+  '/_authenticated/admin/care-actions': typeof AuthenticatedAdminCareActionsRoute
   '/_authenticated/admin/expression-rules': typeof AuthenticatedAdminExpressionRulesRoute
   '/_authenticated/admin/game-config': typeof AuthenticatedAdminGameConfigRoute
   '/_authenticated/admin/genetic-panels': typeof AuthenticatedAdminGeneticPanelsRoute
+  '/_authenticated/admin/health-certificates': typeof AuthenticatedAdminHealthCertificatesRoute
+  '/_authenticated/admin/health-conditions': typeof AuthenticatedAdminHealthConditionsRoute
   '/_authenticated/admin/life-stages': typeof AuthenticatedAdminLifeStagesRoute
   '/_authenticated/admin/loci': typeof AuthenticatedAdminLociRoute
   '/_authenticated/admin/personality-traits': typeof AuthenticatedAdminPersonalityTraitsRoute
   '/_authenticated/admin/species': typeof AuthenticatedAdminSpeciesRoute
   '/_authenticated/admin/stats': typeof AuthenticatedAdminStatsRoute
+  '/_authenticated/admin/treatments': typeof AuthenticatedAdminTreatmentsRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
 }
 export interface FileRouteTypes {
@@ -164,14 +204,18 @@ export interface FileRouteTypes {
     | '/signup'
     | '/admin'
     | '/admin/breeds'
+    | '/admin/care-actions'
     | '/admin/expression-rules'
     | '/admin/game-config'
     | '/admin/genetic-panels'
+    | '/admin/health-certificates'
+    | '/admin/health-conditions'
     | '/admin/life-stages'
     | '/admin/loci'
     | '/admin/personality-traits'
     | '/admin/species'
     | '/admin/stats'
+    | '/admin/treatments'
     | '/admin/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -179,14 +223,18 @@ export interface FileRouteTypes {
     | '/signup'
     | '/'
     | '/admin/breeds'
+    | '/admin/care-actions'
     | '/admin/expression-rules'
     | '/admin/game-config'
     | '/admin/genetic-panels'
+    | '/admin/health-certificates'
+    | '/admin/health-conditions'
     | '/admin/life-stages'
     | '/admin/loci'
     | '/admin/personality-traits'
     | '/admin/species'
     | '/admin/stats'
+    | '/admin/treatments'
     | '/admin'
   id:
     | '__root__'
@@ -196,14 +244,18 @@ export interface FileRouteTypes {
     | '/_authenticated/admin'
     | '/_authenticated/'
     | '/_authenticated/admin/breeds'
+    | '/_authenticated/admin/care-actions'
     | '/_authenticated/admin/expression-rules'
     | '/_authenticated/admin/game-config'
     | '/_authenticated/admin/genetic-panels'
+    | '/_authenticated/admin/health-certificates'
+    | '/_authenticated/admin/health-conditions'
     | '/_authenticated/admin/life-stages'
     | '/_authenticated/admin/loci'
     | '/_authenticated/admin/personality-traits'
     | '/_authenticated/admin/species'
     | '/_authenticated/admin/stats'
+    | '/_authenticated/admin/treatments'
     | '/_authenticated/admin/'
   fileRoutesById: FileRoutesById
 }
@@ -257,6 +309,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/treatments': {
+      id: '/_authenticated/admin/treatments'
+      path: '/treatments'
+      fullPath: '/admin/treatments'
+      preLoaderRoute: typeof AuthenticatedAdminTreatmentsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/stats': {
       id: '/_authenticated/admin/stats'
       path: '/stats'
@@ -292,6 +351,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminLifeStagesRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/health-conditions': {
+      id: '/_authenticated/admin/health-conditions'
+      path: '/health-conditions'
+      fullPath: '/admin/health-conditions'
+      preLoaderRoute: typeof AuthenticatedAdminHealthConditionsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/health-certificates': {
+      id: '/_authenticated/admin/health-certificates'
+      path: '/health-certificates'
+      fullPath: '/admin/health-certificates'
+      preLoaderRoute: typeof AuthenticatedAdminHealthCertificatesRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/genetic-panels': {
       id: '/_authenticated/admin/genetic-panels'
       path: '/genetic-panels'
@@ -313,6 +386,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminExpressionRulesRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/care-actions': {
+      id: '/_authenticated/admin/care-actions'
+      path: '/care-actions'
+      fullPath: '/admin/care-actions'
+      preLoaderRoute: typeof AuthenticatedAdminCareActionsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/breeds': {
       id: '/_authenticated/admin/breeds'
       path: '/breeds'
@@ -325,29 +405,39 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminBreedsRoute: typeof AuthenticatedAdminBreedsRoute
+  AuthenticatedAdminCareActionsRoute: typeof AuthenticatedAdminCareActionsRoute
   AuthenticatedAdminExpressionRulesRoute: typeof AuthenticatedAdminExpressionRulesRoute
   AuthenticatedAdminGameConfigRoute: typeof AuthenticatedAdminGameConfigRoute
   AuthenticatedAdminGeneticPanelsRoute: typeof AuthenticatedAdminGeneticPanelsRoute
+  AuthenticatedAdminHealthCertificatesRoute: typeof AuthenticatedAdminHealthCertificatesRoute
+  AuthenticatedAdminHealthConditionsRoute: typeof AuthenticatedAdminHealthConditionsRoute
   AuthenticatedAdminLifeStagesRoute: typeof AuthenticatedAdminLifeStagesRoute
   AuthenticatedAdminLociRoute: typeof AuthenticatedAdminLociRoute
   AuthenticatedAdminPersonalityTraitsRoute: typeof AuthenticatedAdminPersonalityTraitsRoute
   AuthenticatedAdminSpeciesRoute: typeof AuthenticatedAdminSpeciesRoute
   AuthenticatedAdminStatsRoute: typeof AuthenticatedAdminStatsRoute
+  AuthenticatedAdminTreatmentsRoute: typeof AuthenticatedAdminTreatmentsRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminBreedsRoute: AuthenticatedAdminBreedsRoute,
+  AuthenticatedAdminCareActionsRoute: AuthenticatedAdminCareActionsRoute,
   AuthenticatedAdminExpressionRulesRoute:
     AuthenticatedAdminExpressionRulesRoute,
   AuthenticatedAdminGameConfigRoute: AuthenticatedAdminGameConfigRoute,
   AuthenticatedAdminGeneticPanelsRoute: AuthenticatedAdminGeneticPanelsRoute,
+  AuthenticatedAdminHealthCertificatesRoute:
+    AuthenticatedAdminHealthCertificatesRoute,
+  AuthenticatedAdminHealthConditionsRoute:
+    AuthenticatedAdminHealthConditionsRoute,
   AuthenticatedAdminLifeStagesRoute: AuthenticatedAdminLifeStagesRoute,
   AuthenticatedAdminLociRoute: AuthenticatedAdminLociRoute,
   AuthenticatedAdminPersonalityTraitsRoute:
     AuthenticatedAdminPersonalityTraitsRoute,
   AuthenticatedAdminSpeciesRoute: AuthenticatedAdminSpeciesRoute,
   AuthenticatedAdminStatsRoute: AuthenticatedAdminStatsRoute,
+  AuthenticatedAdminTreatmentsRoute: AuthenticatedAdminTreatmentsRoute,
   AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
 }
 
