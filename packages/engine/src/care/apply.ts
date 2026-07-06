@@ -13,8 +13,10 @@ export async function applyCareAction(
 ) {
   return client.$transaction(async (tx) => {
 
+    const { animalId, careActionDefId, performedByPlayerId, cycleNumber } = input
+
     const action = await tx.careActionDef.findUniqueOrThrow({
-      where: { id: input.careActionDefId },
+      where: { id: careActionDefId },
       include: { items: true },
     })
 
@@ -25,7 +27,7 @@ export async function applyCareAction(
       
       case "CURRENCY":{ 
 
-        if (!input.performedByPlayerId || !action.currencyAmount) {
+        if (!performedByPlayerId || !action.currencyAmount) {
           throw new Error("CURRENCY care action requires a player and currencyAmount")
         }
 
@@ -37,7 +39,7 @@ export async function applyCareAction(
         await tx.playerBalance.update({
           where: {
             playerAccountId_currencyDefId: {
-              playerAccountId: input.performedByPlayerId,
+              playerAccountId: performedByPlayerId,
               currencyDefId: baseCurrency.id,
             },
           },
@@ -47,7 +49,7 @@ export async function applyCareAction(
         await tx.transaction.create({
           data: {
             gameId: action.gameId,
-            fromPlayerAccountId: input.performedByPlayerId,
+            fromPlayerAccountId: performedByPlayerId,
             currencyDefId: baseCurrency.id,
             amount: action.currencyAmount,
             txnType: "CARE_FEE",
@@ -60,7 +62,7 @@ export async function applyCareAction(
 
       case "ITEM": {
 
-        if (!input.performedByPlayerId) {
+        if (!performedByPlayerId) {
           throw new Error("ITEM care action requires a player")
         }
 
@@ -68,7 +70,7 @@ export async function applyCareAction(
           await tx.playerInventory.update({
             where: {
               playerAccountId_itemDefId: {
-                playerAccountId: input.performedByPlayerId,
+                playerAccountId: performedByPlayerId,
                 itemDefId: item.itemDefId,
               },
             },
@@ -84,22 +86,22 @@ export async function applyCareAction(
 
     const careLog = await tx.careLog.create({
       data: {
-        animalId: input.animalId,
-        careActionDefId: input.careActionDefId,
-        cycleNumber: input.cycleNumber,
-        performedByPlayerId: input.performedByPlayerId,
+        animalId: animalId,
+        careActionDefId: careActionDefId,
+        cycleNumber: cycleNumber,
+        performedByPlayerId: performedByPlayerId,
       },
     })
 
     /* Increment energy */
     if (action.energyRestore > 0) {
       const energy = await tx.animalEnergy.findUnique({
-        where: { animalId: input.animalId },
+        where: { animalId: animalId },
       })
 
       if (energy) {
         await tx.animalEnergy.update({
-          where: { animalId: input.animalId },
+          where: { animalId: animalId },
           data: { 
             currentEnergy: Math.min(
               energy.currentEnergy + action.energyRestore,
@@ -108,31 +110,25 @@ export async function applyCareAction(
           },
         })
       } else {
-        await tx.animalEnergy.create({
-          data: {
-            animalId: input.animalId,
-            currentEnergy: Math.min(action.energyRestore, 1),
-            maxEnergy: 1,
-          },
-        })
+        throw new Error(`No energy record for animal ${animalId}`)
       }
     }
 
     /* Increment mood where applicable */
     if (action.moodBoost > 0) {
       const mood = await tx.animalMood.findUnique({
-        where: { animalId: input.animalId },
+        where: { animalId: animalId },
       })
 
       if (mood) {
         await tx.animalMood.update({
-          where: { animalId: input.animalId },
+          where: { animalId: animalId },
           data: { value: Math.min(mood.value + action.moodBoost, 1) },
         })
       } else {
         await tx.animalMood.create({
           data: {
-            animalId: input.animalId,
+            animalId: animalId,
             value: Math.min(action.moodBoost, 1),
           },
         })
@@ -140,8 +136,8 @@ export async function applyCareAction(
     }
 
     await tx.animalCareScore.upsert({
-      where: { animalId: input.animalId },
-      create: { animalId: input.animalId, score: action.careScoreGain },
+      where: { animalId: animalId },
+      create: { animalId: animalId, score: action.careScoreGain },
       update: { score: { increment: action.careScoreGain } },
     })
 

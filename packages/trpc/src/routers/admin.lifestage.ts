@@ -1,6 +1,6 @@
 import { router, publicProcedure } from "../trpc.js";
 import { db } from "@sim-engine/db";
-import { z } from "zod/v4";
+import { z } from "zod";
 
 const stageInput = z.object({
   id: z.string().optional(),

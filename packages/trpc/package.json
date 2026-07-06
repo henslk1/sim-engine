@@ -5,6 +5,7 @@
   "exports": { ".": "./src/index.ts" },
   "dependencies": {
     "@sim-engine/db": "workspace:*",
+    "@sim-engine/engine": "workspace:*",
     "@trpc/server": "^11.18.0",
     "zod": "^3.23.0"
   }
