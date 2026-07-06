@@ -98,6 +98,33 @@ export const breedAdminRouter = router({
     .input(z.object({ id: z.string() }))
     .mutation(({ input }) => db.breedConformationStandard.delete({ where: { id: input.id } })),
 
+  listPersonalityProfiles: publicProcedure
+    .input(z.object({ breedId: z.string() }))
+    .query(({ input }) =>
+      db.breedPersonalityProfile.findMany({
+        where: { breedId: input.breedId },
+        include: { traitDef: { select: { id: true, name: true } } },
+        orderBy: { traitDef: { name: "asc" } },
+      })
+    ),
+  savePersonalityProfile: publicProcedure
+    .input(z.object({
+      id: z.string().optional(),
+      breedId: z.string(),
+      traitDefId: z.string(),
+      naturalMin: z.number(),
+      naturalMax: z.number(),
+      baseline: z.number(),
+    }))
+    .mutation(({ input }) => {
+      const { id, breedId, ...data } = input
+      if (id) return db.breedPersonalityProfile.update({ where: { id }, data })
+      return db.breedPersonalityProfile.create({ data: { breedId, ...data } })
+    }),
+  removePersonalityProfile: publicProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(({ input }) => db.breedPersonalityProfile.delete({ where: { id: input.id } })),
+
   listLoci: publicProcedure
     .input(z.object({ gameId: z.string() }))
     .query(({ input }) =>

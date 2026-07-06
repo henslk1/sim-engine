@@ -75,6 +75,7 @@ model Breed {
   isUnregistered              Boolean                           @default(false)
   convergenceGenerations      Int?
   statProfile                 BreedStatProfile[]
+  personalityProfiles         BreedPersonalityProfile[]
   animals                     Animal[]
   animalBreedCompositions     AnimalBreedComposition[]
   alleleFrequencies           BreedAlleleFrequency[]
@@ -112,6 +113,19 @@ model BreedStatProfile {
   statDef    StatDef @relation(fields: [statDefId], references: [id])
 
   @@unique([breedId, statDefId])
+}
+
+model BreedPersonalityProfile {
+  id         String              @id @default(cuid())
+  breedId    String
+  traitDefId String
+  naturalMin Float
+  naturalMax Float
+  baseline   Float
+  breed      Breed               @relation(fields: [breedId], references: [id])
+  traitDef   PersonalityTraitDef @relation(fields: [traitDefId], references: [id])
+
+  @@unique([breedId, traitDefId])
 }
 
 model Animal {
@@ -162,7 +176,7 @@ model Animal {
   energy                          AnimalEnergy?
   condition                       AnimalCondition?
   mood                            AnimalMood?
-  personality                     AnimalPersonality?
+  personality                     AnimalPersonality[]
   stageActivityLogs               StageActivityLog[]
   clinicEntries                   ClinicEntry[]
   titles                          AnimalTitle[]

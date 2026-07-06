@@ -17,6 +17,7 @@ import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
 import { Route as AuthenticatedAdminStatsRouteImport } from './routes/_authenticated/admin/stats'
 import { Route as AuthenticatedAdminSpeciesRouteImport } from './routes/_authenticated/admin/species'
+import { Route as AuthenticatedAdminPersonalityTraitsRouteImport } from './routes/_authenticated/admin/personality-traits'
 import { Route as AuthenticatedAdminLociRouteImport } from './routes/_authenticated/admin/loci'
 import { Route as AuthenticatedAdminLifeStagesRouteImport } from './routes/_authenticated/admin/life-stages'
 import { Route as AuthenticatedAdminGeneticPanelsRouteImport } from './routes/_authenticated/admin/genetic-panels'
@@ -62,6 +63,12 @@ const AuthenticatedAdminSpeciesRoute =
   AuthenticatedAdminSpeciesRouteImport.update({
     id: '/species',
     path: '/species',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminPersonalityTraitsRoute =
+  AuthenticatedAdminPersonalityTraitsRouteImport.update({
+    id: '/personality-traits',
+    path: '/personality-traits',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
 const AuthenticatedAdminLociRoute = AuthenticatedAdminLociRouteImport.update({
@@ -111,6 +118,7 @@ export interface FileRoutesByFullPath {
   '/admin/genetic-panels': typeof AuthenticatedAdminGeneticPanelsRoute
   '/admin/life-stages': typeof AuthenticatedAdminLifeStagesRoute
   '/admin/loci': typeof AuthenticatedAdminLociRoute
+  '/admin/personality-traits': typeof AuthenticatedAdminPersonalityTraitsRoute
   '/admin/species': typeof AuthenticatedAdminSpeciesRoute
   '/admin/stats': typeof AuthenticatedAdminStatsRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
@@ -125,6 +133,7 @@ export interface FileRoutesByTo {
   '/admin/genetic-panels': typeof AuthenticatedAdminGeneticPanelsRoute
   '/admin/life-stages': typeof AuthenticatedAdminLifeStagesRoute
   '/admin/loci': typeof AuthenticatedAdminLociRoute
+  '/admin/personality-traits': typeof AuthenticatedAdminPersonalityTraitsRoute
   '/admin/species': typeof AuthenticatedAdminSpeciesRoute
   '/admin/stats': typeof AuthenticatedAdminStatsRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
@@ -142,6 +151,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/genetic-panels': typeof AuthenticatedAdminGeneticPanelsRoute
   '/_authenticated/admin/life-stages': typeof AuthenticatedAdminLifeStagesRoute
   '/_authenticated/admin/loci': typeof AuthenticatedAdminLociRoute
+  '/_authenticated/admin/personality-traits': typeof AuthenticatedAdminPersonalityTraitsRoute
   '/_authenticated/admin/species': typeof AuthenticatedAdminSpeciesRoute
   '/_authenticated/admin/stats': typeof AuthenticatedAdminStatsRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
@@ -159,6 +169,7 @@ export interface FileRouteTypes {
     | '/admin/genetic-panels'
     | '/admin/life-stages'
     | '/admin/loci'
+    | '/admin/personality-traits'
     | '/admin/species'
     | '/admin/stats'
     | '/admin/'
@@ -173,6 +184,7 @@ export interface FileRouteTypes {
     | '/admin/genetic-panels'
     | '/admin/life-stages'
     | '/admin/loci'
+    | '/admin/personality-traits'
     | '/admin/species'
     | '/admin/stats'
     | '/admin'
@@ -189,6 +201,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/genetic-panels'
     | '/_authenticated/admin/life-stages'
     | '/_authenticated/admin/loci'
+    | '/_authenticated/admin/personality-traits'
     | '/_authenticated/admin/species'
     | '/_authenticated/admin/stats'
     | '/_authenticated/admin/'
@@ -258,6 +271,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminSpeciesRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/personality-traits': {
+      id: '/_authenticated/admin/personality-traits'
+      path: '/personality-traits'
+      fullPath: '/admin/personality-traits'
+      preLoaderRoute: typeof AuthenticatedAdminPersonalityTraitsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/loci': {
       id: '/_authenticated/admin/loci'
       path: '/loci'
@@ -310,6 +330,7 @@ interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminGeneticPanelsRoute: typeof AuthenticatedAdminGeneticPanelsRoute
   AuthenticatedAdminLifeStagesRoute: typeof AuthenticatedAdminLifeStagesRoute
   AuthenticatedAdminLociRoute: typeof AuthenticatedAdminLociRoute
+  AuthenticatedAdminPersonalityTraitsRoute: typeof AuthenticatedAdminPersonalityTraitsRoute
   AuthenticatedAdminSpeciesRoute: typeof AuthenticatedAdminSpeciesRoute
   AuthenticatedAdminStatsRoute: typeof AuthenticatedAdminStatsRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
@@ -323,6 +344,8 @@ const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminGeneticPanelsRoute: AuthenticatedAdminGeneticPanelsRoute,
   AuthenticatedAdminLifeStagesRoute: AuthenticatedAdminLifeStagesRoute,
   AuthenticatedAdminLociRoute: AuthenticatedAdminLociRoute,
+  AuthenticatedAdminPersonalityTraitsRoute:
+    AuthenticatedAdminPersonalityTraitsRoute,
   AuthenticatedAdminSpeciesRoute: AuthenticatedAdminSpeciesRoute,
   AuthenticatedAdminStatsRoute: AuthenticatedAdminStatsRoute,
   AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,

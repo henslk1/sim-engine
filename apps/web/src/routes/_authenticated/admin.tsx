@@ -11,6 +11,7 @@ const navGroups = [
       { to: "/admin/species", label: "Species"},
       { to: "/admin/life-stages", label: "Life Stages" },
       { to: "/admin/stats", label: "Stats" },
+      { to: "/admin/personality-traits", label: "Personality Traits" },
       { to: "/admin/breeds", label: "Breeds"},
     ],
   },

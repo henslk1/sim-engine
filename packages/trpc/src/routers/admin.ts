@@ -7,6 +7,7 @@ import { breedAdminRouter } from "./admin.breed.js";
 import { locusAdminRouter } from "./admin.locus.js";
 import { expressionAdminRouter } from "./admin.expression.js";
 import { panelAdminRouter } from "./admin.panel.js";
+import { personalityAdminRouter } from "./admin.personality.js";
 
 export const adminRouter = router({
   game: gameAdminRouter,
@@ -17,4 +18,5 @@ export const adminRouter = router({
   locus: locusAdminRouter,
   expression: expressionAdminRouter,
   panel: panelAdminRouter,
+  personality: personalityAdminRouter,
 })

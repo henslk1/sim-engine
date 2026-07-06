@@ -31,6 +31,14 @@ type ConformForm = {
   weight: number
 }
 
+type PersonalityProfileForm = {
+  id?: string
+  traitDefId: string
+  naturalMin: number
+  naturalMax: number
+  baseline: number
+}
+
 const emptyBreed: BreedForm = {
   name: "",
   speciesId: "",
@@ -55,6 +63,13 @@ const emptyConform: ConformForm = {
   weight: 0,
 }
 
+const emptyPersonalityProfile: PersonalityProfileForm = {
+  traitDefId: "",
+  naturalMin: 0,
+  naturalMax: 0,
+  baseline: 0,
+}
+
 function BreedsPage() {
   const { data: gameData } = trpc.admin.game.get.useQuery()
   const gameId = gameData?.id
@@ -67,6 +82,9 @@ function BreedsPage() {
   const [editingConformId, setEditingConformId] = useState<string | null>(null)
   const [editingConform, setEditingConform] = useState<ConformForm | null>(null)
   const [newConform, setNewConform] = useState<ConformForm>({ ...emptyConform })
+  const [editingPersonalityProfileId, setEditingPersonalityProfileId] = useState<string | null>(null)
+  const [editingPersonalityProfile, setEditingPersonalityProfile] = useState<PersonalityProfileForm | null>(null)
+  const [newPersonalityProfile, setNewPersonalityProfile] = useState<PersonalityProfileForm>({ ...emptyPersonalityProfile })
 
   const { data: breeds } = trpc.admin.breed.list.useQuery(
     { gameId: gameId! }, { enabled: !!gameId }
@@ -80,10 +98,16 @@ function BreedsPage() {
   const { data: loci } = trpc.admin.breed.listLoci.useQuery(
     { gameId: gameId! }, { enabled: !!gameId }
   )
+  const { data: personalityTraits } = trpc.admin.personality.list.useQuery(
+    { gameId: gameId! }, { enabled: !!gameId }
+  )
   const { data: statProfiles } = trpc.admin.breed.listStatProfiles.useQuery(
     { breedId: editing?.id! }, { enabled: !!editing?.id }
   )
   const { data: conformStandards } = trpc.admin.breed.listConformationStandards.useQuery(
+    { breedId: editing?.id! }, { enabled: !!editing?.id }
+  )
+  const { data: personalityProfiles } = trpc.admin.breed.listPersonalityProfiles.useQuery(
     { breedId: editing?.id! }, { enabled: !!editing?.id }
   )
 
@@ -120,6 +144,17 @@ function BreedsPage() {
   })
   const removeConform = trpc.admin.breed.removeConformationStandard.useMutation({
     onSuccess: () => utils.admin.breed.listConformationStandards.invalidate(),
+  })
+  const savePersonalityProfile = trpc.admin.breed.savePersonalityProfile.useMutation({
+    onSuccess: () => {
+      utils.admin.breed.listPersonalityProfiles.invalidate()
+      setEditingPersonalityProfileId(null)
+      setEditingPersonalityProfile(null)
+      setNewPersonalityProfile({ ...emptyPersonalityProfile })
+    },
+  })
+  const removePersonalityProfile = trpc.admin.breed.removePersonalityProfile.useMutation({
+    onSuccess: () => utils.admin.breed.listPersonalityProfiles.invalidate(),
   })
 
   function openEdit(breed: BreedForm) {
@@ -169,6 +204,17 @@ function BreedsPage() {
   function handleRemoveConform(id: string) {
     if (!confirm("Remove this conformation standard?")) return
     removeConform.mutate({ id })
+  }
+
+  function handleSavePersonalityProfile(id?: string) {
+    const form = id ? editingPersonalityProfile : newPersonalityProfile
+    if (!form || !editing?.id || !form.traitDefId) return
+    savePersonalityProfile.mutate({ id, breedId: editing.id, ...form })
+  }
+
+  function handleRemovePersonalityProfile(id: string) {
+    if (!confirm("Remove this personality profile entry?")) return
+    removePersonalityProfile.mutate({ id })
   }
 
   if (!gameId) return <p className="p-6 text-sm text-muted-foreground">No game configured yet. Set up Game Config first.</p>
@@ -503,6 +549,87 @@ function BreedsPage() {
                   <td className="px-3 py-2"><Input className="h-7 text-xs" type="number" step="0.01" value={newConform.weight} onChange={(e) => setNewConform((p) => ({ ...p, weight: parseFloat(e.target.value) }))} /></td>
                   <td className="px-3 py-2 text-right">
                     <Button size="sm" onClick={() => handleSaveConform()} disabled={!newConform.locusId || saveConform.isPending}>Add</Button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          )}
+        </section>
+      )}
+      {/* Personality Profiles */}
+      {editing.id && (
+        <section className="rounded-lg border border-border bg-card shadow-sm">
+          <header className="border-b border-border bg-secondary/40 px-4 py-2.5">
+            <h2 className="text-sm font-semibold text-foreground">Personality Profile</h2>
+          </header>
+          {!personalityTraits?.length ? (
+            <p className="px-4 py-4 text-sm text-muted-foreground">Configure personality traits in the Animals section before adding a personality profile.</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Trait</th>
+                  <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Natural Min</th>
+                  <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Natural Max</th>
+                  <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Baseline</th>
+                  <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {personalityProfiles?.map((pp: NonNullable<typeof personalityProfiles>[number]) => (
+                  <tr key={pp.id} className="border-b border-border last:border-0">
+                    {editingPersonalityProfileId === pp.id && editingPersonalityProfile ? (
+                      <>
+                        <td className="px-3 py-2">
+                          <select
+                            value={editingPersonalityProfile.traitDefId}
+                            onChange={(e) => setEditingPersonalityProfile((p) => p && { ...p, traitDefId: e.target.value })}
+                            className="h-7 rounded border border-input bg-background px-2 text-xs"
+                          >
+                            {personalityTraits?.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                          </select>
+                        </td>
+                        <td className="px-3 py-2"><Input className="h-7 text-xs" type="number" step="0.01" value={editingPersonalityProfile.naturalMin} onChange={(e) => setEditingPersonalityProfile((p) => p && { ...p, naturalMin: parseFloat(e.target.value) })} /></td>
+                        <td className="px-3 py-2"><Input className="h-7 text-xs" type="number" step="0.01" value={editingPersonalityProfile.naturalMax} onChange={(e) => setEditingPersonalityProfile((p) => p && { ...p, naturalMax: parseFloat(e.target.value) })} /></td>
+                        <td className="px-3 py-2"><Input className="h-7 text-xs" type="number" step="0.01" value={editingPersonalityProfile.baseline} onChange={(e) => setEditingPersonalityProfile((p) => p && { ...p, baseline: parseFloat(e.target.value) })} /></td>
+                        <td className="px-3 py-2 text-right space-x-2">
+                          <Button size="sm" onClick={() => handleSavePersonalityProfile(pp.id)} disabled={savePersonalityProfile.isPending}>Save</Button>
+                          <Button size="sm" variant="ghost" onClick={() => { setEditingPersonalityProfileId(null); setEditingPersonalityProfile(null) }}>Cancel</Button>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="px-3 py-2 font-medium text-foreground">{pp.traitDef.name}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{pp.naturalMin}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{pp.naturalMax}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{pp.baseline}</td>
+                        <td className="px-3 py-2 text-right space-x-2">
+                          <Button size="sm" variant="ghost" onClick={() => {
+                            setEditingPersonalityProfileId(pp.id)
+                            setEditingPersonalityProfile({ id: pp.id, traitDefId: pp.traitDefId, naturalMin: pp.naturalMin, naturalMax: pp.naturalMax, baseline: pp.baseline })
+                          }}>Edit</Button>
+                          <Button size="sm" variant="ghost" onClick={() => handleRemovePersonalityProfile(pp.id)} className="text-destructive hover:text-destructive">Delete</Button>
+                        </td>
+                      </>
+                    )}
+                  </tr>
+                ))}
+                <tr>
+                  <td className="px-3 py-2">
+                    <select
+                      value={newPersonalityProfile.traitDefId}
+                      onChange={(e) => setNewPersonalityProfile((p) => ({ ...p, traitDefId: e.target.value }))}
+                      className="h-7 rounded border border-input bg-background px-2 text-xs"
+                    >
+                      <option value="">Select trait…</option>
+                      {personalityTraits?.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+                  </td>
+                  <td className="px-3 py-2"><Input className="h-7 text-xs" type="number" step="0.01" value={newPersonalityProfile.naturalMin} onChange={(e) => setNewPersonalityProfile((p) => ({ ...p, naturalMin: parseFloat(e.target.value) }))} /></td>
+                  <td className="px-3 py-2"><Input className="h-7 text-xs" type="number" step="0.01" value={newPersonalityProfile.naturalMax} onChange={(e) => setNewPersonalityProfile((p) => ({ ...p, naturalMax: parseFloat(e.target.value) }))} /></td>
+                  <td className="px-3 py-2"><Input className="h-7 text-xs" type="number" step="0.01" value={newPersonalityProfile.baseline} onChange={(e) => setNewPersonalityProfile((p) => ({ ...p, baseline: parseFloat(e.target.value) }))} /></td>
+                  <td className="px-3 py-2 text-right">
+                    <Button size="sm" onClick={() => handleSavePersonalityProfile()} disabled={!newPersonalityProfile.traitDefId || savePersonalityProfile.isPending}>Add</Button>
                   </td>
                 </tr>
               </tbody>

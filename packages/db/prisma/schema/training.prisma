@@ -69,12 +69,38 @@ model AnimalMood {
   animal   Animal @relation(fields: [animalId], references: [id])
 }
 
+model PersonalityTraitDef {
+  id                  String                   @id @default(cuid())
+  gameId              String
+  name                String
+  description         String?
+  labelRanges         PersonalityLabelRange[]
+  breedProfiles       BreedPersonalityProfile[]
+  animalPersonalities AnimalPersonality[]
+  game                Game                     @relation(fields: [gameId], references: [id])
+
+  @@unique([gameId, name])
+}
+
+model PersonalityLabelRange {
+  id         String              @id @default(cuid())
+  traitDefId String
+  label      String
+  minValue   Float
+  maxValue   Float
+  traitDef   PersonalityTraitDef @relation(fields: [traitDefId], references: [id])
+}
+
 model AnimalPersonality {
-  id         String  @id @default(cuid())
-  animalId   String  @unique
+  id         String              @id @default(cuid())
+  animalId   String
+  traitDefId String
   value      Float
   traitLabel String?
-  animal     Animal  @relation(fields: [animalId], references: [id])
+  animal     Animal              @relation(fields: [animalId], references: [id])
+  traitDef   PersonalityTraitDef @relation(fields: [traitDefId], references: [id])
+
+  @@unique([animalId, traitDefId])
 }
 
 model StageActivityDef {

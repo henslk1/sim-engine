@@ -70,6 +70,7 @@ model Game {
   tutorialStepDefs       TutorialStepDef[]
   achievementDefs        AchievementDef[]
   nightlyUpdateLogs      NightlyUpdateLog[]
+  personalityTraitDefs   PersonalityTraitDef[]
   isActive               Boolean                 @default(false)
   createdAt              DateTime                @default(now())
 }
