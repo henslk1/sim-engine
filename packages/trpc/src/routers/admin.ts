@@ -16,6 +16,8 @@ import { healthCertAdminRouter } from "./admin.healthcert.js";
 import { trainingAdminRouter } from "./admin.training.js";
 import { intensityTierAdminRouter } from "./admin.intensitytier.js";
 import { stageActivityAdminRouter } from "./admin.stageactivity.js";
+import { titleAdminRouter } from "./admin.title.js";
+import { disciplineAdminRouter } from "./admin.discipline.js";
 
 export const adminRouter = router({
   game: gameAdminRouter,
@@ -35,4 +37,6 @@ export const adminRouter = router({
   training: trainingAdminRouter,
   intensityTier: intensityTierAdminRouter,
   stageActivity: stageActivityAdminRouter,
+  title: titleAdminRouter,
+  discipline: disciplineAdminRouter,
 })

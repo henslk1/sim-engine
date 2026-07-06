@@ -46,10 +46,8 @@ const navGroups = [
     links: [
       { to: "/admin/disciplines", label: "Disciplines" },
       { to: "/admin/competition-tiers", label: "Competition Tiers" },
-      { to: "/admin/conformation-standards", label: "Conformation Standards" },
-      { to: "/admin/season-categories", label: "Season Categories" }, 
+      { to: "/admin/season-categories", label: "Season Categories" },
       { to: "/admin/records", label: "Records" },
-      { to: "/admin/prize-config", label: "Prize Config" },
     ],
   },
   {

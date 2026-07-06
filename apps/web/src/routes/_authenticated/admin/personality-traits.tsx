@@ -8,8 +8,11 @@ type TraitForm = {
   id?: string
   name: string
   description: string
+  trainingModifier: string
+  moodModifier: string
+  conceptionModifier: string
 }
-const emptyTrait = (): TraitForm => ({ name: "", description: "" })
+const emptyTrait = (): TraitForm => ({ name: "", description: "", trainingModifier: "0", moodModifier: "0", conceptionModifier: "0" })
 
 type LabelRangeRow = { label: string; minValue: string; maxValue: string }
 const emptyRange = (): LabelRangeRow => ({ label: "", minValue: "", maxValue: "" })
@@ -59,7 +62,14 @@ function PersonalityTraitsPage() {
   const [newRange, setNewRange] = useState<LabelRangeRow>(emptyRange())
 
   function openEdit(trait: NonNullable<typeof traits>[number]) {
-    setEditing({ id: trait.id, name: trait.name, description: trait.description ?? "" })
+    setEditing({
+      id: trait.id,
+      name: trait.name,
+      description: trait.description ?? "",
+      trainingModifier: trait.trainingModifier.toString(),
+      moodModifier: trait.moodModifier.toString(),
+      conceptionModifier: trait.conceptionModifier.toString(),
+    })
     setFormExpanded(false)
     setEditingRangeId(null)
     setEditingRange(emptyRange())
@@ -69,7 +79,14 @@ function PersonalityTraitsPage() {
   function submitTrait() {
     if (!editing || !gameId) return
     saveTrait.mutate(
-      { ...editing, gameId, description: editing.description || null },
+      {
+        ...editing,
+        gameId,
+        description: editing.description || null,
+        trainingModifier: editing.trainingModifier !== "" ? parseFloat(editing.trainingModifier) : 0,
+        moodModifier: editing.moodModifier !== "" ? parseFloat(editing.moodModifier) : 0,
+        conceptionModifier: editing.conceptionModifier !== "" ? parseFloat(editing.conceptionModifier) : 0,
+      },
       {
         onSuccess: (saved) => {
           setEditing((prev) => (prev ? { ...prev, id: saved.id } : null))
@@ -158,6 +175,38 @@ function PersonalityTraitsPage() {
                   className="mt-1"
                 />
               </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Training Modifier</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={editing.trainingModifier}
+                    onChange={(e) => setEditing({ ...editing, trainingModifier: e.target.value })}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Mood Modifier</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={editing.moodModifier}
+                    onChange={(e) => setEditing({ ...editing, moodModifier: e.target.value })}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Conception Modifier</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={editing.conceptionModifier}
+                    onChange={(e) => setEditing({ ...editing, conceptionModifier: e.target.value })}
+                    className="mt-1"
+                  />
+                </div>
+              </div>
               <div className="flex gap-2 pt-1">
                 <Button onClick={submitTrait} disabled={saveTrait.isPending || !editing.name.trim()}>
                   Save
@@ -182,6 +231,11 @@ function PersonalityTraitsPage() {
                   <span className="text-muted-foreground">Description:</span> {editing.description}
                 </p>
               )}
+              <p>
+                <span className="text-muted-foreground">Training Modifier:</span> {editing.trainingModifier}
+                <span className="ml-4 text-muted-foreground">Mood Modifier:</span> {editing.moodModifier}
+                <span className="ml-4 text-muted-foreground">Conception Modifier:</span> {editing.conceptionModifier}
+              </p>
             </div>
           )}
         </section>
