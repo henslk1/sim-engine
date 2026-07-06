@@ -29,6 +29,9 @@ importers:
       '@sim-engine/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@sim-engine/engine':
+        specifier: workspace:*
+        version: link:../../packages/engine
       '@sim-engine/trpc':
         specifier: workspace:*
         version: link:../../packages/trpc
@@ -173,6 +176,12 @@ importers:
       prisma:
         specifier: ^7.8.0
         version: 7.8.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@6.0.3)
+
+  packages/engine:
+    dependencies:
+      '@sim-engine/db':
+        specifier: workspace:*
+        version: link:../db
 
   packages/trpc:
     dependencies:

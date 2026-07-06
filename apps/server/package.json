@@ -13,7 +13,8 @@
     "@trpc/server": "^11.18.0",
     "better-auth": "^1.6.23",
     "hono": "latest",
-    "@sim-engine/trpc": "workspace:*"
+    "@sim-engine/trpc": "workspace:*",
+    "@sim-engine/engine": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^26.0.0",

@@ -49,6 +49,8 @@ function CareActionsPage() {
     { enabled: !!gameId }
   )
 
+  const itemOptions = (itemDefs ?? []) as Array<{ id: string; name: string }>
+
   const utils = trpc.useUtils()
 
   const saveAction = trpc.admin.care.save.useMutation({
@@ -279,7 +281,7 @@ function CareActionsPage() {
             <header className="border-b border-border bg-secondary/40 px-4 py-2.5">
               <h2 className="text-sm font-semibold text-foreground">Required Items</h2>
             </header>
-            {!itemDefs?.length ? (
+            {!itemOptions.length ? (
               <p className="px-4 py-4 text-sm text-muted-foreground">No items configured yet. Set up Items in the Economy section first.</p>
             ) : (
               <table className="w-full text-sm">
@@ -300,7 +302,7 @@ function CareActionsPage() {
                             onChange={(e) => setEditingItem((p) => p ? { ...p, itemDefId: e.target.value } : null)}
                             className="h-7 rounded border border-input bg-background px-2 text-xs"
                           >
-                            {itemDefs.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                            {itemOptions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                           </select>
                         </td>
                         <td className="px-4 py-2">
@@ -340,7 +342,7 @@ function CareActionsPage() {
                         className="h-7 rounded border border-input bg-background px-2 text-xs"
                       >
                         <option value="">Select item…</option>
-                        {itemDefs.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                        {itemOptions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                       </select>
                     </td>
                     <td className="px-4 py-3">
