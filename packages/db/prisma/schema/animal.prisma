@@ -26,21 +26,22 @@ model Species {
 }
 
 model LifeStageDef {
-  id                 String             @id @default(cuid())
-  gameId             String
-  name               String
-  stageIndex         Int
-  minCycle           Int
-  maxCycle           Int
-  canCompete         Boolean
-  canBreed           Boolean
-  canTrain           Boolean
-  canReceiveCare     Boolean
-  hasUniqueActionSet Boolean            @default(false)
-  profileLayout      String
-  animals            Animal[]
-  stageActivityDefs  StageActivityDef[]
-  game               Game               @relation(fields: [gameId], references: [id])
+  id                    String             @id @default(cuid())
+  gameId                String
+  name                  String
+  stageIndex            Int
+  minCycle              Int
+  maxCycle              Int
+  canCompete            Boolean
+  canBreed              Boolean
+  canTrain              Boolean
+  canReceiveCare        Boolean
+  hasUniqueActionSet    Boolean            @default(false)
+  profileLayout         String
+  immunityCapMultiplier Float              @default(1.0)
+  animals               Animal[]
+  stageActivityDefs     StageActivityDef[]
+  game                  Game               @relation(fields: [gameId], references: [id])
 
   @@unique([gameId, stageIndex])
 }
@@ -83,6 +84,7 @@ model Breed {
   breedingListingRestrictions BreedingListingBreedRestriction[]
   conformationStandards       BreedConformationStandard[]
   seasonCategories            SeasonCategory[]
+  competitions                Competition[]
   recordDefs                  RecordDef[]
   bundleAnimals               BundleAnimal[]
   shopBreedConfigs            GameShopBreedConfig[]

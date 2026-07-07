@@ -10,11 +10,12 @@
     "@hono/node-server": "latest",
     "@hono/trpc-server": "^0.4.2",
     "@sim-engine/db": "workspace:*",
+    "@sim-engine/engine": "workspace:*",
+    "@sim-engine/trpc": "workspace:*",
     "@trpc/server": "^11.18.0",
     "better-auth": "^1.6.23",
-    "hono": "latest",
-    "@sim-engine/trpc": "workspace:*",
-    "@sim-engine/engine": "workspace:*"
+    "bullmq": "^5.79.2",
+    "hono": "latest"
   },
   "devDependencies": {
     "@types/node": "^26.0.0",

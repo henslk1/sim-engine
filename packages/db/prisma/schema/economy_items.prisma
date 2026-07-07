@@ -32,7 +32,7 @@ enum PermanentEffectType {
 }
 
 model ItemDef {
-  id                      String                   @id @default(cuid())
+  id                      String                           @id @default(cuid())
   gameId                  String
   name                    String
   description             String?
@@ -56,9 +56,10 @@ model ItemDef {
   dailyLogs               AnimalDailyLog[]
   groupInventory          GroupInventory[]
   campaignRewardTierItems CampaignRewardTierItem[]
-  prizeEligible           Boolean                  @default(true)
-  isSellable              Boolean                  @default(true)
-  game                    Game                     @relation(fields: [gameId], references: [id])
+  disciplineRequirements  DisciplineEquipmentRequirement[]
+  prizeEligible           Boolean                          @default(true)
+  isSellable              Boolean                          @default(true)
+  game                    Game                             @relation(fields: [gameId], references: [id])
 
   @@unique([gameId, name])
 }

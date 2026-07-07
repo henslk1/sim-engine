@@ -106,7 +106,7 @@ model BreedAlleleFrequency {
 }
 
 model AnimalGenotype {
-  id              String  @id @default(cuid())
+  id              String    @id @default(cuid())
   animalId        String
   locusId         String
   alleleOneId     String
@@ -114,9 +114,9 @@ model AnimalGenotype {
   isTestedByOwner Boolean   @default(false)
   testedAt        DateTime?
   animal          Animal    @relation(fields: [animalId], references: [id])
-  locus           Locus   @relation(fields: [locusId], references: [id])
-  alleleOne       Allele  @relation("AlleleOne", fields: [alleleOneId], references: [id])
-  alleleTwo       Allele  @relation("AlleleTwo", fields: [alleleTwoId], references: [id])
+  locus           Locus     @relation(fields: [locusId], references: [id])
+  alleleOne       Allele    @relation("AlleleOne", fields: [alleleOneId], references: [id])
+  alleleTwo       Allele    @relation("AlleleTwo", fields: [alleleTwoId], references: [id])
 
   @@unique([animalId, locusId])
 }

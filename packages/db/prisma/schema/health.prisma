@@ -164,6 +164,7 @@ model AnimalImmunity {
   id        String   @id @default(cuid())
   animalId  String   @unique
   value     Float
+  innateMax Float
   animal    Animal   @relation(fields: [animalId], references: [id])
   updatedAt DateTime @updatedAt
 }

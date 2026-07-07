@@ -124,7 +124,8 @@ model Pregnancy {
   breedingRecordId   String               @unique
   isSurrogate        Boolean              @default(false)
   gestationStartedAt DateTime             @default(now())
-  dueAt              DateTime
+  currentCycles      Int                  @default(0)
+  requiredCycles     Int
   isCompleted        Boolean              @default(false)
   completedAt        DateTime?
   offspring          PregnancyOffspring[]

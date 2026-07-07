@@ -110,6 +110,7 @@ model Group {
   prestigeLogs         GroupPrestigeLog[]
   channels             GroupChannel[]
   activityLogs         GroupActivityLog[]
+  venues               Venue[]
   clinics              Clinic[]
   raffles              Raffle[]
   seasonRankings       SeasonRanking[]
@@ -283,6 +284,9 @@ model GroupPrestigeTierDef {
   maxHostedShowsPerDay         Int?
   prestigeCurrencyRewardPerDay Float           @default(0)
   vetDiscountPercent           Float           @default(0)
+  canHaveVenue                 Boolean         @default(false)
+  canHostInvitational          Boolean         @default(false)
+  entryFeeSharePercent         Float           @default(0)
   prestigeLevels               GroupPrestige[]
   game                         Game            @relation(fields: [gameId], references: [id])
 
@@ -291,12 +295,12 @@ model GroupPrestigeTierDef {
 }
 
 model GroupPrestigeLog {
-  id        String   @id @default(cuid())
+  id        String         @id @default(cuid())
   groupId   String
   source    PrestigeSource
   amount    Float
-  createdAt DateTime @default(now())
-  group     Group    @relation(fields: [groupId], references: [id])
+  createdAt DateTime       @default(now())
+  group     Group          @relation(fields: [groupId], references: [id])
 }
 
 model GroupChannel {

@@ -444,6 +444,16 @@ model GameConfig {
   containerLabel            String?
   subContainerLabel         String?
   breedingEnergyCost        Float    @default(0)
+  gestationCycles           Int      @default(12)
+  moodDecayRate             Float    @default(0)
+  conditionDecayRate        Float    @default(0)
+  conditionWorkGain         Float    @default(0)
+  careScoreDecayRate        Float    @default(0)
+  careScoreFloor            Float    @default(0)
+  careScoreCeiling          Float    @default(100)
+  careScoreRecoveryRate     Float    @default(0)
+  immunityDecayRate         Float    @default(0)
+  immunityRecoveryRate      Float    @default(0)
   game                      Game     @relation(fields: [gameId], references: [id])
   createdAt                 DateTime @default(now())
   updatedAt                 DateTime @updatedAt

@@ -31,11 +31,11 @@ enum RankSubjectType {
 }
 
 model DisciplineDef {
-  id                     String                  @id @default(cuid())
+  id                     String                           @id @default(cuid())
   gameId                 String
   name                   String
   description            String?
-  isConformation         Boolean                 @default(false)
+  isConformation         Boolean                          @default(false)
   statWeights            DisciplineStatWeight[]
   personalityWeights     DisciplinePersonalityWeight[]
   compTierDefs           CompetitionTierDef[]
@@ -48,7 +48,8 @@ model DisciplineDef {
   titleDefs              TitleDef[]
   animals                Animal[]
   groups                 Group[]
-  game                   Game                    @relation(fields: [gameId], references: [id])
+  equipmentRequirements  DisciplineEquipmentRequirement[]
+  game                   Game                             @relation(fields: [gameId], references: [id])
   groupEntryRequirements GroupEntryRequirement[]
 
   @@unique([gameId, name])
@@ -78,41 +79,52 @@ model BreedConformationStandard {
 }
 
 model CompetitionTierDef {
-  id                   String                  @id @default(cuid())
-  gameId               String
-  disciplineDefId      String
-  name                 String
-  tierIndex            Int
-  minScore             Float?
-  advancementThreshold Float?
-  energyCost           Float                   @default(0)
-  entryFee             Int
-  animalTiers          AnimalCompetitionTier[]
-  disciplineDef        DisciplineDef           @relation(fields: [disciplineDefId], references: [id])
-  game                 Game                    @relation(fields: [gameId], references: [id])
+  id                             String                  @id @default(cuid())
+  gameId                         String
+  disciplineDefId                String
+  name                           String
+  tierIndex                      Int
+  minScore                       Float?
+  advancementThreshold           Float?
+  energyCost                     Float                   @default(0)
+  entryFee                       Int
+  minWeeklyPointsForInvitational Float?
+  animalTiers                    AnimalCompetitionTier[]
+  tierPrizes                     CompetitionTierPrize[]
+  disciplineDef                  DisciplineDef           @relation(fields: [disciplineDefId], references: [id])
+  game                           Game                    @relation(fields: [gameId], references: [id])
 
   @@unique([disciplineDefId, tierIndex])
 }
 
 model Venue {
-  id           String            @id @default(cuid())
-  gameId       String
-  name         String
-  climate      VenueClimate
-  terrain      VenueTerrain
-  disciplines  VenueDiscipline[]
-  competitions Competition[]
-  game         Game              @relation(fields: [gameId], references: [id])
+  id            String            @id @default(cuid())
+  gameId        String
+  name          String
+  climate       VenueClimate
+  terrain       VenueTerrain
+  groupId       String?           @unique
+  rotationOrder Int?
+  disciplines   VenueDiscipline[]
+  competitions  Competition[]
+  group         Group?            @relation(fields: [groupId], references: [id])
+  game          Game              @relation(fields: [gameId], references: [id])
 
   @@unique([gameId, name])
 }
 
 model VenueDiscipline {
-  id              String        @id @default(cuid())
-  venueId         String
-  disciplineDefId String
-  disciplineDef   DisciplineDef @relation(fields: [disciplineDefId], references: [id])
-  venue           Venue         @relation(fields: [venueId], references: [id])
+  id                       String        @id @default(cuid())
+  venueId                  String
+  disciplineDefId          String
+  defaultMaxEntries        Int
+  defaultMaxWaitHours      Int
+  invitationalMaxEntries   Int?
+  invitationalMaxWaitHours Int?
+  competitionsPerDay       Int           @default(1)
+  isInvitationalEligible   Boolean       @default(false)
+  disciplineDef            DisciplineDef @relation(fields: [disciplineDefId], references: [id])
+  venue                    Venue         @relation(fields: [venueId], references: [id])
 
   @@unique([venueId, disciplineDefId])
 }
@@ -135,17 +147,6 @@ model ExpressionTerrainModifier {
   expressionRule   ExpressionRule @relation(fields: [expressionRuleId], references: [id])
 
   @@unique([expressionRuleId, terrain])
-}
-
-model PrizeConfig {
-  id            String      @id @default(cuid())
-  competitionId String
-  placement     Int
-  currencyDefId String
-  amount        Int
-  competition   Competition @relation(fields: [competitionId], references: [id])
-
-  @@unique([competitionId, placement])
 }
 
 model Season {
@@ -215,13 +216,14 @@ model Competition {
   disciplineDefId    String
   seasonId           String?
   name               String
-  minEntries         Int
+  maxEntries         Int
   maxWaitHours       Int
+  breedId            String?
   status             CompetitionStatus
   isInvitational     Boolean            @default(false)
   entries            CompetitionEntry[]
-  prizeConfigs       PrizeConfig[]
   campaignPhaseDefId String?
+  breed              Breed?             @relation(fields: [breedId], references: [id])
   campaignPhase      CampaignPhaseDef?  @relation(fields: [campaignPhaseDefId], references: [id])
   season             Season?            @relation(fields: [seasonId], references: [id])
   disciplineDef      DisciplineDef      @relation(fields: [disciplineDefId], references: [id])
@@ -314,4 +316,28 @@ model DisciplinePersonalityWeight {
   traitDef        PersonalityTraitDef @relation(fields: [traitDefId], references: [id])
 
   @@unique([disciplineDefId, traitDefId])
+}
+
+model CompetitionTierPrize {
+  id             String             @id @default(cuid())
+  tierDefId      String
+  placement      Int
+  currencyDefId  String?
+  amount         Int
+  isInvitational Boolean            @default(false)
+  tierDef        CompetitionTierDef @relation(fields: [tierDefId], references: [id])
+  currencyDef    CurrencyDef?       @relation(fields: [currencyDefId], references: [id])
+
+  @@unique([tierDefId, placement, isInvitational])
+}
+
+model DisciplineEquipmentRequirement {
+  id              String        @id @default(cuid())
+  disciplineDefId String
+  itemDefId       String
+  quantity        Int           @default(1)
+  disciplineDef   DisciplineDef @relation(fields: [disciplineDefId], references: [id])
+  itemDef         ItemDef       @relation(fields: [itemDefId], references: [id])
+
+  @@unique([disciplineDefId, itemDefId])
 }

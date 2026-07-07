@@ -53,6 +53,7 @@ model CurrencyDef {
   jobApplications              JobApplication[]
   jobContracts                 JobContract[]
   campaignRewardTierCurrencies CampaignRewardTierCurrency[]
+  competitionTierPrizes        CompetitionTierPrize[]
   game                         Game                         @relation(fields: [gameId], references: [id])
 
   @@unique([gameId, name])
