@@ -52,13 +52,15 @@ model ExpressionRule {
   alleleOneId      String
   alleleTwoId      String
   phenotype        String
-  numericModifier  Float?
-  penetrance       Float?
-  climateModifiers ExpressionClimateModifier[]
-  terrainModifiers ExpressionTerrainModifier[]
-  locus            Locus                       @relation(fields: [locusId], references: [id])
-  alleleOne        Allele                      @relation("AlleleOne", fields: [alleleOneId], references: [id])
-  alleleTwo        Allele                      @relation("AlleleTwo", fields: [alleleTwoId], references: [id])
+  numericModifier       Float?
+  penetrance            Float?
+  healthConditionDefId  String?
+  climateModifiers      ExpressionClimateModifier[]
+  terrainModifiers      ExpressionTerrainModifier[]
+  locus                 Locus                       @relation(fields: [locusId], references: [id])
+  alleleOne             Allele                      @relation("AlleleOne", fields: [alleleOneId], references: [id])
+  alleleTwo             Allele                      @relation("AlleleTwo", fields: [alleleTwoId], references: [id])
+  healthConditionDef    HealthConditionDef?         @relation(fields: [healthConditionDefId], references: [id])
 
   @@unique([locusId, alleleOneId, alleleTwoId])
 }

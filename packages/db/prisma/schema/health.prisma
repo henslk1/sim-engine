@@ -42,6 +42,7 @@ model HealthConditionDef {
   healthRecords          AnimalHealthRecord[]
   testResults            AnimalTestResult[]
   groupEntryRequirements GroupEntryRequirement[]
+  expressionRules        ExpressionRule[]
   game                   Game                      @relation(fields: [gameId], references: [id])
 
   @@unique([gameId, name])
