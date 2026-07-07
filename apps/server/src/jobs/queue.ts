@@ -5,6 +5,6 @@ export const connection = {
   maxRetriesPerRequest: null,
 }
 
-export const nightlyQue = new Queue("nightly", { connection })
+export const nightlyQueue = new Queue("nightly", { connection })
 export const competitionQueue = new Queue("competition-check", { connection })
-export const venueRotatingQueue = new Queue("venue-rotation", { connection })
+export const venueRotationQueue = new Queue("venue-rotation", { connection })
