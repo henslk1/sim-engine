@@ -27,6 +27,7 @@ model HealthConditionDef {
   isGenetic              Boolean                   @default(false)
   isFatal                Boolean                   @default(false)
   moodEffect             Float?
+  energyEffect           Float?
   behaviors              HealthConditionBehavior[]
   treatments             TreatmentDef[]
   healthRecords          AnimalHealthRecord[]

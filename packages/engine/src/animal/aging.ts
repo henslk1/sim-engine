@@ -25,8 +25,56 @@ export async function advanceAnimalAging(client: Client, animalId: string) {
   if (!correctStage) {
     await client.animal.update({
       where: { id: animalId },
-      data: { ageInCycles: newAge, status: "BURIED", diedAt: new Date(), causeOfDeath: "old_age" },
+      data: { ageInCycles: newAge, status: "DECEASED", diedAt: new Date(), causeOfDeath: "old_age" },
     })
     return
   }
+
+  // Death roll
+  const letThreshold = animal.lifeExpectancy ?? correctStage.deathChanceStartCycle
+  const rollStart = letThreshold !== null
+    ? Math.min(letThreshold, correctStage.ageCap)
+    : correctStage.ageCap
+    
+  if (correctStage.deathChancePerCycle !== null && newAge >= rollStart) {
+    const cyclesPast = newAge - rollStart + 1
+    const chance = Math.min(1, cyclesPast * correctStage.deathChancePerCycle)
+    if (Math.random() < chance) {
+      await client.animal.update({
+        where: { id: animalId },
+        data: { ageInCycles: newAge, status: "DECEASED", diedAt: new Date(), causeOfDeath: "natural"},
+      })
+      return
+    }
+  }
+
+  // Survived
+  await client.animal.update({
+    where: { id: animalId },
+    data: {
+      ageInCycles: newAge,
+      ...(correctStage.id !== animal.lifeStageId && { lifeStageId: correctStage.id }),
+    },
+  })
+
+  // Advance gestation if pregnant
+  const pregnancy = await client.pregnancy.findFirst({
+    where: { animalId, isCompleted: false},
+  })
+
+  if (pregnancy) {
+    const newCycles = pregnancy.currentCycles + 1
+    await client.pregnancy.update({
+      where: { id: pregnancy.id },
+      data: {
+        currentCycles: newCycles,
+        ...(newCycles >= pregnancy.requiredCycles && {
+          isCompleted: true,
+          completedAt: new Date(),
+        }),
+      },
+    })
+  }
+
+  
 }
