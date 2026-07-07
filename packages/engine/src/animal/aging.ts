@@ -76,5 +76,6 @@ export async function advanceAnimalAging(client: Client, animalId: string) {
     })
   }
 
-  
+  // Fetch stats and health conditions
+  const [energy, mood, condition, careScore, immunity, activeHealthRecords]
 }

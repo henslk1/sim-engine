@@ -53,6 +53,7 @@ model ExpressionRule {
   alleleTwoId      String
   phenotype        String
   numericModifier  Float?
+  penetrance       Float?
   climateModifiers ExpressionClimateModifier[]
   terrainModifiers ExpressionTerrainModifier[]
   locus            Locus                       @relation(fields: [locusId], references: [id])

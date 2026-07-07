@@ -1,3 +1,8 @@
+enum HealthConditionType {
+  ILLNESS
+  INJURY
+}
+
 enum TreatmentType {
   OTC
   PRESCRIPTION
@@ -24,8 +29,12 @@ model HealthConditionDef {
   id                     String                    @id @default(cuid())
   gameId                 String
   name                   String
+  conditionType          HealthConditionType
   isGenetic              Boolean                   @default(false)
   isFatal                Boolean                   @default(false)
+  onsetMinCycle          Int?
+  fatalityChance         Float?
+  fatalMaxCycle          Int?
   moodEffect             Float?
   energyEffect           Float?
   behaviors              HealthConditionBehavior[]
