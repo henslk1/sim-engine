@@ -91,6 +91,7 @@ model CompetitionTierDef {
   minWeeklyPointsForInvitational Float?
   animalTiers                    AnimalCompetitionTier[]
   tierPrizes                     CompetitionTierPrize[]
+  competitionEntries             CompetitionEntry[]
   disciplineDef                  DisciplineDef           @relation(fields: [disciplineDefId], references: [id])
   game                           Game                    @relation(fields: [gameId], references: [id])
 
@@ -121,7 +122,7 @@ model VenueDiscipline {
   defaultMaxWaitHours      Int
   invitationalMaxEntries   Int?
   invitationalMaxWaitHours Int?
-  competitionsPerDay       Int           @default(1)
+  maxOpenAtOnce            Int           @default(1)
   isInvitationalEligible   Boolean       @default(false)
   disciplineDef            DisciplineDef @relation(fields: [disciplineDefId], references: [id])
   venue                    Venue         @relation(fields: [venueId], references: [id])
@@ -238,8 +239,10 @@ model CompetitionEntry {
   competitionId   String
   animalId        String
   playerAccountId String
+  tierDefId       String
   enteredAt       DateTime           @default(now())
   result          CompetitionResult?
+  tierDef         CompetitionTierDef @relation(fields: [tierDefId], references: [id])
   playerAccount   PlayerAccount      @relation(fields: [playerAccountId], references: [id])
   animal          Animal             @relation(fields: [animalId], references: [id])
   competition     Competition        @relation(fields: [competitionId], references: [id])

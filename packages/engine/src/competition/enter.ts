@@ -104,6 +104,7 @@ export async function enterCompetition(
         competitionId,
         animalId,
         playerAccountId,
+        tierDefId: tier.tierDefId,
       },
     })
 

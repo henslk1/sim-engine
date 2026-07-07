@@ -28,19 +28,16 @@ export async function runCompetition(
           include: {
             statWeights: true,
             personalityWeights: true,
-            compTierDefs: {
-              include: { tierPrizes: true }
-            },
           }
         },
         entries: {
           include: {
+            tierDef: { include: { tierPrizes: true } },
             animal: {
               include: {
                 stats: true,
                 personality: true,
                 conformationScores: true,
-                compTiers: true,
               }
             }
           }
@@ -57,6 +54,7 @@ export async function runCompetition(
       data: { status: "IN_PROGRESS" },
     })
 
+    // score all entries
     const scored = competition.entries.map((entry) => {
       let score = 0
 
@@ -77,32 +75,46 @@ export async function runCompetition(
       }
 
       const variance = (Math.random() - 0.5) * score * 0.2
-      return { entryId: entry.id, animalId: entry.animalId, playerAccountId: entry.playerAccountId, score: score + variance, animal: entry.animal }
+      return {
+        entryId: entry.id,
+        animalId: entry.animalId,
+        playerAccountId: entry.playerAccountId,
+        tierDefId: entry.tierDefId,
+        tierDef: entry.tierDef,
+        score: score + variance,
+      }
     })
 
-    const ranked = [...scored].sort((a, b) => b.score - a.score).map((entry, i) => ({
-      ...entry,
-      placement: i + 1,
-    }))
+    // group by tier and rank within each group
+    const byTier = new Map<string, typeof scored>()
+    for (const entry of scored) {
+      const group = byTier.get(entry.tierDefId) ?? []
+      group.push(entry)
+      byTier.set(entry.tierDefId, group)
+    }
 
-    for (const entry of ranked) {
+    const allRanked: (typeof scored[number] & { placement: number })[] = []
+
+    for (const [, entries] of byTier) {
+      const ranked = [...entries]
+        .sort((a, b) => b.score - a.score)
+        .map((entry, i) => ({ ...entry, placement: i + 1 }))
+      allRanked.push(...ranked)
+    }
+
+    for (const entry of allRanked) {
       await tx.competitionResult.create({
         data: { entryId: entry.entryId, placement: entry.placement, score: entry.score },
       })
     }
 
-    // prizes from CompetitionTierPrize — all entries share the same tier
-    const firstEntry = ranked[0]
-    if (firstEntry) {
-      const animalTier = firstEntry.animal.compTiers.find(
-        t => t.disciplineDefId === competition.disciplineDefId
-      )
-      const tierDef = competition.disciplineDef.compTierDefs.find(
-        t => t.id === animalTier?.tierDefId
-      )
-      const prizes = tierDef?.tierPrizes.filter(
+    // prizes per tier group
+    for (const [, entries] of byTier) {
+      const tierDef = entries[0].tierDef
+      const prizes = tierDef.tierPrizes.filter(
         p => p.isInvitational === competition.isInvitational
-      ) ?? []
+      )
+      const ranked = allRanked.filter(e => e.tierDefId === tierDef.id)
 
       for (const prize of prizes) {
         if (!prize.currencyDefId) continue
@@ -119,36 +131,36 @@ export async function runCompetition(
           data: { gameId: competition.gameId, toPlayerAccountId: winner.playerAccountId, currencyDefId: prize.currencyDefId, amount: prize.amount, txnType: "PRIZE" },
         })
       }
+    }
 
-      // entry fee share to group if venue is group-owned
-      const group = competition.venue.group
-      const entryFeeSharePercent = group?.prestige?.tierDef?.entryFeeSharePercent ?? 0
-      if (group && entryFeeSharePercent > 0 && tierDef) {
-        const totalEntryFees = competition.entries.length * tierDef.entryFee
-        const shareAmount = Math.floor(totalEntryFees * (entryFeeSharePercent / 100))
+    // entry fee share to group if venue is group-owned
+    const group = competition.venue.group
+    const entryFeeSharePercent = group?.prestige?.tierDef?.entryFeeSharePercent ?? 0
+    if (group && entryFeeSharePercent > 0) {
+      const totalEntryFees = allRanked.reduce((sum, e) => sum + e.tierDef.entryFee, 0)
+      const shareAmount = Math.floor(totalEntryFees * (entryFeeSharePercent / 100))
 
-        if (shareAmount > 0) {
-          const baseCurrency = await tx.currencyDef.findFirstOrThrow({
-            where: { gameId: competition.gameId, currencyType: "BASE" },
-            select: { id: true },
-          })
+      if (shareAmount > 0) {
+        const baseCurrency = await tx.currencyDef.findFirstOrThrow({
+          where: { gameId: competition.gameId, currencyType: "BASE" },
+          select: { id: true },
+        })
 
-          await tx.groupFinance.upsert({
-            where: { groupId_currencyDefId: { groupId: group.id, currencyDefId: baseCurrency.id } },
-            create: { groupId: group.id, currencyDefId: baseCurrency.id, balance: shareAmount },
-            update: { balance: { increment: shareAmount } },
-          })
+        await tx.groupFinance.upsert({
+          where: { groupId_currencyDefId: { groupId: group.id, currencyDefId: baseCurrency.id } },
+          create: { groupId: group.id, currencyDefId: baseCurrency.id, balance: shareAmount },
+          update: { balance: { increment: shareAmount } },
+        })
 
-          await tx.transaction.create({
-            data: {
-              gameId: competition.gameId,
-              toGroupId: group.id,
-              currencyDefId: baseCurrency.id,
-              amount: shareAmount,
-              txnType: "GROUP_CONTRIBUTION",
-            },
-          })
-        }
+        await tx.transaction.create({
+          data: {
+            gameId: competition.gameId,
+            toGroupId: group.id,
+            currencyDefId: baseCurrency.id,
+            amount: shareAmount,
+            txnType: "GROUP_CONTRIBUTION",
+          },
+        })
       }
     }
 
@@ -158,7 +170,7 @@ export async function runCompetition(
     weekStart.setUTCDate(now.getUTCDate() - (day === 0 ? 6 : day - 1))
     weekStart.setUTCHours(0, 0, 0, 0)
 
-    for (const entry of ranked) {
+    for (const entry of allRanked) {
       await tx.animalWeeklyPoints.upsert({
         where: { animalId_disciplineDefId_weekStart: { animalId: entry.animalId, disciplineDefId: competition.disciplineDefId, weekStart } },
         create: { animalId: entry.animalId, disciplineDefId: competition.disciplineDefId, weekStart, points: entry.score },
@@ -171,7 +183,7 @@ export async function runCompetition(
       data: { status: "COMPLETED" },
     })
 
-    return ranked
+    return allRanked
 
   })
 }
