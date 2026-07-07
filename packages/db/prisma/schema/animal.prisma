@@ -78,6 +78,7 @@ model Breed {
   lore                        String?
   isUnregistered              Boolean                           @default(false)
   convergenceGenerations      Int?
+  lifeExpectancyBaseline      Int?
   statProfile                 BreedStatProfile[]
   personalityProfiles         BreedPersonalityProfile[]
   animals                     Animal[]
@@ -154,6 +155,7 @@ model Animal {
   fertility                       Float
   isTutorialAnimal                Boolean                    @default(false)
   breedGeneration                 Int?
+  lifeExpectancy                  Int?
   disciplineDefId                 String?
   subContainerId                  String?
   stats                           AnimalStat[]
