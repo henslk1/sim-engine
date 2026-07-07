@@ -32,7 +32,7 @@ model LifeStageDef {
   name                  String
   stageIndex            Int
   minCycle              Int
-  maxCycle              Int
+  ageCap                Int
   canCompete            Boolean
   canBreed              Boolean
   canTrain              Boolean

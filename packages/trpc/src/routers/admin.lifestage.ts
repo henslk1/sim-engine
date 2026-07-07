@@ -8,7 +8,7 @@ const stageInput = z.object({
   name: z.string().min(1),
   stageIndex: z.number().int().min(0),
   minCycle: z.number().int().min(0),
-  maxCycle: z.number().int().min(0),
+  ageCap: z.number().int().min(0),
   canCompete: z.boolean(),
   canBreed: z.boolean(),
   canTrain: z.boolean(),

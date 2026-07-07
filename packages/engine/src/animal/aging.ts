@@ -19,7 +19,7 @@ export async function advanceAnimalAging(client: Client, animalId: string) {
   const newAge = animal.ageInCycles + 1
 
   const correctStage = lifeStageDefs.find(
-    s => newAge >= s.minCycle && newAge <= s.maxCycle
+    s => newAge >= s.minCycle && newAge <= s.ageCap
   )
 
   if (!correctStage) {
