@@ -230,6 +230,7 @@ model Competition {
   venue              Venue              @relation(fields: [venueId], references: [id])
   game               Game               @relation(fields: [gameId], references: [id])
   createdAt          DateTime           @default(now())
+  expiresAt          DateTime
 }
 
 model CompetitionEntry {
