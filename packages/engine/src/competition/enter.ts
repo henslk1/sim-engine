@@ -28,7 +28,10 @@ export async function enterCompetition(
       include: { tierDef: true }
     })
 
-    const energyUsed = tier?.tierDef.energyCost ?? 0
+    if (!tier) throw new Error("Animal has no competition tier for this discipline")
+
+    const energyUsed = tier.tierDef.energyCost
+    const entryFee = tier.tierDef.entryFee
 
     const energy = await tx.animalEnergy.findUnique({ where: { animalId } })
     if (!energy) throw new Error(`No energy record for animal ${animalId}`)
@@ -36,6 +39,26 @@ export async function enterCompetition(
     await tx.animalEnergy.update({
       where: { animalId },
       data: { currentEnergy: Math.max(energy.currentEnergy - energyUsed, 0) },
+    })
+
+    const baseCurrency = await tx.currencyDef.findFirstOrThrow({
+      where: { gameId: competition.gameId, currencyType: "BASE" },
+      select: { id: true },
+    })
+
+    await tx.playerBalance.update({
+      where: { playerAccountId_currencyDefId: { playerAccountId, currencyDefId: baseCurrency.id } },
+      data: { balance: { decrement: entryFee } },
+    })
+
+    await tx.transaction.create({
+      data: {
+        gameId: competition.gameId,
+        fromPlayerAccountId: playerAccountId,
+        currencyDefId: baseCurrency.id,
+        amount: entryFee,
+        txnType: "COMPETITION_ENTRY",
+      },
     })
 
     return tx.competitionEntry.create({

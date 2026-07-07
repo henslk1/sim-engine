@@ -86,6 +86,7 @@ model CompetitionTierDef {
   minScore             Float?
   advancementThreshold Float?
   energyCost           Float                   @default(0)
+  entryFee             Int
   animalTiers          AnimalCompetitionTier[]
   disciplineDef        DisciplineDef           @relation(fields: [disciplineDefId], references: [id])
   game                 Game                    @relation(fields: [gameId], references: [id])
