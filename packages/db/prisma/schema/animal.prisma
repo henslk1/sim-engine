@@ -1,5 +1,6 @@
 enum AnimalStatus {
   ALIVE
+  DECEASED
   ARCHIVED
   BURIED
 }
@@ -39,6 +40,8 @@ model LifeStageDef {
   hasUniqueActionSet    Boolean            @default(false)
   profileLayout         String
   immunityCapMultiplier Float              @default(1.0)
+  deathChanceStartCycle Int?
+  deathChancePerCycle   Float?
   animals               Animal[]
   stageActivityDefs     StageActivityDef[]
   game                  Game               @relation(fields: [gameId], references: [id])
