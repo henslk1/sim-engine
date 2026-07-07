@@ -10,7 +10,13 @@ export const animalCompetitionRouter = router({
       competitionId: z.string(),
       playerAccountId: z.string(),
     }))
-    .mutation(({ input }) => enterCompetition(db, input)),
+    .mutation(async ({ input }) => {
+      const { entry, shouldRun } = await enterCompetition(db, input)
+      if (shouldRun) {
+        await runCompetition(db, { competitionId: input.competitionId })
+      }
+      return entry
+    }),
   run: publicProcedure
     .input(z.object({
       competitionId: z.string(),

@@ -16,7 +16,13 @@ export async function enterCompetition(
 
     const competition = await tx.competition.findUniqueOrThrow({
       where: { id: competitionId },
-      include: { disciplineDef: true }
+      include: {
+        disciplineDef: {
+          include: {
+            equipmentRequirements: true
+          }
+        }
+      }
     })
 
     if (competition.status !== "OPEN") {
@@ -29,6 +35,38 @@ export async function enterCompetition(
     })
 
     if (!tier) throw new Error("Animal has no competition tier for this discipline")
+
+    // equipment check
+    const equipmentRequirements = competition.disciplineDef.equipmentRequirements
+    if (equipmentRequirements.length > 0) {
+      const equippedItems = await tx.animalEquipment.findMany({ where: { animalId } })
+      for (const req of equipmentRequirements) {
+        const count = equippedItems.filter(e => e.itemDefId === req.itemDefId).length
+        if (count < req.quantity) {
+          throw new Error("Animal is missing required equipment for this discipline")
+        }
+      }
+    }
+
+    // invitational eligibility check
+    if (competition.isInvitational) {
+      const minPoints = tier.tierDef.minWeeklyPointsForInvitational
+      if (minPoints !== null && minPoints !== undefined) {
+        const now = new Date()
+        const day = now.getUTCDay()
+        const weekStart = new Date(now)
+        weekStart.setUTCDate(now.getUTCDate() - (day === 0 ? 6 : day - 1))
+        weekStart.setUTCHours(0, 0, 0, 0)
+
+        const weeklyPoints = await tx.animalWeeklyPoints.findUnique({
+          where: { animalId_disciplineDefId_weekStart: { animalId, disciplineDefId: competition.disciplineDefId, weekStart } }
+        })
+
+        if (!weeklyPoints || weeklyPoints.points < minPoints) {
+          throw new Error("Animal does not meet minimum weekly points for this invitational")
+        }
+      }
+    }
 
     const energyUsed = tier.tierDef.energyCost
     const entryFee = tier.tierDef.entryFee
@@ -61,13 +99,18 @@ export async function enterCompetition(
       },
     })
 
-    return tx.competitionEntry.create({
+    const entry = await tx.competitionEntry.create({
       data: {
         competitionId,
         animalId,
         playerAccountId,
       },
     })
+
+    const entryCount = await tx.competitionEntry.count({ where: { competitionId } })
+    const shouldRun = entryCount >= competition.maxEntries
+
+    return { entry, shouldRun }
 
   })
 }
