@@ -188,7 +188,7 @@ export async function advanceAnimalAging(client: Client, animalId: string) {
     careScore && client.animalCareScore.update({
       where: { animalId },
       data: { score: Math.max(gameConfig.careScoreFloor, careScore.score - gameConfig.careScoreDecayRate) },
-    })
+    }),
     immunity && client.animalImmunity.update({
       where: { animalId },
       data: { value: Math.max(0, immunity.value - gameConfig.immunityDecayRate) },
