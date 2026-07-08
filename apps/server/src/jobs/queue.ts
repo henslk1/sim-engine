@@ -8,3 +8,4 @@ export const connection = {
 export const nightlyQueue = new Queue("nightly", { connection })
 export const competitionQueue = new Queue("competition-check", { connection })
 export const venueRotationQueue = new Queue("venue-rotation", { connection })
+export const nightlyDispatchQueue = new Queue("nightly-dispatch", { connection })
