@@ -79,6 +79,8 @@ model Breed {
   isUnregistered              Boolean                           @default(false)
   convergenceGenerations      Int?
   lifeExpectancyBaseline      Int?
+  immunityMin                 Float?
+  immunityMax                 Float?
   statProfile                 BreedStatProfile[]
   personalityProfiles         BreedPersonalityProfile[]
   animals                     Animal[]

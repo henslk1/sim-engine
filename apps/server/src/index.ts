@@ -8,6 +8,7 @@ import { nightlyQueue, competitionQueue, venueRotationQueue, nightlyDispatchQueu
 import "./jobs/nightly.dispatcher.js"
 import "./jobs/nightly.worker.js"
 import "./jobs/competition.worker.js"
+import "./jobs/venue-rotation.worker.js"
 
 const app = new Hono()
 

@@ -454,8 +454,11 @@ model GameConfig {
   careScoreRecoveryRate     Float    @default(0)
   immunityDecayRate         Float    @default(0)
   immunityRecoveryRate      Float    @default(0)
+  immunityMin               Float    @default(0)
+  immunityMax               Float    @default(100)
   energyLowCareThreshold    Float    @default(0)
   energyLowCarePenalty      Float    @default(0)
+  cyclesPerYear             Int      @default(12)
   lifeExpectancyBaseline    Int?
   game                      Game     @relation(fields: [gameId], references: [id])
   createdAt                 DateTime @default(now())
