@@ -13,8 +13,12 @@ function AnimalProfilePage() {
   if (!animal) return <div className="p-8">Animal not found</div>
 
   const config = animal.game.gameConfig
-  const years = config ? Math.floor(animal.ageInCycles / config.cyclesPerYear) : null
-  const months = config ? animal.ageInCycles % config.cyclesPerYear : null
+  function cycleToAge(cycle: number) {
+    if (!config) return `cycle ${cycle}`
+    const y = Math.floor(cycle / config.cyclesPerYear)
+    const m = cycle % config.cyclesPerYear
+    return `${y}y ${m}m`
+  }
 
   return (
     <div className="p-8 max-w-5xl mx-auto">
@@ -32,9 +36,7 @@ function AnimalProfilePage() {
         <span>·</span>
         <span>{animal.sex}</span>
         <span>·</span>
-        {years !== null && (
-          <span>{years}y {months}m</span>
-        )}
+        <span>{cycleToAge(animal.ageInCycles)}</span>
         {animal.disciplineDef && (
           <>
             <span>·</span>
@@ -155,6 +157,98 @@ function AnimalProfilePage() {
                 <span className="text-sm font-medium">{score.score.toFixed(1)}</span>
               </div>
             ))}
+          </div>
+        )}
+      </section>
+
+      {/* Health */}
+      <section className="mb-8">
+        <h2 className="text-lg font-semibold mb-3">Health</h2>
+
+        {animal.healthRecords.length > 0 && (
+          <div className="mb-4">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Conditions</h3>
+            <div className="rounded-md border divide-y">
+              {animal.healthRecords.map((record) => (
+                <div key={record.id} className="p-3">
+                  <div className="flex items-center gap-4">
+                    <span className="font-medium w-40">{record.conditionDef.name}</span>
+                    <span className={`text-xs font-medium ${record.isActive ? "text-primary" : "text-muted-foreground"}`}>
+                      {record.isActive ? "Active" : "Resolved"}
+                    </span>
+                    <span className="text-sm text-muted-foreground">Diagnosed {cycleToAge(record.diagnosedCycle)}</span>
+                  </div>
+                  {record.treatmentRecords.length > 0 && (
+                    <div className="mt-2 ml-4 space-y-1">
+                      {record.treatmentRecords.map((t) => (
+                        <div key={t.id} className="flex items-center gap-3 text-sm text-muted-foreground">
+                          <span>{t.treatmentDef.name}</span>
+                          {t.activityRestriction && <span className="text-xs">· Activity restricted</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {animal.healthCertificates.length > 0 && (
+          <div className="mb-4">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Certificates</h3>
+            <div className="rounded-md border divide-y">
+              {animal.healthCertificates.map((cert) => (
+                <div key={cert.id} className="p-3 flex items-center gap-6">
+                  <span className="font-medium w-40">{cert.certDef.name}</span>
+                  <span className="text-sm text-muted-foreground">Issued at age {cycleToAge(cert.issuedCycle)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {animal.vetVisitLogs.length > 0 && (
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Recent Vet Visits</h3>
+            <div className="rounded-md border divide-y">
+              {animal.vetVisitLogs.map((visit) => (
+                <div key={visit.id} className="p-3 flex items-center gap-6">
+                  <span className="font-medium w-40">{visit.vetServiceDef?.name ?? "Vet visit"}</span>
+                  <span className="text-sm text-muted-foreground">Visited at age {cycleToAge(visit.visitCycle)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* Care */}
+      <section>
+        <h2>Care</h2>
+
+        {animal.longTermCareRecords.map((record) => (
+          <div key={record.id}>
+            <span>{record.longTermCareActionDef.name}</span>
+            {record.lastPerformedCycle !== null 
+              ? <span>Last done {cycleToAge(record.lastPerformedCycle)}</span>
+              : <span>Never performed</span>
+            }
+            <span>Next due {cycleToAge(record.nextDueCycle)}</span> 
+          </div>
+        ))}
+
+        {animal.careLogs.length > 0 && (
+          <div>
+            <h3>Recent Care</h3>
+            <div>
+              {animal.careLogs.map((log) => (
+                <div key={log.id}>
+                  <span>{log.careActionDef.name}</span>
+                  <span>{cycleToAge(log.cycleNumber)}</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </section>
