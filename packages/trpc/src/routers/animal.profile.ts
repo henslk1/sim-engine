@@ -11,7 +11,8 @@ type AnimalProfileType = Prisma.AnimalGetPayload<{
         personalityProfiles: { include: { traitDef: true } }
       }
     }
-    playerAccount: { select: { id: true; username: true } }
+    playerAccount: { select: { id: true, username: true, avatar: true } }
+    breeder: { select: { id: true, username: true } }
     brands: { include: { playerBrand: true } }
     lifeStage: {
       include: {
@@ -32,7 +33,7 @@ type AnimalProfileType = Prisma.AnimalGetPayload<{
             image: true
             bornAt: true
             inbreedingCoefficient: true
-            breed: { select: { id: true; name: true } }
+            breed: { select: { id: true, name: true } }
           }
         }
       }
@@ -174,7 +175,8 @@ export const animalProfileRouter = router({
               personalityProfiles: { include: { traitDef: true } },
             },
           },
-          playerAccount: { select: { id: true, username: true } },
+          playerAccount: { select: { id: true, username: true, avatar: true } },
+          breeder: {select: { id: true, username: true } },
           brands: { include: { playerBrand: true } },
 
           lifeStage: {

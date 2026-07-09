@@ -61,6 +61,7 @@ function AnimalProfilePage() {
   const activeConditions = animal.healthRecords.filter((r) => r.isActive)
   const currentTier = animal.compTiers[0]
   const latestWeeklyPoints = animal.weeklyPoints[0]?.points
+  const preg = animal.pregnancies[0]
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-transparent text-foreground">
@@ -191,21 +192,42 @@ function AnimalProfilePage() {
             </Panel>
 
             <Panel title="Breeding" icon={<Baby className="size-4 text-accent-foreground" />}>
-              {animal.pregnancies.length > 0 ? (
-                <div className="rounded-md border border-border/70 bg-secondary/30 px-3 py-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-foreground">Active Pregnancy</span>
-                    <Badge tone="accent"><Sparkles className="size-3" /> Expecting</Badge>
-                  </div>
-                  {animal.pregnancies[0].breedingRecord.sire && (
-                    <p className="mt-1 text-[11px] text-muted-foreground">
-                      Sire: <span className="font-medium text-foreground">{animal.pregnancies[0].breedingRecord.sire.name}</span>
-                    </p>
-                  )}
+              {/*COI*/}
+              <div>
+                <div>
+                  <p>Inbreeding (COI)</p>
+                  <p>{(animal.inbreedingCoefficient * 100).toFixed(2)}%</p>
                 </div>
-              ) : (
-                <p className="text-[11px] text-muted-foreground">No active pregnancy</p>
-              )}
+                <Badge>
+                  {animal.inbreedingCoefficient < 0.0625 ? "Low" :
+                  animal.inbreedingCoefficient < 0.125 ? "Moderate" : "High"}
+                </Badge>
+              </div>
+
+              {/* Pregnancy */}
+              
+              {animal.pregnancies.length > 0 ? (
+                <div>
+                  <div>
+                    <span>Active Pregnancy</span>
+                    <Badge tone="accent"> Expecting</Badge>
+                  </div>
+                  {preg.breedingRecord.sire && (
+                    <p>Sire: <span>{preg.breedingRecord.sire.name}</span></p>
+                  )}
+                  <div>
+                    <div>
+                      <span>Gestation</span>
+                      <span>{preg.currentCycles} / {preg.requiredCycles} months</span>
+                    </div>
+                    <Meter
+                      value={preg.currentCycles}
+                      max={preg.requiredCycles}
+                      tone="mood"
+                    />
+                  </div>
+                </div>
+              ) : <p>Breed</p>} /* add button for breeding */
             </Panel>
 
             <Panel title="Daily Log" icon={<ScrollText className="size-4 text-muted-foreground" />}>
@@ -584,6 +606,12 @@ function PedigreeTab({ animal }: { animal: AnimalProfile }) {
           ))}
         </div>
       )}
+      <p className="mb-3 text-[11px] text-muted-foreground">
+        Bred by{""}
+        <span className="font-medium text-foreground">
+          {animal.breeder?.username ?? " Unknown"}
+        </span>
+      </p>
       <p className="text-[11px] text-muted-foreground">Pedigree tree coming soon.</p>
     </div>
   )
