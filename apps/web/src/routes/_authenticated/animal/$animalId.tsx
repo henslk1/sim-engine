@@ -224,28 +224,70 @@ function AnimalProfilePage() {
       </section>
 
       {/* Care */}
-      <section>
-        <h2>Care</h2>
+      <section className="mb-8">
+        <h2 className="text-lg font-semibold mb-3">Care</h2>
 
-        {animal.longTermCareRecords.map((record) => (
-          <div key={record.id}>
-            <span>{record.longTermCareActionDef.name}</span>
-            {record.lastPerformedCycle !== null 
-              ? <span>Last done {cycleToAge(record.lastPerformedCycle)}</span>
-              : <span>Never performed</span>
-            }
-            <span>Next due {cycleToAge(record.nextDueCycle)}</span> 
+        {animal.longTermCareRecords.length > 0 && (
+          <div className="mb-4">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Long-Term Care</h3>
+            <div className="rounded-md border divide-y">
+              {animal.longTermCareRecords.map((record) => (
+                <div key={record.id} className="p-3 flex items-center gap-6">
+                  <span className="font-medium w-40">{record.longTermCareActionDef.name}</span>
+                  {record.lastPerformedCycle !== null
+                    ? <span className="text-sm text-muted-foreground">Last done {cycleToAge(record.lastPerformedCycle)}</span>
+                    : <span className="text-sm text-muted-foreground">Never performed</span>
+                  }
+                  <span className="text-sm text-muted-foreground">Next due {cycleToAge(record.nextDueCycle)}</span>
+                </div>
+              ))}
+            </div>
           </div>
-        ))}
+        )}
 
         {animal.careLogs.length > 0 && (
           <div>
-            <h3>Recent Care</h3>
-            <div>
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Recent Care</h3>
+            <div className="rounded-md border divide-y">
               {animal.careLogs.map((log) => (
-                <div key={log.id}>
-                  <span>{log.careActionDef.name}</span>
-                  <span>{cycleToAge(log.cycleNumber)}</span>
+                <div key={log.id} className="p-3 flex items-center gap-6">
+                  <span className="font-medium w-40">{log.careActionDef.name}</span>
+                  <span className="text-sm text-muted-foreground">{cycleToAge(log.cycleNumber)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* Training */}
+      <section className="mb-8">
+        <h2 className="text-lg font-semibold mb-3">Training</h2>
+
+        {animal.trainingLogs.length > 0 && (
+          <div className="mb-4">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Recent Training</h3>
+            <div className="rounded-md border divide-y">
+              {animal.trainingLogs.map((log) => (
+                <div key={log.id} className="p-3 flex items-center gap-6">
+                  <span className="font-medium w-40">{log.trainingActionDef.name}</span>
+                  <span className="text-sm text-muted-foreground">{log.trainingActionDef.statDef.name}</span>
+                  <span className="text-sm text-muted-foreground">{log.intensityTierDef.name}</span>
+                  <span className="text-sm text-muted-foreground">{cycleToAge(log.cycleNumber)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {animal.stageActivityLogs.length > 0 && (
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Stage Activities</h3>
+            <div className="rounded-md border divide-y">
+              {animal.stageActivityLogs.map((log) => (
+                <div key={log.id} className="p-3 flex items-center gap-6">
+                  <span className="font-medium w-40">{log.stageActivityDef.name}</span>
+                  <span className="text-sm text-muted-foreground">{cycleToAge(log.cycleNumber)}</span>
                 </div>
               ))}
             </div>
