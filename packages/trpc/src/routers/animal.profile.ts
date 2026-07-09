@@ -15,6 +15,9 @@ export const animalProfileRouter = router({
               personalityProfiles: { include: { traitDef: true } },
             },
           },
+          playerAccount: { select: { id: true, username: true } },
+          brands: { include: { playerBrand: true } },
+
           lifeStage: {
             include: {
               stageActivityDefs: { include: { traitDef: true } },
@@ -22,6 +25,25 @@ export const animalProfileRouter = router({
           },
           disciplineDef: true,
           breedComposition: { include: { breed: true } },
+
+          // Pedigree
+          ancestors: {
+            orderBy: { depth: "asc" },
+            include: {
+              ancestor: {
+                select: {
+                  id: true,
+                  name: true,
+                  sex: true,
+                  status: true,
+                  image: true,
+                  bornAt: true,
+                  inbreedingCoefficient: true,
+                  breed: { select: { id: true, name: true } },
+                },
+              },
+            },
+          },
 
           // vitals
           energy: true,
@@ -93,7 +115,11 @@ export const animalProfileRouter = router({
           // competition
           compTiers: {
             include: {
-              disciplineDef: true,
+              disciplineDef: {
+                include: {
+                  equipmentRequirements: true,
+                },
+              },
               tierDef: true,
             },
           },
@@ -115,6 +141,7 @@ export const animalProfileRouter = router({
               result: true,
             },
           },
+          equipment: { include: { itemDef: true } },
 
           // stage activities
           stageActivityLogs: {
@@ -139,6 +166,7 @@ export const animalProfileRouter = router({
           // game config
           game: {
             select: {
+              innateMax: true,
               gameConfig: {
                 select: {
                   cyclesPerYear: true,
@@ -152,4 +180,44 @@ export const animalProfileRouter = router({
         },
       })
     }),
+
+    getOffspring: publicProcedure
+      .input(z.object({ animalId: z.string() }))
+      .query(async ({ input }) => {
+        return db.animal.findMany({
+          where: {
+            pregnancyOffspring: {
+              some: {
+                pregnancy: {
+                  breedingRecord: {
+                    OR: [{ sireId: input.animalId }, { damId: input.animalId }],
+                  },
+                },
+              },
+            },
+          },
+          select: {
+            id: true,
+            name: true,
+            sex: true,
+            status: true,
+            image: true,
+            ageInCycles: true,
+            bornAt: true,
+            breed: { select: { id: true, name: true } },
+          },
+          orderBy: { bornAt: "desc" },
+        })
+      }),
+
+      getStatHistory: publicProcedure
+        .input(z.object({ animalId: z.string() }))
+        .query(async ({ input }) => {
+          return db.animalStatHistory.findMany({
+            where: { animalId: input.animalId },
+            orderBy: { cycleNumber: "desc" },
+            take: 20,
+            include: { statDef: true },
+          })
+        }),
 })
