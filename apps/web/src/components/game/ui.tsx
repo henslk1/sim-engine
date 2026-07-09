@@ -107,12 +107,14 @@ export function ActionButton({
   disabled,
   className,
   title,
+  onClick,
 }: {
   children: ReactNode
   variant?: "primary" | "soft" | "ghost" | "danger"
   disabled?: boolean
   className?: string
   title?: string
+  onClick?: () => void
 }) {
   const variants = {
     primary: "bg-primary text-primary-foreground hover:bg-primary/90",
@@ -125,6 +127,7 @@ export function ActionButton({
       type="button"
       disabled={disabled}
       title={title}
+      onClick={onClick}
       className={cn(
         "inline-flex items-center justify-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-45",
         variants[variant],

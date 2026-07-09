@@ -1,11 +1,170 @@
 import { db } from "@sim-engine/db"
 import { router, publicProcedure } from "../trpc.js"
 import { z } from "zod"
+import { Prisma } from "@sim-engine/db"
+
+type AnimalProfileType = Prisma.AnimalGetPayload<{
+  include: {
+    breed: {
+      include: {
+        statProfile: { include: { statDef: true } }
+        personalityProfiles: { include: { traitDef: true } }
+      }
+    }
+    playerAccount: { select: { id: true; username: true } }
+    brands: { include: { playerBrand: true } }
+    lifeStage: {
+      include: {
+        stageActivityDefs: { include: { traitDef: true } }
+      }
+    }
+    disciplineDef: true
+    breedComposition: { include: { breed: true } }
+    ancestors: {
+      orderBy: { depth: "asc" }
+      include: {
+        ancestor: {
+          select: {
+            id: true
+            name: true
+            sex: true
+            status: true
+            image: true
+            bornAt: true
+            inbreedingCoefficient: true
+            breed: { select: { id: true; name: true } }
+          }
+        }
+      }
+    }
+    energy: true
+    mood: true
+    condition: true
+    careScore: true
+    immunity: true
+    stats: { include: { statDef: true } }
+    personality: { include: { traitDef: true } }
+    genotypes: {
+      include: {
+        locus: true
+        alleleOne: true
+        alleleTwo: true
+      }
+    }
+    conformationScores: { include: { breed: true } }
+    healthRecords: {
+      orderBy: { diagnosedCycle: "desc" }
+      include: {
+        conditionDef: true
+        treatmentRecords: {
+          include: {
+            treatmentDef: true
+            activityRestriction: true
+          }
+        }
+      }
+    }
+    testResults: {
+      orderBy: { testedCycle: "desc" }
+      include: { conditionDef: true }
+    }
+    healthCertificates: { include: { certDef: true } }
+    vetVisitLogs: {
+      orderBy: { visitCycle: "desc" }
+      take: 5
+      include: { vetServiceDef: true }
+    }
+    longTermCareRecords: {
+      include: { longTermCareActionDef: true }
+    }
+    careLogs: {
+      orderBy: { cycleNumber: "desc" }
+      take: 10
+      include: { careActionDef: true }
+    }
+    trainingLogs: {
+      orderBy: { cycleNumber: "desc" }
+      take: 10
+      include: {
+        trainingActionDef: { include: { statDef: true } }
+        intensityTierDef: true
+      }
+    }
+    compTiers: {
+      include: {
+        disciplineDef: {
+          select: {
+            id: true
+            name: true
+            equipmentRequirements: {
+              select: {
+                id: true
+                quantity: true
+                itemDef: { select: { id: true; name: true } }
+              }
+            }
+          }
+        }
+        tierDef: true
+      }
+    }
+    titles: {
+      include: {
+        titleDef: { include: { disciplineDef: true } }
+      }
+    }
+    weeklyPoints: {
+      orderBy: { weekStart: "desc" }
+      take: 4
+    }
+    competitionEntries: {
+      orderBy: { enteredAt: "desc" }
+      take: 5
+      include: {
+        competition: { include: { venue: true } }
+        tierDef: true
+        result: true
+      }
+    }
+    equipment: { include: { itemDef: true } }
+    stageActivityLogs: {
+      orderBy: { cycleNumber: "desc" }
+      take: 10
+      include: { stageActivityDef: true }
+    }
+    pregnancies: {
+      where: { isCompleted: false }
+      take: 1
+      include: {
+        breedingRecord: {
+          include: {
+            sire: { select: { id: true; name: true } }
+          }
+        }
+      }
+    }
+    game: {
+      select: {
+        gameInnateMax: {
+          select: { averageTotalInnate: true; maxTotalInnate: true }
+        }
+        gameConfig: {
+          select: {
+            cyclesPerYear: true
+            trainingCeilingMultiplier: true
+            immunityMin: true
+            immunityMax: true
+          }
+        }
+      }
+    }
+  }
+}>
 
 export const animalProfileRouter = router({
   get: publicProcedure
     .input(z.object({ animalId: z.string() }))
-    .query(async ({ input }) => {
+    .query(async ({ input }): Promise<AnimalProfileType> => {
       return db.animal.findUniqueOrThrow({
         where: { id: input.animalId },
         include: {
@@ -116,8 +275,16 @@ export const animalProfileRouter = router({
           compTiers: {
             include: {
               disciplineDef: {
-                include: {
-                  equipmentRequirements: true,
+                select: {
+                  id: true,
+                  name: true,
+                  equipmentRequirements: {
+                    select: {
+                      id: true,
+                      quantity: true,
+                      itemDef: { select: { id: true, name: true } },
+                    },
+                  },
                 },
               },
               tierDef: true,
@@ -166,7 +333,9 @@ export const animalProfileRouter = router({
           // game config
           game: {
             select: {
-              innateMax: true,
+              gameInnateMax: {
+                select: { averageTotalInnate: true, maxTotalInnate: true },
+              },
               gameConfig: {
                 select: {
                   cyclesPerYear: true,

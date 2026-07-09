@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { createFileRoute } from "@tanstack/react-router"
 import { trpc, type RouterOutputs } from "@/lib/trpc"
-import { Panel, Badge, Meter, Stat } from "@/components/game/ui"
+import { Panel, Badge, Meter, Stat, ActionButton } from "@/components/game/ui"
 import { cn } from "@/lib/utils"
 import {
   Stethoscope,
@@ -23,6 +23,11 @@ import {
   Skull,
   ShieldCheck,
   Sparkles,
+  Clock,
+  Zap,
+  Brain,
+  Sword,
+  GitBranch,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import type { ReactNode } from "react"
@@ -75,6 +80,11 @@ function AnimalProfilePage() {
           )}
         </div>
 
+        <ActionButton variant="soft" disabled>
+          <Clock className="size-3.5" />
+          Advance Age
+        </ActionButton>
+
         {/* Vitals */}
         <div className="grid w-full max-w-lg grid-cols-5 gap-x-4 gap-y-2">
           {(
@@ -103,8 +113,14 @@ function AnimalProfilePage() {
         <InfoChip>{animal.sex}</InfoChip>
         <InfoChip>{animal.lifeStage.name}</InfoChip>
         <InfoChip>Age {cycleToAge(animal.ageInCycles)}</InfoChip>
+        {animal.breedGeneration !== null && (
+          <InfoChip><GitBranch className="size-3" /> Gen {animal.breedGeneration}</InfoChip>
+        )}
         {animal.breedComposition.map((bc) => (
           <InfoChip key={bc.breedId}>{bc.breed.name} {Math.round(bc.percentage)}%</InfoChip>
+        ))}
+        {animal.brands.map((b) => (
+          <BrandChip key={b.id} path={b.playerBrand.path} />
         ))}
         {animal.disciplineDef && (
           <span className="inline-flex items-center gap-1 rounded-full bg-accent/20 px-2 py-0.5 text-[11px] font-semibold text-accent-foreground">
@@ -330,7 +346,7 @@ function AnimalProfilePage() {
           </div>
 
           {/* Col 4+5 */}
-          <div className="flex min-h-0 flex-col gap-3 min-[1400px]:col-span-2 min-[1400px]:grid min-[1400px]:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] min-[1400px]:grid-rows-[auto_minmax(0,1fr)]">
+          <div className="flex min-h-0 flex-col gap-3 min-[1400px]:col-span-2 min-[1400px]:grid min-[1400px]:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] min-[1400px]:grid-rows-[auto_auto_minmax(0,1fr)]">
 
             <Panel title="Daily Care" icon={<Heart className="size-4 text-chart-4" />}>
               {animal.longTermCareRecords.length > 0 && (
@@ -381,6 +397,46 @@ function AnimalProfilePage() {
               </div>
             </div>
 
+            {/* Personality */}
+            <Panel title="Personality" icon={<Brain className="size-4 text-chart-5" />}>
+              {animal.personality.length === 0 ? (
+                <p className="text-[11px] text-muted-foreground">No personality data</p>
+              ) : (
+                <div className="space-y-2">
+                  {animal.personality.map((trait) => (
+                    <div key={trait.traitDef.name}>
+                      <div className="mb-1 flex items-center justify-between">
+                        <span className="text-xs font-semibold text-foreground">{trait.traitDef.name}</span>
+                        <span className="text-[11px] text-muted-foreground">
+                          {trait.traitLabel && (
+                            <span className="mr-1.5 font-medium text-foreground">{trait.traitLabel}</span>
+                          )}
+                          <span className="tabular-nums">{Math.round(trait.value)}</span>
+                        </span>
+                      </div>
+                      <Meter value={trait.value} max={100} tone="mood" className="h-1" />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Panel>
+
+            {/* Items Equipped */}
+            <Panel title="Equipped" icon={<Sword className="size-4 text-muted-foreground" />}>
+              {animal.equipment.length === 0 ? (
+                <p className="text-[11px] text-muted-foreground">No items equipped</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {animal.equipment.map((eq) => (
+                    <div key={eq.id} className="flex items-center justify-between rounded-md border border-border/70 bg-secondary/30 px-2.5 py-1.5">
+                      <span className="text-xs font-semibold text-foreground">{eq.itemDef.name}</span>
+                      <Badge tone="muted">{eq.slot}</Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Panel>
+
             <div className="flex min-h-0 flex-col min-[1400px]:col-span-2">
               <Panel title="Conformation" icon={<Ruler className="size-4 text-chart-2" />}>
                 {animal.conformationScores.length > 0 ? (
@@ -412,6 +468,16 @@ function InfoChip({ children }: { children: ReactNode }) {
   return (
     <span className="inline-flex items-center gap-1 rounded-md bg-secondary/60 px-2 py-1 text-xs font-medium text-secondary-foreground">
       {children}
+    </span>
+  )
+}
+
+function BrandChip({ path }: { path: string }) {
+  return (
+    <span className="inline-flex items-center justify-center rounded-md bg-secondary/60 p-1" title="Player brand">
+      <svg viewBox="0 0 100 100" className="size-4" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+        <path d={path} />
+      </svg>
     </span>
   )
 }
@@ -530,7 +596,8 @@ function GeneticsTab({
   animal: AnimalProfile
   config: AnimalProfile["game"]["gameConfig"]
 }) {
-  const groups = animal.genotypes.reduce<Record<string, typeof animal.genotypes>>((acc, g) => {
+  type Genotype = NonNullable<AnimalProfile["genotypes"]>[number]
+  const groups = animal.genotypes.reduce<Record<string, Genotype[]>>((acc: Record<string, Genotype[]>, g: Genotype) => {
     const key = g.locus.displayGroup ?? "Other"
     if (!acc[key]) acc[key] = []
     acc[key].push(g)
@@ -549,7 +616,7 @@ function GeneticsTab({
             </tr>
           </thead>
           <tbody>
-            {Object.entries(groups).flatMap(([group, genotypes]) =>
+            {(Object.entries(groups) as Array<[string, Genotype[]]>).flatMap(([group, genotypes]) =>
               genotypes.map((g, i) => (
                 <tr key={g.locusId} className="border-t border-border/60">
                   <td className="px-2 py-1 font-medium text-foreground">{g.locus.name}</td>
