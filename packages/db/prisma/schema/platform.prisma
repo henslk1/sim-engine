@@ -145,7 +145,8 @@ model PlayerAccount {
   bugReports                 BugReport[]
   bugReportUpvotes           BugReportUpvote[]
   bugReportComments          BugReportComment[]
-  animals                    Animal[]
+  animalsOwned               Animal[]                   @relation("AnimalOwner")
+  animalsBred                Animal[]                   @relation("AnimalBreeder")
   playerBrand                PlayerBrand?
   foundedBreeds              Breed[]                    @relation("BreedFounder")
   performedCareLogs          CareLog[]                  @relation("CarePerformedBy")

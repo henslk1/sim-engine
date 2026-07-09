@@ -141,6 +141,7 @@ model Animal {
   gameId                          String
   playerAccountId                 String
   breedId                         String
+  breederId                       String?
   name                            String
   sex                             AnimalSex
   lifeStageId                     String
@@ -215,7 +216,8 @@ model Animal {
   followers                       Follow[]
   userReports                     UserReport[]
   game                            Game                       @relation(fields: [gameId], references: [id])
-  playerAccount                   PlayerAccount              @relation(fields: [playerAccountId], references: [id])
+  playerAccount                   PlayerAccount              @relation("AnimalOwner", fields: [playerAccountId], references: [id])
+  breeder                         PlayerAccount?             @relation("AnimalBreeder", fields: [breederId], references: [id])
   breed                           Breed                      @relation(fields: [breedId], references: [id])
   lifeStage                       LifeStageDef               @relation(fields: [lifeStageId], references: [id])
   disciplineDef                   DisciplineDef?             @relation(fields: [disciplineDefId], references: [id])
