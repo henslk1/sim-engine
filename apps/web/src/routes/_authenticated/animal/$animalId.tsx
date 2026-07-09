@@ -295,6 +295,60 @@ function AnimalProfilePage() {
         )}
       </section>
 
+      {/* Competition */}
+      <section className="mb-8">
+        <h2 className="text-lg font-semibold mb-3">Competition</h2>
+
+        {animal.compTiers.length > 0 && (
+          <div className="mb-4">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Competition Tiers</h3>
+            <div className="rounded-md border divide-y">
+              {animal.compTiers.map((ct) => (
+                <div key={ct.id} className="p-3 flex items-center gap-6">
+                  <span className="font-medium w-40">{ct.disciplineDef.name}</span>
+                  <span className="text-sm text-muted-foreground">{ct.tierDef.name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {animal.titles.length > 0 && (
+          <div className="mb-4">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Titles</h3>
+            <div className="rounded-md border divide-y">
+              {animal.titles.map((t) => (
+                <div key={t.id} className="p-3 flex items-center gap-6">
+                  <span className="font-medium w-40">{t.titleDef.name}</span>
+                  {t.titleDef.disciplineDef && <span className="text-sm text-muted-foreground">{t.titleDef.disciplineDef.name}</span>}
+                  <span className="text-sm text-muted-foreground">Earned {cycleToAge(t.cycleNumber)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {animal.competitionEntries.length > 0 && (
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Recent Entries</h3>
+            <div className="rounded-md border divide-y">
+              {animal.competitionEntries.map((entry) => (
+                <div key={entry.id} className="p-3 flex items-center gap-6">
+                  <span className="font-medium w-40">{entry.competition.venue.name}</span>
+                  <span className="text-sm text-muted-foreground">{entry.tierDef.name}</span>
+                  {entry.result && (
+                    <>
+                      {entry.result.placement !== null && <span className="text-sm font-medium">#{entry.result.placement}</span>}
+                      <span className="text-sm text-muted-foreground">Score {entry.result.score.toFixed(1)}</span>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </section>
+
     </div>
   )
 }
