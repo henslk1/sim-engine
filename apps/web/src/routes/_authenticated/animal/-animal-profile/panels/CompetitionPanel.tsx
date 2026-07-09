@@ -1,0 +1,110 @@
+import type { AnimalProfile } from "../types"
+import { Panel, Badge, Stat } from "@/components/game/ui"
+import { Trophy, CheckCircle, XCircle } from "lucide-react"
+
+export function CompetitionPanel({ animal }: { animal: AnimalProfile }) {
+  const currentTier = animal.compTiers[0]
+  const latestWeeklyPoints = animal.weeklyPoints[0]?.points
+
+  return (
+    <Panel title="Competition" icon={<Trophy className="size-4 text-chart-1" />}>
+      {animal.disciplineDef ? (
+        <>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-md border border-border/70 bg-secondary/30 px-3 py-2">
+              <Stat label="Discipline" value={animal.disciplineDef.name} />
+            </div>
+            <div className="rounded-md border border-border/70 bg-secondary/30 px-3 py-2">
+              <Stat label="Current Tier" value={currentTier?.tierDef.name ?? "—"} />
+            </div>
+          </div>
+
+          {latestWeeklyPoints !== undefined && (
+            <div className="mt-2 rounded-md border border-border/70 bg-secondary/30 px-3 py-2">
+              <Stat label="Weekly Points" value={`${Math.round(latestWeeklyPoints)} pts`} />
+            </div>
+          )}
+
+          {currentTier && currentTier.disciplineDef.equipmentRequirements.length > 0 && (
+            <div className="mt-3">
+              <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Equipment</h4>
+              <div className="space-y-1">
+                {currentTier.disciplineDef.equipmentRequirements.map(
+                  (req: AnimalProfile["compTiers"][number]["disciplineDef"]["equipmentRequirements"][number]) => {
+                    const equipped = animal.equipment.filter(
+                      (eq: AnimalProfile["equipment"][number]) => eq.itemDef.id === req.itemDef.id
+                    ).length
+                    const met = equipped >= req.quantity
+                    return (
+                      <div key={req.id} className="flex items-center gap-2 text-[11px]">
+                        {met ? (
+                          <CheckCircle className="size-3.5 shrink-0 text-chart-2" />
+                        ) : (
+                          <XCircle className="size-3.5 shrink-0 text-destructive" />
+                        )}
+                        <span className={met ? "text-foreground" : "text-destructive"}>{req.itemDef.name}</span>
+                        {req.quantity > 1 && (
+                          <span className="ml-auto tabular-nums text-muted-foreground">
+                            {equipped}/{req.quantity}
+                          </span>
+                        )}
+                      </div>
+                    )
+                  }
+                )}
+              </div>
+            </div>
+          )}
+
+          {animal.competitionEntries.length > 0 && (
+            <div className="mt-3">
+              <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Recent Entries</h4>
+              <div className="overflow-hidden rounded-md border border-border/70">
+                <table className="w-full text-left text-[11px]">
+                  <thead className="bg-secondary/50 text-muted-foreground">
+                    <tr>
+                      <th className="px-2 py-1 font-medium">Venue</th>
+                      <th className="px-2 py-1 font-medium">Tier</th>
+                      <th className="px-2 py-1 text-right font-medium">Result</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {animal.competitionEntries.map((entry: AnimalProfile["competitionEntries"][number]) => (
+                      <tr key={entry.id} className="border-t border-border/60">
+                        <td className="px-2 py-1 font-medium text-foreground">{entry.competition.venue.name}</td>
+                        <td className="px-2 py-1 text-muted-foreground">{entry.tierDef.name}</td>
+                        <td className="px-2 py-1 text-right">
+                          {entry.result ? (
+                            entry.result.placement !== null ? (
+                              <Badge
+                                tone={
+                                  entry.result.placement === 1
+                                    ? "success"
+                                    : entry.result.placement <= 3
+                                      ? "accent"
+                                      : "muted"
+                                }
+                              >
+                                #{entry.result.placement}
+                              </Badge>
+                            ) : (
+                              <span className="tabular-nums text-foreground">{entry.result.score.toFixed(1)}</span>
+                            )
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </>
+      ) : (
+        <p className="text-[11px] text-muted-foreground">No discipline assigned</p>
+      )}
+    </Panel>
+  )
+}
