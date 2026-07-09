@@ -62,6 +62,14 @@ function AnimalProfilePage() {
   const currentTier = animal.compTiers[0]
   const latestWeeklyPoints = animal.weeklyPoints[0]?.points
   const preg = animal.pregnancies[0]
+  const breedingGrade = computeBreedingGrade(animal, config)
+  const breedingGradeColor: Record<string, string> = {
+    A: "text-chart-2",
+    B: "text-sky-500",
+    C: "text-amber-400",
+    D: "text-orange-500",
+    F: "text-destructive",
+  }
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-transparent text-foreground">
@@ -123,6 +131,9 @@ function AnimalProfilePage() {
         {animal.brands.map((b) => (
           <BrandChip key={b.id} path={b.playerBrand.path} />
         ))}
+        <span className="inline-flex items-center justify-center rounded-md bg-secondary/60 px-2 py-1" title={`Breeding quality: ${breedingGrade}`}>
+          <Heart className={cn("size-3", breedingGradeColor[breedingGrade])} fill="currentColor" />
+        </span>
         {animal.disciplineDef && (
           <span className="inline-flex items-center gap-1 rounded-full bg-accent/20 px-2 py-0.5 text-[11px] font-semibold text-accent-foreground">
             <Trophy className="size-3 text-chart-1" /> {animal.disciplineDef.name}
@@ -191,43 +202,51 @@ function AnimalProfilePage() {
               )}
             </Panel>
 
+            {/* Breeding */}
             <Panel title="Breeding" icon={<Baby className="size-4 text-accent-foreground" />}>
-              {/*COI*/}
-              <div>
-                <div>
-                  <p>Inbreeding (COI)</p>
-                  <p>{(animal.inbreedingCoefficient * 100).toFixed(2)}%</p>
-                </div>
-                <Badge>
-                  {animal.inbreedingCoefficient < 0.0625 ? "Low" :
-                  animal.inbreedingCoefficient < 0.125 ? "Moderate" : "High"}
-                </Badge>
-              </div>
+              {(() => {
+                const coiColor = animal.inbreedingCoefficient < 0.0625 ? "text-chart-2" : animal.inbreedingCoefficient < 0.125 ? "text-amber-500" : "text-destructive"
+                return (
+                  <div className="mb-3 flex items-center gap-4 border-b border-border pb-2">
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      COI — <span className={cn("font-bold tabular-nums", coiColor)}>{(animal.inbreedingCoefficient * 100).toFixed(2)}%</span>
+                    </span>
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Quality — <span className="font-bold">{breedingGrade}</span>
+                    </span>
+                    {animal.breedComposition.length > 1 && (
+                      <Badge tone="muted">Cross</Badge>
+                    )}
+                  </div>
+                )
+              })()}
 
               {/* Pregnancy */}
               
               {animal.pregnancies.length > 0 ? (
-                <div>
-                  <div>
-                    <span>Active Pregnancy</span>
-                    <Badge tone="accent"> Expecting</Badge>
+                <div className="rounded-md border border-border/70 bg-secondary/30 px-3 py-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-foreground">Active Pregnancy</span>
+                    <Badge tone="accent"><Sparkles className="size-3" /> Expecting</Badge>
                   </div>
                   {preg.breedingRecord.sire && (
-                    <p>Sire: <span>{preg.breedingRecord.sire.name}</span></p>
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      Sire: <span className="font-medium text-foreground">{preg.breedingRecord.sire.name}</span>
+                    </p>
                   )}
-                  <div>
-                    <div>
-                      <span>Gestation</span>
-                      <span>{preg.currentCycles} / {preg.requiredCycles} months</span>
+                  <div className="mt-2">
+                    <div className="mb-1 flex items-center justify-between">
+                      <span className="text-[11px] text-muted-foreground">Gestation</span>
+                      <span className="text-[11px] tabular-nums text-muted-foreground">
+                        {preg.currentCycles} / {preg.requiredCycles} months
+                      </span>
                     </div>
-                    <Meter
-                      value={preg.currentCycles}
-                      max={preg.requiredCycles}
-                      tone="mood"
-                    />
+                    <Meter value={preg.currentCycles} max={preg.requiredCycles} tone="mood" className="h-1.5" />
                   </div>
                 </div>
-              ) : <p>Breed</p>} /* add button for breeding */
+              ) : (
+                <p className="text-[11px] text-muted-foreground">{/* TODO: breed action button */}Not pregnant</p>
+              )}
             </Panel>
 
             <Panel title="Daily Log" icon={<ScrollText className="size-4 text-muted-foreground" />}>
@@ -743,4 +762,49 @@ function CompHistoryTab({
       )}
     </div>
   )
+}
+
+function computeBreedingGrade(
+  animal: AnimalProfile,
+  config: AnimalProfile["game"]["gameConfig"]
+): string {
+  const components: number[] = []
+
+  // Care
+  components.push((animal.careScore?.score ?? 0) / 100)
+
+  // Competition tier
+  const tierIndex = animal.compTiers[0]?.tierDef.tierIndex ?? -1
+  components.push(tierIndex < 0 ? 0 : Math.min((tierIndex + 1) / 10, 1))
+
+  // Inbreeding (0 = 1.0; 25 = 0 )
+  components.push(Math.max(0, 1 - animal.inbreedingCoefficient / 0.25))
+
+  // Training completion
+  if (animal.stats.length > 0 && config) {
+    const avg = animal.stats.reduce((sum, s) => {
+      const cap = s.innateValue * config.trainingCeilingMultiplier 
+      return sum + Math.min(s.trainedValue / cap, 1)
+    }, 0) / animal.stats.length
+    components.push(avg)
+  } else {
+    components.push(0)
+  }
+
+  // Conformation for purebreds
+  const isCross = animal.breedComposition.length > 1
+  if (!isCross && animal.conformationScores.length > 0) {
+    const avg = animal.conformationScores.reduce((sum, s) => sum + s.score, 0) / animal.conformationScores.length
+    components.push(avg / 100)
+  }
+
+  const pct = (components.reduce((a, b) => a + b, 0) /components.length) * 100
+
+  switch(true) {
+    case (pct >= 85): return "A"
+    case (pct >= 70): return "B"
+    case (pct >= 55): return "C"
+    case (pct >= 40): return "D"
+    default: return "F"
+  }
 }
