@@ -124,9 +124,6 @@ function AnimalProfilePage() {
         {animal.breedGeneration !== null && (
           <InfoChip><GitBranch className="size-3" /> Gen {animal.breedGeneration}</InfoChip>
         )}
-        {animal.breedComposition.map((bc: AnimalProfile["breedComposition"][number]) => (
-          <InfoChip key={bc.breedId}>{bc.breed.name} {Math.round(bc.percentage)}%</InfoChip>
-        ))}
         {animal.brands.map((b: AnimalProfile["brands"][number]) => (
           <BrandChip key={b.id} path={b.playerBrand.path} />
         ))}
@@ -392,7 +389,7 @@ function AnimalProfilePage() {
               {animal.longTermCareRecords.length > 0 && (
                 <>
                   <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Long-Term Schedule</h4>
-                  <div className="space-y-1.5">
+                  <div className="mb-3 space-y-1.5">
                     {animal.longTermCareRecords.map((record: AnimalProfile["longTermCareRecords"][number]) => (
                       <div key={record.id} className="flex items-center justify-between gap-2 rounded-md border border-border/70 bg-secondary/30 px-2.5 py-1.5">
                         <p className="text-xs font-semibold text-foreground">{record.longTermCareActionDef.name}</p>
@@ -407,23 +404,26 @@ function AnimalProfilePage() {
                   </div>
                 </>
               )}
-
-              {animal.careLogs.length > 0 && (
-                <>
-                  <h4 className="mb-1.5 mt-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Recent Care</h4>
-                  <div className="space-y-1.5">
-                    {animal.careLogs.map((log: AnimalProfile["careLogs"][number]) => (
-                      <div key={log.id} className="flex items-center justify-between rounded-md border border-border/70 bg-secondary/30 px-2.5 py-1.5">
-                        <span className="text-xs font-semibold text-foreground">{log.careActionDef.name}</span>
-                        <span className="text-[11px] text-muted-foreground">{cycleToAge(log.cycleNumber)}</span>
+              {animal.game.careActionDefs.length === 0 ? (
+                <p className="text-[11px] text-muted-foreground">No care actions configured</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {animal.game.careActionDefs.map((action: AnimalProfile["game"]["careActionDefs"][number]) => (
+                    <button
+                      key={action.id}
+                      type="button"
+                      disabled
+                      className="flex w-full items-center justify-between rounded-md border border-border/70 bg-secondary/30 px-2.5 py-1.5 text-left transition-colors hover:bg-secondary/60 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <span className="text-xs font-semibold text-foreground">{action.name}</span>
+                      <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                        {action.energyRestore > 0 && <span>+{action.energyRestore} energy</span>}
+                        {action.moodBoost > 0 && <span>+{action.moodBoost} mood</span>}
+                        <Badge tone="muted">{action.costType}</Badge>
                       </div>
-                    ))}
-                  </div>
-                </>
-              )}
-
-              {animal.longTermCareRecords.length === 0 && animal.careLogs.length === 0 && (
-                <p className="text-[11px] text-muted-foreground">No care records</p>
+                    </button>
+                  ))}
+                </div>
               )}
             </Panel>
 

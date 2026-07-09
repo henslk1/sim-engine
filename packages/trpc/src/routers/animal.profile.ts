@@ -157,6 +157,9 @@ type AnimalProfileType = Prisma.AnimalGetPayload<{
             immunityMax: true
           }
         }
+        careActionDefs: {
+          select: { id: true; name: true; costType: true; careScoreGain: true; energyRestore: true; moodBoost: true }
+        }
       }
     }
   }
@@ -345,6 +348,9 @@ export const animalProfileRouter = router({
                   immunityMin: true,
                   immunityMax: true,
                 },
+              },
+              careActionDefs: {
+                select: { id: true, name: true, costType: true, careScoreGain: true, energyRestore: true, moodBoost: true },
               },
             },
           },
