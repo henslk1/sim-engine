@@ -15,6 +15,7 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
+import { Route as AuthenticatedAnimalAnimalIdRouteImport } from './routes/_authenticated/animal/$animalId'
 import { Route as AuthenticatedAdminVetServicesRouteImport } from './routes/_authenticated/admin/vet-services'
 import { Route as AuthenticatedAdminTutorialStepsRouteImport } from './routes/_authenticated/admin/tutorial-steps'
 import { Route as AuthenticatedAdminTreatmentsRouteImport } from './routes/_authenticated/admin/treatments'
@@ -72,6 +73,12 @@ const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedAdminRoute,
 } as any)
+const AuthenticatedAnimalAnimalIdRoute =
+  AuthenticatedAnimalAnimalIdRouteImport.update({
+    id: '/animal/$animalId',
+    path: '/animal/$animalId',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedAdminVetServicesRoute =
   AuthenticatedAdminVetServicesRouteImport.update({
     id: '/vet-services',
@@ -264,6 +271,7 @@ export interface FileRoutesByFullPath {
   '/admin/treatments': typeof AuthenticatedAdminTreatmentsRoute
   '/admin/tutorial-steps': typeof AuthenticatedAdminTutorialStepsRoute
   '/admin/vet-services': typeof AuthenticatedAdminVetServicesRoute
+  '/animal/$animalId': typeof AuthenticatedAnimalAnimalIdRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
 }
 export interface FileRoutesByTo {
@@ -297,6 +305,7 @@ export interface FileRoutesByTo {
   '/admin/treatments': typeof AuthenticatedAdminTreatmentsRoute
   '/admin/tutorial-steps': typeof AuthenticatedAdminTutorialStepsRoute
   '/admin/vet-services': typeof AuthenticatedAdminVetServicesRoute
+  '/animal/$animalId': typeof AuthenticatedAnimalAnimalIdRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
 }
 export interface FileRoutesById {
@@ -333,6 +342,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/treatments': typeof AuthenticatedAdminTreatmentsRoute
   '/_authenticated/admin/tutorial-steps': typeof AuthenticatedAdminTutorialStepsRoute
   '/_authenticated/admin/vet-services': typeof AuthenticatedAdminVetServicesRoute
+  '/_authenticated/animal/$animalId': typeof AuthenticatedAnimalAnimalIdRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
 }
 export interface FileRouteTypes {
@@ -369,6 +379,7 @@ export interface FileRouteTypes {
     | '/admin/treatments'
     | '/admin/tutorial-steps'
     | '/admin/vet-services'
+    | '/animal/$animalId'
     | '/admin/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -402,6 +413,7 @@ export interface FileRouteTypes {
     | '/admin/treatments'
     | '/admin/tutorial-steps'
     | '/admin/vet-services'
+    | '/animal/$animalId'
     | '/admin'
   id:
     | '__root__'
@@ -437,6 +449,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/treatments'
     | '/_authenticated/admin/tutorial-steps'
     | '/_authenticated/admin/vet-services'
+    | '/_authenticated/animal/$animalId'
     | '/_authenticated/admin/'
   fileRoutesById: FileRoutesById
 }
@@ -489,6 +502,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/'
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/animal/$animalId': {
+      id: '/_authenticated/animal/$animalId'
+      path: '/animal/$animalId'
+      fullPath: '/animal/$animalId'
+      preLoaderRoute: typeof AuthenticatedAnimalAnimalIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/admin/vet-services': {
       id: '/_authenticated/admin/vet-services'
@@ -760,11 +780,13 @@ const AuthenticatedAdminRouteWithChildren =
 interface AuthenticatedRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
+  AuthenticatedAnimalAnimalIdRoute: typeof AuthenticatedAnimalAnimalIdRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
+  AuthenticatedAnimalAnimalIdRoute: AuthenticatedAnimalAnimalIdRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(

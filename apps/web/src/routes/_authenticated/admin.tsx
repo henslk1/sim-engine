@@ -94,7 +94,7 @@ function AdminLayout() {
                   key={link.to}
                   to={link.to}
                   className="block rounded-md px-2 py-1.5 text-sm text-foreground hover:bg-muted"
-                  activeProps={{ className: "block rounded-md px-2 py-1.5 text-sm bg-primary/10 text-primary font-medium"}}
+                  activeProps={{ className: "block rounded-md px-2 py-1.5 text-sm bg-muted text-foreground font-semibold border-l-2 border-primary" }}
                 >
                   {link.label}
                 </Link>

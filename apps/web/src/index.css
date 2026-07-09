@@ -49,40 +49,40 @@
 
 :root, .light {
   color-scheme: light;
-  /* Gilded Sandstone (Light Theme) — aged manuscript parchment */
-  --background: oklch(0.828 0.037 83);
-  --foreground: oklch(0.335 0.035 66);
-  --card: oklch(0.915 0.03 88);
-  --card-foreground: oklch(0.335 0.035 66);
-  --popover: oklch(0.925 0.028 88);
-  --popover-foreground: oklch(0.335 0.035 66);
-  --primary: oklch(0.475 0.062 138);
-  --primary-foreground: oklch(0.955 0.022 90);
-  --secondary: oklch(0.865 0.033 85);
-  --secondary-foreground: oklch(0.36 0.035 66);
-  --muted: oklch(0.878 0.03 85);
-  --muted-foreground: oklch(0.515 0.032 72);
+  /* Verdant Manuscript (Light Theme) — soft sage with lifted surfaces */
+  --background: oklch(0.950 0.045 130); /* deeper alt: oklch(0.905 0.045 130) */
+  --foreground: oklch(0.22 0.03 120);
+  --card: oklch(0.970 0.018 128);
+  --card-foreground: oklch(0.22 0.03 120);
+  --popover: oklch(0.970 0.016 128);
+  --popover-foreground: oklch(0.22 0.03 120);
+  --primary: oklch(0.40 0.09 140);
+  --primary-foreground: oklch(0.970 0.016 128);
+  --secondary: oklch(0.930 0.055 128);
+  --secondary-foreground: oklch(0.28 0.03 120);
+  --muted: oklch(0.855 0.055 128);
+  --muted-foreground: oklch(0.46 0.030 125);
   --accent: oklch(0.63 0.098 68);
   --accent-foreground: oklch(0.33 0.045 62);
   --destructive: oklch(0.52 0.12 28);
-  --destructive-foreground: oklch(0.955 0.022 90);
-  --border: oklch(0.745 0.033 81);
-  --input: oklch(0.745 0.033 81);
-  --ring: oklch(0.475 0.062 138);
+  --destructive-foreground: oklch(0.970 0.016 128);
+  --border: oklch(0.78 0.032 128);
+  --input: oklch(0.78 0.032 128);
+  --ring: oklch(0.40 0.09 140);
   --chart-1: oklch(0.63 0.098 68);
-  --chart-2: oklch(0.475 0.062 138);
-  --chart-3: oklch(0.50 0.05 80);
-  --chart-4: oklch(0.72 0.08 70);
+  --chart-2: oklch(0.40 0.09 140);
+  --chart-3: oklch(0.52 0.045 128);
+  --chart-4: oklch(0.70 0.07 110);
   --chart-5: oklch(0.52 0.12 28);
   --radius: 0.5rem;
-  --sidebar: oklch(0.90 0.032 87);
-  --sidebar-foreground: oklch(0.335 0.035 66);
-  --sidebar-primary: oklch(0.475 0.062 138);
-  --sidebar-primary-foreground: oklch(0.955 0.022 90);
-  --sidebar-accent: oklch(0.865 0.033 85);
-  --sidebar-accent-foreground: oklch(0.335 0.035 66);
-  --sidebar-border: oklch(0.745 0.033 81);
-  --sidebar-ring: oklch(0.475 0.062 138);
+  --sidebar: oklch(0.868 0.036 128);
+  --sidebar-foreground: oklch(0.22 0.03 120);
+  --sidebar-primary: oklch(0.40 0.09 140);
+  --sidebar-primary-foreground: oklch(0.970 0.016 128);
+  --sidebar-accent: oklch(0.930 0.055 128);
+  --sidebar-accent-foreground: oklch(0.22 0.03 120);
+  --sidebar-border: oklch(0.75 0.032 128);
+  --sidebar-ring: oklch(0.40 0.09 140);
 }
 
 .dark {
@@ -129,8 +129,8 @@
   body {
     @apply bg-background text-foreground;
     background-image:
-      radial-gradient(ellipse 120% 90% at 30% 0%, oklch(0.9 0.03 88 / 0.5), transparent 60%),
-      radial-gradient(ellipse 120% 90% at 80% 100%, oklch(0.78 0.045 78 / 0.5), transparent 55%),
+      radial-gradient(ellipse 120% 90% at 30% 0%, oklch(0.96 0.022 120 / 0.5), transparent 60%),
+      radial-gradient(ellipse 120% 90% at 80% 100%, oklch(0.88 0.035 130 / 0.4), transparent 55%),
       url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
     background-attachment: fixed;
   }
@@ -140,7 +140,7 @@
     inset: 0;
     pointer-events: none;
     z-index: 50;
-    background: radial-gradient(ellipse at center, transparent 58%, oklch(0.45 0.05 62 / 0.14) 100%);
+    background: radial-gradient(ellipse at center, transparent 58%, oklch(0.50 0.03 130 / 0.12) 100%);
   }
   .dark body {
     background-image: none;
@@ -148,4 +148,9 @@
   .dark body::after {
     display: none;
   }
+}
+
+textarea.bg-background,
+select.bg-background {
+  background-color: var(--card);
 }
