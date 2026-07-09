@@ -679,7 +679,7 @@ function PedigreeTab({ animal }: { animal: AnimalProfile }) {
                     <td className="px-2 py-1 font-medium text-foreground">{a.ancestor.name}</td>
                     <td className="px-2 py-1 text-muted-foreground">{a.ancestor.breed.name}</td>
                     <td className="px-2 py-1 text-muted-foreground">{a.ancestor.sex}</td>
-                    <td className="px-2 py-1"><Badge tone={a.ancestor.status === "ACTIVE" ? "success" : "muted"}>{a.ancestor.status}</Badge></td>
+                    <td className="px-2 py-1"><Badge tone={a.ancestor.status === "ALIVE" ? "success" : "muted"}>{a.ancestor.status}</Badge></td>
                     <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{(a.ancestor.inbreedingCoefficient * 100).toFixed(2)}%</td>
                   </tr>
                 )
@@ -722,7 +722,7 @@ function OffspringTab({
               <td className="px-2 py-1 font-medium text-foreground">{o.name}</td>
               <td className="px-2 py-1 text-muted-foreground">{o.breed.name}</td>
               <td className="px-2 py-1 text-muted-foreground">{o.sex}</td>
-              <td className="px-2 py-1"><Badge tone={o.status === "ACTIVE" ? "success" : "muted"}>{o.status}</Badge></td>
+              <td className="px-2 py-1"><Badge tone={o.status === "ALIVE" ? "success" : "muted"}>{o.status}</Badge></td>
               <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{cycleToAge(o.ageInCycles)}</td>
             </tr>
           ))}

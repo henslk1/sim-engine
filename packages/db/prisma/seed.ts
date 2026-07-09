@@ -930,20 +930,185 @@ async function main() {
   })
   await db.animalBreedComposition.create({ data: { animalId: ash.id, breedId: thoroughbred.id, percentage: 100 } })
 
+  // ── BLAZE ANCESTORS ──────────────────────────────────────────────────────
+  const thunderstrike = await db.animal.create({
+    data: {
+      gameId: game.id,
+      playerAccountId: player.id,
+      breedId: thoroughbred.id,
+      name: "Thunderstrike",
+      sex: "MALE",
+      lifeStageId: seniorStage.id,
+      status: "DECEASED",
+      generation: 2,
+      ageInCycles: 116,
+      diedAt: new Date("2024-01-01"),
+      inbreedingCoefficient: 0.0,
+      fertility: 0.0,
+      breedGeneration: 4,
+    },
+  })
+  await db.animalBreedComposition.create({ data: { animalId: thunderstrike.id, breedId: thoroughbred.id, percentage: 100 } })
+
+  const silverBell = await db.animal.create({
+    data: {
+      gameId: game.id,
+      playerAccountId: player.id,
+      breedId: thoroughbred.id,
+      name: "Silver Bell",
+      sex: "FEMALE",
+      lifeStageId: seniorStage.id,
+      status: "DECEASED",
+      generation: 2,
+      ageInCycles: 114,
+      diedAt: new Date("2024-06-01"),
+      inbreedingCoefficient: 0.01,
+      fertility: 0.0,
+      breedGeneration: 4,
+    },
+  })
+  await db.animalBreedComposition.create({ data: { animalId: silverBell.id, breedId: thoroughbred.id, percentage: 100 } })
+
+  const ironDuke = await db.animal.create({
+    data: {
+      gameId: game.id,
+      playerAccountId: player.id,
+      breedId: thoroughbred.id,
+      name: "Iron Duke",
+      sex: "MALE",
+      lifeStageId: seniorStage.id,
+      status: "DECEASED",
+      generation: 1,
+      ageInCycles: 120,
+      diedAt: new Date("2022-03-01"),
+      inbreedingCoefficient: 0.0,
+      fertility: 0.0,
+      breedGeneration: 3,
+    },
+  })
+  await db.animalBreedComposition.create({ data: { animalId: ironDuke.id, breedId: thoroughbred.id, percentage: 100 } })
+
+  const morningFrost = await db.animal.create({
+    data: {
+      gameId: game.id,
+      playerAccountId: player.id,
+      breedId: thoroughbred.id,
+      name: "Morning Frost",
+      sex: "FEMALE",
+      lifeStageId: seniorStage.id,
+      generation: 1,
+      ageInCycles: 98,
+      inbreedingCoefficient: 0.0,
+      fertility: 0.0,
+      breedGeneration: 3,
+    },
+  })
+  await db.animalBreedComposition.create({ data: { animalId: morningFrost.id, breedId: thoroughbred.id, percentage: 100 } })
+
+  await db.animalAncestor.createMany({
+    data: [
+      { animalId: blaze.id, ancestorId: thunderstrike.id, depth: 1 },
+      { animalId: blaze.id, ancestorId: silverBell.id, depth: 1 },
+      { animalId: blaze.id, ancestorId: ironDuke.id, depth: 2 },
+      { animalId: blaze.id, ancestorId: morningFrost.id, depth: 2 },
+    ],
+  })
+
+  // ── BLAZE OFFSPRING ───────────────────────────────────────────────────────
+  const pastBreedingRecord = await db.breedingRecord.create({
+    data: {
+      gameId: game.id,
+      sireId: blaze.id,
+      damId: duchess.id,
+      sireSnapshot: { name: "Blaze", generation: 3, breedName: "Thoroughbred" },
+      damSnapshot: { name: "Duchess", generation: 2, breedName: "Thoroughbred" },
+    },
+  })
+
+  const completedPregnancy = await db.pregnancy.create({
+    data: {
+      animalId: duchess.id,
+      breedingRecordId: pastBreedingRecord.id,
+      currentCycles: 12,
+      requiredCycles: 12,
+      isCompleted: true,
+      completedAt: new Date("2025-10-01"),
+    },
+  })
+
+  const storm = await db.animal.create({
+    data: {
+      gameId: game.id,
+      playerAccountId: player.id,
+      breedId: thoroughbred.id,
+      name: "Storm",
+      sex: "MALE",
+      lifeStageId: foalStage.id,
+      generation: 4,
+      ageInCycles: 6,
+      inbreedingCoefficient: 0.015,
+      fertility: 0.9,
+      breedGeneration: 6,
+    },
+  })
+  await db.animalBreedComposition.create({ data: { animalId: storm.id, breedId: thoroughbred.id, percentage: 100 } })
+  await db.animalStat.createMany({
+    data: [
+      { animalId: storm.id, statDefId: speedStat.id, innateValue: 80 },
+      { animalId: storm.id, statDefId: enduranceStat.id, innateValue: 76 },
+      { animalId: storm.id, statDefId: agilityStat.id, innateValue: 71 },
+    ],
+  })
+  await createVitals(storm.id, { energyCurrent: 92, moodValue: 88, conditionValue: 92, careScore: 72, immunityValue: 52, immunityInnateMax: 80 })
+
+  const ember = await db.animal.create({
+    data: {
+      gameId: game.id,
+      playerAccountId: player.id,
+      breedId: thoroughbred.id,
+      name: "Ember",
+      sex: "FEMALE",
+      lifeStageId: foalStage.id,
+      generation: 4,
+      ageInCycles: 6,
+      inbreedingCoefficient: 0.015,
+      fertility: 0.9,
+      breedGeneration: 6,
+    },
+  })
+  await db.animalBreedComposition.create({ data: { animalId: ember.id, breedId: thoroughbred.id, percentage: 100 } })
+  await db.animalStat.createMany({
+    data: [
+      { animalId: ember.id, statDefId: speedStat.id, innateValue: 77 },
+      { animalId: ember.id, statDefId: enduranceStat.id, innateValue: 79 },
+      { animalId: ember.id, statDefId: agilityStat.id, innateValue: 74 },
+    ],
+  })
+  await createVitals(ember.id, { energyCurrent: 90, moodValue: 85, conditionValue: 90, careScore: 68, immunityValue: 50, immunityInnateMax: 78 })
+
+  await db.pregnancyOffspring.createMany({
+    data: [
+      { animalId: storm.id, pregnancyId: completedPregnancy.id, birthOrder: 1 },
+      { animalId: ember.id, pregnancyId: completedPregnancy.id, birthOrder: 2 },
+    ],
+  })
+
   // ── SUMMARY ───────────────────────────────────────────────────────────────
   console.log(`\nSeed complete!`)
   console.log(`  Game:   ${game.name} (ID: ${game.id})`)
   console.log(`  Player: ${player.username} (ID: ${player.id})`)
-  console.log(`  Animals: Blaze · Duchess · Meadow · Pip · Sparks · Elder · Ghost · Ash`)
+  console.log(`  Animals: Blaze · Duchess · Meadow · Pip · Sparks · Elder · Ghost · Ash · Storm · Ember`)
   console.log(`\nAnimal IDs for tRPC testing:`)
-  console.log(`  Blaze (adult male):       ${blaze.id}`)
-  console.log(`  Duchess (adult female):   ${duchess.id}`)
-  console.log(`  Meadow (pregnant):        ${meadow.id}`)
-  console.log(`  Pip (foal):               ${pip.id}`)
-  console.log(`  Sparks (adolescent):      ${sparks.id}`)
-  console.log(`  Elder (senior):           ${elder.id}`)
-  console.log(`  Ghost (deceased):         ${ghost.id}`)
-  console.log(`  Ash (buried):             ${ash.id}`)
+  console.log(`  Blaze (adult male, ancestors + offspring): ${blaze.id}`)
+  console.log(`  Duchess (adult female):                    ${duchess.id}`)
+  console.log(`  Meadow (pregnant):                         ${meadow.id}`)
+  console.log(`  Pip (foal):                                ${pip.id}`)
+  console.log(`  Sparks (adolescent):                       ${sparks.id}`)
+  console.log(`  Elder (senior):                            ${elder.id}`)
+  console.log(`  Ghost (deceased):                          ${ghost.id}`)
+  console.log(`  Ash (buried):                              ${ash.id}`)
+  console.log(`  Storm (foal, offspring of Blaze):          ${storm.id}`)
+  console.log(`  Ember (foal, offspring of Blaze):          ${ember.id}`)
 }
 
 main()
