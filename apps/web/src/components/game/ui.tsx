@@ -2,10 +2,11 @@ import type { ReactNode } from "react"
 import { cn } from "@/lib/utils"
 
 const toneBar: Record<string, string> = {
-  mood: "bg-chart-1",
+  energy:    "bg-amber-400",
+  mood:      "bg-rose-400",
   condition: "bg-chart-2",
-  energy: "bg-chart-3",
-  care: "bg-chart-4",
+  care:      "bg-violet-400",
+  immunity:  "bg-sky-400",
 }
 
 export function Meter({
@@ -16,7 +17,7 @@ export function Meter({
 }: {
   value: number
   max: number
-  tone?: keyof typeof toneBar
+  tone?: "energy" | "mood" | "condition" | "care" | "immunity"
   className?: string
 }) {
   const pct = Math.max(0, Math.min(100, (value / max) * 100))
