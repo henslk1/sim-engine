@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router"
 import { trpc } from "@/lib/trpc"
 import { OwnerView } from "./-animal-profile/views/OwnerView"
+import { BuriedView } from "./-animal-profile/views/BuriedView"
 
 export const Route = createFileRoute("/_authenticated/animal/$animalId")({
   component: AnimalProfilePage,
@@ -19,5 +20,6 @@ function AnimalProfilePage() {
   if (!animal) return <div className="p-8 text-sm">Animal not found</div>
 
   // viewMode derived from animal.status + auth will gate which view renders
+  if (animal.status === "BURIED") return <BuriedView animal={animal} />
   return <OwnerView animal={animal} animalId={animalId} />
 }
