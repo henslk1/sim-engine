@@ -43,6 +43,7 @@ model HealthConditionDef {
   testResults            AnimalTestResult[]
   groupEntryRequirements GroupEntryRequirement[]
   expressionRules        ExpressionRule[]
+  vetVisitLogs           VetVisitLog[]
   game                   Game                      @relation(fields: [gameId], references: [id])
 
   @@unique([gameId, name])
@@ -58,14 +59,24 @@ model HealthConditionBehavior {
 }
 
 model TreatmentDef {
-  id               String                  @id @default(cuid())
+  id               String                    @id @default(cuid())
   conditionDefId   String
   name             String
   treatmentType    TreatmentType
   durationCycles   Int?
   items            TreatmentItem[]
   treatmentRecords AnimalTreatmentRecord[]
-  conditionDef     HealthConditionDef      @relation(fields: [conditionDefId], references: [id])
+  restrictionDefs  TreatmentRestrictionDef[]
+  conditionDef     HealthConditionDef        @relation(fields: [conditionDefId], references: [id])
+}
+
+model TreatmentRestrictionDef {
+  id               String                  @id @default(cuid())
+  treatmentDefId   String
+  restrictionType  ActivityRestrictionType
+  maxIntensityTier Int?
+  durationCycles   Int?
+  treatmentDef     TreatmentDef            @relation(fields: [treatmentDefId], references: [id])
 }
 
 model TreatmentItem {
@@ -159,16 +170,18 @@ model HealthCertificate {
 }
 
 model VetVisitLog {
-  id              String         @id @default(cuid())
+  id              String              @id @default(cuid())
   animalId        String
   playerAccountId String
   vetServiceDefId String?
+  conditionDefId  String?
   visitCycle      Int
   notes           String?
-  visitedAt       DateTime       @default(now())
-  vetServiceDef   VetServiceDef? @relation(fields: [vetServiceDefId], references: [id])
-  animal          Animal         @relation(fields: [animalId], references: [id])
-  playerAccount   PlayerAccount  @relation(fields: [playerAccountId], references: [id])
+  visitedAt       DateTime            @default(now())
+  vetServiceDef   VetServiceDef?      @relation(fields: [vetServiceDefId], references: [id])
+  conditionDef    HealthConditionDef? @relation(fields: [conditionDefId], references: [id])
+  animal          Animal              @relation(fields: [animalId], references: [id])
+  playerAccount   PlayerAccount       @relation(fields: [playerAccountId], references: [id])
 }
 
 model AnimalImmunity {

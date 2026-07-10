@@ -47,7 +47,7 @@ type AnimalProfileType = Prisma.AnimalGetPayload<{
     personality: { include: { traitDef: true } }
     genotypes: {
       include: {
-        locus: true
+        locus: { include: { panelEntries: { include: {panelDef: true } } } }
         alleleOne: true
         alleleTwo: true
       }
@@ -225,7 +225,7 @@ export const animalProfileRouter = router({
           // genetics
           genotypes: {
             include: {
-              locus: true,
+              locus: { include: { panelEntries: { include: { panelDef: true } } } },
               alleleOne: true,
               alleleTwo: true,
             },

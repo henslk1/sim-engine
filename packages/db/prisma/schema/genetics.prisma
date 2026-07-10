@@ -20,6 +20,7 @@ model Locus {
   panelEntries           GeneticPanelLocus[]
   animalGenotypes        AnimalGenotype[]
   conformationStandards  BreedConformationStandard[]
+  sectionEntries         ConformationSectionEntry[]
   groupEntryRequirements GroupEntryRequirement[]
   templateGenotypes      AnimalTemplateGenotype[]
   dqTraits               BreedDqTrait[]
@@ -134,4 +135,41 @@ model AnimalConformationScore {
   breed        Breed    @relation(fields: [breedId], references: [id])
 
   @@unique([animalId, breedId])
+}
+
+model ConformationSection {
+  id           String                         @id @default(cuid())
+  gameId       String
+  name         String
+  displayOrder Int                            @default(0)
+  entries      ConformationSectionEntry[]
+  sectionScores AnimalConformationSectionScore[]
+  game         Game                           @relation(fields: [gameId], references: [id])
+
+  @@unique([gameId, name])
+}
+
+model ConformationSectionEntry {
+  id           String              @id @default(cuid())
+  sectionId    String
+  locusId      String
+  displayOrder Int                 @default(0)
+  section      ConformationSection @relation(fields: [sectionId], references: [id])
+  locus        Locus               @relation(fields: [locusId], references: [id])
+
+  @@unique([sectionId, locusId])
+}
+
+model AnimalConformationSectionScore {
+  id           String              @id @default(cuid())
+  animalId     String
+  breedId      String
+  sectionId    String
+  score        Float
+  calculatedAt DateTime            @default(now())
+  animal       Animal              @relation(fields: [animalId], references: [id])
+  breed        Breed               @relation(fields: [breedId], references: [id])
+  section      ConformationSection @relation(fields: [sectionId], references: [id])
+
+  @@unique([animalId, breedId, sectionId])
 }

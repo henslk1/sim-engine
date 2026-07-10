@@ -18,6 +18,7 @@ export const healthAdminRouter = router({
       id: z.string().optional(),
       gameId: z.string(),
       name: z.string().min(1),
+      conditionType: z.enum(["ILLNESS", "INJURY"]),
       isGenetic: z.boolean(),
       isFatal: z.boolean(),
       moodEffect: z.number().nullish(),

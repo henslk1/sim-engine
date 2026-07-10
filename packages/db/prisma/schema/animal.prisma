@@ -87,6 +87,7 @@ model Breed {
   animalBreedCompositions     AnimalBreedComposition[]
   alleleFrequencies           BreedAlleleFrequency[]
   conformationScores          AnimalConformationScore[]
+  conformationSectionScores   AnimalConformationSectionScore[]
   breedingListingRestrictions BreedingListingBreedRestriction[]
   conformationStandards       BreedConformationStandard[]
   seasonCategories            SeasonCategory[]
@@ -154,6 +155,7 @@ model Animal {
   status                          AnimalStatus               @default(ALIVE)
   deletedAt                       DateTime?
   isCastrated                     Boolean                    @default(false)
+  phenotypeDescription            String?
   inbreedingCoefficient           Float                      @default(0)
   fertility                       Float
   isTutorialAnimal                Boolean                    @default(false)
@@ -171,6 +173,7 @@ model Animal {
   partnerLogs                     AnimalDailyLog[]           @relation("DailyLogPartner")
   genotypes                       AnimalGenotype[]
   conformationScores              AnimalConformationScore[]
+  conformationSectionScores       AnimalConformationSectionScore[]
   careScore                       AnimalCareScore?
   longTermCareRecords             AnimalLongTermCareRecord[]
   behaviorEvents                  AnimalBehaviorEvent[]

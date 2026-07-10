@@ -33,11 +33,28 @@ export function getTrainingCap(innateValue: number, config: AnimalProfile["game"
   return config ? innateValue * config.trainingCeilingMultiplier : innateValue * 1.5
 }
 
+export function getFertilityDisplay(fertility: number): { hearts: number; label: string } {
+  if (fertility === 0) return { hearts: 0, label: "Infertile" }
+  if (fertility <= 20) return { hearts: 1, label: "Low" }
+  if (fertility <= 40) return { hearts: 2, label: "Moderate" }
+  if (fertility <= 60) return { hearts: 3, label: "Good" }
+  if (fertility <= 80) return { hearts: 4, label: "High" }
+  return { hearts: 5, label: "Excellent" }
+}
+
 export function formatCycleAge(cycle: number, config: AnimalProfile["game"]["gameConfig"]): string {
   if (!config) return `cycle ${cycle}`
   const y = Math.floor(cycle / config.cyclesPerYear)
   const m = cycle % config.cyclesPerYear
   return `${y}y ${m}m`
+}
+
+export function getConformationGrade(score: number): { grade: string; label: string } {
+  if (score >= 90) return { grade: "A", label: "Excellent" }
+  if (score >= 75) return { grade: "B", label: "Good" }
+  if (score >= 60) return { grade: "C", label: "Fair" }
+  if (score >= 45) return { grade: "D", label: "Below Standard" }
+  return { grade: "F", label: "Poor" }
 }
 
 export function computeBreedingGrade(

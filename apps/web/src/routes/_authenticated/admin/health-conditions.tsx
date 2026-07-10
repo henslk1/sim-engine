@@ -7,12 +7,13 @@ import { Button } from "@/components/ui/button"
 type ConditionForm = {
   id?: string
   name: string
+  conditionType: "ILLNESS" | "INJURY"
   isGenetic: boolean
   isFatal: boolean
   moodEffect: string
 }
 
-const emptyCondition = (): ConditionForm => ({ name: "", isGenetic: false, isFatal: false, moodEffect: "" })
+const emptyCondition = (): ConditionForm => ({ name: "", conditionType: "ILLNESS", isGenetic: false, isFatal: false, moodEffect: "" })
 
 type BehaviorRow = { symptomText: string; careActionDefId: string }
 const emptyBehavior = (): BehaviorRow => ({ symptomText: "", careActionDefId: "" })
@@ -70,7 +71,7 @@ function HealthConditionsPage() {
   const [newBehavior, setNewBehavior] = useState<BehaviorRow>(emptyBehavior())
 
   function openEdit(condition: NonNullable<typeof conditions>[number]) {
-    setEditing({ id: condition.id, name: condition.name, isGenetic: condition.isGenetic, isFatal: condition.isFatal, moodEffect: condition.moodEffect?.toString() ?? "" })
+    setEditing({ id: condition.id, name: condition.name, conditionType: condition.conditionType, isGenetic: condition.isGenetic, isFatal: condition.isFatal, moodEffect: condition.moodEffect?.toString() ?? "" })
     setFormExpanded(false)
     setEditingBehaviorId(null)
     setEditingBehavior(null)
@@ -80,7 +81,7 @@ function HealthConditionsPage() {
   function submitCondition() {
     if (!editing || !gameId) return
     saveCondition.mutate(
-      { id: editing.id, gameId, name: editing.name, isGenetic: editing.isGenetic, isFatal: editing.isFatal, moodEffect: editing.moodEffect !== "" ? parseFloat(editing.moodEffect) : null },
+      { id: editing.id, gameId, name: editing.name, conditionType: editing.conditionType, isGenetic: editing.isGenetic, isFatal: editing.isFatal, moodEffect: editing.moodEffect !== "" ? parseFloat(editing.moodEffect) : null },
       {
         onSuccess: (saved) => {
           setEditing((prev) => (prev ? { ...prev, id: saved.id } : null))
@@ -132,6 +133,17 @@ function HealthConditionsPage() {
                   className="mt-1"
                 />
               </div>
+              <div className="max-w-xs">
+                <label className="text-xs font-medium text-muted-foreground">Type</label>
+                <select
+                  value={editing.conditionType}
+                  onChange={(e) => setEditing({ ...editing, conditionType: e.target.value as "ILLNESS" | "INJURY" })}
+                  className="mt-1 h-9 w-full rounded border border-input bg-background px-2 text-sm"
+                >
+                  <option value="ILLNESS">Illness</option>
+                  <option value="INJURY">Injury</option>
+                </select>
+              </div>
               <div className="flex gap-6">
                 <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
                   <input
@@ -171,6 +183,7 @@ function HealthConditionsPage() {
             <div className="p-4 text-sm space-y-1 text-foreground">
               <p><span className="text-muted-foreground">Name:</span> {editing.name}</p>
               <div className="flex gap-4">
+                <p><span className="text-muted-foreground">Type:</span> {editing.conditionType === "ILLNESS" ? "Illness" : "Injury"}</p>
                 <p><span className="text-muted-foreground">Genetic:</span> {editing.isGenetic ? "Yes" : "No"}</p>
                 <p><span className="text-muted-foreground">Fatal:</span> {editing.isFatal ? "Yes" : "No"}</p>
               </div>
@@ -293,6 +306,7 @@ function HealthConditionsPage() {
           <thead>
             <tr className="border-b border-border">
               <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Name</th>
+              <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Type</th>
               <th className="px-4 py-2 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">Genetic</th>
               <th className="px-4 py-2 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fatal</th>
               <th className="px-4 py-2 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">Behaviors</th>
@@ -303,6 +317,7 @@ function HealthConditionsPage() {
             {conditions?.map((c) => (
               <tr key={c.id} className="border-b border-border last:border-0">
                 <td className="px-4 py-2 font-medium text-foreground">{c.name}</td>
+                <td className="px-4 py-2 text-muted-foreground">{c.conditionType === "ILLNESS" ? "Illness" : "Injury"}</td>
                 <td className="px-4 py-2 text-center">
                   {c.isGenetic ? <span className="text-primary">✓</span> : <span className="text-muted-foreground">—</span>}
                 </td>
@@ -317,7 +332,7 @@ function HealthConditionsPage() {
             ))}
             {conditions?.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-sm text-muted-foreground">No health conditions yet.</td>
+                <td colSpan={6} className="px-4 py-6 text-center text-sm text-muted-foreground">No health conditions yet.</td>
               </tr>
             )}
           </tbody>

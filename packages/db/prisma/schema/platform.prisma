@@ -71,6 +71,7 @@ model Game {
   achievementDefs        AchievementDef[]
   nightlyUpdateLogs      NightlyUpdateLog[]
   personalityTraitDefs   PersonalityTraitDef[]
+  conformationSections   ConformationSection[]
   isActive               Boolean                 @default(false)
   createdAt              DateTime                @default(now())
 }

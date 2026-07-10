@@ -75,7 +75,7 @@ export function Panel({
   className,
   bodyClassName,
 }: {
-  title: string
+  title: ReactNode
   icon?: ReactNode
   action?: ReactNode
   children: ReactNode

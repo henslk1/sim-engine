@@ -13,8 +13,8 @@ import { StatHistoryTab } from "./tabs/StatHistoryTab"
 type WorkspaceTab = "pedigree" | "genetics" | "comp-history" | "offspring" | "stat-history"
 
 const WORKSPACE_TABS: { id: WorkspaceTab; label: string; Icon: LucideIcon }[] = [
-  { id: "pedigree", label: "Pedigree", Icon: Network },
   { id: "genetics", label: "Genetics", Icon: Dna },
+  { id: "pedigree", label: "Pedigree", Icon: Network },
   { id: "comp-history", label: "Comp. History", Icon: Trophy },
   { id: "offspring", label: "Offspring", Icon: Baby },
   { id: "stat-history", label: "Stat History", Icon: TrendingUp },
