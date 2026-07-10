@@ -12,6 +12,13 @@ export const nightlyWorker = new Worker (
       data: { gameId, success: false },
     })
 
+    // Auto-bury deceased animals
+    const cutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)
+    await db.animal.updateMany({
+      where: { gameId, status: "DECEASED", diedAt: { lt: cutoff } },
+      data: { status: "BURIED"}
+    })
+
     const animals = await db.animal.findMany({
       where: { gameId, status: "ALIVE" },
       select: { id: true, lifeStageId: true },

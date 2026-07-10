@@ -39,7 +39,7 @@ export function BuriedView({ animal }: { animal: AnimalProfile }) {
           <MetaCell label="Died" value={animal.diedAt ? new Date(animal.diedAt).toLocaleDateString() : "-"} />
           <MetaCell label="Age at Death" value={cycleToAge(animal.ageInCycles)} />
           <MetaCell label="Cause of Death" value={animal.causeOfDeath ?? "Unknown"} />
-          <MetaCell label="Bred by" value={animal.breder?.username ?? "Unknown"} />
+          <MetaCell label="Bred by" value={animal.breeder?.username ?? "Unknown"} />
           <MetaCell label="Owned by" value={animal.playerAccount.username} />
           <MetaCell label="COI" value={`${(animal.inbreedingCoefficient * 100).toFixed(2)}%`} />
           <MetaCell label="Breed" value={breedLabel} />
