@@ -2,18 +2,17 @@ import type { ReactNode } from "react"
 import type { AnimalProfile } from "./types"
 import { Badge } from "@/components/game/ui"
 import { cn } from "@/lib/utils"
-import { GitBranch, Trophy, Award, Heart } from "lucide-react"
+import { GitBranch, Trophy, Award, Star } from "lucide-react"
+import { BREEDING_GRADE_COLOR } from "./utils"
 
 export function InfoStrip({
   animal,
   cycleToAge,
   breedingGrade,
-  breedingGradeColor,
 }: {
   animal: AnimalProfile
   cycleToAge: (n: number) => string
   breedingGrade: string
-  breedingGradeColor: Record<string, string>
 }) {
   return (
     <div className="flex shrink-0 flex-wrap items-center justify-center gap-1.5 border-b border-border bg-card/50 px-4 py-2">
@@ -33,7 +32,7 @@ export function InfoStrip({
         className="inline-flex items-center justify-center rounded-md bg-secondary/60 px-2 py-1"
         title={`Breeding quality: ${breedingGrade}`}
       >
-        <Heart className={cn("size-3", breedingGradeColor[breedingGrade])} fill="currentColor" />
+        <Star className={cn("size-3", BREEDING_GRADE_COLOR[breedingGrade])} fill="currentColor" />
       </span>
       {animal.disciplineDef && (
         <span className="inline-flex items-center gap-1 rounded-full bg-accent/20 px-2 py-0.5 text-[11px] font-semibold text-accent-foreground">

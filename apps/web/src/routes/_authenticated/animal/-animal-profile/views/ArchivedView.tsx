@@ -1,23 +1,20 @@
 import type { AnimalProfile } from "../types"
 import { formatCycleAge, computeBreedingGrade, BREEDING_GRADE_COLOR } from "../utils"
 import { Badge, Meter } from "@/components/game/ui"
-import { ActionButton } from "@/components/game/ui"
-import { Stethoscope, Clock } from "lucide-react"
+import { Stethoscope, Archive } from "lucide-react"
 import { InfoStrip } from "../InfoStrip"
-import { OwnerActionList } from "../OwnerActions"
 import { WorkspaceTabs } from "../WorkspaceTabs"
 import { HealthPanel } from "../panels/HealthPanel"
 import { BreedingPanel } from "../panels/BreedingPanel"
-import { DailyLogPanel } from "../panels/DailyLogPanel"
 import { TrainingPanel } from "../panels/TrainingPanel"
 import { CompetitionPanel } from "../panels/CompetitionPanel"
-import { DailyCarePanel } from "../panels/DailyCarePanel"
+import { OwnerInfoPanel } from "../panels/OwnerInfoPanel"
 import { PersonalityPanel } from "../panels/PersonalityPanel"
 import { EquippedPanel } from "../panels/EquippedPanel"
 import { ConformationPanel } from "../panels/ConformationPanel"
 
 
-export function OwnerView({ animal, animalId }: { animal: AnimalProfile; animalId: string }) {
+export function ArchivedView({ animal, animalId }: { animal: AnimalProfile; animalId: string }) {
   const config = animal.game.gameConfig
   const cycleToAge = (n: number) => formatCycleAge(n, config)
   const breedingGrade = computeBreedingGrade(animal, config)
@@ -27,10 +24,9 @@ export function OwnerView({ animal, animalId }: { animal: AnimalProfile; animalI
     <div className="flex h-dvh flex-col overflow-hidden bg-transparent text-foreground">
 
       {/* Header */}
-      <div className="flex shrink-0 flex-col items-center gap-3 border-b border-border bg-card px-4 py-4">
+      <div className="flex shrink-0 flex-col items-center gap-3 border-b border-amber-800/20 bg-amber-950/5 px-4 py-4">
         <div className="flex flex-wrap items-center justify-center gap-2">
-          <h1 className="font-serif text-2xl font-semibold tracking-tight text-foreground">{animal.name}</h1>
-          <Badge tone="success">{animal.status}</Badge>
+          <h1 className="font-serif text-2xl font-semibold tracking-tight text-foreground/80">{animal.name}</h1>
           {activeConditions.length > 0 && (
             <Badge tone="danger">
               <Stethoscope className="size-3" />
@@ -39,13 +35,14 @@ export function OwnerView({ animal, animalId }: { animal: AnimalProfile; animalI
           )}
         </div>
 
-        <ActionButton variant="soft" disabled>
-          <Clock className="size-3.5" />
-          Advance Age
-        </ActionButton>
+        {/* Archived badge in place of action button */}
+        <div className="flex items-center gap-2 rounded-full border border-amber-700/25 bg-amber-500/10 px-4 py-1.5">
+          <Archive className="size-3.5 text-amber-700/60 dark:text-amber-400/60" />
+          <span className="text-sm font-semibold text-amber-800/70 dark:text-amber-300/70">Archived</span>
+        </div>
 
         {/* Vitals */}
-        <div className="grid w-full max-w-lg grid-cols-5 gap-x-4 gap-y-2">
+        <div className="grid w-full max-w-lg grid-cols-5 gap-x-4 gap-y-2 opacity-60">
           {(
             [
               { label: "Energy", value: animal.energy?.currentEnergy ?? 0, max: animal.energy?.maxEnergy ?? 100, tone: "energy" as const },
@@ -76,11 +73,10 @@ export function OwnerView({ animal, animalId }: { animal: AnimalProfile; animalI
       <main className="min-h-0 flex-1 overflow-auto p-3">
         <div className="grid min-h-0 gap-3 grid-cols-1 min-[1400px]:h-full min-[1400px]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,2.6fr)_minmax(0,1.15fr)_minmax(0,0.85fr)]">
 
-          {/* Col 1 — Health / Breeding / Daily Log */}
-          <div className="flex min-h-0 flex-col gap-3 min-[1400px]:grid min-[1400px]:grid-rows-[auto_auto_minmax(0,1fr)]">
+          {/* Col 1 — Health / Breeding */}
+          <div className="flex min-h-0 flex-col gap-3 min-[1400px]:grid min-[1400px]:grid-rows-[auto_minmax(0,1fr)]">
             <HealthPanel animal={animal} />
             <BreedingPanel animal={animal} breedingGrade={breedingGrade} />
-            <DailyLogPanel animal={animal} />
           </div>
 
           {/* Col 2 — Training / Competition */}
@@ -102,18 +98,10 @@ export function OwnerView({ animal, animalId }: { animal: AnimalProfile; animalI
             <WorkspaceTabs animal={animal} animalId={animalId} cycleToAge={cycleToAge} config={config} />
           </div>
 
-          {/* Col 4+5 — Care / Owner Actions / Personality / Equipped / Conformation */}
+          {/* Col 4+5 — Owner Info / Personality / Equipped / Conformation */}
           <div className="flex min-h-0 flex-col gap-3 min-[1400px]:col-span-2 min-[1400px]:grid min-[1400px]:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] min-[1400px]:grid-rows-[auto_auto_minmax(0,1fr)]">
-            <DailyCarePanel animal={animal} cycleToAge={cycleToAge} />
-
-            {/* Owner Actions */}
-            <div className="flex min-h-0 shrink-0 flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm">
-              <header className="border-b border-border bg-secondary/40 px-3 py-2">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">Owner Actions</h3>
-              </header>
-              <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto p-2">
-                <OwnerActionList />
-              </div>
+            <div className="min-[1400px]:col-span-2">
+              <OwnerInfoPanel animal={animal} />
             </div>
 
             <PersonalityPanel animal={animal} />

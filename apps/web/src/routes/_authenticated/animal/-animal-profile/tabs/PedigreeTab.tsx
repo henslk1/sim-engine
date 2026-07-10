@@ -1,14 +1,10 @@
 import type { AnimalProfile } from "../types"
 import { Badge } from "@/components/game/ui"
 import { cn } from "@/lib/utils"
+import { getCOIColor } from "../utils"
 
 export function PedigreeTab({ animal }: { animal: AnimalProfile }) {
-  const coiColor =
-    animal.inbreedingCoefficient < 0.0625
-      ? "text-chart-2"
-      : animal.inbreedingCoefficient < 0.125
-        ? "text-amber-500"
-        : "text-destructive"
+  const coiColor = getCOIColor(animal.inbreedingCoefficient)
 
   return (
     <div>

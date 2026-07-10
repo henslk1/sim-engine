@@ -1,5 +1,38 @@
 import type { AnimalProfile } from "./types"
 
+export const BREEDING_GRADE_COLOR: Record<string, string> = {
+  A: "text-amber-400",
+  B: "text-violet-500",
+  C: "text-sky-500",
+  D: "text-emerald-500",
+  F: "text-zinc-400",
+}
+
+export function getCOIColor(coefficient: number): string {
+  if (coefficient < 0.0625) return "text-chart-2"
+  if (coefficient < 0.125) return "text-amber-500"
+  return "text-destructive"
+}
+
+export function placementBadgeTone(placement: number): "success" | "accent" | "muted" {
+  if (placement === 1) return "success"
+  if (placement <= 3) return "accent"
+  return "muted"
+}
+
+export function formatBreedLabel(animal: AnimalProfile): string {
+  if (animal.breedComposition.length > 1) {
+    return animal.breedComposition
+      .map((bc) => `${bc.breed.name} ${Math.round(bc.percentage)}%`)
+      .join(" / ")
+  }
+  return animal.breed.name
+}
+
+export function getTrainingCap(innateValue: number, config: AnimalProfile["game"]["gameConfig"]): number {
+  return config ? innateValue * config.trainingCeilingMultiplier : innateValue * 1.5
+}
+
 export function formatCycleAge(cycle: number, config: AnimalProfile["game"]["gameConfig"]): string {
   if (!config) return `cycle ${cycle}`
   const y = Math.floor(cycle / config.cyclesPerYear)

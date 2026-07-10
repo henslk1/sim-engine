@@ -1,17 +1,12 @@
 import type { AnimalProfile } from "../types"
-import { formatCycleAge } from "../utils"
+import { formatCycleAge, formatBreedLabel } from "../utils"
 import { Badge } from "@/components/game/ui"
 import { Skull } from "lucide-react"
 
 export function BuriedView({ animal }: { animal: AnimalProfile }) {
   const config = animal.game.gameConfig
   const cycleToAge = (n: number) => formatCycleAge(n, config)
-  const breedLabel =
-    animal.breedComposition.length > 1
-      ? animal.breedComposition
-          .map((bc: AnimalProfile["breedComposition"][number]) => `${bc.breed.name} ${Math.round(bc.percentage)}%`)
-          .join(" / ")
-      : animal.breed.name
+  const breedLabel = formatBreedLabel(animal)
 
   return (
     <div className="flex h-dvh flex-col items-center justify-center bg-muted/20 p-6">

@@ -1,6 +1,7 @@
 import type { AnimalProfile } from "../types"
 import { Panel, Badge, Meter } from "@/components/game/ui"
 import { Dumbbell } from "lucide-react"
+import { getTrainingCap } from "../utils"
 
 export function TrainingPanel({
   animal,
@@ -17,7 +18,7 @@ export function TrainingPanel({
     >
       <div className="space-y-2">
         {animal.stats.map((stat: AnimalProfile["stats"][number]) => {
-          const cap = config ? stat.innateValue * config.trainingCeilingMultiplier : stat.innateValue * 1.5
+          const cap = getTrainingCap(stat.innateValue, config)
           return (
             <div key={stat.statDef.name} className="rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2">
               <div className="mb-1 flex items-center justify-between">

@@ -1,4 +1,5 @@
 import type { AnimalProfile } from "../types"
+import { getTrainingCap } from "../utils"
 
 type Genotype = NonNullable<AnimalProfile["genotypes"]>[number]
 
@@ -54,7 +55,7 @@ export function GeneticsTab({
         <p className="mb-2 text-[11px] text-muted-foreground">Sets the training cap for each stat.</p>
         <div className="space-y-1.5">
           {animal.stats.map((s: AnimalProfile["stats"][number]) => {
-            const cap = config ? s.innateValue * config.trainingCeilingMultiplier : s.innateValue * 1.5
+            const cap = getTrainingCap(s.innateValue, config)
             return (
               <div
                 key={s.statDef.name}

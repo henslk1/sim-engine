@@ -1,6 +1,7 @@
 import type { AnimalProfile } from "../types"
 import { Badge } from "@/components/game/ui"
 import { Award } from "lucide-react"
+import { placementBadgeTone } from "../utils"
 
 export function CompHistoryTab({
   animal,
@@ -42,15 +43,7 @@ export function CompHistoryTab({
                   </td>
                   <td className="px-2 py-1 text-right">
                     {entry.result?.placement != null ? (
-                      <Badge
-                        tone={
-                          entry.result.placement === 1
-                            ? "success"
-                            : entry.result.placement <= 3
-                              ? "accent"
-                              : "muted"
-                        }
-                      >
+                      <Badge tone={placementBadgeTone(entry.result.placement)}>
                         #{entry.result.placement}
                       </Badge>
                     ) : (
