@@ -4,6 +4,7 @@ import { Badge, Meter } from "@/components/game/ui"
 import { ActionButton } from "@/components/game/ui"
 import { Stethoscope, Clock } from "lucide-react"
 import { InfoStrip } from "../InfoStrip"
+import { AlertBanner } from "../AlertBanner"
 import { OwnerActionList } from "../OwnerActions"
 import { WorkspaceTabs } from "../WorkspaceTabs"
 import { HealthPanel } from "../panels/HealthPanel"
@@ -67,6 +68,8 @@ export function OwnerView({ animal, animalId }: { animal: AnimalProfile; animalI
       </div>
 
       {/* Info strip */}
+      <AlertBanner animal={animal} />
+
       <InfoStrip
         animal={animal}
         cycleToAge={cycleToAge}
@@ -76,17 +79,17 @@ export function OwnerView({ animal, animalId }: { animal: AnimalProfile; animalI
       <main className="min-h-0 flex-1 overflow-auto p-3">
         <div className="grid min-h-0 gap-3 grid-cols-1 min-[1400px]:h-full min-[1400px]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,2.6fr)_minmax(0,1.15fr)_minmax(0,0.85fr)]">
 
-          {/* Col 1 — Health / Breeding / Daily Log */}
-          <div className="flex min-h-0 flex-col gap-3 min-[1400px]:grid min-[1400px]:grid-rows-[auto_auto_minmax(0,1fr)]">
-            <HealthPanel animal={animal} />
+          {/* Col 1 — Breeding / Health */}
+          <div className="flex min-h-0 flex-col gap-3 min-[1400px]:grid min-[1400px]:grid-rows-[auto_minmax(0,1fr)]">
             <BreedingPanel animal={animal} breedingGrade={breedingGrade} />
-            <DailyLogPanel animal={animal} />
+            <HealthPanel animal={animal} />
           </div>
 
-          {/* Col 2 — Training / Competition */}
-          <div className="flex min-h-0 flex-col gap-3 min-[1400px]:grid min-[1400px]:grid-rows-[auto_minmax(0,1fr)]">
+          {/* Col 2 — Training / Competition / Equipped */}
+          <div className="flex min-h-0 flex-col gap-3">
             <TrainingPanel animal={animal} config={config} />
             <CompetitionPanel animal={animal} />
+            <EquippedPanel animal={animal} />
           </div>
 
           {/* Col 3 — Animal image + WorkspaceTabs */}
@@ -102,7 +105,7 @@ export function OwnerView({ animal, animalId }: { animal: AnimalProfile; animalI
             <WorkspaceTabs animal={animal} animalId={animalId} cycleToAge={cycleToAge} config={config} />
           </div>
 
-          {/* Col 4+5 — Care / Owner Actions / Personality / Equipped / Conformation */}
+          {/* Col 4+5 — Care / Owner Actions / DailyLog / Conformation / Personality / Equipped */}
           <div className="flex min-h-0 flex-col gap-3 min-[1400px]:col-span-2 min-[1400px]:grid min-[1400px]:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] min-[1400px]:grid-rows-[auto_auto_minmax(0,1fr)]">
             <DailyCarePanel animal={animal} cycleToAge={cycleToAge} />
 
@@ -116,12 +119,12 @@ export function OwnerView({ animal, animalId }: { animal: AnimalProfile; animalI
               </div>
             </div>
 
-            <PersonalityPanel animal={animal} />
-            <EquippedPanel animal={animal} />
-
-            <div className="flex min-h-0 flex-col min-[1400px]:col-span-2">
-              <ConformationPanel animal={animal} />
+            <ConformationPanel animal={animal} />
+            <div className="min-[1400px]:row-span-2 min-[1400px]:min-h-0">
+              <DailyLogPanel animal={animal} />
             </div>
+
+            <PersonalityPanel animal={animal} />
           </div>
 
         </div>

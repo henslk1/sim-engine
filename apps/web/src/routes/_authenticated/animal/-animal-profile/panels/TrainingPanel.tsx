@@ -1,7 +1,7 @@
 import type { AnimalProfile } from "../types"
 import { Panel, Badge, Meter } from "@/components/game/ui"
-import { Dumbbell } from "lucide-react"
-import { getTrainingCap } from "../utils"
+import { Dumbbell, Ban } from "lucide-react"
+import { getTrainingCap, getActiveRestrictions } from "../utils"
 
 export function TrainingPanel({
   animal,
@@ -10,12 +10,21 @@ export function TrainingPanel({
   animal: AnimalProfile
   config: AnimalProfile["game"]["gameConfig"]
 }) {
+  const restrictions = getActiveRestrictions(animal)
+  const isRestricted = restrictions.has("TRAINING") || restrictions.has("ALL")
+
   return (
     <Panel
       title="Training"
       icon={<Dumbbell className="size-4 text-chart-2" />}
       action={config ? <Badge tone="outline">Cap = innate × {config.trainingCeilingMultiplier}</Badge> : undefined}
     >
+      {isRestricted && (
+        <div className="mb-2 flex items-center gap-1.5 rounded-md bg-destructive/10 px-2.5 py-1.5 text-[11px] text-destructive">
+          <Ban className="size-3 shrink-0" />
+          Training restricted due to active treatment
+        </div>
+      )}
       <div className="space-y-2">
         {animal.stats.map((stat: AnimalProfile["stats"][number]) => {
           const cap = getTrainingCap(stat.innateValue, config)

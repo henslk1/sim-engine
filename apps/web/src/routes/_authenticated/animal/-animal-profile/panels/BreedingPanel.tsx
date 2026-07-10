@@ -1,8 +1,8 @@
 import type { AnimalProfile } from "../types"
 import { Panel, Badge, Meter } from "@/components/game/ui"
-import { Baby, Sparkles, Heart } from "lucide-react"
+import { Baby, Sparkles, Heart, Ban } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { getCOIColor, getFertilityDisplay } from "../utils"
+import { getCOIColor, getFertilityDisplay, getActiveRestrictions } from "../utils"
 
 export function BreedingPanel({
   animal,
@@ -14,6 +14,8 @@ export function BreedingPanel({
   const preg = animal.pregnancies[0]
   const coiColor = getCOIColor(animal.inbreedingCoefficient)
   const fertility = getFertilityDisplay(animal.fertility)
+  const restrictions = getActiveRestrictions(animal)
+  const isRestricted = restrictions.has("BREEDING") || restrictions.has("ALL")
 
   return (
     <Panel title="Breeding" icon={<Baby className="size-4 text-accent-foreground" />}>
@@ -40,6 +42,12 @@ export function BreedingPanel({
         {animal.isCastrated && <Badge tone="muted">Castrated</Badge>}
       </div>
 
+      {isRestricted && (
+        <div className="mb-2 flex items-center gap-1.5 rounded-md bg-destructive/10 px-2.5 py-1.5 text-[11px] text-destructive">
+          <Ban className="size-3 shrink-0" />
+          Breeding restricted due to active treatment
+        </div>
+      )}
       {animal.isCastrated ? (
         <p className="text-[11px] text-muted-foreground">Not eligible for breeding</p>
       ) : animal.pregnancies.length > 0 ? (

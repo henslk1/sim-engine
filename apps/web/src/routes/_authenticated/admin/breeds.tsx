@@ -128,6 +128,14 @@ function BreedsPage() {
   const { data: alleleFrequencies } = trpc.admin.breed.listAlleleFrequencies.useQuery(
     { breedId: editing?.id! }, { enabled: !!editing?.id }
   )
+  const { data: newConformRules } = trpc.admin.expression.listByLocus.useQuery(
+    { locusId: newConform.locusId },
+    { enabled: !!newConform.locusId }
+  )
+  const { data: editingConformRules } = trpc.admin.expression.listByLocus.useQuery(
+    { locusId: editingConform?.locusId ?? "" },
+    { enabled: !!editingConform?.locusId }
+  )
 
   const utils = trpc.useUtils()
 
@@ -602,13 +610,24 @@ function BreedsPage() {
                         <td className="px-3 py-2">
                           <select
                             value={editingConform.locusId}
-                            onChange={(e) => setEditingConform((p) => p && { ...p, locusId: e.target.value })}
+                            onChange={(e) => setEditingConform((p) => p && { ...p, locusId: e.target.value, idealExpressionLabel: "" })}
                             className="h-7 rounded border border-input bg-background px-2 text-xs"
                           >
                             {loci.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
                           </select>
                         </td>
-                        <td className="px-3 py-2"><Input className="h-7 text-xs" value={editingConform.idealExpressionLabel} onChange={(e) => setEditingConform((p) => p && { ...p, idealExpressionLabel: e.target.value })} /></td>
+                        <td className="px-3 py-2">
+                          <select
+                            value={editingConform.idealExpressionLabel}
+                            onChange={(e) => setEditingConform((p) => p && { ...p, idealExpressionLabel: e.target.value })}
+                            className="h-7 rounded border border-input bg-background px-2 text-xs"
+                          >
+                            <option value="">Select expression…</option>
+                            {[...new Set((editingConformRules ?? []).map((r) => r.phenotype))].map((p) => (
+                              <option key={p} value={p}>{p}</option>
+                            ))}
+                          </select>
+                        </td>
                         <td className="px-3 py-2"><Input className="h-7 text-xs" type="number" step="0.01" value={editingConform.weight} onChange={(e) => setEditingConform((p) => p && { ...p, weight: parseFloat(e.target.value) })} /></td>
                         <td className="px-3 py-2 text-right space-x-2">
                           <Button size="sm" onClick={() => handleSaveConform(cs.id)} disabled={saveConform.isPending}>Save</Button>
@@ -635,14 +654,26 @@ function BreedsPage() {
                   <td className="px-3 py-2">
                     <select
                       value={newConform.locusId}
-                      onChange={(e) => setNewConform((p) => ({ ...p, locusId: e.target.value }))}
+                      onChange={(e) => setNewConform((p) => ({ ...p, locusId: e.target.value, idealExpressionLabel: "" }))}
                       className="h-7 rounded border border-input bg-background px-2 text-xs"
                     >
                       <option value="">Select locus…</option>
                       {loci.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
                     </select>
                   </td>
-                  <td className="px-3 py-2"><Input className="h-7 text-xs" value={newConform.idealExpressionLabel} onChange={(e) => setNewConform((p) => ({ ...p, idealExpressionLabel: e.target.value }))} /></td>
+                  <td className="px-3 py-2">
+                    <select
+                      value={newConform.idealExpressionLabel}
+                      onChange={(e) => setNewConform((p) => ({ ...p, idealExpressionLabel: e.target.value }))}
+                      className="h-7 rounded border border-input bg-background px-2 text-xs"
+                      disabled={!newConform.locusId}
+                    >
+                      <option value="">{newConform.locusId ? "Select expression…" : "Select locus first"}</option>
+                      {[...new Set((newConformRules ?? []).map((r) => r.phenotype))].map((p) => (
+                        <option key={p} value={p}>{p}</option>
+                      ))}
+                    </select>
+                  </td>
                   <td className="px-3 py-2"><Input className="h-7 text-xs" type="number" step="0.01" value={newConform.weight} onChange={(e) => setNewConform((p) => ({ ...p, weight: parseFloat(e.target.value) }))} /></td>
                   <td className="px-3 py-2 text-right">
                     <Button size="sm" onClick={() => handleSaveConform()} disabled={!newConform.locusId || saveConform.isPending}>Add</Button>

@@ -62,13 +62,23 @@ export function HealthPanel({ animal }: { animal: AnimalProfile }) {
                           Duration: {t.treatmentDef.durationCycles} cycle{t.treatmentDef.durationCycles !== 1 ? "s" : ""}
                         </p>
                       )}
-                      {activeRestrictions.map((r) => (
-                        <p key={r.id} className="mt-0.5 text-[11px] text-destructive/80">
-                          {RESTRICTION_LABEL[r.restrictionType]} restricted
-                          {r.maxIntensityTier != null && ` · max tier ${r.maxIntensityTier}`}
-                          {" · "}{r.remainingCycles} cycle{r.remainingCycles !== 1 ? "s" : ""} remaining
-                        </p>
-                      ))}
+                      {t.treatmentDef.restrictionDefs.map((rd) => {
+                        const live = t.activityRestriction.find(
+                          (r) => r.isActive && r.restrictionType === rd.restrictionType
+                        )
+                        return (
+                          <p key={rd.id} className="mt-0.5 text-[11px] text-destructive/80">
+                            {RESTRICTION_LABEL[rd.restrictionType]} restricted
+                            {(rd.maxIntensityTier ?? live?.maxIntensityTier) != null &&
+                              ` · max tier ${rd.maxIntensityTier ?? live?.maxIntensityTier}`}
+                            {live
+                              ? ` · ${live.remainingCycles} cycle${live.remainingCycles !== 1 ? "s" : ""} remaining`
+                              : rd.durationCycles != null
+                              ? ` · ${rd.durationCycles} cycles`
+                              : ""}
+                          </p>
+                        )
+                      })}
                       {needsAction && (
                         <div className="mt-1.5">
                           <ActionButton variant="soft" disabled className="justify-center w-full">

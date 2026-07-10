@@ -1,0 +1,106 @@
+import type { AnimalProfile } from "./types"
+import { getActiveRestrictions } from "./utils"
+import { Stethoscope, Clock, Ban, Skull, Baby } from "lucide-react"
+import type { ReactNode } from "react"
+
+const RESTRICTION_LABEL: Record<string, string> = {
+  TRAINING: "Training",
+  COMPETITION: "Competition",
+  BREEDING: "Breeding",
+  CARE_ACTION: "Care actions",
+  ALL: "All activities",
+}
+
+const toneClass = {
+  danger: "border-destructive/30 bg-destructive/10 text-destructive",
+  warning: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400",
+  accent: "border-accent/30 bg-accent/10 text-accent-foreground",
+}
+
+function Banner({
+  tone,
+  icon,
+  children,
+}: {
+  tone: keyof typeof toneClass
+  icon: ReactNode
+  children: ReactNode
+}) {
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${toneClass[tone]}`}>
+      {icon}
+      {children}
+    </span>
+  )
+}
+
+export function AlertBanner({ animal }: { animal: AnimalProfile }) {
+  const banners: ReactNode[] = []
+
+  // Priority 1: Active health conditions
+  const activeConditions = animal.healthRecords.filter((r) => r.isActive)
+  if (activeConditions.length > 0) {
+    const first = activeConditions[0]
+    banners.push(
+      <Banner key="health" tone="danger" icon={<Stethoscope className="size-3.5 shrink-0" />}>
+        {first.conditionDef.name}
+        {activeConditions.length > 1 && ` +${activeConditions.length - 1} more`}
+        {" — "}Visit the vet
+      </Banner>
+    )
+  }
+
+  // Priority 2: Long-term care overdue (past grace period)
+  const overdue = animal.longTermCareRecords.filter(
+    (r) => animal.ageInCycles > r.nextDueCycle + r.longTermCareActionDef.gracePeriodCycles
+  )
+  if (overdue.length > 0) {
+    const first = overdue[0]
+    banners.push(
+      <Banner key="care" tone="warning" icon={<Clock className="size-3.5 shrink-0" />}>
+        {first.longTermCareActionDef.name} is overdue
+        {overdue.length > 1 && ` · +${overdue.length - 1} more`}
+      </Banner>
+    )
+  }
+
+  // Priority 3: Active restrictions
+  const restrictions = getActiveRestrictions(animal)
+  if (restrictions.size > 0) {
+    const labels = [...restrictions]
+      .map((r) => RESTRICTION_LABEL[r] ?? r)
+      .join(", ")
+    banners.push(
+      <Banner key="restriction" tone="warning" icon={<Ban className="size-3.5 shrink-0" />}>
+        Activity restricted: {labels}
+      </Banner>
+    )
+  }
+
+  // Priority 4: Death — pending bury / archive
+  if (animal.status === "DECEASED") {
+    banners.push(
+      <Banner key="death" tone="danger" icon={<Skull className="size-3.5 shrink-0" />}>
+        {animal.name} has passed away — choose to Bury or Archive
+      </Banner>
+    )
+  }
+
+  // Priority 5: Birth imminent
+  const preg = animal.pregnancies[0]
+  if (preg && preg.currentCycles >= preg.requiredCycles) {
+    banners.push(
+      <Banner key="birth" tone="accent" icon={<Baby className="size-3.5 shrink-0" />}>
+        Birth imminent
+      </Banner>
+    )
+  }
+
+  if (banners.length === 0) return null
+
+  return (
+    <div className="flex shrink-0 flex-wrap justify-center gap-2 border-b border-border px-4 py-2">
+      {banners}
+    </div>
+  )
+}

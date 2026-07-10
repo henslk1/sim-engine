@@ -1,30 +1,40 @@
 import type { AnimalProfile } from "../types"
-import { Panel, Badge, Stat } from "@/components/game/ui"
-import { Trophy, CheckCircle, XCircle } from "lucide-react"
-import { placementBadgeTone } from "../utils"
+import { Panel, Badge } from "@/components/game/ui"
+import { Trophy, CheckCircle, XCircle, Ban } from "lucide-react"
+import { placementBadgeTone, getActiveRestrictions } from "../utils"
 
 export function CompetitionPanel({ animal }: { animal: AnimalProfile }) {
   const currentTier = animal.compTiers[0]
   const latestWeeklyPoints = animal.weeklyPoints[0]?.points
+  const restrictions = getActiveRestrictions(animal)
+  const isRestricted = restrictions.has("COMPETITION") || restrictions.has("ALL")
 
   return (
     <Panel title="Competition" icon={<Trophy className="size-4 text-chart-1" />}>
+      {isRestricted && (
+        <div className="mb-2 flex items-center gap-1.5 rounded-md bg-destructive/10 px-2.5 py-1.5 text-[11px] text-destructive">
+          <Ban className="size-3 shrink-0" />
+          Competition restricted due to active treatment
+        </div>
+      )}
       {animal.disciplineDef ? (
         <>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-md border border-border/70 bg-secondary/30 px-3 py-2">
-              <Stat label="Discipline" value={animal.disciplineDef.name} />
+          <div className="flex items-center justify-between rounded-md border border-border/70 bg-secondary/30 px-2.5 py-1.5">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Discipline</span>
+              <span className="text-xs font-semibold text-foreground">{animal.disciplineDef.name}</span>
             </div>
-            <div className="rounded-md border border-border/70 bg-secondary/30 px-3 py-2">
-              <Stat label="Current Tier" value={currentTier?.tierDef.name ?? "—"} />
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Tier</span>
+              <span className="text-xs font-semibold text-foreground">{currentTier?.tierDef.name ?? "—"}</span>
             </div>
+            {latestWeeklyPoints !== undefined && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Points</span>
+                <span className="text-xs font-semibold text-foreground">{Math.round(latestWeeklyPoints)}</span>
+              </div>
+            )}
           </div>
-
-          {latestWeeklyPoints !== undefined && (
-            <div className="mt-2 rounded-md border border-border/70 bg-secondary/30 px-3 py-2">
-              <Stat label="Weekly Points" value={`${Math.round(latestWeeklyPoints)} pts`} />
-            </div>
-          )}
 
           {currentTier && currentTier.disciplineDef.equipmentRequirements.length > 0 && (
             <div className="mt-3">

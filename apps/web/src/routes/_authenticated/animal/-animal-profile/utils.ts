@@ -57,6 +57,23 @@ export function getConformationGrade(score: number): { grade: string; label: str
   return { grade: "F", label: "Poor" }
 }
 
+export function getActiveRestrictions(animal: AnimalProfile): Set<string> {
+  const types = new Set<string>()
+  for (const record of animal.healthRecords) {
+    if (!record.isActive) continue
+    for (const t of record.treatmentRecords) {
+      if (!t.isActive) continue
+      for (const rd of t.treatmentDef.restrictionDefs) {
+        types.add(rd.restrictionType)
+      }
+      for (const r of t.activityRestriction) {
+        if (r.isActive) types.add(r.restrictionType)
+      }
+    }
+  }
+  return types
+}
+
 export function computeBreedingGrade(
   animal: AnimalProfile,
   config: AnimalProfile["game"]["gameConfig"]

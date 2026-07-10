@@ -53,13 +53,26 @@ type AnimalProfileType = Prisma.AnimalGetPayload<{
       }
     }
     conformationScores: { include: { breed: true } }
+    conformationSectionScores: {
+      include: {
+        section: {
+          include: {
+            entries: {
+              orderBy: { displayOrder: "asc" }
+              include: { locus: { select: { id: true, name: true } } }
+            }
+          }
+        }
+        breed: { select: { id: true, name: true } }
+      }
+    }
     healthRecords: {
       orderBy: { diagnosedCycle: "desc" }
       include: {
         conditionDef: true
         treatmentRecords: {
           include: {
-            treatmentDef: true
+            treatmentDef: { include: { restrictionDefs: true } }
             activityRestriction: true
           }
         }
@@ -231,6 +244,19 @@ export const animalProfileRouter = router({
             },
           },
           conformationScores: { include: { breed: true } },
+          conformationSectionScores: {
+            include: {
+              section: {
+                include: {
+                  entries: {
+                    orderBy: { displayOrder: "asc" },
+                    include: { locus: { select: { id: true, name: true } } },
+                  },
+                },
+              },
+              breed: { select: { id: true, name: true } },
+            },
+          },
 
           // health
           healthRecords: {
@@ -239,7 +265,7 @@ export const animalProfileRouter = router({
               conditionDef: true,
               treatmentRecords: {
                 include: {
-                  treatmentDef: true,
+                  treatmentDef: { include: { restrictionDefs: true } },
                   activityRestriction: true,
                 },
               },

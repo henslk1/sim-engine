@@ -31,6 +31,13 @@ export const treatmentAdminRouter = router({
     .input(z.object({ id: z.string() }))
     .mutation(({ input }) =>
       db.$transaction(async (tx) => {
+        const treatmentRecords = await tx.animalTreatmentRecord.findMany({
+          where: { treatmentDefId: input.id },
+          select: { id: true },
+        })
+        const recordIds = treatmentRecords.map((r) => r.id)
+        await tx.activityRestriction.deleteMany({ where: { treatmentRecordId: { in: recordIds } } })
+        await tx.animalTreatmentRecord.deleteMany({ where: { treatmentDefId: input.id } })
         await tx.treatmentRestrictionDef.deleteMany({ where: { treatmentDefId: input.id } })
         await tx.treatmentItem.deleteMany({ where: { treatmentDefId: input.id } })
         return tx.treatmentDef.delete({ where: { id: input.id } })
