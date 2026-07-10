@@ -16,6 +16,9 @@ type StageForm = {
   canReceiveCare: boolean
   hasUniqueActionSet: boolean
   profileLayout: string
+  immunityCapMultiplier: number
+  deathChanceStartCycle: string
+  deathChancePerCycle: string
 }
 
 const emptyForm: StageForm = {
@@ -29,6 +32,9 @@ const emptyForm: StageForm = {
   canReceiveCare: false,
   hasUniqueActionSet: false,
   profileLayout: "",
+  immunityCapMultiplier: 1.0,
+  deathChanceStartCycle: "",
+  deathChancePerCycle: "",
 }
 
 const checkboxFields: [keyof StageForm, string][] = [
@@ -61,8 +67,23 @@ function LifeStagePage() {
 
   const [editing, setEditing] = useState<StageForm | null>(null)
 
-  function startEdit(stage: StageForm) {
-    setEditing({ ...stage })
+  function startEdit(stage: NonNullable<typeof stages>[number]) {
+    setEditing({
+      id: stage.id,
+      name: stage.name,
+      stageIndex: stage.stageIndex,
+      minCycle: stage.minCycle,
+      maxCycle: stage.ageCap,
+      canCompete: stage.canCompete,
+      canBreed: stage.canBreed,
+      canTrain: stage.canTrain,
+      canReceiveCare: stage.canReceiveCare,
+      hasUniqueActionSet: stage.hasUniqueActionSet,
+      profileLayout: stage.profileLayout,
+      immunityCapMultiplier: stage.immunityCapMultiplier,
+      deathChanceStartCycle: stage.deathChanceStartCycle?.toString() ?? "",
+      deathChancePerCycle: stage.deathChancePerCycle?.toString() ?? "",
+    })
   }
 
   function startAdd() {
@@ -76,7 +97,14 @@ function LifeStagePage() {
 
   function handleSave() {
     if (!editing || !gameId) return
-    save.mutate({ ...editing, gameId })
+    const { maxCycle, deathChanceStartCycle, deathChancePerCycle, ...rest } = editing
+    save.mutate({
+      ...rest,
+      gameId,
+      ageCap: maxCycle,
+      deathChanceStartCycle: deathChanceStartCycle !== "" ? parseInt(deathChanceStartCycle) : null,
+      deathChancePerCycle: deathChancePerCycle !== "" ? parseFloat(deathChancePerCycle) : null,
+    })
   }
 
   function update(field: keyof StageForm, value: string | number | boolean) {
@@ -122,6 +150,23 @@ function LifeStagePage() {
               <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Profile Layout</label>
               <p className="text-[11px] text-muted-foreground">Layout identifier for this stage's animal profile page.</p>
               <Input value={editing.profileLayout} onChange={(e) => update("profileLayout", e.target.value)} />
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Immunity Cap Multiplier</label>
+                <p className="text-[11px] text-muted-foreground">Max immunity as a fraction of innate max (1.0 = no cap reduction)</p>
+                <Input type="number" step="0.01" min="0" max="1" value={editing.immunityCapMultiplier} onChange={(e) => update("immunityCapMultiplier", parseFloat(e.target.value))} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Death Chance Start Cycle <span className="font-normal text-muted-foreground">(optional)</span></label>
+                <p className="text-[11px] text-muted-foreground">Age at which natural death chance begins</p>
+                <Input type="number" step="1" min="0" value={editing.deathChanceStartCycle} onChange={(e) => update("deathChanceStartCycle", e.target.value)} placeholder="e.g. 120" />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Death Chance Per Cycle <span className="font-normal text-muted-foreground">(optional)</span></label>
+                <p className="text-[11px] text-muted-foreground">Probability of death per cycle once onset is reached (0–1)</p>
+                <Input type="number" step="0.001" min="0" max="1" value={editing.deathChancePerCycle} onChange={(e) => update("deathChancePerCycle", e.target.value)} placeholder="e.g. 0.02" />
+              </div>
             </div>
             <div className="flex flex-col gap-2">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Abilities</p>

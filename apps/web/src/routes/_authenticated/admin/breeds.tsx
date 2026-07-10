@@ -13,6 +13,9 @@ type BreedForm = {
   lore: string
   isUnregistered: boolean
   convergenceGenerations: string
+  lifeExpectancyBaseline: string
+  immunityMin: string
+  immunityMax: string
 }
 
 type StatProfileForm = {
@@ -47,6 +50,9 @@ const emptyBreed: BreedForm = {
   lore: "",
   isUnregistered: false,
   convergenceGenerations: "",
+  lifeExpectancyBaseline: "",
+  immunityMin: "",
+  immunityMax: "",
 }
 
 const emptyStatProfile: StatProfileForm = {
@@ -196,9 +202,10 @@ function BreedsPage() {
       image: editing.image || null,
       lore: editing.lore || null,
       isUnregistered: editing.isUnregistered,
-      convergenceGenerations: editing.convergenceGenerations
-        ? parseInt(editing.convergenceGenerations)
-        : null,
+      convergenceGenerations: editing.convergenceGenerations ? parseInt(editing.convergenceGenerations) : null,
+      lifeExpectancyBaseline: editing.lifeExpectancyBaseline ? parseInt(editing.lifeExpectancyBaseline) : null,
+      immunityMin: editing.immunityMin !== "" ? parseFloat(editing.immunityMin) : null,
+      immunityMax: editing.immunityMax !== "" ? parseFloat(editing.immunityMax) : null,
     })
   }
 
@@ -311,6 +318,9 @@ function BreedsPage() {
                       lore: b.lore ?? "",
                       isUnregistered: b.isUnregistered,
                       convergenceGenerations: b.convergenceGenerations?.toString() ?? "",
+                      lifeExpectancyBaseline: b.lifeExpectancyBaseline?.toString() ?? "",
+                      immunityMin: b.immunityMin?.toString() ?? "",
+                      immunityMax: b.immunityMax?.toString() ?? "",
                     })}>Edit</Button>
                     <Button size="sm" variant="ghost" onClick={() => handleRemoveBreed(b.id)} className="text-destructive hover:text-destructive">Delete</Button>
                   </td>
@@ -383,6 +393,42 @@ function BreedsPage() {
                   min="1"
                   value={editing.convergenceGenerations}
                   onChange={(e) => setEditing((p) => p && { ...p, convergenceGenerations: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Life Expectancy Baseline <span className="font-normal">(optional)</span></label>
+                <p className="text-[11px] text-muted-foreground">Override game-level baseline for this breed</p>
+                <Input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={editing.lifeExpectancyBaseline}
+                  onChange={(e) => setEditing((p) => p && { ...p, lifeExpectancyBaseline: e.target.value })}
+                  placeholder="e.g. 144"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Immunity Min <span className="font-normal">(optional)</span></label>
+                <p className="text-[11px] text-muted-foreground">Override game-level immunity floor</p>
+                <Input
+                  type="number"
+                  step="0.1"
+                  value={editing.immunityMin}
+                  onChange={(e) => setEditing((p) => p && { ...p, immunityMin: e.target.value })}
+                  placeholder="e.g. 10"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Immunity Max <span className="font-normal">(optional)</span></label>
+                <p className="text-[11px] text-muted-foreground">Override game-level immunity ceiling</p>
+                <Input
+                  type="number"
+                  step="0.1"
+                  value={editing.immunityMax}
+                  onChange={(e) => setEditing((p) => p && { ...p, immunityMax: e.target.value })}
+                  placeholder="e.g. 90"
                 />
               </div>
             </div>

@@ -21,6 +21,22 @@ function GameConfigPage() {
     breedingEnergyCost: 0,
     containerLabel: "",
     subContainerLabel: "",
+    gestationCycles: 12,
+    cyclesPerYear: 12,
+    moodDecayRate: 0,
+    conditionDecayRate: 0,
+    conditionWorkGain: 0,
+    careScoreDecayRate: 0,
+    careScoreFloor: 0,
+    careScoreCeiling: 100,
+    careScoreRecoveryRate: 0,
+    immunityDecayRate: 0,
+    immunityRecoveryRate: 0,
+    immunityMin: 0,
+    immunityMax: 100,
+    energyLowCareThreshold: 0,
+    energyLowCarePenalty: 0,
+    lifeExpectancyBaseline: "",
   })
 
   useEffect(() => {
@@ -35,6 +51,22 @@ function GameConfigPage() {
           breedingEnergyCost: data.gameConfig.breedingEnergyCost,
           containerLabel: data.gameConfig.containerLabel ?? "",
           subContainerLabel: data.gameConfig.subContainerLabel ?? "",
+          gestationCycles: data.gameConfig.gestationCycles,
+          cyclesPerYear: data.gameConfig.cyclesPerYear,
+          moodDecayRate: data.gameConfig.moodDecayRate,
+          conditionDecayRate: data.gameConfig.conditionDecayRate,
+          conditionWorkGain: data.gameConfig.conditionWorkGain,
+          careScoreDecayRate: data.gameConfig.careScoreDecayRate,
+          careScoreFloor: data.gameConfig.careScoreFloor,
+          careScoreCeiling: data.gameConfig.careScoreCeiling,
+          careScoreRecoveryRate: data.gameConfig.careScoreRecoveryRate,
+          immunityDecayRate: data.gameConfig.immunityDecayRate,
+          immunityRecoveryRate: data.gameConfig.immunityRecoveryRate,
+          immunityMin: data.gameConfig.immunityMin,
+          immunityMax: data.gameConfig.immunityMax,
+          energyLowCareThreshold: data.gameConfig.energyLowCareThreshold,
+          energyLowCarePenalty: data.gameConfig.energyLowCarePenalty,
+          lifeExpectancyBaseline: data.gameConfig.lifeExpectancyBaseline?.toString() ?? "",
         })
       }
     }
@@ -140,6 +172,102 @@ function GameConfigPage() {
                   onChange={(e) => setConfigForm(f => ({ ...f, subContainerLabel: e.target.value }))} />
               </div>
             </div>
+
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground pt-2">Time</p>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Cycles Per Year</label>
+                <p className="text-[11px] text-muted-foreground">Used to display ages in years/months</p>
+                <Input type="number" step="1" min="1" value={configForm.cyclesPerYear}
+                  onChange={(e) => setConfigForm(f => ({ ...f, cyclesPerYear: parseInt(e.target.value) }))} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Gestation Cycles</label>
+                <p className="text-[11px] text-muted-foreground">Pregnancy duration in cycles</p>
+                <Input type="number" step="1" min="1" value={configForm.gestationCycles}
+                  onChange={(e) => setConfigForm(f => ({ ...f, gestationCycles: parseInt(e.target.value) }))} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Life Expectancy Baseline <span className="font-normal">(optional)</span></label>
+                <p className="text-[11px] text-muted-foreground">Default life expectancy in cycles (overridable per breed)</p>
+                <Input type="number" step="1" min="1" value={configForm.lifeExpectancyBaseline}
+                  onChange={(e) => setConfigForm(f => ({ ...f, lifeExpectancyBaseline: e.target.value }))}
+                  placeholder="e.g. 144" />
+              </div>
+            </div>
+
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground pt-2">Care & Condition</p>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Mood Decay Rate</label>
+                <Input type="number" step="0.001" value={configForm.moodDecayRate}
+                  onChange={(e) => setConfigForm(f => ({ ...f, moodDecayRate: parseFloat(e.target.value) }))} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Condition Decay Rate</label>
+                <Input type="number" step="0.001" value={configForm.conditionDecayRate}
+                  onChange={(e) => setConfigForm(f => ({ ...f, conditionDecayRate: parseFloat(e.target.value) }))} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Condition Work Gain</label>
+                <Input type="number" step="0.001" value={configForm.conditionWorkGain}
+                  onChange={(e) => setConfigForm(f => ({ ...f, conditionWorkGain: parseFloat(e.target.value) }))} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Care Score Decay Rate</label>
+                <Input type="number" step="0.001" value={configForm.careScoreDecayRate}
+                  onChange={(e) => setConfigForm(f => ({ ...f, careScoreDecayRate: parseFloat(e.target.value) }))} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Care Score Recovery Rate</label>
+                <Input type="number" step="0.001" value={configForm.careScoreRecoveryRate}
+                  onChange={(e) => setConfigForm(f => ({ ...f, careScoreRecoveryRate: parseFloat(e.target.value) }))} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Care Score Floor / Ceiling</label>
+                <div className="flex gap-2">
+                  <Input type="number" step="0.1" placeholder="Floor" value={configForm.careScoreFloor}
+                    onChange={(e) => setConfigForm(f => ({ ...f, careScoreFloor: parseFloat(e.target.value) }))} />
+                  <Input type="number" step="0.1" placeholder="Ceiling" value={configForm.careScoreCeiling}
+                    onChange={(e) => setConfigForm(f => ({ ...f, careScoreCeiling: parseFloat(e.target.value) }))} />
+                </div>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Energy Low Care Threshold</label>
+                <Input type="number" step="0.01" value={configForm.energyLowCareThreshold}
+                  onChange={(e) => setConfigForm(f => ({ ...f, energyLowCareThreshold: parseFloat(e.target.value) }))} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Energy Low Care Penalty</label>
+                <Input type="number" step="0.01" value={configForm.energyLowCarePenalty}
+                  onChange={(e) => setConfigForm(f => ({ ...f, energyLowCarePenalty: parseFloat(e.target.value) }))} />
+              </div>
+            </div>
+
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground pt-2">Immunity</p>
+            <div className="grid grid-cols-4 gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Decay Rate</label>
+                <Input type="number" step="0.001" value={configForm.immunityDecayRate}
+                  onChange={(e) => setConfigForm(f => ({ ...f, immunityDecayRate: parseFloat(e.target.value) }))} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Recovery Rate</label>
+                <Input type="number" step="0.001" value={configForm.immunityRecoveryRate}
+                  onChange={(e) => setConfigForm(f => ({ ...f, immunityRecoveryRate: parseFloat(e.target.value) }))} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Min</label>
+                <Input type="number" step="0.1" value={configForm.immunityMin}
+                  onChange={(e) => setConfigForm(f => ({ ...f, immunityMin: parseFloat(e.target.value) }))} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Max</label>
+                <Input type="number" step="0.1" value={configForm.immunityMax}
+                  onChange={(e) => setConfigForm(f => ({ ...f, immunityMax: parseFloat(e.target.value) }))} />
+              </div>
+            </div>
+
             {saveConfig.error && <p className="text-sm text-destructive">{saveConfig.error.message}</p>}
             <Button
               onClick={() => saveConfig.mutate({
@@ -147,6 +275,7 @@ function GameConfigPage() {
                 ...configForm,
                 containerLabel: configForm.containerLabel || undefined,
                 subContainerLabel: configForm.subContainerLabel || undefined,
+                lifeExpectancyBaseline: configForm.lifeExpectancyBaseline !== "" ? parseInt(configForm.lifeExpectancyBaseline) : null,
               })}
               disabled={saveConfig.isPending}
             >

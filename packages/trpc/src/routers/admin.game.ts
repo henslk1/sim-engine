@@ -36,17 +36,34 @@ export const gameAdminRouter = router({
         breedingEnergyCost: z.number().min(0).default(0),
         containerLabel: z.string().nullish(),
         subContainerLabel: z.string().nullish(),
+        gestationCycles: z.number().int().min(1).default(12),
+        cyclesPerYear: z.number().int().min(1).default(12),
+        moodDecayRate: z.number().default(0),
+        conditionDecayRate: z.number().default(0),
+        conditionWorkGain: z.number().default(0),
+        careScoreDecayRate: z.number().default(0),
+        careScoreFloor: z.number().default(0),
+        careScoreCeiling: z.number().default(100),
+        careScoreRecoveryRate: z.number().default(0),
+        immunityDecayRate: z.number().default(0),
+        immunityRecoveryRate: z.number().default(0),
+        immunityMin: z.number().default(0),
+        immunityMax: z.number().default(100),
+        energyLowCareThreshold: z.number().default(0),
+        energyLowCarePenalty: z.number().default(0),
+        lifeExpectancyBaseline: z.number().int().nullish(),
       }))
       .mutation(({ input }) => {
-        const { gameId, containerLabel, subContainerLabel, ...rest } = input
+        const { gameId, containerLabel, subContainerLabel, lifeExpectancyBaseline, ...rest } = input
         const labels = {
           containerLabel: containerLabel ?? null,
           subContainerLabel: subContainerLabel ?? null,
         }
+        const nullable = { lifeExpectancyBaseline: lifeExpectancyBaseline ?? null }
         return db.gameConfig.upsert({
           where: { gameId },
-          create: { gameId, ...rest, ...labels },
-          update: { ...rest, ...labels },
+          create: { gameId, ...rest, ...labels, ...nullable },
+          update: { ...rest, ...labels, ...nullable },
         })
       }),
 })

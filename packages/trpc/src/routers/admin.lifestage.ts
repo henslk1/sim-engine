@@ -15,6 +15,9 @@ const stageInput = z.object({
   canReceiveCare: z.boolean(),
   hasUniqueActionSet: z.boolean(),
   profileLayout: z.string().min(1),
+  immunityCapMultiplier: z.number().default(1.0),
+  deathChanceStartCycle: z.number().int().nullish(),
+  deathChancePerCycle: z.number().min(0).max(1).nullish(),
 })
 
 export const lifeStageAdminRouter = router({
@@ -29,10 +32,13 @@ export const lifeStageAdminRouter = router({
   save: publicProcedure
     .input(stageInput)
     .mutation(({ input }) => {
-      const { id, gameId, ...data } = input
-      if(id) {
-        return db.lifeStageDef.update({ where: { id }, data})
+      const { id, gameId, deathChanceStartCycle, deathChancePerCycle, ...rest } = input
+      const data = {
+        ...rest,
+        deathChanceStartCycle: deathChanceStartCycle ?? null,
+        deathChancePerCycle: deathChancePerCycle ?? null,
       }
+      if (id) return db.lifeStageDef.update({ where: { id }, data })
       return db.lifeStageDef.create({ data: { gameId, ...data } })
     }),
   remove: publicProcedure

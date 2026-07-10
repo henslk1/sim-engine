@@ -21,6 +21,7 @@ const navGroups = [
       { to: "/admin/loci", label: "Loci & Alleles" },
       { to: "/admin/expression-rules", label: "Expression Rules" },
       { to: "/admin/genetic-panels", label: "Genetic Panels"},
+      { to: "/admin/conformation-sections", label: "Conformation Sections" },
     ],
   },
   {

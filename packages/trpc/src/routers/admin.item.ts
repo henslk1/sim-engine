@@ -17,7 +17,7 @@ export const itemAdminRouter = router({
       gameId: z.string(),
       name: z.string().min(1),
       description: z.string().nullish(),
-      itemType: z.enum(["OTC_MEDICATION", "CARE_CONSUMABLE", "EQUIPMENT", "DIRECT_EFFECT", "PERMANENT_APPLIED", "ANIMAL_SLOT_EXPAND", "SUBCONTAINER_EXPAND"]),
+      itemType: z.enum(["OTC_MEDICATION", "CARE_CONSUMABLE", "EQUIPMENT", "DIRECT_EFFECT", "PERMANENT_APPLIED", "ANIMAL_SLOT_EXPAND", "SUBCONTAINER_EXPAND", "AGING_BASE", "AGING_PREMIUM"]),
       category: z.enum(["AGING", "CARE", "HEALTH", "EQUIPMENT", "BREEDING", "STORAGE", "MISC"]),
       effectType: z.enum(["IMMORTALITY", "SEX_CHANGE", "FREE_AGING", "BREEDING_SLOT_RAISE", "ENERGY_MAX_RAISE", "TWIN_CHANCE_RAISE", "TWIN_GUARANTEE", "STAGE_SKIP"]).nullish(),
       effects: z.record(z.unknown()).nullish(),

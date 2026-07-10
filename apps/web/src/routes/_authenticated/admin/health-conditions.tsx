@@ -11,9 +11,13 @@ type ConditionForm = {
   isGenetic: boolean
   isFatal: boolean
   moodEffect: string
+  energyEffect: string
+  onsetMinCycle: string
+  fatalityChance: string
+  fatalMaxCycle: string
 }
 
-const emptyCondition = (): ConditionForm => ({ name: "", conditionType: "ILLNESS", isGenetic: false, isFatal: false, moodEffect: "" })
+const emptyCondition = (): ConditionForm => ({ name: "", conditionType: "ILLNESS", isGenetic: false, isFatal: false, moodEffect: "", energyEffect: "", onsetMinCycle: "", fatalityChance: "", fatalMaxCycle: "" })
 
 type BehaviorRow = { symptomText: string; careActionDefId: string }
 const emptyBehavior = (): BehaviorRow => ({ symptomText: "", careActionDefId: "" })
@@ -71,7 +75,18 @@ function HealthConditionsPage() {
   const [newBehavior, setNewBehavior] = useState<BehaviorRow>(emptyBehavior())
 
   function openEdit(condition: NonNullable<typeof conditions>[number]) {
-    setEditing({ id: condition.id, name: condition.name, conditionType: condition.conditionType, isGenetic: condition.isGenetic, isFatal: condition.isFatal, moodEffect: condition.moodEffect?.toString() ?? "" })
+    setEditing({
+      id: condition.id,
+      name: condition.name,
+      conditionType: condition.conditionType,
+      isGenetic: condition.isGenetic,
+      isFatal: condition.isFatal,
+      moodEffect: condition.moodEffect?.toString() ?? "",
+      energyEffect: condition.energyEffect?.toString() ?? "",
+      onsetMinCycle: condition.onsetMinCycle?.toString() ?? "",
+      fatalityChance: condition.fatalityChance?.toString() ?? "",
+      fatalMaxCycle: condition.fatalMaxCycle?.toString() ?? "",
+    })
     setFormExpanded(false)
     setEditingBehaviorId(null)
     setEditingBehavior(null)
@@ -81,7 +96,19 @@ function HealthConditionsPage() {
   function submitCondition() {
     if (!editing || !gameId) return
     saveCondition.mutate(
-      { id: editing.id, gameId, name: editing.name, conditionType: editing.conditionType, isGenetic: editing.isGenetic, isFatal: editing.isFatal, moodEffect: editing.moodEffect !== "" ? parseFloat(editing.moodEffect) : null },
+      {
+        id: editing.id,
+        gameId,
+        name: editing.name,
+        conditionType: editing.conditionType,
+        isGenetic: editing.isGenetic,
+        isFatal: editing.isFatal,
+        moodEffect: editing.moodEffect !== "" ? parseFloat(editing.moodEffect) : null,
+        energyEffect: editing.energyEffect !== "" ? parseFloat(editing.energyEffect) : null,
+        onsetMinCycle: editing.onsetMinCycle !== "" ? parseInt(editing.onsetMinCycle) : null,
+        fatalityChance: editing.fatalityChance !== "" ? parseFloat(editing.fatalityChance) : null,
+        fatalMaxCycle: editing.fatalMaxCycle !== "" ? parseInt(editing.fatalMaxCycle) : null,
+      },
       {
         onSuccess: (saved) => {
           setEditing((prev) => (prev ? { ...prev, id: saved.id } : null))
@@ -162,16 +189,68 @@ function HealthConditionsPage() {
                   Fatal
                 </label>
               </div>
-              <div className="max-w-xs">
-                <label className="text-xs font-medium text-muted-foreground">Mood Effect <span className="font-normal">(optional)</span></label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={editing.moodEffect}
-                  onChange={(e) => setEditing({ ...editing, moodEffect: e.target.value })}
-                  placeholder="e.g. -0.2"
-                  className="mt-1"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Mood Effect <span className="font-normal">(optional)</span></label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={editing.moodEffect}
+                    onChange={(e) => setEditing({ ...editing, moodEffect: e.target.value })}
+                    placeholder="e.g. -0.2"
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Energy Effect <span className="font-normal">(optional)</span></label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={editing.energyEffect}
+                    onChange={(e) => setEditing({ ...editing, energyEffect: e.target.value })}
+                    placeholder="e.g. -0.1"
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Onset Min Cycle <span className="font-normal">(optional)</span></label>
+                  <Input
+                    type="number"
+                    step="1"
+                    min="0"
+                    value={editing.onsetMinCycle}
+                    onChange={(e) => setEditing({ ...editing, onsetMinCycle: e.target.value })}
+                    placeholder="e.g. 24"
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Fatality Chance <span className="font-normal">(0–1, optional)</span></label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="1"
+                    value={editing.fatalityChance}
+                    onChange={(e) => setEditing({ ...editing, fatalityChance: e.target.value })}
+                    placeholder="e.g. 0.05"
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Fatal Max Cycle <span className="font-normal">(optional)</span></label>
+                  <Input
+                    type="number"
+                    step="1"
+                    min="0"
+                    value={editing.fatalMaxCycle}
+                    onChange={(e) => setEditing({ ...editing, fatalMaxCycle: e.target.value })}
+                    placeholder="e.g. 48"
+                    className="mt-1"
+                  />
+                </div>
               </div>
               <div className="flex gap-2 pt-1">
                 <Button onClick={submitCondition} disabled={saveCondition.isPending || !editing.name.trim()}>Save</Button>

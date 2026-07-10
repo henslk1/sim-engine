@@ -73,7 +73,7 @@ type AnimalProfileType = Prisma.AnimalGetPayload<{
     vetVisitLogs: {
       orderBy: { visitCycle: "desc" }
       take: 5
-      include: { vetServiceDef: true }
+      include: { vetServiceDef: true, conditionDef: true }
     }
     longTermCareRecords: {
       include: { longTermCareActionDef: true }
@@ -253,7 +253,7 @@ export const animalProfileRouter = router({
           vetVisitLogs: {
             orderBy: { visitCycle: "desc" },
             take: 5,
-            include: { vetServiceDef: true },
+            include: { vetServiceDef: true, conditionDef: true },
           },
 
           // care

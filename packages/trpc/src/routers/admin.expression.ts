@@ -13,6 +13,7 @@ export const expressionAdminRouter = router({
           alleleTwo: { select: { id: true, symbol: true } },
           climateModifiers: true,
           terrainModifiers: true,
+          healthConditionDef: { select: { id: true, name: true } },
         },
         orderBy: [{ alleleOne: { symbol: "asc" } }, { alleleTwo: { symbol: "asc" } }],
       })
@@ -26,10 +27,17 @@ export const expressionAdminRouter = router({
       alleleTwoId: z.string(),
       phenotype: z.string().min(1),
       numericModifier: z.number().nullish(),
+      penetrance: z.number().min(0).max(1).nullish(),
+      healthConditionDefId: z.string().nullish(),
     }))
     .mutation(({ input }) => {
-      const { id, locusId, numericModifier, ...rest } = input
-      const data = { ...rest, numericModifier: numericModifier ?? null }
+      const { id, locusId, numericModifier, penetrance, healthConditionDefId, ...rest } = input
+      const data = {
+        ...rest,
+        numericModifier: numericModifier ?? null,
+        penetrance: penetrance ?? null,
+        healthConditionDefId: healthConditionDefId ?? null,
+      }
       if (id) return db.expressionRule.update({ where: { id }, data })
       return db.expressionRule.create({ data: { locusId, ...data } })
     }),

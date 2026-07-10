@@ -23,14 +23,20 @@ export const breedAdminRouter = router({
       lore: z.string().nullish(),
       isUnregistered: z.boolean(),
       convergenceGenerations: z.number().int().min(1).nullish(),
+      lifeExpectancyBaseline: z.number().int().nullish(),
+      immunityMin: z.number().nullish(),
+      immunityMax: z.number().nullish(),
     }))
     .mutation(({ input }) => {
-      const { id, gameId, image, lore, convergenceGenerations, ...rest } = input
+      const { id, gameId, image, lore, convergenceGenerations, lifeExpectancyBaseline, immunityMin, immunityMax, ...rest } = input
       const data = {
         ...rest,
         image: image ?? null,
         lore: lore ?? null,
         convergenceGenerations: convergenceGenerations ?? null,
+        lifeExpectancyBaseline: lifeExpectancyBaseline ?? null,
+        immunityMin: immunityMin ?? null,
+        immunityMax: immunityMax ?? null,
       }
       if (id) return db.breed.update({ where: { id }, data })
       return db.breed.create({ data: { gameId, ...data } })

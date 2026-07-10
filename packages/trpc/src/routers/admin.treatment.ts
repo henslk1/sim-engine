@@ -9,7 +9,7 @@ export const treatmentAdminRouter = router({
       db.treatmentDef.findMany({
         where: { conditionDefId: input.conditionDefId },
         orderBy: { name: "asc" },
-        include: { _count: { select: { items: true } } },
+        include: { _count: { select: { items: true, restrictionDefs: true } } },
       })
     ),
 
@@ -31,6 +31,7 @@ export const treatmentAdminRouter = router({
     .input(z.object({ id: z.string() }))
     .mutation(({ input }) =>
       db.$transaction(async (tx) => {
+        await tx.treatmentRestrictionDef.deleteMany({ where: { treatmentDefId: input.id } })
         await tx.treatmentItem.deleteMany({ where: { treatmentDefId: input.id } })
         return tx.treatmentDef.delete({ where: { id: input.id } })
       })
@@ -62,4 +63,31 @@ export const treatmentAdminRouter = router({
   removeItem: publicProcedure
     .input(z.object({ id: z.string() }))
     .mutation(({ input }) => db.treatmentItem.delete({ where: { id: input.id } })),
+
+  listRestrictions: publicProcedure
+    .input(z.object({ treatmentDefId: z.string() }))
+    .query(({ input }) =>
+      db.treatmentRestrictionDef.findMany({
+        where: { treatmentDefId: input.treatmentDefId },
+        orderBy: { restrictionType: "asc" },
+      })
+    ),
+
+  saveRestriction: publicProcedure
+    .input(z.object({
+      id: z.string().optional(),
+      treatmentDefId: z.string(),
+      restrictionType: z.enum(["TRAINING", "COMPETITION", "BREEDING", "CARE_ACTION", "ALL"]),
+      maxIntensityTier: z.number().int().nullable(),
+      durationCycles: z.number().int().nullable(),
+    }))
+    .mutation(({ input }) => {
+      const { id, treatmentDefId, ...data } = input
+      if (id) return db.treatmentRestrictionDef.update({ where: { id }, data })
+      return db.treatmentRestrictionDef.create({ data: { treatmentDefId, ...data } })
+    }),
+
+  removeRestriction: publicProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(({ input }) => db.treatmentRestrictionDef.delete({ where: { id: input.id } })),
 })

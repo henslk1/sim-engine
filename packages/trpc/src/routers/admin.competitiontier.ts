@@ -21,15 +21,19 @@ export const competitionTierAdminRouter = router({
       minScore: z.number().nullish(),
       advancementThreshold: z.number().nullish(),
       energyCost: z.number().default(0),
+      entryFee: z.number().int().min(0).default(0),
+      minWeeklyPointsForInvitational: z.number().nullish(),
     }))
     .mutation(({ input }) => {
-      const { id, gameId, disciplineDefId, minScore, advancementThreshold, energyCost, ...rest } = input
+      const { id, gameId, disciplineDefId, minScore, advancementThreshold, energyCost, entryFee, minWeeklyPointsForInvitational, ...rest } = input
       const data = {
         ...rest,
         disciplineDefId,
         minScore: minScore ?? null,
         advancementThreshold: advancementThreshold ?? null,
         energyCost,
+        entryFee,
+        minWeeklyPointsForInvitational: minWeeklyPointsForInvitational ?? null,
       }
       if (id) return db.competitionTierDef.update({ where: { id }, data })
       return db.competitionTierDef.create({ data: { gameId, ...data } })

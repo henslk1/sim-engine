@@ -22,10 +22,21 @@ export const healthAdminRouter = router({
       isGenetic: z.boolean(),
       isFatal: z.boolean(),
       moodEffect: z.number().nullish(),
+      energyEffect: z.number().nullish(),
+      onsetMinCycle: z.number().int().nullish(),
+      fatalityChance: z.number().min(0).max(1).nullish(),
+      fatalMaxCycle: z.number().int().nullish(),
     }))
     .mutation(({ input }) => {
-      const { id, gameId, moodEffect, ...rest } = input
-      const data = { ...rest, moodEffect: moodEffect ?? null }
+      const { id, gameId, moodEffect, energyEffect, onsetMinCycle, fatalityChance, fatalMaxCycle, ...rest } = input
+      const data = {
+        ...rest,
+        moodEffect: moodEffect ?? null,
+        energyEffect: energyEffect ?? null,
+        onsetMinCycle: onsetMinCycle ?? null,
+        fatalityChance: fatalityChance ?? null,
+        fatalMaxCycle: fatalMaxCycle ?? null,
+      }
       if (id) return db.healthConditionDef.update({ where: { id }, data })
       return db.healthConditionDef.create({ data: { gameId, ...data } })
     }),

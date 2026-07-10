@@ -40,6 +40,7 @@ import { Route as AuthenticatedAdminExpressionRulesRouteImport } from './routes/
 import { Route as AuthenticatedAdminDisciplinesRouteImport } from './routes/_authenticated/admin/disciplines'
 import { Route as AuthenticatedAdminDirectoryFiltersRouteImport } from './routes/_authenticated/admin/directory-filters'
 import { Route as AuthenticatedAdminCurrenciesRouteImport } from './routes/_authenticated/admin/currencies'
+import { Route as AuthenticatedAdminConformationSectionsRouteImport } from './routes/_authenticated/admin/conformation-sections'
 import { Route as AuthenticatedAdminCompetitionTiersRouteImport } from './routes/_authenticated/admin/competition-tiers'
 import { Route as AuthenticatedAdminCareActionsRouteImport } from './routes/_authenticated/admin/care-actions'
 import { Route as AuthenticatedAdminBreedsRouteImport } from './routes/_authenticated/admin/breeds'
@@ -220,6 +221,12 @@ const AuthenticatedAdminCurrenciesRoute =
     path: '/currencies',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminConformationSectionsRoute =
+  AuthenticatedAdminConformationSectionsRouteImport.update({
+    id: '/conformation-sections',
+    path: '/conformation-sections',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedAdminCompetitionTiersRoute =
   AuthenticatedAdminCompetitionTiersRouteImport.update({
     id: '/competition-tiers',
@@ -247,6 +254,7 @@ export interface FileRoutesByFullPath {
   '/admin/breeds': typeof AuthenticatedAdminBreedsRoute
   '/admin/care-actions': typeof AuthenticatedAdminCareActionsRoute
   '/admin/competition-tiers': typeof AuthenticatedAdminCompetitionTiersRoute
+  '/admin/conformation-sections': typeof AuthenticatedAdminConformationSectionsRoute
   '/admin/currencies': typeof AuthenticatedAdminCurrenciesRoute
   '/admin/directory-filters': typeof AuthenticatedAdminDirectoryFiltersRoute
   '/admin/disciplines': typeof AuthenticatedAdminDisciplinesRoute
@@ -281,6 +289,7 @@ export interface FileRoutesByTo {
   '/admin/breeds': typeof AuthenticatedAdminBreedsRoute
   '/admin/care-actions': typeof AuthenticatedAdminCareActionsRoute
   '/admin/competition-tiers': typeof AuthenticatedAdminCompetitionTiersRoute
+  '/admin/conformation-sections': typeof AuthenticatedAdminConformationSectionsRoute
   '/admin/currencies': typeof AuthenticatedAdminCurrenciesRoute
   '/admin/directory-filters': typeof AuthenticatedAdminDirectoryFiltersRoute
   '/admin/disciplines': typeof AuthenticatedAdminDisciplinesRoute
@@ -318,6 +327,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/breeds': typeof AuthenticatedAdminBreedsRoute
   '/_authenticated/admin/care-actions': typeof AuthenticatedAdminCareActionsRoute
   '/_authenticated/admin/competition-tiers': typeof AuthenticatedAdminCompetitionTiersRoute
+  '/_authenticated/admin/conformation-sections': typeof AuthenticatedAdminConformationSectionsRoute
   '/_authenticated/admin/currencies': typeof AuthenticatedAdminCurrenciesRoute
   '/_authenticated/admin/directory-filters': typeof AuthenticatedAdminDirectoryFiltersRoute
   '/_authenticated/admin/disciplines': typeof AuthenticatedAdminDisciplinesRoute
@@ -355,6 +365,7 @@ export interface FileRouteTypes {
     | '/admin/breeds'
     | '/admin/care-actions'
     | '/admin/competition-tiers'
+    | '/admin/conformation-sections'
     | '/admin/currencies'
     | '/admin/directory-filters'
     | '/admin/disciplines'
@@ -389,6 +400,7 @@ export interface FileRouteTypes {
     | '/admin/breeds'
     | '/admin/care-actions'
     | '/admin/competition-tiers'
+    | '/admin/conformation-sections'
     | '/admin/currencies'
     | '/admin/directory-filters'
     | '/admin/disciplines'
@@ -425,6 +437,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/breeds'
     | '/_authenticated/admin/care-actions'
     | '/_authenticated/admin/competition-tiers'
+    | '/_authenticated/admin/conformation-sections'
     | '/_authenticated/admin/currencies'
     | '/_authenticated/admin/directory-filters'
     | '/_authenticated/admin/disciplines'
@@ -678,6 +691,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminCurrenciesRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/conformation-sections': {
+      id: '/_authenticated/admin/conformation-sections'
+      path: '/conformation-sections'
+      fullPath: '/admin/conformation-sections'
+      preLoaderRoute: typeof AuthenticatedAdminConformationSectionsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/competition-tiers': {
       id: '/_authenticated/admin/competition-tiers'
       path: '/competition-tiers'
@@ -706,6 +726,7 @@ interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminBreedsRoute: typeof AuthenticatedAdminBreedsRoute
   AuthenticatedAdminCareActionsRoute: typeof AuthenticatedAdminCareActionsRoute
   AuthenticatedAdminCompetitionTiersRoute: typeof AuthenticatedAdminCompetitionTiersRoute
+  AuthenticatedAdminConformationSectionsRoute: typeof AuthenticatedAdminConformationSectionsRoute
   AuthenticatedAdminCurrenciesRoute: typeof AuthenticatedAdminCurrenciesRoute
   AuthenticatedAdminDirectoryFiltersRoute: typeof AuthenticatedAdminDirectoryFiltersRoute
   AuthenticatedAdminDisciplinesRoute: typeof AuthenticatedAdminDisciplinesRoute
@@ -738,6 +759,8 @@ const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminCareActionsRoute: AuthenticatedAdminCareActionsRoute,
   AuthenticatedAdminCompetitionTiersRoute:
     AuthenticatedAdminCompetitionTiersRoute,
+  AuthenticatedAdminConformationSectionsRoute:
+    AuthenticatedAdminConformationSectionsRoute,
   AuthenticatedAdminCurrenciesRoute: AuthenticatedAdminCurrenciesRoute,
   AuthenticatedAdminDirectoryFiltersRoute:
     AuthenticatedAdminDirectoryFiltersRoute,

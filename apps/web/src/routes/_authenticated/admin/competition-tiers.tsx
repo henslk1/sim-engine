@@ -10,8 +10,10 @@ type TierForm = {
   minScore: string
   advancementThreshold: string
   energyCost: string
+  entryFee: string
+  minWeeklyPoints: string
 }
-const emptyForm = (): TierForm => ({ name: "", tierIndex: "", minScore: "", advancementThreshold: "", energyCost: "0" })
+const emptyForm = (): TierForm => ({ name: "", tierIndex: "", minScore: "", advancementThreshold: "", energyCost: "0", entryFee: "0", minWeeklyPoints: "" })
 
 function CompetitionTiersPage() {
   const { data: gameData } = trpc.admin.game.get.useQuery()
@@ -64,6 +66,8 @@ function CompetitionTiersPage() {
       minScore: editing.minScore !== "" ? parseFloat(editing.minScore) : null,
       advancementThreshold: editing.advancementThreshold !== "" ? parseFloat(editing.advancementThreshold) : null,
       energyCost: parseFloat(editing.energyCost),
+      entryFee: editing.entryFee !== "" ? parseInt(editing.entryFee) : 0,
+      minWeeklyPointsForInvitational: editing.minWeeklyPoints !== "" ? parseFloat(editing.minWeeklyPoints) : null,
     })
   }
 
@@ -102,6 +106,7 @@ function CompetitionTiersPage() {
                   <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Min Score</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Adv. Threshold</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Energy</th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Entry Fee</th>
                   <th className="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Actions</th>
                 </tr>
               </thead>
@@ -113,6 +118,7 @@ function CompetitionTiersPage() {
                     <td className="px-4 py-2 text-muted-foreground">{t.minScore ?? "—"}</td>
                     <td className="px-4 py-2 text-muted-foreground">{t.advancementThreshold ?? "—"}</td>
                     <td className="px-4 py-2 text-muted-foreground">{t.energyCost}</td>
+                    <td className="px-4 py-2 text-muted-foreground">{t.entryFee}</td>
                     <td className="px-4 py-2 text-right space-x-1">
                       <Button size="sm" variant="ghost" onClick={() => {
                         setEditingId(t.id)
@@ -122,6 +128,8 @@ function CompetitionTiersPage() {
                           minScore: t.minScore?.toString() ?? "",
                           advancementThreshold: t.advancementThreshold?.toString() ?? "",
                           energyCost: t.energyCost.toString(),
+                          entryFee: t.entryFee.toString(),
+                          minWeeklyPoints: t.minWeeklyPointsForInvitational?.toString() ?? "",
                         })
                       }}>Edit</Button>
                       <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
@@ -202,6 +210,31 @@ function CompetitionTiersPage() {
                       value={editing.energyCost}
                       onChange={(e) => setEditing({ ...editing, energyCost: e.target.value })}
                       placeholder="e.g. 15"
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">Entry Fee</label>
+                    <Input
+                      type="number"
+                      step="1"
+                      min="0"
+                      value={editing.entryFee}
+                      onChange={(e) => setEditing({ ...editing, entryFee: e.target.value })}
+                      placeholder="0"
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">Min Weekly Points for Invitational <span className="font-normal">(optional)</span></label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={editing.minWeeklyPoints}
+                      onChange={(e) => setEditing({ ...editing, minWeeklyPoints: e.target.value })}
+                      placeholder="e.g. 100"
                       className="mt-1"
                     />
                   </div>
