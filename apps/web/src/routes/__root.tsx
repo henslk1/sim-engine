@@ -27,7 +27,10 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 function RootComponent() {
   const [trpcClient] = useState(() =>
     trpc.createClient({
-      links: [httpBatchLink({ url: "http://localhost:3000/trpc" })],
+      links: [httpBatchLink({ 
+        url: "http://localhost:3000/trpc",
+        fetch: (url, options) => fetch(url, { ...options, credentials: "include" }),
+      })],
     })
   )
 

@@ -19,7 +19,13 @@ app.use("*", cors({
 
 app.get("/health", (c) => c.json({ status: "ok" }))
 
-app.use("/trpc/*", trpcServer({ router: appRouter }))
+app.use("/trpc/*", trpcServer({
+  router: appRouter,
+  createContext: async (_opts, c) => {
+    const session = await auth.api.getSession({ headers: c.req.raw.headers })
+    return { userId: session?.user.id ?? null}
+  }
+}))
 
 app.on(["GET", "POST"], "/api/auth/**", (c) => auth.handler(c.req.raw))
 
