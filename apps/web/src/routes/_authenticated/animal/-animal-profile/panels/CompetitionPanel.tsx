@@ -1,7 +1,7 @@
 import type { AnimalProfile } from "../types"
-import { Panel, Badge, ActionButton, Meter } from "@/components/game/ui"
+import { Panel, ActionButton, Meter } from "@/components/game/ui"
 import { Trophy, CheckCircle, XCircle, Ban, MapPin } from "lucide-react"
-import { placementBadgeTone, getActiveRestrictions } from "../utils"
+import { getActiveRestrictions } from "../utils"
 
 type Cert = AnimalProfile["healthCertificates"][number]
 
@@ -22,12 +22,6 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
   const isRestricted = restrictions.has("COMPETITION") || restrictions.has("ALL")
 
   const requiredCertDefs = animal.game.healthCertificateDefs.filter((d) => d.requiredForCompetition)
-  const missingOrExpiredCerts = requiredCertDefs.filter((def) => {
-    const cert = animal.healthCertificates.find((c: Cert) => c.certDef.id === def.id)
-    return !cert || !cert.isValid || cert.expiresAtCycle <= animal.ageInCycles
-  })
-
-  const energyCost = currentTier?.tierDef.energyCost ?? 0
 
   return (
     <Panel title="Competition" icon={<Trophy className="size-4 text-chart-1" />}>
@@ -77,100 +71,62 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
             </ActionButton>
           )}
 
-          {currentTier && currentTier.disciplineDef.equipmentRequirements.length > 0 && (
-            <div className="mt-3">
-              <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Equipment</h4>
-              <div className="space-y-1">
-                {currentTier.disciplineDef.equipmentRequirements.map(
-                  (req: AnimalProfile["compTiers"][number]["disciplineDef"]["equipmentRequirements"][number]) => {
-                    const equipped = animal.equipment.filter(
-                      (eq: AnimalProfile["equipment"][number]) => eq.itemDef.id === req.itemDef.id
-                    ).length
-                    const met = equipped >= req.quantity
-                    return (
-                      <div key={req.id} className="flex items-center gap-2 text-[11px]">
-                        {met ? (
-                          <CheckCircle className="size-3.5 shrink-0 text-chart-2" />
-                        ) : (
-                          <XCircle className="size-3.5 shrink-0 text-destructive" />
-                        )}
-                        <span className={met ? "text-foreground" : "text-destructive"}>{req.itemDef.name}</span>
-                        {req.quantity > 1 && (
-                          <span className="ml-auto tabular-nums text-muted-foreground">
-                            {equipped}/{req.quantity}
-                          </span>
-                        )}
-                      </div>
-                    )
-                  }
-                )}
-              </div>
-            </div>
-          )}
-
-          {requiredCertDefs.length > 0 && (
-            <div className="mt-3">
-              <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Health Certificates
-              </h4>
-              <div className="space-y-1">
-                {requiredCertDefs.map((def) => {
-                  const cert = animal.healthCertificates.find((c: Cert) => c.certDef.id === def.id)
-                  const met = !!cert && cert.isValid && cert.expiresAtCycle > animal.ageInCycles
-                  return (
-                    <div key={def.id} className="flex items-center gap-2 text-[11px]">
-                      {met ? (
-                        <CheckCircle className="size-3.5 shrink-0 text-chart-2" />
-                      ) : (
-                        <XCircle className="size-3.5 shrink-0 text-destructive" />
-                      )}
-                      <span className={met ? "text-foreground" : "text-destructive"}>
-                        {def.name}
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
-          {animal.competitionEntries.length > 0 && (
-            <div className="mt-3">
-              <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Recent Entries</h4>
-              <div className="overflow-hidden rounded-md border border-border/70">
-                <table className="w-full text-left text-[11px]">
-                  <thead className="bg-secondary/50 text-muted-foreground">
-                    <tr>
-                      <th className="px-2 py-1 font-medium">Venue</th>
-                      <th className="px-2 py-1 font-medium">Tier</th>
-                      <th className="px-2 py-1 text-right font-medium">Result</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {animal.competitionEntries.map((entry: AnimalProfile["competitionEntries"][number]) => (
-                      <tr key={entry.id} className="border-t border-border/60">
-                        <td className="px-2 py-1 font-medium text-foreground">{entry.competition.venue.name}</td>
-                        <td className="px-2 py-1 text-muted-foreground">{entry.tierDef.name}</td>
-                        <td className="px-2 py-1 text-right">
-                          {entry.result ? (
-                            entry.result.placement !== null ? (
-                              <Badge tone={placementBadgeTone(entry.result.placement)}>
-                                #{entry.result.placement}
-                              </Badge>
+          {(currentTier?.disciplineDef.equipmentRequirements.length ?? 0) > 0 || requiredCertDefs.length > 0 ? (
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              {(currentTier?.disciplineDef.equipmentRequirements.length ?? 0) > 0 && (
+                <div>
+                  <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Equipment</h4>
+                  <div className="space-y-1">
+                    {currentTier!.disciplineDef.equipmentRequirements.map(
+                      (req: AnimalProfile["compTiers"][number]["disciplineDef"]["equipmentRequirements"][number]) => {
+                        const equipped = animal.equipment.filter(
+                          (eq: AnimalProfile["equipment"][number]) => eq.itemDef.id === req.itemDef.id
+                        ).length
+                        const met = equipped >= req.quantity
+                        return (
+                          <div key={req.id} className="flex items-center gap-1.5 text-[11px]">
+                            {met ? (
+                              <CheckCircle className="size-3.5 shrink-0 text-chart-2" />
                             ) : (
-                              <span className="tabular-nums text-foreground">{entry.result.score.toFixed(1)}</span>
-                            )
+                              <XCircle className="size-3.5 shrink-0 text-destructive" />
+                            )}
+                            <span className={met ? "text-foreground" : "text-destructive"}>{req.itemDef.name}</span>
+                            {req.quantity > 1 && (
+                              <span className="ml-auto tabular-nums text-muted-foreground">
+                                {equipped}/{req.quantity}
+                              </span>
+                            )}
+                          </div>
+                        )
+                      }
+                    )}
+                  </div>
+                </div>
+              )}
+              {requiredCertDefs.length > 0 && (
+                <div>
+                  <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Certificates</h4>
+                  <div className="space-y-1">
+                    {requiredCertDefs.map((def) => {
+                      const cert = animal.healthCertificates.find((c: Cert) => c.certDef.id === def.id)
+                      const met = !!cert && cert.isValid && cert.expiresAtCycle > animal.ageInCycles
+                      return (
+                        <div key={def.id} className="flex items-center gap-1.5 text-[11px]">
+                          {met ? (
+                            <CheckCircle className="size-3.5 shrink-0 text-chart-2" />
                           ) : (
-                            <span className="text-muted-foreground">—</span>
+                            <XCircle className="size-3.5 shrink-0 text-destructive" />
                           )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                          <span className={met ? "text-foreground" : "text-destructive"}>{def.name}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
-          )}
+          ) : null}
+
         </>
       ) : (
         <p className="text-[11px] text-muted-foreground">No discipline assigned</p>

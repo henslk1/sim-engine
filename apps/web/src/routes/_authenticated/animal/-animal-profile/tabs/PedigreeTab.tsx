@@ -6,25 +6,6 @@ import { getCOIColor } from "../utils"
 
 type Ancestor = AnimalProfile["ancestors"][number]
 
-// TEMP: set true to preview a full 3-gen pedigree with placeholder data
-const SHOW_PLACEHOLDER_PEDIGREE = true
-
-const PLACEHOLDER_ANCESTORS: Ancestor[] = [
-  { depth: 1, position: 2,  ancestor: { id: "p2",  name: "Thunderstrike",  sex: "MALE",   status: "BURIED",   image: null, bornAt: new Date("2010-01-01"), inbreedingCoefficient: 0.00, breed: { id: "b1", name: "Thoroughbred" } } },
-  { depth: 1, position: 3,  ancestor: { id: "p3",  name: "Silver Bell",    sex: "FEMALE", status: "DECEASED", image: null, bornAt: new Date("2011-03-15"), inbreedingCoefficient: 0.01, breed: { id: "b1", name: "Thoroughbred" } } },
-  { depth: 2, position: 4,  ancestor: { id: "p4",  name: "Iron Duke",      sex: "MALE",   status: "DECEASED", image: null, bornAt: new Date("2004-06-01"), inbreedingCoefficient: 0.00, breed: { id: "b1", name: "Thoroughbred" } } },
-  { depth: 2, position: 5,  ancestor: { id: "p5",  name: "Morning Frost",  sex: "FEMALE", status: "ALIVE",    image: null, bornAt: new Date("2005-09-20"), inbreedingCoefficient: 0.00, breed: { id: "b1", name: "Thoroughbred" } } },
-  { depth: 2, position: 6,  ancestor: { id: "p6",  name: "Noble Star",     sex: "MALE",   status: "BURIED",   image: null, bornAt: new Date("2003-04-10"), inbreedingCoefficient: 0.02, breed: { id: "b1", name: "Thoroughbred" } } },
-  { depth: 2, position: 7,  ancestor: { id: "p7",  name: "Velvet Rose",    sex: "FEMALE", status: "DECEASED", image: null, bornAt: new Date("2004-07-22"), inbreedingCoefficient: 0.00, breed: { id: "b1", name: "Thoroughbred" } } },
-  { depth: 3, position: 8,  ancestor: { id: "p8",  name: "Midnight Fury",  sex: "MALE",   status: "BURIED",   image: null, bornAt: new Date("1997-02-14"), inbreedingCoefficient: 0.00, breed: { id: "b1", name: "Thoroughbred" } } },
-  { depth: 3, position: 9,  ancestor: { id: "p9",  name: "Golden Haze",    sex: "FEMALE", status: "BURIED",   image: null, bornAt: new Date("1998-05-05"), inbreedingCoefficient: 0.00, breed: { id: "b1", name: "Thoroughbred" } } },
-  { depth: 3, position: 10, ancestor: { id: "p10", name: "Dark Wind",      sex: "MALE",   status: "BURIED",   image: null, bornAt: new Date("1997-11-30"), inbreedingCoefficient: 0.00, breed: { id: "b1", name: "Thoroughbred" } } },
-  { depth: 3, position: 11, ancestor: { id: "p11", name: "River Mist",     sex: "FEMALE", status: "DECEASED", image: null, bornAt: new Date("1999-01-18"), inbreedingCoefficient: 0.03, breed: { id: "b1", name: "Thoroughbred" } } },
-  { depth: 3, position: 12, ancestor: { id: "p12", name: "Storm King",     sex: "MALE",   status: "BURIED",   image: null, bornAt: new Date("1996-08-08"), inbreedingCoefficient: 0.00, breed: { id: "b1", name: "Thoroughbred" } } },
-  { depth: 3, position: 13, ancestor: { id: "p13", name: "Crimson Dawn",   sex: "FEMALE", status: "BURIED",   image: null, bornAt: new Date("1997-03-27"), inbreedingCoefficient: 0.00, breed: { id: "b1", name: "Thoroughbred" } } },
-  { depth: 3, position: 14, ancestor: { id: "p14", name: "Iron Crown",     sex: "MALE",   status: "DECEASED", image: null, bornAt: new Date("1996-12-01"), inbreedingCoefficient: 0.01, breed: { id: "b1", name: "Thoroughbred" } } },
-  { depth: 3, position: 15, ancestor: { id: "p15", name: "Silver Moon",    sex: "FEMALE", status: "ALIVE",    image: null, bornAt: new Date("1998-06-14"), inbreedingCoefficient: 0.00, breed: { id: "b1", name: "Thoroughbred" } } },
-]
 
 const TOTAL_ROWS = 8
 const ROW_HEIGHT = "2.25rem"
@@ -166,7 +147,7 @@ function PedigreeColumn({
 
 export function PedigreeTab({ animal }: { animal: AnimalProfile }) {
   const coiColor = getCOIColor(animal.inbreedingCoefficient)
-  const ancestors = SHOW_PLACEHOLDER_PEDIGREE ? PLACEHOLDER_ANCESTORS : animal.ancestors
+  const ancestors = animal.ancestors
   const positionMap = buildPositionMap(ancestors)
 
   return (

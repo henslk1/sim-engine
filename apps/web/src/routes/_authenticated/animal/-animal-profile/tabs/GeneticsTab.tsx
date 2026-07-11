@@ -38,7 +38,7 @@ function GenotypeTable({
       <div className="flex items-center justify-between">
         {untestedCount > 0 && (
           <span className="text-[11px] text-muted-foreground">
-            {untestedCount} untested · scored by inferred probability
+            {untestedCount} untested
           </span>
         )}
         <div className="ml-auto flex items-center gap-2">

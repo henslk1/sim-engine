@@ -19,9 +19,9 @@ export function OwnerActionList() {
           key={label}
           type="button"
           disabled
-          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs font-medium text-foreground transition-colors hover:bg-secondary/70 disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex w-full items-center gap-3 px-3 py-3 text-left text-sm font-medium text-foreground transition-colors hover:bg-secondary/50 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <Icon className="size-4 text-muted-foreground" />
+          <Icon className="size-5 shrink-0 text-muted-foreground" />
           <span className="flex-1">{label}</span>
         </button>
       ))}

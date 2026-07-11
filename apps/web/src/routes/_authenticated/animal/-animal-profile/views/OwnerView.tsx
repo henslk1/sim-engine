@@ -123,11 +123,10 @@ export function OwnerView({ animal, animalId }: { animal: AnimalProfile; animalI
             <HealthPanel animal={animal} />
           </div>
 
-          {/* Col 2 — Training / Competition / Equipped */}
-          <div className="flex min-h-0 flex-col gap-3 min-[1400px]:grid min-[1400px]:grid-rows-[auto_auto_minmax(0,1fr)]">
+          {/* Col 2 — Training / Competition */}
+          <div className="flex min-h-0 flex-col gap-3 min-[1400px]:grid min-[1400px]:grid-rows-[auto_minmax(0,1fr)]">
             <TrainingPanel animal={animal} config={config} />
             <CompetitionPanel animal={animal} />
-            <EquippedPanel animal={animal} />
           </div>
 
           {/* Col 3 — Animal image + WorkspaceTabs */}
@@ -143,8 +142,8 @@ export function OwnerView({ animal, animalId }: { animal: AnimalProfile; animalI
             <WorkspaceTabs animal={animal} animalId={animalId} cycleToAge={cycleToAge} config={config} />
           </div>
 
-          {/* Col 4+5 — Care / Owner Actions / DailyLog / Conformation / Personality / Equipped */}
-          <div className="flex min-h-0 flex-col gap-3 min-[1400px]:col-span-2 min-[1400px]:grid min-[1400px]:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] min-[1400px]:grid-rows-[auto_auto_auto_minmax(0,1fr)]">
+          {/* Col 4+5 — Care / Owner Actions / Equipped / Conformation / DailyLog / Personality / Notes */}
+          <div className="flex min-h-0 flex-col gap-3 min-[1400px]:col-span-2 min-[1400px]:grid min-[1400px]:grid-flow-row-dense min-[1400px]:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] min-[1400px]:grid-rows-[auto_auto_auto_minmax(0,1fr)]">
             <DailyCarePanel animal={animal} />
 
             {/* Owner Actions */}
@@ -152,13 +151,18 @@ export function OwnerView({ animal, animalId }: { animal: AnimalProfile; animalI
               <header className="border-b border-border bg-secondary/40 px-3 py-2">
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">Owner Actions</h3>
               </header>
-              <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto p-2">
+              <div className="min-h-0 flex-1 divide-y divide-border/50 overflow-y-auto">
                 <OwnerActionList />
               </div>
             </div>
 
+            {/* Equipped — pinned to col 2, directly under Owner Actions */}
+            <div className="min-[1400px]:col-start-2">
+              <EquippedPanel animal={animal} />
+            </div>
+
             <ConformationPanel animal={animal} />
-            <div className="min-[1400px]:row-span-3 min-[1400px]:min-h-0">
+            <div className="min-[1400px]:col-start-2 min-[1400px]:row-span-2 min-[1400px]:min-h-0">
               <DailyLogPanel animal={animal} />
             </div>
 
