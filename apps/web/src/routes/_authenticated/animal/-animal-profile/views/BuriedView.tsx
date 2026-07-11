@@ -9,7 +9,7 @@ export function BuriedView({ animal }: { animal: AnimalProfile }) {
   const breedLabel = formatBreedLabel(animal)
 
   return (
-    <div className="flex h-dvh flex-col items-center justify-center bg-muted/20 p-6">
+    <div className="flex h-full flex-col items-center justify-center bg-muted/20 p-6">
       <div className="w-full max-w-lg rounded-xl border border-border/50 bg-card/80 shadow-sm">
 
         {/* Header */}

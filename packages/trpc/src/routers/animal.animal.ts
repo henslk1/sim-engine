@@ -42,4 +42,14 @@ export const animalAnimalRouter = router({
         select: { id: true, name: true },
       })
     ),
+
+  updateNotes: publicProcedure
+    .input(z.object({ animalId: z.string(), notes: z.string().max(5000) }))
+    .mutation(({ input }) =>
+      db.animal.update({
+        where: { id: input.animalId },
+        data: { notes: input.notes.trim() || null },
+        select: { id: true, notes: true },
+      })
+    ),
 })

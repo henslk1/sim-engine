@@ -50,7 +50,7 @@ export function DeceasedPendingView({ animal }: { animal: AnimalProfile; animalI
   })
 
   return (
-    <div className="flex min-h-dvh flex-col bg-muted/20">
+    <div className="flex min-h-full flex-col bg-muted/20">
 
       {/* Header */}
       <div className="border-b border-border bg-card px-6 py-5">

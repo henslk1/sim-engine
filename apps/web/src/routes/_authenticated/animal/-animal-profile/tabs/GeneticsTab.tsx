@@ -15,14 +15,14 @@ const GENETICS_SUB_TABS: { id: GeneticsSubTab; label: string }[] = [
   { id: "stats", label: "Stats" },
 ]
 
-const TESTS_PER_CYCLE = 2
-
 function GenotypeTable({
   genotypes,
+  testsPerCycle,
   testedThisCycle,
   onTest,
 }: {
   genotypes: Genotype[]
+  testsPerCycle: number
   testedThisCycle: number
   onTest?: (locusId: string) => void
 }) {
@@ -31,7 +31,7 @@ function GenotypeTable({
   }
 
   const untestedCount = genotypes.filter((g) => !g.isTestedByOwner).length
-  const testsRemaining = Math.max(0, TESTS_PER_CYCLE - testedThisCycle)
+  const testsRemaining = Math.max(0, testsPerCycle - testedThisCycle)
 
   return (
     <div className="space-y-2">
@@ -42,7 +42,7 @@ function GenotypeTable({
           </span>
         )}
         <div className="ml-auto flex items-center gap-2">
-          {testsRemaining < TESTS_PER_CYCLE && (
+          {testsRemaining < testsPerCycle && (
             <Badge tone="muted">{testsRemaining} test{testsRemaining !== 1 ? "s" : ""} remaining today</Badge>
           )}
           <ActionButton variant="soft" disabled className="h-6 px-2 text-[11px]">
@@ -127,9 +127,17 @@ export function GeneticsTab({
       g.locus.panelEntries.some((e) => e.panelDef.panelType === "CONFORMATION")
   )
 
-  // Count tests done this cycle (testedAt within current cycle — approximated by today's date for now)
-  // TODO: add testedCycle field to AnimalGenotype schema for accurate per-cycle tracking
-  const testedThisCycle = 0
+  const testsPerCycle = config?.maxLocusTestsPerCycle ?? 2
+
+  // Count tests done in the most recent test cycle seen across all genotypes
+  const allTestedCycles = animal.genotypes
+    .filter((g) => g.testedCycle !== null)
+    .map((g) => g.testedCycle as number)
+  const latestTestedCycle = allTestedCycles.length > 0 ? Math.max(...allTestedCycles) : null
+  const testedThisCycle =
+    latestTestedCycle !== null
+      ? animal.genotypes.filter((g) => g.testedCycle === latestTestedCycle).length
+      : 0
 
   return (
     <div className="space-y-3">
@@ -152,13 +160,13 @@ export function GeneticsTab({
       </div>
 
       {subTab === "color" && (
-        <GenotypeTable genotypes={colorGenotypes} testedThisCycle={testedThisCycle} />
+        <GenotypeTable genotypes={colorGenotypes} testsPerCycle={testsPerCycle} testedThisCycle={testedThisCycle} />
       )}
       {subTab === "health" && (
-        <GenotypeTable genotypes={healthGenotypes} testedThisCycle={testedThisCycle} />
+        <GenotypeTable genotypes={healthGenotypes} testsPerCycle={testsPerCycle} testedThisCycle={testedThisCycle} />
       )}
       {subTab === "conformation" && (
-        <GenotypeTable genotypes={conformationGenotypes} testedThisCycle={testedThisCycle} />
+        <GenotypeTable genotypes={conformationGenotypes} testsPerCycle={testsPerCycle} testedThisCycle={testedThisCycle} />
       )}
       {subTab === "stats" && <InnateStats animal={animal} config={config} />}
     </div>

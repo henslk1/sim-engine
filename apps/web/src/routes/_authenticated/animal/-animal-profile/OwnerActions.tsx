@@ -1,10 +1,10 @@
-import { LayoutGrid, Package, Award, Stethoscope, Tag, Store, Gift } from "lucide-react"
+import { LayoutGrid, Package, Baby, Stethoscope, Tag, Store, Gift } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
 const OWNER_ACTIONS: { Icon: LucideIcon; label: string }[] = [
   { Icon: LayoutGrid, label: "Move to Sub-Container" },
   { Icon: Package, label: "Equip / Unequip Item" },
-  { Icon: Award, label: "Create Stud Listing" },
+  { Icon: Baby, label: "Breeding Listing" },
   { Icon: Stethoscope, label: "Visit Vet" },
   { Icon: Tag, label: "Brand this Animal" },
   { Icon: Store, label: "List on Marketplace" },

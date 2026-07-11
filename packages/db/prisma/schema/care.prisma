@@ -59,6 +59,7 @@ model LongTermCareActionDef {
   name              String
   intervalCycles    Int
   gracePeriodCycles Int                        @default(0)
+  currencyAmount    Int?
   records           AnimalLongTermCareRecord[]
   game              Game                       @relation(fields: [gameId], references: [id])
 

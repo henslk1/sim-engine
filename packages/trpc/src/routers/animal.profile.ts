@@ -168,6 +168,7 @@ type AnimalProfileType = Prisma.AnimalGetPayload<{
             trainingCeilingMultiplier: true
             immunityMin: true
             immunityMax: true
+            maxLocusTestsPerCycle: true
           }
         }
         careActionDefs: {
@@ -387,6 +388,7 @@ export const animalProfileRouter = router({
                   trainingCeilingMultiplier: true,
                   immunityMin: true,
                   immunityMax: true,
+                  maxLocusTestsPerCycle: true,
                 },
               },
               careActionDefs: {
@@ -436,6 +438,26 @@ export const animalProfileRouter = router({
             ageInCycles: true,
             bornAt: true,
             breed: { select: { id: true, name: true } },
+            breedComposition: { select: { breedId: true, percentage: true } },
+            conformationScores: {
+              select: { score: true, breedId: true },
+              orderBy: { calculatedAt: "desc" },
+              take: 1,
+            },
+            pregnancyOffspring: {
+              take: 1,
+              select: {
+                pregnancy: {
+                  select: {
+                    breedingRecord: {
+                      select: {
+                        dam: { select: { id: true, name: true } },
+                      },
+                    },
+                  },
+                },
+              },
+            },
           },
           orderBy: { bornAt: "desc" },
         })

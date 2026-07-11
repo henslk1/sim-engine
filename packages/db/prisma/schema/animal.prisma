@@ -138,7 +138,7 @@ model BreedPersonalityProfile {
 }
 
 model Animal {
-  id                              String                     @id @default(cuid())
+  id                              String                           @id @default(cuid())
   gameId                          String
   playerAccountId                 String
   breedId                         String
@@ -147,30 +147,31 @@ model Animal {
   sex                             AnimalSex
   lifeStageId                     String
   image                           String?
-  generation                      Int                        @default(1)
-  ageInCycles                     Int                        @default(0)
-  bornAt                          DateTime                   @default(now())
+  generation                      Int                              @default(1)
+  ageInCycles                     Int                              @default(0)
+  bornAt                          DateTime                         @default(now())
   diedAt                          DateTime?
   causeOfDeath                    String?
-  status                          AnimalStatus               @default(ALIVE)
+  status                          AnimalStatus                     @default(ALIVE)
   deletedAt                       DateTime?
-  isCastrated                     Boolean                    @default(false)
+  isCastrated                     Boolean                          @default(false)
   phenotypeDescription            String?
-  inbreedingCoefficient           Float                      @default(0)
+  notes                           String?
+  inbreedingCoefficient           Float                            @default(0)
   fertility                       Float
-  isTutorialAnimal                Boolean                    @default(false)
+  isTutorialAnimal                Boolean                          @default(false)
   breedGeneration                 Int?
   lifeExpectancy                  Int?
   disciplineDefId                 String?
   subContainerId                  String?
   stats                           AnimalStat[]
   statHistory                     AnimalStatHistory[]
-  ancestors                       AnimalAncestor[]           @relation("AnimalLineage")
-  offspring                       AnimalAncestor[]           @relation("AncestorAnimals")
+  ancestors                       AnimalAncestor[]                 @relation("AnimalLineage")
+  offspring                       AnimalAncestor[]                 @relation("AncestorAnimals")
   breedComposition                AnimalBreedComposition[]
   brands                          AnimalBrand[]
-  dailyLogs                       AnimalDailyLog[]           @relation("DailyLogAnimal")
-  partnerLogs                     AnimalDailyLog[]           @relation("DailyLogPartner")
+  dailyLogs                       AnimalDailyLog[]                 @relation("DailyLogAnimal")
+  partnerLogs                     AnimalDailyLog[]                 @relation("DailyLogPartner")
   genotypes                       AnimalGenotype[]
   conformationScores              AnimalConformationScore[]
   conformationSectionScores       AnimalConformationSectionScore[]
@@ -195,8 +196,8 @@ model Animal {
   titles                          AnimalTitle[]
   equipment                       AnimalEquipment[]
   breedingListings                BreedingListing[]
-  breedingRecordsAsSire           BreedingRecord[]           @relation("BreedingSire")
-  breedingRecordsAsDam            BreedingRecord[]           @relation("BreedingDam")
+  breedingRecordsAsSire           BreedingRecord[]                 @relation("BreedingSire")
+  breedingRecordsAsDam            BreedingRecord[]                 @relation("BreedingDam")
   pregnancies                     Pregnancy[]
   pregnancyOffspring              PregnancyOffspring[]
   geneticMaterials                GeneticMaterial[]
@@ -205,7 +206,7 @@ model Animal {
   weeklyPoints                    AnimalWeeklyPoints[]
   competitionEntries              CompetitionEntry[]
   recordEntries                   RecordEntry[]
-  subContainer                    SubContainer?              @relation(fields: [subContainerId], references: [id])
+  subContainer                    SubContainer?                    @relation(fields: [subContainerId], references: [id])
   appliedItems                    AnimalAppliedItem[]
   marketplaceListings             MarketplaceListingAnimal[]
   marketplaceOfferAnimals         MarketplaceOfferAnimal[]
@@ -218,14 +219,14 @@ model Animal {
   foundationAnimalRecords         FoundationAnimal[]
   followers                       Follow[]
   userReports                     UserReport[]
-  game                            Game                       @relation(fields: [gameId], references: [id])
-  playerAccount                   PlayerAccount              @relation("AnimalOwner", fields: [playerAccountId], references: [id])
-  breeder                         PlayerAccount?             @relation("AnimalBreeder", fields: [breederId], references: [id])
-  breed                           Breed                      @relation(fields: [breedId], references: [id])
-  lifeStage                       LifeStageDef               @relation(fields: [lifeStageId], references: [id])
-  disciplineDef                   DisciplineDef?             @relation(fields: [disciplineDefId], references: [id])
-  createdAt                       DateTime                   @default(now())
-  updatedAt                       DateTime                   @updatedAt
+  game                            Game                             @relation(fields: [gameId], references: [id])
+  playerAccount                   PlayerAccount                    @relation("AnimalOwner", fields: [playerAccountId], references: [id])
+  breeder                         PlayerAccount?                   @relation("AnimalBreeder", fields: [breederId], references: [id])
+  breed                           Breed                            @relation(fields: [breedId], references: [id])
+  lifeStage                       LifeStageDef                     @relation(fields: [lifeStageId], references: [id])
+  disciplineDef                   DisciplineDef?                   @relation(fields: [disciplineDefId], references: [id])
+  createdAt                       DateTime                         @default(now())
+  updatedAt                       DateTime                         @updatedAt
 }
 
 model AnimalStat {
@@ -257,6 +258,7 @@ model AnimalAncestor {
   animalId   String
   ancestorId String
   depth      Int
+  position   Int?
   animal     Animal @relation("AnimalLineage", fields: [animalId], references: [id])
   ancestor   Animal @relation("AncestorAnimals", fields: [ancestorId], references: [id])
 

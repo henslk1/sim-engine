@@ -15,6 +15,7 @@ model Locus {
   name                   String
   displayGroup           String?
   biasTarget             LocusBiasTarget             @default(NONE)
+  minTestCycle           Int?
   alleles                Allele[]
   expressionRules        ExpressionRule[]
   panelEntries           GeneticPanelLocus[]
@@ -117,6 +118,7 @@ model AnimalGenotype {
   alleleTwoId     String
   isTestedByOwner Boolean   @default(false)
   testedAt        DateTime?
+  testedCycle     Int?
   animal          Animal    @relation(fields: [animalId], references: [id])
   locus           Locus     @relation(fields: [locusId], references: [id])
   alleleOne       Allele    @relation("AlleleOne", fields: [alleleOneId], references: [id])
@@ -138,13 +140,13 @@ model AnimalConformationScore {
 }
 
 model ConformationSection {
-  id           String                         @id @default(cuid())
-  gameId       String
-  name         String
-  displayOrder Int                            @default(0)
-  entries      ConformationSectionEntry[]
+  id            String                           @id @default(cuid())
+  gameId        String
+  name          String
+  displayOrder  Int                              @default(0)
+  entries       ConformationSectionEntry[]
   sectionScores AnimalConformationSectionScore[]
-  game         Game                           @relation(fields: [gameId], references: [id])
+  game          Game                             @relation(fields: [gameId], references: [id])
 
   @@unique([gameId, name])
 }

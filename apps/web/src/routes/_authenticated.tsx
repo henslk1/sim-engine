@@ -12,9 +12,9 @@ function AuthenticatedLayout() {
   const { session } = Route.useRouteContext()
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="flex h-dvh flex-col overflow-hidden">
       <Header session={session!} />
-      <main className="flex-1">
+      <main className="min-h-0 flex-1 overflow-auto">
         <Outlet />
       </main>
     </div>

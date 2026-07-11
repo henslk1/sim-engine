@@ -1,10 +1,18 @@
 import type { AnimalProfile } from "../types"
-import { Panel, Badge } from "@/components/game/ui"
-import { Package } from "lucide-react"
+import { Panel, Badge, ActionButton } from "@/components/game/ui"
+import { Package, ShoppingBag } from "lucide-react"
 
 export function EquippedPanel({ animal }: { animal: AnimalProfile }) {
   return (
-    <Panel title="Equipped" icon={<Package className="size-4 text-muted-foreground" />}>
+    <Panel
+      title="Equipped"
+      icon={<Package className="size-4 text-muted-foreground" />}
+      action={
+        <ActionButton variant="soft" disabled className="h-6 px-2 text-[11px]">
+          <ShoppingBag className="size-3" /> Visit Store
+        </ActionButton>
+      }
+    >
       {animal.equipment.length === 0 ? (
         <p className="text-[11px] text-muted-foreground">No items equipped</p>
       ) : (

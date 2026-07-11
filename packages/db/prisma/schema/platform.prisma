@@ -462,6 +462,7 @@ model GameConfig {
   energyLowCarePenalty      Float    @default(0)
   cyclesPerYear             Int      @default(12)
   lifeExpectancyBaseline    Int?
+  maxLocusTestsPerCycle     Int      @default(2)
   game                      Game     @relation(fields: [gameId], references: [id])
   createdAt                 DateTime @default(now())
   updatedAt                 DateTime @updatedAt

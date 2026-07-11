@@ -1,15 +1,178 @@
+import { Link } from "@tanstack/react-router"
 import type { AnimalProfile } from "../types"
 import { Badge } from "@/components/game/ui"
 import { cn } from "@/lib/utils"
 import { getCOIColor } from "../utils"
 
+type Ancestor = AnimalProfile["ancestors"][number]
+
+// TEMP: set true to preview a full 3-gen pedigree with placeholder data
+const SHOW_PLACEHOLDER_PEDIGREE = true
+
+const PLACEHOLDER_ANCESTORS: Ancestor[] = [
+  { depth: 1, position: 2,  ancestor: { id: "p2",  name: "Thunderstrike",  sex: "MALE",   status: "BURIED",   image: null, bornAt: new Date("2010-01-01"), inbreedingCoefficient: 0.00, breed: { id: "b1", name: "Thoroughbred" } } },
+  { depth: 1, position: 3,  ancestor: { id: "p3",  name: "Silver Bell",    sex: "FEMALE", status: "DECEASED", image: null, bornAt: new Date("2011-03-15"), inbreedingCoefficient: 0.01, breed: { id: "b1", name: "Thoroughbred" } } },
+  { depth: 2, position: 4,  ancestor: { id: "p4",  name: "Iron Duke",      sex: "MALE",   status: "DECEASED", image: null, bornAt: new Date("2004-06-01"), inbreedingCoefficient: 0.00, breed: { id: "b1", name: "Thoroughbred" } } },
+  { depth: 2, position: 5,  ancestor: { id: "p5",  name: "Morning Frost",  sex: "FEMALE", status: "ALIVE",    image: null, bornAt: new Date("2005-09-20"), inbreedingCoefficient: 0.00, breed: { id: "b1", name: "Thoroughbred" } } },
+  { depth: 2, position: 6,  ancestor: { id: "p6",  name: "Noble Star",     sex: "MALE",   status: "BURIED",   image: null, bornAt: new Date("2003-04-10"), inbreedingCoefficient: 0.02, breed: { id: "b1", name: "Thoroughbred" } } },
+  { depth: 2, position: 7,  ancestor: { id: "p7",  name: "Velvet Rose",    sex: "FEMALE", status: "DECEASED", image: null, bornAt: new Date("2004-07-22"), inbreedingCoefficient: 0.00, breed: { id: "b1", name: "Thoroughbred" } } },
+  { depth: 3, position: 8,  ancestor: { id: "p8",  name: "Midnight Fury",  sex: "MALE",   status: "BURIED",   image: null, bornAt: new Date("1997-02-14"), inbreedingCoefficient: 0.00, breed: { id: "b1", name: "Thoroughbred" } } },
+  { depth: 3, position: 9,  ancestor: { id: "p9",  name: "Golden Haze",    sex: "FEMALE", status: "BURIED",   image: null, bornAt: new Date("1998-05-05"), inbreedingCoefficient: 0.00, breed: { id: "b1", name: "Thoroughbred" } } },
+  { depth: 3, position: 10, ancestor: { id: "p10", name: "Dark Wind",      sex: "MALE",   status: "BURIED",   image: null, bornAt: new Date("1997-11-30"), inbreedingCoefficient: 0.00, breed: { id: "b1", name: "Thoroughbred" } } },
+  { depth: 3, position: 11, ancestor: { id: "p11", name: "River Mist",     sex: "FEMALE", status: "DECEASED", image: null, bornAt: new Date("1999-01-18"), inbreedingCoefficient: 0.03, breed: { id: "b1", name: "Thoroughbred" } } },
+  { depth: 3, position: 12, ancestor: { id: "p12", name: "Storm King",     sex: "MALE",   status: "BURIED",   image: null, bornAt: new Date("1996-08-08"), inbreedingCoefficient: 0.00, breed: { id: "b1", name: "Thoroughbred" } } },
+  { depth: 3, position: 13, ancestor: { id: "p13", name: "Crimson Dawn",   sex: "FEMALE", status: "BURIED",   image: null, bornAt: new Date("1997-03-27"), inbreedingCoefficient: 0.00, breed: { id: "b1", name: "Thoroughbred" } } },
+  { depth: 3, position: 14, ancestor: { id: "p14", name: "Iron Crown",     sex: "MALE",   status: "DECEASED", image: null, bornAt: new Date("1996-12-01"), inbreedingCoefficient: 0.01, breed: { id: "b1", name: "Thoroughbred" } } },
+  { depth: 3, position: 15, ancestor: { id: "p15", name: "Silver Moon",    sex: "FEMALE", status: "ALIVE",    image: null, bornAt: new Date("1998-06-14"), inbreedingCoefficient: 0.00, breed: { id: "b1", name: "Thoroughbred" } } },
+]
+
+const TOTAL_ROWS = 8
+const ROW_HEIGHT = "2.25rem"
+
+function getGridRowStyle(position: number) {
+  const depth = Math.floor(Math.log2(position))
+  const indexInDepth = position - Math.pow(2, depth)
+  const rowSpan = TOTAL_ROWS / Math.pow(2, depth)
+  const rowStart = indexInDepth * rowSpan + 1
+  return { gridRow: `${rowStart} / span ${rowSpan}` }
+}
+
+function buildPositionMap(ancestors: Ancestor[]) {
+  const map = new Map<number, Ancestor>()
+  const byDepth = new Map<number, Ancestor[]>()
+
+  for (const a of ancestors) {
+    if (!byDepth.has(a.depth)) byDepth.set(a.depth, [])
+    byDepth.get(a.depth)!.push(a)
+  }
+
+  for (const [depth, items] of byDepth) {
+    const base = Math.pow(2, depth)
+    const sorted = [...items].sort((a, b) => {
+      if (a.position !== null && b.position !== null) return a.position - b.position
+      if (a.position !== null) return -1
+      if (b.position !== null) return 1
+      if (a.ancestor.sex !== b.ancestor.sex) return a.ancestor.sex === "MALE" ? -1 : 1
+      return 0
+    })
+    sorted.forEach((a, i) => {
+      map.set(a.position ?? (base + i), a)
+    })
+  }
+
+  return map
+}
+
+function centerYPct(position: number): string {
+  const depth = Math.floor(Math.log2(position))
+  const indexInDepth = position - Math.pow(2, depth)
+  const rowsPerNode = TOTAL_ROWS / Math.pow(2, depth)
+  const rowStart = indexInDepth * rowsPerNode
+  return `${((rowStart + rowsPerNode / 2) / TOTAL_ROWS) * 100}%`
+}
+
+function PedigreeConnectors({ positionMap }: { positionMap: Map<number, Ancestor> }) {
+  // Approximate column edge positions as % of total grid width (3 equal cols, gap-1)
+  const C1R = "33%"
+  const MID12 = "33.5%"
+  const C2L = "34%"
+  const C2R = "66%"
+  const MID23 = "66.5%"
+  const C3L = "67%"
+
+  const lines: React.ReactElement[] = []
+
+  function addBranch(parentPos: number, c1r: string, mid: string, c2l: string) {
+    if (!positionMap.has(parentPos)) return
+    const child1 = parentPos * 2
+    const child2 = parentPos * 2 + 1
+    const pY = centerYPct(parentPos)
+    const c1Y = centerYPct(child1)
+    const c2Y = centerYPct(child2)
+
+    // horizontal: parent → fork
+    lines.push(<line key={`h0-${parentPos}`} x1={c1r} y1={pY} x2={mid} y2={pY} />)
+    // vertical: fork bar
+    lines.push(<line key={`v-${parentPos}`} x1={mid} y1={c1Y} x2={mid} y2={c2Y} />)
+    // horizontal: fork → child 1
+    if (positionMap.has(child1))
+      lines.push(<line key={`h1-${child1}`} x1={mid} y1={c1Y} x2={c2l} y2={c1Y} />)
+    // horizontal: fork → child 2
+    if (positionMap.has(child2))
+      lines.push(<line key={`h2-${child2}`} x1={mid} y1={c2Y} x2={c2l} y2={c2Y} />)
+  }
+
+  // col 1 → col 2
+  addBranch(2, C1R, MID12, C2L)
+  addBranch(3, C1R, MID12, C2L)
+
+  // col 2 → col 3
+  for (const p of [4, 5, 6, 7]) addBranch(p, C2R, MID23, C3L)
+
+  return (
+    <svg
+      aria-hidden
+      className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
+      style={{ stroke: "var(--border)", strokeWidth: 1, fill: "none", strokeOpacity: 0.6 }}
+    >
+      {lines}
+    </svg>
+  )
+}
+
+function PedigreeNode({ ancestor }: { ancestor: Ancestor }) {
+  return (
+    <div className="text-center">
+      <Link
+        to="/animal/$animalId"
+        params={{ animalId: ancestor.ancestor.id }}
+        className="block text-[11px] font-semibold text-foreground transition-colors hover:text-primary"
+      >
+        {ancestor.ancestor.name}
+      </Link>
+      <span className="block text-[10px] text-muted-foreground">
+        {ancestor.ancestor.breed.name}
+      </span>
+    </div>
+  )
+}
+
+function PedigreeColumn({
+  positions,
+  positionMap,
+}: {
+  positions: number[]
+  positionMap: Map<number, Ancestor>
+}) {
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateRows: `repeat(${TOTAL_ROWS}, ${ROW_HEIGHT})`,
+        gap: "0.125rem",
+      }}
+    >
+      {positions.map((pos) => {
+        const ancestor = positionMap.get(pos)
+        return (
+          <div key={pos} style={getGridRowStyle(pos)} className="flex items-center justify-center">
+            {ancestor && <PedigreeNode ancestor={ancestor} />}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export function PedigreeTab({ animal }: { animal: AnimalProfile }) {
   const coiColor = getCOIColor(animal.inbreedingCoefficient)
+  const ancestors = SHOW_PLACEHOLDER_PEDIGREE ? PLACEHOLDER_ANCESTORS : animal.ancestors
+  const positionMap = buildPositionMap(ancestors)
 
   return (
     <div>
       {animal.breedComposition.length > 0 && (
-        <div className="mb-3 flex flex-wrap gap-1.5">
+        <div className="mb-2 flex flex-wrap gap-1.5">
           {animal.breedComposition.map((bc: AnimalProfile["breedComposition"][number]) => (
             <Badge key={bc.breedId} tone="outline">
               {bc.breed.name} · {Math.round(bc.percentage)}%
@@ -18,7 +181,7 @@ export function PedigreeTab({ animal }: { animal: AnimalProfile }) {
         </div>
       )}
 
-      <div className="mb-3 flex items-center gap-4 border-b border-border pb-2">
+      <div className="mb-2 flex flex-wrap items-center gap-4 border-b border-border pb-2">
         <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           COI —{" "}
           <span className={cn("font-bold tabular-nums", coiColor)}>
@@ -31,53 +194,19 @@ export function PedigreeTab({ animal }: { animal: AnimalProfile }) {
         </span>
       </div>
 
-      <p className="mb-3 text-[11px] text-muted-foreground">
+      <p className="mb-2 text-[11px] text-muted-foreground">
         Bred by{" "}
         <span className="font-medium text-foreground">{animal.breeder?.username ?? "Unknown"}</span>
       </p>
 
-      {animal.ancestors.length === 0 ? (
+      {ancestors.length === 0 ? (
         <p className="text-[11px] text-muted-foreground">No pedigree on record.</p>
       ) : (
-        <div className="overflow-hidden rounded-md border border-border/70">
-          <table className="w-full text-left text-[11px]">
-            <thead className="bg-secondary/50 text-muted-foreground">
-              <tr>
-                <th className="px-2 py-1 font-medium">Relationship</th>
-                <th className="px-2 py-1 font-medium">Name</th>
-                <th className="px-2 py-1 font-medium">Breed</th>
-                <th className="px-2 py-1 font-medium">Sex</th>
-                <th className="px-2 py-1 font-medium">Status</th>
-                <th className="px-2 py-1 text-right font-medium">COI</th>
-              </tr>
-            </thead>
-            <tbody>
-              {animal.ancestors.map((a: AnimalProfile["ancestors"][number]) => {
-                const rel =
-                  a.depth === 1
-                    ? "Parent"
-                    : a.depth === 2
-                      ? "Grandparent"
-                      : a.depth === 3
-                        ? "Great-grandparent"
-                        : `Gen-${a.depth} ancestor`
-                return (
-                  <tr key={a.ancestor.id} className="border-t border-border/60">
-                    <td className="px-2 py-1 text-muted-foreground">{rel}</td>
-                    <td className="px-2 py-1 font-medium text-foreground">{a.ancestor.name}</td>
-                    <td className="px-2 py-1 text-muted-foreground">{a.ancestor.breed.name}</td>
-                    <td className="px-2 py-1 text-muted-foreground">{a.ancestor.sex}</td>
-                    <td className="px-2 py-1">
-                      <Badge tone={a.ancestor.status === "ALIVE" ? "success" : "muted"}>{a.ancestor.status}</Badge>
-                    </td>
-                    <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">
-                      {(a.ancestor.inbreedingCoefficient * 100).toFixed(2)}%
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+        <div className="relative grid grid-cols-3 gap-1">
+          <PedigreeConnectors positionMap={positionMap} />
+          <PedigreeColumn positions={[2, 3]} positionMap={positionMap} />
+          <PedigreeColumn positions={[4, 5, 6, 7]} positionMap={positionMap} />
+          <PedigreeColumn positions={[8, 9, 10, 11, 12, 13, 14, 15]} positionMap={positionMap} />
         </div>
       )}
     </div>

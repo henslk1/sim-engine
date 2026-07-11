@@ -42,7 +42,7 @@ export function OwnerView({ animal, animalId }: { animal: AnimalProfile; animalI
   }
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-transparent text-foreground">
+    <div className="flex h-full flex-col overflow-hidden bg-transparent text-foreground">
 
       {/* Header */}
       <div className="flex shrink-0 flex-col items-center gap-3 border-b border-border bg-card px-4 py-4">
@@ -132,7 +132,7 @@ export function OwnerView({ animal, animalId }: { animal: AnimalProfile; animalI
 
           {/* Col 3 — Animal image + WorkspaceTabs */}
           <div className="order-first flex min-h-0 flex-col gap-3 min-[1400px]:order-none min-[1400px]:grid min-[1400px]:grid-rows-[auto_minmax(0,1fr)]">
-            <div className="relative flex aspect-[3/2] w-full shrink-0 items-end overflow-hidden rounded-lg border border-border bg-gradient-to-br from-secondary to-muted shadow-sm">
+            <div className="relative flex aspect-[9/5] w-full shrink-0 items-end overflow-hidden rounded-lg border border-border bg-gradient-to-br from-secondary to-muted shadow-sm">
               <div className="w-full bg-gradient-to-t from-card/90 to-transparent px-4 py-3">
                 <p className="font-serif text-lg font-semibold text-foreground">{animal.name}</p>
                 <p className="text-xs text-muted-foreground">
@@ -163,7 +163,7 @@ export function OwnerView({ animal, animalId }: { animal: AnimalProfile; animalI
             </div>
 
             <PersonalityPanel animal={animal} />
-            <NotesPanel />
+            <NotesPanel animal={animal} animalId={animalId} />
           </div>
 
         </div>

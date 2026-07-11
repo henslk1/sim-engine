@@ -22,7 +22,7 @@ export function ArchivedView({ animal, animalId }: { animal: AnimalProfile; anim
   const activeConditions = animal.healthRecords.filter((r) => r.isActive)
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-transparent text-foreground">
+    <div className="flex h-full flex-col overflow-hidden bg-transparent text-foreground">
 
       {/* Header */}
       <div className="flex shrink-0 flex-col items-center gap-3 border-b border-amber-800/20 bg-amber-950/5 px-4 py-4">
@@ -89,7 +89,7 @@ export function ArchivedView({ animal, animalId }: { animal: AnimalProfile; anim
 
           {/* Col 3 — Animal image + WorkspaceTabs */}
           <div className="order-first flex min-h-0 flex-col gap-3 min-[1400px]:order-none min-[1400px]:grid min-[1400px]:grid-rows-[auto_minmax(0,1fr)]">
-            <div className="relative flex aspect-[3/2] w-full shrink-0 items-end overflow-hidden rounded-lg border border-border bg-gradient-to-br from-secondary to-muted shadow-sm">
+            <div className="relative flex aspect-[9/5] w-full shrink-0 items-end overflow-hidden rounded-lg border border-border bg-gradient-to-br from-secondary to-muted shadow-sm">
               <div className="w-full bg-gradient-to-t from-card/90 to-transparent px-4 py-3">
                 <p className="font-serif text-lg font-semibold text-foreground">{animal.name}</p>
                 <p className="text-xs text-muted-foreground">
@@ -111,7 +111,7 @@ export function ArchivedView({ animal, animalId }: { animal: AnimalProfile; anim
               <PersonalityPanel animal={animal} />
             </div>
 
-            <NotesPanel />
+            <NotesPanel animal={animal} animalId={animalId} readonly />
           </div>
 
         </div>

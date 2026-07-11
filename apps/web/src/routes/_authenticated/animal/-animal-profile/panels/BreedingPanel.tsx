@@ -27,13 +27,14 @@ export function BreedingPanel({
   const isFemale = animal.sex === "FEMALE"
 
   const isConceptionCycle = preg && preg.currentCycles === 0
+  const canBreed = animal.lifeStage.canBreed
 
   return (
     <Panel
       title="Breeding"
       icon={<Baby className="size-4 text-accent-foreground" />}
       action={
-        !animal.isCastrated && !readonly ? (
+        canBreed && !animal.isCastrated && !readonly ? (
           <div className="flex gap-0.5">
             {(["info", "covers"] as BreedingTab[]).map((t) => (
               <button
@@ -85,7 +86,9 @@ export function BreedingPanel({
         </div>
       )}
 
-      {animal.isCastrated ? (
+      {!canBreed ? (
+        <p className="text-[11px] text-muted-foreground">Not available at this life stage.</p>
+      ) : animal.isCastrated ? (
         <p className="text-[11px] text-muted-foreground">Not eligible for breeding</p>
       ) : tab === "info" ? (
         <div className="space-y-2">

@@ -1,6 +1,6 @@
 import type { AnimalProfile } from "../types"
 import { Panel, Badge, ActionButton, Meter } from "@/components/game/ui"
-import { Trophy, CheckCircle, XCircle, Ban, Zap } from "lucide-react"
+import { Trophy, CheckCircle, XCircle, Ban, MapPin } from "lucide-react"
 import { placementBadgeTone, getActiveRestrictions } from "../utils"
 
 type Cert = AnimalProfile["healthCertificates"][number]
@@ -15,6 +15,7 @@ function InfoCard({ label, value }: { label: string; value: string }) {
 }
 
 export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalProfile; readonly?: boolean }) {
+  const canCompete = animal.lifeStage.canCompete
   const currentTier = animal.compTiers[0]
   const latestWeeklyPoints = animal.weeklyPoints[0]?.points
   const restrictions = getActiveRestrictions(animal)
@@ -30,6 +31,10 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
 
   return (
     <Panel title="Competition" icon={<Trophy className="size-4 text-chart-1" />}>
+      {!canCompete ? (
+        <p className="text-[11px] text-muted-foreground">Not available at this life stage.</p>
+      ) : (
+      <>
       {isRestricted && (
         <div className="mb-2 flex items-center gap-1.5 rounded-md bg-destructive/10 px-2.5 py-1.5 text-[11px] text-destructive">
           <Ban className="size-3 shrink-0" />
@@ -44,21 +49,31 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
               <InfoCard label="Current Tier" value={currentTier?.tierDef.name ?? "—"} />
               <InfoCard label="Weekly Points" value={latestWeeklyPoints !== undefined ? `${Math.round(latestWeeklyPoints)} pts` : "—"} />
             </div>
-            <div className="rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2">
-              <div className="mb-1.5 flex items-center justify-between">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Progress to Next Tier</p>
-                <span className="text-[11px] tabular-nums text-muted-foreground">
-                  {latestWeeklyPoints !== undefined ? Math.round(latestWeeklyPoints) : 0} / 200
-                </span>
+            {currentTier?.tierDef.advancementThreshold != null && (
+              <div className="rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2">
+                <div className="mb-1.5 flex items-center justify-between">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Progress to Next Tier
+                  </p>
+                  <span className="text-[11px] tabular-nums text-muted-foreground">
+                    {latestWeeklyPoints !== undefined ? Math.round(latestWeeklyPoints) : 0} /{" "}
+                    {Math.round(currentTier.tierDef.advancementThreshold)}
+                  </span>
+                </div>
+                <Meter
+                  value={latestWeeklyPoints ?? 0}
+                  max={currentTier.tierDef.advancementThreshold}
+                  tone="condition"
+                  className="h-1.5"
+                />
               </div>
-              <Meter value={latestWeeklyPoints ?? 0} max={200} tone="condition" className="h-1.5" />
-            </div>
+            )}
           </div>
 
           {!readonly && (
             <ActionButton variant="soft" disabled className="w-full justify-center">
-              <Zap className="size-3.5" />
-              Enter · {Math.round(energyCost)} Energy
+              <MapPin className="size-3.5" />
+              Browse Venues
             </ActionButton>
           )}
 
@@ -159,6 +174,8 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
         </>
       ) : (
         <p className="text-[11px] text-muted-foreground">No discipline assigned</p>
+      )}
+      </>
       )}
     </Panel>
   )
