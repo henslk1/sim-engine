@@ -171,7 +171,21 @@ type AnimalProfileType = Prisma.AnimalGetPayload<{
           }
         }
         careActionDefs: {
-          select: { id: true; name: true; costType: true; careScoreGain: true; energyRestore: true; moodBoost: true }
+          select: {
+            id: true; name: true; costType: true; currencyAmount: true
+            careScoreGain: true; energyRestore: true; moodBoost: true
+            items: { select: { id: true; quantity: true; itemDef: { select: { id: true; name: true } } } }
+          }
+        }
+        intensityTierDefs: {
+          orderBy: { tierIndex: "asc" }
+          select: { id: true; name: true; energyCost: true; tierIndex: true }
+        }
+        trainingActionDefs: {
+          select: { id: true; name: true; statDefId: true }
+        }
+        healthCertificateDefs: {
+          select: { id: true; name: true; validForCycles: true; requiredForCompetition: true }
         }
       }
     }
@@ -376,7 +390,21 @@ export const animalProfileRouter = router({
                 },
               },
               careActionDefs: {
-                select: { id: true, name: true, costType: true, careScoreGain: true, energyRestore: true, moodBoost: true },
+                select: {
+                  id: true, name: true, costType: true, currencyAmount: true,
+                  careScoreGain: true, energyRestore: true, moodBoost: true,
+                  items: { select: { id: true, quantity: true, itemDef: { select: { id: true, name: true } } } },
+                },
+              },
+              intensityTierDefs: {
+                orderBy: { tierIndex: "asc" as const },
+                select: { id: true, name: true, energyCost: true, tierIndex: true },
+              },
+              trainingActionDefs: {
+                select: { id: true, name: true, statDefId: true },
+              },
+              healthCertificateDefs: {
+                select: { id: true, name: true, validForCycles: true, requiredForCompetition: true },
               },
             },
           },

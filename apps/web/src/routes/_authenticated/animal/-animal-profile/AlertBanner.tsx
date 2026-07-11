@@ -1,6 +1,6 @@
 import type { AnimalProfile } from "./types"
 import { getActiveRestrictions } from "./utils"
-import { Stethoscope, Clock, Ban, Skull, Baby } from "lucide-react"
+import { Stethoscope, Clock, Ban, Skull, Baby, Package, ShieldAlert } from "lucide-react"
 import type { ReactNode } from "react"
 
 const RESTRICTION_LABEL: Record<string, string> = {
@@ -77,7 +77,43 @@ export function AlertBanner({ animal }: { animal: AnimalProfile }) {
     )
   }
 
-  // Priority 4: Death — pending bury / archive
+  // Priority 4: Missing competition equipment
+  const currentTier = animal.compTiers[0]
+  if (animal.disciplineDef && currentTier) {
+    const missingEquipment = currentTier.disciplineDef.equipmentRequirements.filter((req) => {
+      const equipped = animal.equipment.filter(
+        (eq: AnimalProfile["equipment"][number]) => eq.itemDef.id === req.itemDef.id
+      ).length
+      return equipped < req.quantity
+    })
+    if (missingEquipment.length > 0) {
+      banners.push(
+        <Banner key="equipment" tone="warning" icon={<Package className="size-3.5 shrink-0" />}>
+          Missing equipment: {missingEquipment.map((r) => r.itemDef.name).join(", ")}
+        </Banner>
+      )
+    }
+  }
+
+  // Priority 5: Missing or expired health certificates
+  if (animal.disciplineDef) {
+    const requiredCertDefs = animal.game.healthCertificateDefs.filter((d) => d.requiredForCompetition)
+    const missingCerts = requiredCertDefs.filter((def) => {
+      const cert = animal.healthCertificates.find(
+        (c: AnimalProfile["healthCertificates"][number]) => c.certDef.id === def.id
+      )
+      return !cert || !cert.isValid || cert.expiresAtCycle <= animal.ageInCycles
+    })
+    if (missingCerts.length > 0) {
+      banners.push(
+        <Banner key="certs" tone="warning" icon={<ShieldAlert className="size-3.5 shrink-0" />}>
+          Certificate required: {missingCerts.map((d) => d.name).join(", ")}
+        </Banner>
+      )
+    }
+  }
+
+  // Priority 6: Death — pending bury / archive
   if (animal.status === "DECEASED") {
     banners.push(
       <Banner key="death" tone="danger" icon={<Skull className="size-3.5 shrink-0" />}>
@@ -86,7 +122,7 @@ export function AlertBanner({ animal }: { animal: AnimalProfile }) {
     )
   }
 
-  // Priority 5: Birth imminent
+  // Priority 7: Birth imminent
   const preg = animal.pregnancies[0]
   if (preg && preg.currentCycles >= preg.requiredCycles) {
     banners.push(

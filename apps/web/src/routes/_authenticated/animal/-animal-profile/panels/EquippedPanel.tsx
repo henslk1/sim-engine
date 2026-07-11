@@ -1,10 +1,10 @@
 import type { AnimalProfile } from "../types"
 import { Panel, Badge } from "@/components/game/ui"
-import { Sword } from "lucide-react"
+import { Package } from "lucide-react"
 
 export function EquippedPanel({ animal }: { animal: AnimalProfile }) {
   return (
-    <Panel title="Equipped" icon={<Sword className="size-4 text-muted-foreground" />}>
+    <Panel title="Equipped" icon={<Package className="size-4 text-muted-foreground" />}>
       {animal.equipment.length === 0 ? (
         <p className="text-[11px] text-muted-foreground">No items equipped</p>
       ) : (

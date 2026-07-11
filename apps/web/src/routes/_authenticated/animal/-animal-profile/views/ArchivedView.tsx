@@ -1,5 +1,5 @@
 import type { AnimalProfile } from "../types"
-import { formatCycleAge, computeBreedingGrade, BREEDING_GRADE_COLOR } from "../utils"
+import { formatCycleAge, computeBreedingGrade } from "../utils"
 import { Badge, Meter } from "@/components/game/ui"
 import { Stethoscope, Archive } from "lucide-react"
 import { InfoStrip } from "../InfoStrip"
@@ -10,6 +10,7 @@ import { TrainingPanel } from "../panels/TrainingPanel"
 import { CompetitionPanel } from "../panels/CompetitionPanel"
 import { OwnerInfoPanel } from "../panels/OwnerInfoPanel"
 import { PersonalityPanel } from "../panels/PersonalityPanel"
+import { NotesPanel } from "../panels/NotesPanel"
 import { EquippedPanel } from "../panels/EquippedPanel"
 import { ConformationPanel } from "../panels/ConformationPanel"
 
@@ -73,16 +74,17 @@ export function ArchivedView({ animal, animalId }: { animal: AnimalProfile; anim
       <main className="min-h-0 flex-1 overflow-auto p-3">
         <div className="grid min-h-0 gap-3 grid-cols-1 min-[1400px]:h-full min-[1400px]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,2.6fr)_minmax(0,1.15fr)_minmax(0,0.85fr)]">
 
-          {/* Col 1 — Health / Breeding */}
+          {/* Col 1 — Breeding / Health */}
           <div className="flex min-h-0 flex-col gap-3 min-[1400px]:grid min-[1400px]:grid-rows-[auto_minmax(0,1fr)]">
-            <HealthPanel animal={animal} />
-            <BreedingPanel animal={animal} breedingGrade={breedingGrade} />
+            <BreedingPanel animal={animal} breedingGrade={breedingGrade} readonly />
+            <HealthPanel animal={animal} readonly />
           </div>
 
-          {/* Col 2 — Training / Competition */}
-          <div className="flex min-h-0 flex-col gap-3 min-[1400px]:grid min-[1400px]:grid-rows-[auto_minmax(0,1fr)]">
-            <TrainingPanel animal={animal} config={config} />
-            <CompetitionPanel animal={animal} />
+          {/* Col 2 — Training / Competition / Equipped */}
+          <div className="flex min-h-0 flex-col gap-3 min-[1400px]:grid min-[1400px]:grid-rows-[auto_auto_minmax(0,1fr)]">
+            <TrainingPanel animal={animal} config={config} readonly />
+            <CompetitionPanel animal={animal} readonly />
+            <EquippedPanel animal={animal} />
           </div>
 
           {/* Col 3 — Animal image + WorkspaceTabs */}
@@ -98,18 +100,18 @@ export function ArchivedView({ animal, animalId }: { animal: AnimalProfile; anim
             <WorkspaceTabs animal={animal} animalId={animalId} cycleToAge={cycleToAge} config={config} />
           </div>
 
-          {/* Col 4+5 — Owner Info / Personality / Equipped / Conformation */}
+          {/* Col 4+5 — Owner Info / Conformation / Personality / Notes */}
           <div className="flex min-h-0 flex-col gap-3 min-[1400px]:col-span-2 min-[1400px]:grid min-[1400px]:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] min-[1400px]:grid-rows-[auto_auto_minmax(0,1fr)]">
             <div className="min-[1400px]:col-span-2">
               <OwnerInfoPanel animal={animal} />
             </div>
 
-            <PersonalityPanel animal={animal} />
-            <EquippedPanel animal={animal} />
-
-            <div className="flex min-h-0 flex-col min-[1400px]:col-span-2">
-              <ConformationPanel animal={animal} />
+            <ConformationPanel animal={animal} />
+            <div className="min-[1400px]:row-span-2 min-[1400px]:min-h-0">
+              <PersonalityPanel animal={animal} />
             </div>
+
+            <NotesPanel />
           </div>
 
         </div>

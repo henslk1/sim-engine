@@ -25,13 +25,18 @@ export function WorkspaceTabs({
   animalId,
   cycleToAge,
   config,
+  hideTabs = [],
 }: {
   animal: AnimalProfile
   animalId: string
   cycleToAge: (n: number) => string
   config: AnimalProfile["game"]["gameConfig"]
+  hideTabs?: WorkspaceTab[]
 }) {
-  const [activeTab, setActiveTab] = useState<WorkspaceTab>("genetics")
+  const visibleTabs = WORKSPACE_TABS.filter((t) => !hideTabs.includes(t.id))
+  const [activeTab, setActiveTab] = useState<WorkspaceTab>(
+    hideTabs.includes("genetics") ? (visibleTabs[0]?.id ?? "pedigree") : "genetics"
+  )
 
   const { data: offspring, isLoading: offspringLoading } = trpc.animalProfile.getOffspring.useQuery(
     { animalId },
@@ -45,7 +50,7 @@ export function WorkspaceTabs({
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm">
       <div className="flex shrink-0 flex-wrap items-center justify-center gap-1 border-b border-border bg-secondary/40 px-2 py-1.5">
-        {WORKSPACE_TABS.map(({ id, label, Icon }) => (
+        {visibleTabs.map(({ id, label, Icon }) => (
           <button
             key={id}
             type="button"

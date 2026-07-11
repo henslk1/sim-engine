@@ -74,6 +74,7 @@ export function Panel({
   children,
   className,
   bodyClassName,
+  fit = false,
 }: {
   title: ReactNode
   icon?: ReactNode
@@ -81,11 +82,13 @@ export function Panel({
   children: ReactNode
   className?: string
   bodyClassName?: string
+  fit?: boolean
 }) {
   return (
     <section
       className={cn(
-        "flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm",
+        "flex flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm",
+        fit ? "shrink-0" : "h-full min-h-0",
         className,
       )}
     >
@@ -96,7 +99,7 @@ export function Panel({
         </h3>
         {action}
       </header>
-      <div className={cn("min-h-0 flex-1 overflow-y-auto p-3", bodyClassName)}>{children}</div>
+      <div className={cn("p-3", !fit && "min-h-0 flex-1 overflow-y-auto", bodyClassName)}>{children}</div>
     </section>
   )
 }

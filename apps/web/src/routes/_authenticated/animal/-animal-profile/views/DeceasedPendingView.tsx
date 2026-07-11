@@ -3,6 +3,7 @@ import type { AnimalProfile } from "../types"
 import { formatCycleAge, formatBreedLabel } from "../utils"
 import { Badge, ActionButton } from "@/components/game/ui"
 import { Skull, Archive, AlertTriangle } from "lucide-react"
+import { trpc } from "@/lib/trpc"
 
 // First midnight that falls at least 24h after diedAt, so a death right before
 // a nightly reset still gets a full day of grace.
@@ -39,6 +40,14 @@ export function DeceasedPendingView({ animal }: { animal: AnimalProfile; animalI
     : getAutoBurialDeadline(new Date())
   const countdown = useCountdown(deadline)
   const breedLabel = formatBreedLabel(animal)
+
+  const utils = trpc.useUtils()
+  const { mutate: bury, isPending: isBurying } = trpc.animal.bury.useMutation({
+    onSuccess: () => utils.animalProfile.get.invalidate({ animalId: animal.id }),
+  })
+  const { mutate: archive, isPending: isArchiving } = trpc.animal.archive.useMutation({
+    onSuccess: () => utils.animalProfile.get.invalidate({ animalId: animal.id }),
+  })
 
   return (
     <div className="flex min-h-dvh flex-col bg-muted/20">
@@ -105,8 +114,13 @@ export function DeceasedPendingView({ animal }: { animal: AnimalProfile; animalI
                 Preserve a minimal memorial. Basic stats, pedigree reference, and cause of death
                 remain visible. The animal no longer appears in active rosters.
               </p>
-              <ActionButton variant="soft" disabled className="w-full justify-center">
-                Bury {animal.name}
+              <ActionButton
+                variant="soft"
+                disabled={isBurying || isArchiving}
+                className="w-full justify-center"
+                onClick={() => bury({ animalId: animal.id })}
+              >
+                {isBurying ? "Burying…" : `Bury ${animal.name}`}
               </ActionButton>
             </div>
 
@@ -119,8 +133,13 @@ export function DeceasedPendingView({ animal }: { animal: AnimalProfile; animalI
                 Keep the full profile as a historical record. Stats, training history,
                 competition results, and pedigree remain browsable.
               </p>
-              <ActionButton variant="soft" disabled className="w-full justify-center">
-                Archive {animal.name}
+              <ActionButton
+                variant="soft"
+                disabled={isBurying || isArchiving}
+                className="w-full justify-center"
+                onClick={() => archive({ animalId: animal.id })}
+              >
+                {isArchiving ? "Archiving…" : `Archive ${animal.name}`}
               </ActionButton>
             </div>
           </div>

@@ -1,9 +1,10 @@
 import type { AnimalProfile } from "../types"
 import { Panel, Badge, ActionButton } from "@/components/game/ui"
-import { Stethoscope, ShieldCheck, FlaskConical, CalendarClock, Pill } from "lucide-react"
+import { Stethoscope, ShieldCheck, ShieldAlert, FlaskConical, CalendarClock, Pill } from "lucide-react"
 
 type HealthRecord = AnimalProfile["healthRecords"][number]
 type TreatmentRecord = HealthRecord["treatmentRecords"][number]
+type Cert = AnimalProfile["healthCertificates"][number]
 
 const TREATMENT_LABEL: Record<string, string> = {
   OTC: "OTC",
@@ -21,11 +22,13 @@ const RESTRICTION_LABEL: Record<string, string> = {
   ALL: "All activities",
 }
 
-export function HealthPanel({ animal }: { animal: AnimalProfile }) {
+export function HealthPanel({ animal, readonly = false }: { animal: AnimalProfile; readonly?: boolean }) {
   const activeConditions = animal.healthRecords.filter((r) => r.isActive)
   const hasOTCTreatment = activeConditions.some((r) =>
     r.treatmentRecords.some((t) => t.isActive && t.treatmentDef.treatmentType === "OTC")
   )
+
+  const certDefs = animal.game.healthCertificateDefs
 
   return (
     <Panel title="Health" icon={<Stethoscope className="size-4 text-destructive" />}>
@@ -38,7 +41,6 @@ export function HealthPanel({ animal }: { animal: AnimalProfile }) {
             const isUntreated = activeTreatments.length === 0
             return (
               <div key={record.id} className="overflow-hidden rounded-md border border-destructive/25">
-                {/* Condition header */}
                 <div className="flex items-center justify-between gap-2 bg-destructive/10 px-3 py-2">
                   <div className="flex items-center gap-2">
                     <Badge tone="danger">{record.conditionDef.conditionType}</Badge>
@@ -47,10 +49,10 @@ export function HealthPanel({ animal }: { animal: AnimalProfile }) {
                   {isUntreated && <Badge tone="muted">Untreated</Badge>}
                 </div>
 
-                {/* Treatments */}
                 {activeTreatments.map((t: TreatmentRecord) => {
-                  const activeRestrictions = t.activityRestriction.filter((r) => r.isActive)
-                  const needsAction = t.treatmentDef.treatmentType === "PRESCRIPTION" || t.treatmentDef.treatmentType === "VET_PROCEDURE"
+                  const needsAction =
+                    t.treatmentDef.treatmentType === "PRESCRIPTION" ||
+                    t.treatmentDef.treatmentType === "VET_PROCEDURE"
                   return (
                     <div key={t.id} className="border-t border-destructive/15 bg-destructive/5 px-3 py-2">
                       <div className="flex items-center justify-between gap-2">
@@ -79,13 +81,14 @@ export function HealthPanel({ animal }: { animal: AnimalProfile }) {
                           </p>
                         )
                       })}
-                      {needsAction && (
+                      {needsAction && !readonly && (
                         <div className="mt-1.5">
-                          <ActionButton variant="soft" disabled className="justify-center w-full">
-                            {t.treatmentDef.treatmentType === "PRESCRIPTION"
-                              ? <><Pill className="size-3.5" /> Administer Medication</>
-                              : <><CalendarClock className="size-3.5" /> Book Procedure</>
-                            }
+                          <ActionButton variant="soft" disabled className="w-full justify-center">
+                            {t.treatmentDef.treatmentType === "PRESCRIPTION" ? (
+                              <><Pill className="size-3.5" /> Administer Medication</>
+                            ) : (
+                              <><CalendarClock className="size-3.5" /> Book Procedure</>
+                            )}
                           </ActionButton>
                         </div>
                       )}
@@ -98,52 +101,59 @@ export function HealthPanel({ animal }: { animal: AnimalProfile }) {
         </div>
       )}
 
-      <div className="mt-3 flex gap-2">
-        <ActionButton variant="soft" disabled className="flex-1 justify-center">
-          <Stethoscope className="size-3.5" />
-          Visit Vet
-        </ActionButton>
-        {hasOTCTreatment && (
-          <ActionButton variant="soft" disabled className="flex-1 justify-center">
+      {hasOTCTreatment && !readonly && (
+        <div className="mt-3">
+          <ActionButton variant="soft" disabled className="w-full justify-center">
             <FlaskConical className="size-3.5" />
             Buy OTC Meds
           </ActionButton>
-        )}
-      </div>
+        </div>
+      )}
 
-      {animal.healthCertificates.length > 0 && (
+      {certDefs.length > 0 && (
         <>
           <h4 className="mb-1.5 mt-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             Certificates
           </h4>
-          <div className="flex flex-wrap gap-1.5">
-            {animal.healthCertificates.map((cert: AnimalProfile["healthCertificates"][number]) => (
-              <span
-                key={cert.id}
-                className="inline-flex items-center gap-1 rounded-md border border-chart-2/30 bg-chart-2/10 px-2 py-1 text-[11px] font-medium text-chart-2"
-              >
-                <ShieldCheck className="size-3" /> {cert.certDef.name}
-              </span>
-            ))}
-          </div>
-        </>
-      )}
-
-      {animal.testResults.length > 0 && (
-        <>
-          <h4 className="mb-1.5 mt-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Panel Tests
-          </h4>
           <div className="space-y-1.5">
-            {animal.testResults.map((t: AnimalProfile["testResults"][number]) => (
-              <div
-                key={t.id}
-                className="flex items-center justify-between rounded-md border border-border/70 bg-secondary/30 px-2.5 py-1.5"
-              >
-                <span className="text-xs font-semibold text-foreground">{t.conditionDef.name}</span>
-                <Badge tone="success">Tested · {t.result}</Badge>
-              </div>
-            ))}
+            {certDefs.map((def) => {
+              const cert = animal.healthCertificates.find((c: Cert) => c.certDef.id === def.id)
+              const isExpired = cert && (cert.expiresAtCycle <= animal.ageInCycles || !cert.isValid)
+              const isMissing = !cert
+              const cyclesLeft = cert ? cert.expiresAtCycle - animal.ageInCycles : null
+
+              return (
+                <div
+                  key={def.id}
+                  className="flex items-center justify-between gap-2 rounded-md border border-border/70 bg-secondary/30 px-2.5 py-1.5"
+                >
+                  <div className="flex items-center gap-1.5">
+                    {isMissing || isExpired ? (
+                      <ShieldAlert className="size-3.5 shrink-0 text-destructive" />
+                    ) : (
+                      <ShieldCheck className="size-3.5 shrink-0 text-chart-2" />
+                    )}
+                    <span className="text-xs font-semibold text-foreground">{def.name}</span>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    {isMissing ? (
+                      <Badge tone="danger">Not certified</Badge>
+                    ) : isExpired ? (
+                      <Badge tone="danger">Expired</Badge>
+                    ) : (
+                      <span className="text-[11px] text-muted-foreground">
+                        {cyclesLeft} cycle{cyclesLeft !== 1 ? "s" : ""} left
+                      </span>
+                    )}
+                    {!readonly && (
+                      <ActionButton variant="soft" disabled className="h-6 px-2 text-[11px]">
+                        Book Testing
+                      </ActionButton>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </>
       )}
