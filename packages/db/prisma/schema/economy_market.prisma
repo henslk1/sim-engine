@@ -9,6 +9,7 @@ enum VetServiceType {
   PANEL_TEST
   GENETIC_COLLECTION
   GENETIC_STORAGE
+  CASTRATION
 }
 
 enum ListingType {

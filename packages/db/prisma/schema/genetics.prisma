@@ -80,6 +80,7 @@ model GeneticPanelDef {
   gameId                 String
   name                   String
   panelType              GeneticPanelType
+  testCost               Int                     @default(0)
   loci                   GeneticPanelLocus[]
   vetServiceDefs         VetServiceDef[]
   groupEntryRequirements GroupEntryRequirement[]

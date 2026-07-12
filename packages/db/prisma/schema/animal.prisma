@@ -155,6 +155,7 @@ model Animal {
   status                          AnimalStatus                     @default(ALIVE)
   deletedAt                       DateTime?
   isCastrated                     Boolean                          @default(false)
+  isPinned                        Boolean                          @default(false)
   phenotypeDescription            String?
   notes                           String?
   inbreedingCoefficient           Float                            @default(0)
