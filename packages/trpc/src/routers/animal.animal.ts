@@ -3,6 +3,20 @@ import { router, publicProcedure } from "../trpc.js"
 import { z } from "zod"
 
 export const animalAnimalRouter = router({
+  list: publicProcedure.query(() =>
+    db.animal.findMany({
+      orderBy: { name: "asc" },
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        sex: true,
+        breed: { select: { name: true } },
+        lifeStage: { select: { name: true } },
+      },
+    })
+  ),
+
   archive: publicProcedure
     .input(z.object({ animalId: z.string() }))
     .mutation(({ input }) =>
