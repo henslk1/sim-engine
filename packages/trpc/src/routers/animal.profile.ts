@@ -182,6 +182,11 @@ export const animalProfileRouter = router({
                   sire: { select: { id: true, name: true } },
                 },
               },
+              offspring: {
+                include: {
+                  animal: { select: { id: true, sex: true, phenotypeDescription: true } },
+                },
+              },
             },
           },
 
