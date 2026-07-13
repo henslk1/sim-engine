@@ -93,4 +93,31 @@ export const disciplineAdminRouter = router({
   removePersonalityWeight: publicProcedure
     .input(z.object({ id: z.string() }))
     .mutation(({ input }) => db.disciplinePersonalityWeight.delete({ where: { id: input.id } })),
+
+  listEquipmentRequirements: publicProcedure
+    .input(z.object({ disciplineDefId: z.string() }))
+    .query(({ input }) =>
+      db.disciplineEquipmentRequirement.findMany({
+        where: { disciplineDefId: input.disciplineDefId },
+        orderBy: { itemDef: { name: "asc" } },
+        include: { itemDef: { select: { id: true, name: true } } },
+      })
+    ),
+
+  saveEquipmentRequirement: publicProcedure
+    .input(z.object({
+      id: z.string().optional(),
+      disciplineDefId: z.string(),
+      itemDefId: z.string(),
+      quantity: z.number().int().min(1).default(1),
+    }))
+    .mutation(({ input }) => {
+      const { id, disciplineDefId, ...data } = input
+      if (id) return db.disciplineEquipmentRequirement.update({ where: { id }, data: { quantity: data.quantity } })
+      return db.disciplineEquipmentRequirement.create({ data: { disciplineDefId, ...data } })
+    }),
+
+  removeEquipmentRequirement: publicProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(({ input }) => db.disciplineEquipmentRequirement.delete({ where: { id: input.id } })),
 })

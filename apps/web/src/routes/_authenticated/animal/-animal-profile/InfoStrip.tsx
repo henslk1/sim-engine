@@ -5,6 +5,13 @@ import { cn } from "@/lib/utils"
 import { GitBranch, Trophy, Award, Star } from "lucide-react"
 import { BREEDING_GRADE_COLOR, BREEDING_GRADE_BG } from "./utils"
 
+function displaySex(sex: string, isCastrated: boolean) {
+  if (sex === "MALE" && isCastrated) return "Gelding"
+  if (sex === "MALE") return "Male"
+  if (sex === "FEMALE") return "Female"
+  return sex
+}
+
 export function InfoStrip({
   animal,
   cycleToAge,
@@ -17,7 +24,7 @@ export function InfoStrip({
   return (
     <div className="flex shrink-0 flex-wrap items-center justify-center gap-1.5 border-b border-border bg-card/50 px-4 py-2">
       <InfoChip>{animal.breed.name}</InfoChip>
-      <InfoChip>{animal.sex}</InfoChip>
+      <InfoChip>{displaySex(animal.sex, animal.isCastrated)}</InfoChip>
       <InfoChip>{animal.lifeStage.name}</InfoChip>
       <InfoChip>Age {cycleToAge(animal.ageInCycles)}</InfoChip>
       {animal.breedGeneration !== null && (

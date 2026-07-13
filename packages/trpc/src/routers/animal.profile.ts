@@ -204,6 +204,8 @@ export const animalProfileRouter = router({
               pricePerSlot: true,
               currencyDef: { select: { id: true, name: true, symbol: true } },
               slots: { select: { id: true, status: true } },
+              breedRestrictions: { select: { id: true, breedId: true, breed: { select: { id: true, name: true } } } },
+              statMinimums: { select: { id: true, statDefId: true, minValue: true, statDef: { select: { id: true, name: true } } } },
             },
           },
 
@@ -241,6 +243,8 @@ export const animalProfileRouter = router({
                   maxLocusTestsPerCycle: true,
                   subContainerLabel: true,
                   ultrasoundOpenCycle: true,
+                  breedingEnergyCost: true,
+                  maxBreedingSlots: true,
                 },
               },
               careActionDefs: {
@@ -262,6 +266,10 @@ export const animalProfileRouter = router({
               },
               currencyDefs: {
                 select: { id: true, name: true, symbol: true },
+              },
+              breeds: {
+                select: { id: true, name: true },
+                orderBy: { name: "asc" as const },
               },
             },
           },

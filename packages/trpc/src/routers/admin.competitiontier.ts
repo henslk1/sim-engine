@@ -46,4 +46,34 @@ export const competitionTierAdminRouter = router({
         return tx.competitionTierDef.delete({ where: { id: input.id } })
       })
     ),
+
+  listPrizes: publicProcedure
+    .input(z.object({ tierDefId: z.string() }))
+    .query(({ input }) =>
+      db.competitionTierPrize.findMany({
+        where: { tierDefId: input.tierDefId },
+        orderBy: [{ isInvitational: "asc" }, { placement: "asc" }],
+        include: { currencyDef: { select: { id: true, name: true, symbol: true } } },
+      })
+    ),
+
+  savePrize: publicProcedure
+    .input(z.object({
+      id: z.string().optional(),
+      tierDefId: z.string(),
+      placement: z.number().int().min(1),
+      currencyDefId: z.string().optional(),
+      amount: z.number().int().min(0),
+      isInvitational: z.boolean().default(false),
+    }))
+    .mutation(({ input }) => {
+      const { id, tierDefId, currencyDefId, ...rest } = input
+      const data = { ...rest, currencyDefId: currencyDefId ?? null }
+      if (id) return db.competitionTierPrize.update({ where: { id }, data: { currencyDefId: data.currencyDefId, amount: data.amount } })
+      return db.competitionTierPrize.create({ data: { tierDefId, ...data } })
+    }),
+
+  removePrize: publicProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(({ input }) => db.competitionTierPrize.delete({ where: { id: input.id } })),
 })

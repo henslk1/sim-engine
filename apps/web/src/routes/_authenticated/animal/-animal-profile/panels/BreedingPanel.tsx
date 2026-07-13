@@ -1,6 +1,6 @@
 import { useState } from "react"
 import type { AnimalProfile } from "../types"
-import { Panel, Badge, Meter, ActionButton } from "@/components/game/ui"
+import { Panel, Badge, Meter, ActionButton, Dialog } from "@/components/game/ui"
 import { Baby, Sparkles, Heart, Ban, Dna, Scissors, Send, Plus, Syringe, FlaskConical, Scan, Search, Loader2, ChevronDown, ChevronUp } from "lucide-react"
 import { CreateListingDialog } from "./CreateListingDialog"
 import { cn } from "@/lib/utils"
@@ -24,6 +24,7 @@ export function BreedingPanel({
   const [storageType, setStorageType] = useState<StorageType>("PERSONAL")
   const [confirmCastrate, setConfirmCastrate] = useState(false)
   const [listingDialogOpen, setListingDialogOpen] = useState(false)
+  const [editListingOpen, setEditListingOpen] = useState(false)
   const [sendCoverOpen, setSendCoverOpen] = useState(false)
   const [coverTab, setCoverTab] = useState<CoverTab>("own")
   const [selectedDamId, setSelectedDamId] = useState("")
@@ -42,8 +43,7 @@ export function BreedingPanel({
     trpc.breeding.material.collectMaterial.useMutation({ onSettled: invalidate })
   const { mutate: castrate, isPending: castratePending } =
     trpc.animal.castrate.useMutation({
-      onSuccess: () => setConfirmCastrate(false),
-      onSettled: invalidate,
+      onSuccess: () => { setConfirmCastrate(false); invalidate() },
     })
 
   const preg = animal.pregnancies[0]
@@ -74,6 +74,8 @@ export function BreedingPanel({
   })
   const { mutate: toggleListing, isPending: toggleListingPending } =
     trpc.breeding.listing.toggleActive.useMutation({ onSettled: invalidate })
+  const { mutate: addSlot, isPending: addSlotPending, error: addSlotError } =
+    trpc.breeding.listing.addSlot.useMutation({ onSettled: invalidate })
 
   const { mutate: acceptCover, isPending: acceptCoverPending } =
     trpc.breeding.cover.accept.useMutation({ onSettled: invalidate })
@@ -258,12 +260,38 @@ export function BreedingPanel({
                   <ActionButton
                     variant="soft"
                     className="w-full justify-center"
-                    disabled={toggleListingPending}
-                    onClick={() => toggleListing({ listingId: listing.id })}
+                    disabled={addSlotPending || !listing.isActive || isRestricted}
+                    onClick={() => addSlot({ listingId: listing.id })}
                   >
-                    {toggleListingPending && <Loader2 className="size-3.5 animate-spin" />}
-                    {listing.isActive ? "Deactivate Listing" : "Activate Listing"}
+                    {addSlotPending ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
+                    Add Slot
+                    {(animal.game.gameConfig?.breedingEnergyCost ?? 0) > 0 && (
+                      <span className="ml-auto text-[10px] text-muted-foreground">
+                        -{animal.game.gameConfig!.breedingEnergyCost} energy
+                      </span>
+                    )}
                   </ActionButton>
+                  {addSlotError && (
+                    <p className="text-[11px] text-destructive">{addSlotError.message}</p>
+                  )}
+                  <div className="flex gap-1.5">
+                    <ActionButton
+                      variant="soft"
+                      className="flex-1 justify-center"
+                      onClick={() => setEditListingOpen(true)}
+                    >
+                      Edit
+                    </ActionButton>
+                    <ActionButton
+                      variant="soft"
+                      className="flex-1 justify-center"
+                      disabled={toggleListingPending}
+                      onClick={() => toggleListing({ listingId: listing.id })}
+                    >
+                      {toggleListingPending && <Loader2 className="size-3.5 animate-spin" />}
+                      {listing.isActive ? "Deactivate" : "Activate"}
+                    </ActionButton>
+                  </div>
                 </div>
               ) : (
                 <ActionButton
@@ -282,7 +310,15 @@ export function BreedingPanel({
             <CreateListingDialog
               animal={animal}
               onClose={() => setListingDialogOpen(false)}
-              onCreated={invalidate}
+              onSaved={invalidate}
+            />
+          )}
+          {editListingOpen && listing && (
+            <CreateListingDialog
+              animal={animal}
+              listing={listing}
+              onClose={() => setEditListingOpen(false)}
+              onSaved={invalidate}
             />
           )}
 
@@ -463,30 +499,7 @@ export function BreedingPanel({
 
           {/* Castrate */}
           {isMale && !readonly && (
-            confirmCastrate ? (
-              <div className="space-y-2 rounded-md border border-destructive/30 bg-destructive/5 px-2.5 py-2">
-                <p className="text-[11px] font-medium text-destructive">This is permanent and cannot be undone.</p>
-                <div className="flex gap-2">
-                  <ActionButton
-                    variant="soft"
-                    className="flex-1 justify-center text-destructive hover:bg-destructive/10"
-                    disabled={castratePending}
-                    onClick={() => castrate({ animalId: animal.id })}
-                  >
-                    {castratePending ? <Loader2 className="size-3.5 animate-spin" /> : <Scissors className="size-3.5" />}
-                    Confirm Castrate
-                  </ActionButton>
-                  <ActionButton
-                    variant="soft"
-                    className="flex-1 justify-center"
-                    disabled={castratePending}
-                    onClick={() => setConfirmCastrate(false)}
-                  >
-                    Cancel
-                  </ActionButton>
-                </div>
-              </div>
-            ) : (
+            <>
               <ActionButton
                 variant="soft"
                 className="w-full justify-center text-destructive hover:bg-destructive/10"
@@ -494,7 +507,36 @@ export function BreedingPanel({
               >
                 <Scissors className="size-3.5" /> Castrate
               </ActionButton>
-            )
+              {confirmCastrate && (
+                <Dialog open onClose={() => setConfirmCastrate(false)} title="Castrate this horse?">
+                  <div className="space-y-4 p-4">
+                    <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-3 space-y-2">
+                      <p className="text-sm font-bold text-destructive">This is permanent and cannot be undone.</p>
+                      <ul className="space-y-1 text-[11px] text-destructive/90 list-disc list-inside">
+                        <li>{animal.name} will permanently lose the ability to breed</li>
+                        <li>Any active breeding listing will become inaccessible to new bookings</li>
+                        <li>This horse will be recorded as a gelding for the remainder of its life</li>
+                        <li>No refunds will be issued for any purchased breeding slots</li>
+                      </ul>
+                    </div>
+                    <div className="flex justify-end gap-2 border-t border-border pt-3">
+                      <ActionButton variant="soft" onClick={() => setConfirmCastrate(false)} disabled={castratePending}>
+                        Cancel
+                      </ActionButton>
+                      <ActionButton
+                        variant="soft"
+                        className="text-destructive hover:bg-destructive/10"
+                        disabled={castratePending}
+                        onClick={() => castrate({ animalId: animal.id })}
+                      >
+                        {castratePending ? <Loader2 className="size-3.5 animate-spin" /> : <Scissors className="size-3.5" />}
+                        Castrate {animal.name}
+                      </ActionButton>
+                    </div>
+                  </div>
+                </Dialog>
+              )}
+            </>
           )}
         </div>
       ) : (

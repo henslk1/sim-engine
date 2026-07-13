@@ -19,6 +19,7 @@ function GameConfigPage() {
     pedigreeDisplayDepth: 0,
     predictorDailyLimitFree: 0,
     breedingEnergyCost: 0,
+    maxBreedingSlots: "",
     containerLabel: "",
     subContainerLabel: "",
     gestationCycles: 12,
@@ -49,6 +50,7 @@ function GameConfigPage() {
           pedigreeDisplayDepth: data.gameConfig.pedigreeDisplayDepth,
           predictorDailyLimitFree: data.gameConfig.predictorDailyLimitFree,
           breedingEnergyCost: data.gameConfig.breedingEnergyCost,
+          maxBreedingSlots: data.gameConfig.maxBreedingSlots?.toString() ?? "",
           containerLabel: data.gameConfig.containerLabel ?? "",
           subContainerLabel: data.gameConfig.subContainerLabel ?? "",
           gestationCycles: data.gameConfig.gestationCycles,
@@ -152,10 +154,18 @@ function GameConfigPage() {
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Breeding Energy Cost</label>
-                <p className="text-[11px] text-muted-foreground">Energy deducted from each animal when breeding</p>
+                <p className="text-[11px] text-muted-foreground">Energy deducted when stud owner adds a slot</p>
                 <Input type="number" step="0.1" min="0"
                   value={configForm.breedingEnergyCost}
                   onChange={(e) => setConfigForm(f => ({ ...f, breedingEnergyCost: parseFloat(e.target.value) }))} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Max Breeding Slots <span className="font-normal">(optional)</span></label>
+                <p className="text-[11px] text-muted-foreground">Cap on AVAILABLE slots per stud listing (items can raise this)</p>
+                <Input type="number" step="1" min="1"
+                  value={configForm.maxBreedingSlots}
+                  onChange={(e) => setConfigForm(f => ({ ...f, maxBreedingSlots: e.target.value }))}
+                  placeholder="e.g. 5" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -276,6 +286,7 @@ function GameConfigPage() {
                 containerLabel: configForm.containerLabel || undefined,
                 subContainerLabel: configForm.subContainerLabel || undefined,
                 lifeExpectancyBaseline: configForm.lifeExpectancyBaseline !== "" ? parseInt(configForm.lifeExpectancyBaseline) : null,
+              maxBreedingSlots: configForm.maxBreedingSlots !== "" ? parseInt(configForm.maxBreedingSlots) : null,
               })}
               disabled={saveConfig.isPending}
             >

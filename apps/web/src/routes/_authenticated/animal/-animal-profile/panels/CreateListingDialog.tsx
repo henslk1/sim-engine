@@ -5,36 +5,93 @@ import { RichTextEditor } from "@/components/game/editor/RichTextEditor"
 import { trpc } from "@/lib/trpc"
 import { Loader2 } from "lucide-react"
 
+type Listing = NonNullable<AnimalProfile["breedingListings"][number]>
+
 export function CreateListingDialog({
   animal,
+  listing,
   onClose,
-  onCreated,
+  onSaved,
 }: {
   animal: AnimalProfile
+  listing?: Listing
   onClose: () => void
-  onCreated: () => void
+  onSaved: () => void
 }) {
+  const isEditing = !!listing
   const currencies = animal.game.currencyDefs ?? []
-  const [pricePerSlot, setPricePerSlot] = useState(0)
-  const [currencyDefId, setCurrencyDefId] = useState(currencies[0]?.id ?? "")
-  const [description, setDescription] = useState<object | null>(null)
+  const gameBreeds = animal.game.breeds ?? []
+  const statDefs = animal.stats.map((s) => s.statDef)
 
-  const { mutate: createListing, isPending, error } = trpc.breeding.listing.create.useMutation({
-    onSuccess: () => { onCreated(); onClose() },
-  })
+  const [pricePerSlot, setPricePerSlot] = useState(listing?.pricePerSlot ?? 0)
+  const [currencyDefId, setCurrencyDefId] = useState(listing?.currencyDef?.id ?? currencies[0]?.id ?? "")
+  const [description, setDescription] = useState<object | null>(
+    listing?.description ? (listing.description as object) : null
+  )
+  const [breedRestrictionIds, setBreedRestrictionIds] = useState<Set<string>>(
+    new Set(listing?.breedRestrictions.map((r) => r.breedId) ?? [])
+  )
+  const [statMinimums, setStatMinimums] = useState<Record<string, number>>(
+    Object.fromEntries(listing?.statMinimums.map((sm) => [sm.statDefId, sm.minValue]) ?? [])
+  )
 
-  function handleSubmit() {
-    createListing({
-      animalId: animal.id,
-      pricePerSlot,
-      currencyDefId: pricePerSlot > 0 && currencyDefId ? currencyDefId : undefined,
-      description: description ?? undefined,
+  const { mutate: createListing, isPending: createPending, error: createError } =
+    trpc.breeding.listing.create.useMutation({ onSuccess: () => { onSaved(); onClose() } })
+
+  const { mutate: updateListing, isPending: updatePending, error: updateError } =
+    trpc.breeding.listing.update.useMutation({ onSuccess: () => { onSaved(); onClose() } })
+
+  const isPending = createPending || updatePending
+  const error = createError ?? updateError
+
+  function toggleBreed(breedId: string) {
+    setBreedRestrictionIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(breedId)) next.delete(breedId)
+      else next.add(breedId)
+      return next
     })
   }
 
+  function setStatMin(statDefId: string, value: number) {
+    setStatMinimums((prev) => {
+      const next = { ...prev }
+      if (value <= 0) delete next[statDefId]
+      else next[statDefId] = value
+      return next
+    })
+  }
+
+  function handleSubmit() {
+    const restrictions = Array.from(breedRestrictionIds)
+    const minimums = Object.entries(statMinimums)
+      .filter(([, v]) => v > 0)
+      .map(([statDefId, minValue]) => ({ statDefId, minValue }))
+
+    if (isEditing) {
+      updateListing({
+        listingId: listing.id,
+        pricePerSlot,
+        currencyDefId: pricePerSlot > 0 && currencyDefId ? currencyDefId : undefined,
+        description: description ?? undefined,
+        breedRestrictions: restrictions,
+        statMinimums: minimums,
+      })
+    } else {
+      createListing({
+        animalId: animal.id,
+        pricePerSlot,
+        currencyDefId: pricePerSlot > 0 && currencyDefId ? currencyDefId : undefined,
+        description: description ?? undefined,
+        breedRestrictions: restrictions,
+        statMinimums: minimums,
+      })
+    }
+  }
+
   return (
-    <Dialog open onClose={onClose} title="Create Breeding Listing">
-      <div className="space-y-4 p-4">
+    <Dialog open onClose={onClose} title={isEditing ? "Edit Breeding Listing" : "Create Breeding Listing"}>
+      <div className="max-h-[80vh] overflow-y-auto space-y-4 p-4">
 
         {/* Price per slot */}
         <div>
@@ -67,12 +124,65 @@ export function CreateListingDialog({
           </div>
         </div>
 
+        {/* Breed restrictions */}
+        {gameBreeds.length > 0 && (
+          <div>
+            <label className="mb-0.5 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Breed restrictions
+            </label>
+            <p className="mb-1.5 text-[11px] text-muted-foreground">
+              If none selected, any breed may use this listing.
+            </p>
+            <div className="space-y-1">
+              {gameBreeds.map((breed) => (
+                <label key={breed.id} className="flex cursor-pointer items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={breedRestrictionIds.has(breed.id)}
+                    onChange={() => toggleBreed(breed.id)}
+                    className="rounded border-input accent-primary"
+                  />
+                  <span className="text-sm">{breed.name}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Stat minimums */}
+        {statDefs.length > 0 && (
+          <div>
+            <label className="mb-0.5 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Stat minimums
+            </label>
+            <p className="mb-1.5 text-[11px] text-muted-foreground">
+              Total (innate + trained) required. Leave at 0 for no minimum.
+            </p>
+            <div className="space-y-1.5">
+              {statDefs.map((stat) => (
+                <div key={stat.id} className="flex items-center gap-2">
+                  <span className="w-28 shrink-0 text-[11px] text-muted-foreground">{stat.name}</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={200}
+                    value={statMinimums[stat.id] ?? 0}
+                    onChange={(e) => setStatMin(stat.id, parseInt(e.target.value) || 0)}
+                    className="w-20 rounded-md border border-input bg-background px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Ad description */}
         <div>
           <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             Stud ad
           </label>
           <RichTextEditor
+            defaultContent={listing?.description as object | undefined}
             placeholder="Write your stud ad…"
             onChange={(json) => setDescription(json)}
             minHeight="10rem"
@@ -92,7 +202,7 @@ export function CreateListingDialog({
           </ActionButton>
           <ActionButton variant="primary" onClick={handleSubmit} disabled={isPending}>
             {isPending && <Loader2 className="size-3.5 animate-spin" />}
-            Create Listing
+            {isEditing ? "Save Changes" : "Create Listing"}
           </ActionButton>
         </div>
       </div>

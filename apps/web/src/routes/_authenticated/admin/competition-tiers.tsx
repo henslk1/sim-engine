@@ -27,6 +27,26 @@ function CompetitionTiersPage() {
   const [selectedDisciplineId, setSelectedDisciplineId] = useState("")
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editing, setEditing] = useState<TierForm | null>(null)
+  const [prizeTierId, setPrizeTierId] = useState<string | null>(null)
+  const [newPrize, setNewPrize] = useState({ placement: "", currencyDefId: "", amount: "", isInvitational: false })
+
+  const { data: currencies } = trpc.admin.currency.list.useQuery(
+    { gameId: gameId! },
+    { enabled: !!gameId }
+  )
+  const { data: prizes } = trpc.admin.competitionTier.listPrizes.useQuery(
+    { tierDefId: prizeTierId! },
+    { enabled: !!prizeTierId }
+  )
+  const savePrize = trpc.admin.competitionTier.savePrize.useMutation({
+    onSuccess: () => {
+      utils.admin.competitionTier.listPrizes.invalidate({ tierDefId: prizeTierId ?? undefined })
+      setNewPrize({ placement: "", currencyDefId: "", amount: "", isInvitational: false })
+    },
+  })
+  const removePrize = trpc.admin.competitionTier.removePrize.useMutation({
+    onSuccess: () => utils.admin.competitionTier.listPrizes.invalidate({ tierDefId: prizeTierId ?? undefined }),
+  })
 
   const { data: tiers } = trpc.admin.competitionTier.list.useQuery(
     { disciplineDefId: selectedDisciplineId },
@@ -107,6 +127,7 @@ function CompetitionTiersPage() {
                   <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Adv. Threshold</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Energy</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Entry Fee</th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Prizes</th>
                   <th className="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Actions</th>
                 </tr>
               </thead>
@@ -119,6 +140,11 @@ function CompetitionTiersPage() {
                     <td className="px-4 py-2 text-muted-foreground">{t.advancementThreshold ?? "—"}</td>
                     <td className="px-4 py-2 text-muted-foreground">{t.energyCost}</td>
                     <td className="px-4 py-2 text-muted-foreground">{t.entryFee}</td>
+                    <td className="px-4 py-2">
+                      <Button size="sm" variant="ghost" onClick={() => setPrizeTierId(prizeTierId === t.id ? null : t.id)}>
+                        {prizeTierId === t.id ? "Hide" : "Prizes"}
+                      </Button>
+                    </td>
                     <td className="px-4 py-2 text-right space-x-1">
                       <Button size="sm" variant="ghost" onClick={() => {
                         setEditingId(t.id)
@@ -148,6 +174,88 @@ function CompetitionTiersPage() {
             </table>
             {remove.error && <p className="px-4 pb-3 text-sm text-destructive">{remove.error.message}</p>}
           </section>
+
+          {prizeTierId && (
+            <section className="rounded-lg border border-border bg-card shadow-sm">
+              <header className="border-b border-border bg-secondary/40 px-4 py-2.5">
+                <h2 className="text-sm font-semibold text-foreground">
+                  Prizes — {tiers?.find(t => t.id === prizeTierId)?.name}
+                </h2>
+              </header>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Placement</th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Amount</th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Currency</th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Type</th>
+                    <th className="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {prizes?.map((p) => (
+                    <tr key={p.id} className="border-b border-border last:border-0">
+                      <td className="px-4 py-2 text-foreground">#{p.placement}</td>
+                      <td className="px-4 py-2 text-muted-foreground">{p.amount}</td>
+                      <td className="px-4 py-2 text-muted-foreground">{p.currencyDef ? `${p.currencyDef.symbol ?? ""} ${p.currencyDef.name}`.trim() : "—"}</td>
+                      <td className="px-4 py-2 text-muted-foreground">{p.isInvitational ? "Invitational" : "Regular"}</td>
+                      <td className="px-4 py-2 text-right">
+                        <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
+                          onClick={() => removePrize.mutate({ id: p.id })}>
+                          Remove
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                  <tr>
+                    <td className="px-4 py-3">
+                      <Input type="number" step="1" min="1" placeholder="e.g. 1"
+                        value={newPrize.placement}
+                        onChange={(e) => setNewPrize(p => ({ ...p, placement: e.target.value }))}
+                        className="h-7 text-sm max-w-[80px]" />
+                    </td>
+                    <td className="px-4 py-3">
+                      <Input type="number" step="1" min="0" placeholder="0"
+                        value={newPrize.amount}
+                        onChange={(e) => setNewPrize(p => ({ ...p, amount: e.target.value }))}
+                        className="h-7 text-sm max-w-[100px]" />
+                    </td>
+                    <td className="px-4 py-3">
+                      <select value={newPrize.currencyDefId}
+                        onChange={(e) => setNewPrize(p => ({ ...p, currencyDefId: e.target.value }))}
+                        className="rounded-md border border-input bg-background px-2.5 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                        <option value="">— Currency —</option>
+                        {currencies?.map((c) => <option key={c.id} value={c.id}>{c.symbol} {c.name}</option>)}
+                      </select>
+                    </td>
+                    <td className="px-4 py-3">
+                      <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                        <input type="checkbox" checked={newPrize.isInvitational}
+                          onChange={(e) => setNewPrize(p => ({ ...p, isInvitational: e.target.checked }))}
+                          className="rounded border-input accent-primary" />
+                        Invitational
+                      </label>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <Button size="sm"
+                        disabled={savePrize.isPending || !newPrize.placement || !newPrize.amount}
+                        onClick={() => savePrize.mutate({
+                          tierDefId: prizeTierId,
+                          placement: parseInt(newPrize.placement),
+                          currencyDefId: newPrize.currencyDefId || undefined,
+                          amount: parseInt(newPrize.amount),
+                          isInvitational: newPrize.isInvitational,
+                        })}>
+                        Add
+                      </Button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              {savePrize.error && <p className="px-4 pb-3 text-sm text-destructive">{savePrize.error.message}</p>}
+              {removePrize.error && <p className="px-4 pb-3 text-sm text-destructive">{removePrize.error.message}</p>}
+            </section>
+          )}
 
           {editing !== null && (
             <section className="rounded-lg border border-border bg-card shadow-sm">

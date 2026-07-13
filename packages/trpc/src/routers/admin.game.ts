@@ -34,6 +34,7 @@ export const gameAdminRouter = router({
         pedigreeDisplayDepth: z.number().int().min(1),
         predictorDailyLimitFree: z.number().int().min(0),
         breedingEnergyCost: z.number().min(0).default(0),
+        maxBreedingSlots: z.number().int().min(1).nullish(),
         containerLabel: z.string().nullish(),
         subContainerLabel: z.string().nullish(),
         gestationCycles: z.number().int().min(1).default(12),
@@ -54,12 +55,15 @@ export const gameAdminRouter = router({
         lifeExpectancyBaseline: z.number().int().nullish(),
       }))
       .mutation(({ input }) => {
-        const { gameId, containerLabel, subContainerLabel, lifeExpectancyBaseline, ...rest } = input
+        const { gameId, containerLabel, subContainerLabel, lifeExpectancyBaseline, maxBreedingSlots, ...rest } = input
         const labels = {
           containerLabel: containerLabel ?? null,
           subContainerLabel: subContainerLabel ?? null,
         }
-        const nullable = { lifeExpectancyBaseline: lifeExpectancyBaseline ?? null }
+        const nullable = {
+          lifeExpectancyBaseline: lifeExpectancyBaseline ?? null,
+          maxBreedingSlots: maxBreedingSlots ?? null,
+        }
         return db.gameConfig.upsert({
           where: { gameId },
           create: { gameId, ...rest, ...labels, ...nullable },

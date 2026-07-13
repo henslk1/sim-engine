@@ -25,6 +25,7 @@ function DisciplinesPage() {
   )
   const { data: stats } = trpc.admin.stat.list.useQuery({ gameId: gameId! }, { enabled: !!gameId })
   const { data: traits } = trpc.admin.personality.list.useQuery({ gameId: gameId! }, { enabled: !!gameId })
+  const { data: items } = trpc.admin.item.list.useQuery({ gameId: gameId! }, { enabled: !!gameId })
 
   const utils = trpc.useUtils()
 
@@ -44,6 +45,20 @@ function DisciplinesPage() {
 
   const [editing, setEditing] = useState<DisciplineForm | null>(null)
   const [formExpanded, setFormExpanded] = useState(false)
+
+  const { data: equipmentRequirements } = trpc.admin.discipline.listEquipmentRequirements.useQuery(
+    { disciplineDefId: editing?.id! },
+    { enabled: !!editing?.id }
+  )
+  const saveEquipReq = trpc.admin.discipline.saveEquipmentRequirement.useMutation({
+    onSuccess: () => {
+      utils.admin.discipline.listEquipmentRequirements.invalidate({ disciplineDefId: editing?.id })
+      setNewEquipReq({ itemDefId: "", quantity: "1" })
+    },
+  })
+  const removeEquipReq = trpc.admin.discipline.removeEquipmentRequirement.useMutation({
+    onSuccess: () => utils.admin.discipline.listEquipmentRequirements.invalidate({ disciplineDefId: editing?.id }),
+  })
 
   const { data: statWeights } = trpc.admin.discipline.listStatWeights.useQuery(
     { disciplineDefId: editing?.id! },
@@ -93,6 +108,7 @@ function DisciplinesPage() {
   const [editingPersonalityWeightId, setEditingPersonalityWeightId] = useState<string | null>(null)
   const [editingPersonalityWeight, setEditingPersonalityWeight] = useState<WeightRow>(emptyWeight())
   const [newPersonalityWeight, setNewPersonalityWeight] = useState({ traitDefId: "", weight: "" })
+  const [newEquipReq, setNewEquipReq] = useState({ itemDefId: "", quantity: "1" })
 
   function openEdit(d: NonNullable<typeof disciplines>[number]) {
     setEditing({ id: d.id, name: d.name, description: d.description ?? "", isConformation: d.isConformation })
@@ -103,6 +119,7 @@ function DisciplinesPage() {
     setEditingPersonalityWeightId(null)
     setEditingPersonalityWeight(emptyWeight())
     setNewPersonalityWeight({ traitDefId: "", weight: "" })
+    setNewEquipReq({ itemDefId: "", quantity: "1" })
   }
 
   function submitDiscipline() {
@@ -421,6 +438,69 @@ function DisciplinesPage() {
                 </tbody>
               </table>
               {removePersonalityWeight.error && <p className="px-4 pb-3 text-sm text-destructive">{removePersonalityWeight.error.message}</p>}
+            </section>
+
+            <section className="rounded-lg border border-border bg-card shadow-sm">
+              <header className="border-b border-border bg-secondary/40 px-4 py-2.5">
+                <h2 className="text-sm font-semibold text-foreground">Equipment Requirements</h2>
+              </header>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Item</th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Quantity</th>
+                    <th className="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {equipmentRequirements?.map((r) => (
+                    <tr key={r.id} className="border-b border-border last:border-0">
+                      <td className="px-4 py-2 font-medium text-foreground">{r.itemDef.name}</td>
+                      <td className="px-4 py-2 text-muted-foreground">{r.quantity}</td>
+                      <td className="px-4 py-2 text-right">
+                        <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
+                          onClick={() => removeEquipReq.mutate({ id: r.id })}>
+                          Remove
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                  <tr>
+                    <td className="px-4 py-3">
+                      <select value={newEquipReq.itemDefId}
+                        onChange={(e) => setNewEquipReq(r => ({ ...r, itemDefId: e.target.value }))}
+                        className="block w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                        <option value="">— Select item —</option>
+                        {items?.filter(i => !equipmentRequirements?.some(r => r.itemDef.id === i.id))
+                          .map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
+                      </select>
+                    </td>
+                    <td className="px-4 py-3">
+                      <Input type="number" step="1" min="1"
+                        value={newEquipReq.quantity}
+                        onChange={(e) => setNewEquipReq(r => ({ ...r, quantity: e.target.value }))}
+                        placeholder="1"
+                        className="h-7 text-sm max-w-[80px]" />
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <Button size="sm"
+                        onClick={() => {
+                          if (!editing?.id || !newEquipReq.itemDefId) return
+                          saveEquipReq.mutate({
+                            disciplineDefId: editing.id,
+                            itemDefId: newEquipReq.itemDefId,
+                            quantity: parseInt(newEquipReq.quantity) || 1,
+                          })
+                        }}
+                        disabled={saveEquipReq.isPending || !newEquipReq.itemDefId}>
+                        Add
+                      </Button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              {saveEquipReq.error && <p className="px-4 pb-3 text-sm text-destructive">{saveEquipReq.error.message}</p>}
+              {removeEquipReq.error && <p className="px-4 pb-3 text-sm text-destructive">{removeEquipReq.error.message}</p>}
             </section>
           </>
         )}
