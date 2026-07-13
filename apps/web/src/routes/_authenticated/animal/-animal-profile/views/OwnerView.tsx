@@ -1,6 +1,6 @@
 import { useState } from "react"
 import type { AnimalProfile } from "../types"
-import { formatCycleAge, computeBreedingGrade, BREEDING_GRADE_COLOR } from "../utils"
+import { formatCycleAge, computeBreedingGrade } from "../utils"
 import { Badge, Meter } from "@/components/game/ui"
 import { ActionButton } from "@/components/game/ui"
 import { Stethoscope, Clock, Pencil } from "lucide-react"
@@ -152,7 +152,7 @@ export function OwnerView({ animal, animalId }: { animal: AnimalProfile; animalI
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">Owner Actions</h3>
               </header>
               <div className="min-h-0 flex-1 divide-y divide-border/50 overflow-y-auto">
-                <OwnerActionList />
+                <OwnerActionList animal={animal} />
               </div>
             </div>
 

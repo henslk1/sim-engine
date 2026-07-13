@@ -66,4 +66,18 @@ export const animalAnimalRouter = router({
         select: { id: true, notes: true },
       })
     ),
+
+    togglePin: publicProcedure
+      .input(z.object({ animalId: z.string() }))
+      .mutation(async ({ input }) => {
+        const animal = await db.animal.findUniqueOrThrow({
+          where: { id: input.animalId },
+          select: { isPinned: true },
+        })
+        return db.animal.update({
+          where: { id: input.animalId },
+          data: { isPinned: !animal.isPinned },
+          select: { id: true, isPinned: true },
+        })
+      }),
 })

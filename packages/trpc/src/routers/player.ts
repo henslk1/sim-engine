@@ -12,4 +12,14 @@ export const playerRouter = router({
         select: { id: true, username: true, avatar: true },
       })
     }),
+
+  listSubContainers: publicProcedure
+    .input(z.object({ playerAccountId: z.string() }))
+    .query(({ input }) =>
+      db.subContainer.findMany({
+        where: { playerAccountId: input.playerAccountId },
+        select: { id: true, name: true },
+        orderBy: { displayOrder: "asc" },
+      })
+    ),
 })
