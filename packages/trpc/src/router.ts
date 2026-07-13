@@ -5,6 +5,7 @@ import { animalTrainingRouter } from "./routers/animal.training.js";
 import { animalCompetitionRouter } from "./routers/animal.competition.js";
 import { animalProfileRouter } from "./routers/animal.profile.js";
 import { animalAnimalRouter } from "./routers/animal.animal.js";
+import { animalGeneticsRouter } from "./routers/animal.genetics.js";
 import { playerRouter } from "./routers/player.js";
 import { breedingRouter } from "./routers/breeding.js";
 
@@ -16,6 +17,7 @@ export const appRouter = router({
   competition: animalCompetitionRouter,
   animalProfile: animalProfileRouter,
   animal: animalAnimalRouter,
+  genetics: animalGeneticsRouter,
   player: playerRouter,
   breeding: breedingRouter,
 })

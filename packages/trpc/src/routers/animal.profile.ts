@@ -54,7 +54,7 @@ export const animalProfileRouter = router({
           immunity: true,
 
           // stats
-          stats: { include: { statDef: true } },
+          stats: { include: { statDef: true }, orderBy: { statDef: { name: "asc" } } },
 
           // personality
           personality: { include: { traitDef: true } },
@@ -216,7 +216,7 @@ export const animalProfileRouter = router({
               },
               intensityTierDefs: {
                 orderBy: { tierIndex: "asc" as const },
-                select: { id: true, name: true, energyCost: true, tierIndex: true },
+                select: { id: true, name: true, energyCost: true, tierIndex: true, minMood: true, minCondition: true },
               },
               trainingActionDefs: {
                 select: { id: true, name: true, statDefId: true },

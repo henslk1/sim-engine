@@ -25,57 +25,71 @@ export async function applyTrainingAction(
     })
 
     if (tier.minMood !== null) {
-      const mood = await tx.animalMood.findUnique({ where: { animalId: animalId } })
-      if ((mood?.value ?? 9) < tier.minMood) {
+      const mood = await tx.animalMood.findUnique({ where: { animalId } })
+      if ((mood?.value ?? 0) < tier.minMood) {
         throw new Error("Mood too low for this intensity tier")
       }
     }
 
     if (tier.minCondition !== null) {
-      const condition = await tx.animalCondition.findUnique({ where: { animalId: animalId } })
-      if ((condition?.value ?? 9) < tier.minCondition) {
+      const condition = await tx.animalCondition.findUnique({ where: { animalId } })
+      if ((condition?.value ?? 0) < tier.minCondition) {
         throw new Error("Condition too low for this intensity tier")
       }
     }
 
-    const statGained = action.baseGain * tier.gainMultiplier
     const energyUsed = tier.energyCost
-
-    const energy = await tx.animalEnergy.findUnique({ where: { animalId: animalId } })
+    const energy = await tx.animalEnergy.findUnique({ where: { animalId } })
     if (!energy) throw new Error(`No energy record for animal ${animalId}`)
+    if (energy.currentEnergy < energyUsed) throw new Error("Not enough energy")
 
-    await tx.animalEnergy.update({
-      where: { animalId: animalId },
-      data: { currentEnergy: Math.max(energy.currentEnergy - energyUsed, 0) },
+    const currentStat = await tx.animalStat.findUniqueOrThrow({
+      where: { animalId_statDefId: { animalId, statDefId: action.statDefId } },
+      select: { innateValue: true, trainedValue: true },
     })
 
-    const stat = await tx.animalStat.upsert({
-      where: { animalId_statDefId: { animalId: animalId, statDefId: action.statDefId } },
-      create: { animalId: animalId, statDefId: action.statDefId, innateValue: 0, trainedValue: statGained },
-      update: { trainedValue: { increment: statGained } },
+    const config = await tx.gameConfig.findUniqueOrThrow({
+      where: { gameId: action.gameId },
+      select: { trainingCeilingMultiplier: true },
+    })
+
+    const cap = currentStat.innateValue * config.trainingCeilingMultiplier
+    if (currentStat.trainedValue >= cap) throw new Error("Stat is already at training cap")
+
+    const rawGain = action.baseGain * tier.gainMultiplier
+    const statGained = Math.min(rawGain, cap - currentStat.trainedValue)
+
+    await tx.animalEnergy.update({
+      where: { animalId },
+      data: { currentEnergy: energy.currentEnergy - energyUsed },
+    })
+
+    const stat = await tx.animalStat.update({
+      where: { animalId_statDefId: { animalId, statDefId: action.statDefId } },
+      data: { trainedValue: { increment: statGained } },
     })
 
     await tx.animalStatHistory.upsert({
       where: {
         animalId_statDefId_cycleNumber: {
-          animalId: animalId,
+          animalId,
           statDefId: action.statDefId,
-          cycleNumber: cycleNumber,
+          cycleNumber,
         },
       },
-      create: { animalId: animalId, statDefId: action.statDefId, cycleNumber: cycleNumber, trainedValue: stat.trainedValue },
+      create: { animalId, statDefId: action.statDefId, cycleNumber, trainedValue: stat.trainedValue },
       update: { trainedValue: stat.trainedValue },
     })
 
     return tx.trainingLog.create({
       data: {
-        animalId: animalId,
-        trainingActionDefId: trainingActionDefId,
-        intensityTierDefId: intensityTierDefId,
-        cycleNumber: cycleNumber,
+        animalId,
+        trainingActionDefId,
+        intensityTierDefId,
+        cycleNumber,
         statGained,
         energyUsed,
-        performedByPlayerId: performedByPlayerId,
+        performedByPlayerId,
       },
     })
 

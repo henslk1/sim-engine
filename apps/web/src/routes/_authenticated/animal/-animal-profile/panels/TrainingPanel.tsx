@@ -50,6 +50,13 @@ export function TrainingPanel({
     return null
   })()
 
+  const moodBlocksAll = tiers.length > 0 && tiers.every(
+    (t) => t.minMood != null && (animal.mood?.value ?? 0) < t.minMood
+  )
+  const conditionBlocksAll = tiers.length > 0 && tiers.every(
+    (t) => t.minCondition != null && (animal.condition?.value ?? 0) < t.minCondition
+  )
+
   const canTrainStage = animal.lifeStage.canTrain
   const activities = animal.lifeStage.stageActivityDefs
 
@@ -142,6 +149,12 @@ export function TrainingPanel({
               Training restricted due to active treatment
             </div>
           )}
+          {(moodBlocksAll || conditionBlocksAll) && (
+            <div className="mb-2 flex flex-wrap gap-1.5">
+              {moodBlocksAll && <Badge tone="danger">Mood too low</Badge>}
+              {conditionBlocksAll && <Badge tone="danger">Condition too low</Badge>}
+            </div>
+          )}
           <div className="space-y-2">
             {animal.stats.map((stat: Stat) => {
               const cap = getTrainingCap(stat.innateValue, config)
@@ -149,8 +162,21 @@ export function TrainingPanel({
               const tierId = selectedTier[stat.statDef.id] ?? tiers[0]?.id
               const tier = tiers.find((t) => t.id === tierId)
               const isPending = pendingStatId === stat.statDef.id
-              const tierLocked = maxAllowedTierIndex != null && tier != null && tier.tierIndex > maxAllowedTierIndex
-              const canTrain = !isRestricted && !tierLocked && !!trainingDef && !!tier && !isPending
+              const atCap = stat.trainedValue >= cap
+              const hasEnergy = tier != null && (animal.energy?.currentEnergy ?? 0) >= tier.energyCost
+              const tierLocked = tier != null && (
+                (maxAllowedTierIndex != null && tier.tierIndex > maxAllowedTierIndex) ||
+                (tier.minMood != null && (animal.mood?.value ?? 0) < tier.minMood) ||
+                (tier.minCondition != null && (animal.condition?.value ?? 0) < tier.minCondition)
+              )
+              const canTrain = !isRestricted && !tierLocked && hasEnergy && !atCap && !!trainingDef && !!tier && !isPending
+              const blockReason: string | null =
+                atCap ? "At cap"
+                : !hasEnergy ? "No energy"
+                : !moodBlocksAll && tier?.minMood != null && (animal.mood?.value ?? 0) < tier.minMood ? "Mood too low"
+                : !conditionBlocksAll && tier?.minCondition != null && (animal.condition?.value ?? 0) < tier.minCondition ? "Condition too low"
+                : maxAllowedTierIndex != null && tier != null && tier.tierIndex > maxAllowedTierIndex ? "Vet restriction"
+                : null
 
               return (
                 <div key={stat.statDef.name} className="rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2">
@@ -165,7 +191,10 @@ export function TrainingPanel({
                   {!readonly && tiers.length > 0 && (
                     <div className="mb-1.5 flex gap-1">
                       {tiers.map((t: IntensityTier) => {
-                        const locked = maxAllowedTierIndex != null && t.tierIndex > maxAllowedTierIndex
+                        const locked =
+                          (maxAllowedTierIndex != null && t.tierIndex > maxAllowedTierIndex) ||
+                          (t.minMood != null && (animal.mood?.value ?? 0) < t.minMood) ||
+                          (t.minCondition != null && (animal.condition?.value ?? 0) < t.minCondition)
                         return (
                           <button
                             key={t.id}
@@ -188,25 +217,32 @@ export function TrainingPanel({
                   )}
 
                   {!readonly && (
-                    <ActionButton
-                      variant="soft"
-                      disabled={!canTrain}
-                      className="w-full justify-center"
-                      onClick={() => {
-                        if (!canTrain || !trainingDef || !tierId) return
-                        setPendingStatId(stat.statDef.id)
-                        train({ animalId: animal.id, trainingActionDefId: trainingDef.id, intensityTierDefId: tierId })
-                      }}
-                    >
-                      {isPending ? (
-                        <Loader2 className="size-3.5 animate-spin" />
-                      ) : (
-                        <>
-                          <Zap className="size-3.5" />
-                          Train{tier ? ` · ${Math.round(tier.energyCost)} energy` : ""}
-                        </>
+                    <>
+                      <ActionButton
+                        variant="soft"
+                        disabled={!canTrain}
+                        className="w-full justify-center"
+                        onClick={() => {
+                          if (!canTrain || !trainingDef || !tierId) return
+                          setPendingStatId(stat.statDef.id)
+                          train({ animalId: animal.id, trainingActionDefId: trainingDef.id, intensityTierDefId: tierId })
+                        }}
+                      >
+                        {isPending ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          <>
+                            <Zap className="size-3.5" />
+                            Train{tier ? ` · ${Math.round(tier.energyCost)} energy` : ""}
+                          </>
+                        )}
+                      </ActionButton>
+                      {!isPending && !canTrain && blockReason && (
+                        <div className="mt-1 flex">
+                          <Badge tone="muted">{blockReason}</Badge>
+                        </div>
                       )}
-                    </ActionButton>
+                    </>
                   )}
                 </div>
               )
