@@ -1,13 +1,14 @@
 import { useState } from "react"
 import type { AnimalProfile } from "../types"
 import { Panel, Badge, Meter, ActionButton } from "@/components/game/ui"
-import { Baby, Sparkles, Heart, Ban, Dna, Scissors, Send, Plus, Syringe, FlaskConical, Scan, Search, Loader2 } from "lucide-react"
+import { Baby, Sparkles, Heart, Ban, Dna, Scissors, Send, Plus, Syringe, FlaskConical, Scan, Search, Loader2, ChevronDown, ChevronUp } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getCOIColor, getFertilityDisplay, getActiveRestrictions } from "../utils"
 import { trpc } from "@/lib/trpc"
 
 type BreedingTab = "info" | "covers"
 type StorageType = "PERSONAL" | "VET" | "GROUP"
+type CoverTab = "own" | "player"
 
 export function BreedingPanel({
   animal,
@@ -21,6 +22,12 @@ export function BreedingPanel({
   const [tab, setTab] = useState<BreedingTab>("info")
   const [storageType, setStorageType] = useState<StorageType>("PERSONAL")
   const [confirmCastrate, setConfirmCastrate] = useState(false)
+  const [sendCoverOpen, setSendCoverOpen] = useState(false)
+  const [coverTab, setCoverTab] = useState<CoverTab>("own")
+  const [selectedDamId, setSelectedDamId] = useState("")
+  const [playerUsername, setPlayerUsername] = useState("")
+  const [usernameSearch, setUsernameSearch] = useState("")
+  const [coverPrice, setCoverPrice] = useState(0)
 
   const utils = trpc.useUtils()
   const invalidate = () => utils.animalProfile.get.invalidate({ animalId: animal.id })
@@ -44,6 +51,29 @@ export function BreedingPanel({
   const isRestricted = restrictions.has("BREEDING") || restrictions.has("ALL")
   const isMale = animal.sex === "MALE"
   const isFemale = animal.sex === "FEMALE"
+
+  const { data: ownFemales } = trpc.breeding.cover.listEligibleOwn.useQuery(
+    { sireId: animal.id },
+    { enabled: isMale && sendCoverOpen && coverTab === "own" }
+  )
+  const { data: playerResult, isFetching: lookupFetching } = trpc.breeding.cover.lookupPlayerFemales.useQuery(
+    { username: usernameSearch, gameId: animal.gameId, excludePlayerAccountId: animal.playerAccountId },
+    { enabled: isMale && sendCoverOpen && coverTab === "player" && usernameSearch.length > 0 }
+  )
+  const { mutate: sendCover, isPending: sendCoverPending } = trpc.breeding.cover.send.useMutation({
+    onSuccess: () => {
+      setSendCoverOpen(false)
+      setSelectedDamId("")
+      setPlayerUsername("")
+      setUsernameSearch("")
+      setCoverPrice(0)
+      invalidate()
+    },
+  })
+  const { mutate: acceptCover, isPending: acceptCoverPending } =
+    trpc.breeding.cover.accept.useMutation({ onSettled: invalidate })
+  const { mutate: declineCover, isPending: declineCoverPending } =
+    trpc.breeding.cover.decline.useMutation({ onSettled: invalidate })
   const canBreed = animal.lifeStage.canBreed
   const canSurrogate = animal.lifeStage.canSurrogate
 
@@ -212,9 +242,132 @@ export function BreedingPanel({
 
           {/* Send Cover (male) */}
           {isMale && !readonly && (
-            <ActionButton variant="soft" disabled className="w-full justify-center">
-              <Send className="size-3.5" /> Send Cover
-            </ActionButton>
+            <div>
+              <ActionButton
+                variant="soft"
+                className="w-full justify-center"
+                disabled={isRestricted}
+                onClick={() => { setSendCoverOpen((o) => !o); setSelectedDamId(""); setCoverTab("own") }}
+              >
+                <Send className="size-3.5" /> Send Cover
+                {sendCoverOpen ? <ChevronUp className="size-3.5 ml-auto" /> : <ChevronDown className="size-3.5 ml-auto" />}
+              </ActionButton>
+
+              {sendCoverOpen && (
+                <div className="mt-1.5 rounded-md border border-border/70 bg-secondary/20 px-2.5 py-2 space-y-2">
+                  {/* Cover sub-tabs */}
+                  <div className="flex gap-0.5">
+                    {(["own", "player"] as CoverTab[]).map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => { setCoverTab(t); setSelectedDamId("") }}
+                        className={cn(
+                          "flex-1 rounded px-2 py-0.5 text-[11px] font-semibold transition-colors",
+                          coverTab === t ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        {t === "own" ? "Own Females" : "To Player"}
+                      </button>
+                    ))}
+                  </div>
+
+                  {coverTab === "own" && (
+                    <div className="space-y-1.5">
+                      <select
+                        value={selectedDamId}
+                        onChange={(e) => setSelectedDamId(e.target.value)}
+                        className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-ring"
+                      >
+                        <option value="">Select a female…</option>
+                        {ownFemales?.map((f) => (
+                          <option key={f.id} value={f.id}>
+                            {f.name} · {f.breed.name} · {f.lifeStage.name}
+                          </option>
+                        ))}
+                      </select>
+                      {ownFemales?.length === 0 && (
+                        <p className="text-[11px] text-muted-foreground">No eligible females found.</p>
+                      )}
+                      <ActionButton
+                        variant="soft"
+                        className="w-full justify-center"
+                        disabled={!selectedDamId || sendCoverPending}
+                        onClick={() => selectedDamId && sendCover({ sireId: animal.id, damId: selectedDamId, price: 0 })}
+                      >
+                        {sendCoverPending ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
+                        Confirm Cover
+                      </ActionButton>
+                    </div>
+                  )}
+
+                  {coverTab === "player" && (
+                    <div className="space-y-1.5">
+                      <div className="flex gap-1.5">
+                        <input
+                          type="text"
+                          value={playerUsername}
+                          onChange={(e) => setPlayerUsername(e.target.value)}
+                          placeholder="Username…"
+                          className="min-w-0 flex-1 rounded-md border border-input bg-background px-2.5 py-1.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-ring"
+                        />
+                        <ActionButton
+                          variant="soft"
+                          className="shrink-0"
+                          disabled={!playerUsername.trim() || lookupFetching}
+                          onClick={() => { setUsernameSearch(playerUsername.trim()); setSelectedDamId("") }}
+                        >
+                          {lookupFetching ? <Loader2 className="size-3.5 animate-spin" /> : <Search className="size-3.5" />}
+                        </ActionButton>
+                      </div>
+
+                      {usernameSearch && playerResult === null && (
+                        <p className="text-[11px] text-muted-foreground">Player not found.</p>
+                      )}
+
+                      {playerResult && (
+                        <>
+                          <select
+                            value={selectedDamId}
+                            onChange={(e) => setSelectedDamId(e.target.value)}
+                            className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-ring"
+                          >
+                            <option value="">Select a female…</option>
+                            {playerResult.females.map((f) => (
+                              <option key={f.id} value={f.id}>
+                                {f.name} · {f.breed.name} · {f.lifeStage.name}
+                              </option>
+                            ))}
+                          </select>
+                          {playerResult.females.length === 0 && (
+                            <p className="text-[11px] text-muted-foreground">No eligible females for this player.</p>
+                          )}
+                          <div>
+                            <label className="mb-0.5 block text-[11px] text-muted-foreground">Stud fee</label>
+                            <input
+                              type="number"
+                              min={0}
+                              value={coverPrice}
+                              onChange={(e) => setCoverPrice(Math.max(0, parseInt(e.target.value) || 0))}
+                              className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-ring"
+                            />
+                          </div>
+                          <ActionButton
+                            variant="soft"
+                            className="w-full justify-center"
+                            disabled={!selectedDamId || sendCoverPending}
+                            onClick={() => selectedDamId && sendCover({ sireId: animal.id, damId: selectedDamId, price: coverPrice })}
+                          >
+                            {sendCoverPending ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
+                            Confirm Cover{coverPrice > 0 ? ` · ${coverPrice}g` : ""}
+                          </ActionButton>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           )}
 
           {/* Genetic material collect */}
@@ -306,7 +459,54 @@ export function BreedingPanel({
               <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 Incoming Covers
               </h4>
-              <p className="text-[11px] text-muted-foreground">No covers available</p>
+              {animal.coverOffersAsDam.length === 0 ? (
+                <p className="text-[11px] text-muted-foreground">No pending offers</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {animal.coverOffersAsDam.map((offer) => (
+                    <div
+                      key={offer.id}
+                      className="rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2 space-y-1.5"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <span className="text-[11px] font-semibold text-foreground">{offer.sire.name}</span>
+                          <span className="ml-1.5 text-[11px] text-muted-foreground">· {offer.sire.breed.name}</span>
+                          <p className="text-[10px] text-muted-foreground">from {offer.sire.playerAccount.username}</p>
+                        </div>
+                        {offer.price > 0 && (
+                          <span className="shrink-0 text-[11px] font-semibold text-foreground">{offer.price}g</span>
+                        )}
+                      </div>
+                      {!readonly && !preg && (
+                        <div className="flex gap-1.5">
+                          <ActionButton
+                            variant="soft"
+                            className="flex-1 justify-center"
+                            disabled={acceptCoverPending || declineCoverPending}
+                            onClick={() => acceptCover({ offerId: offer.id })}
+                          >
+                            {acceptCoverPending ? <Loader2 className="size-3.5 animate-spin" /> : null}
+                            Accept
+                          </ActionButton>
+                          <ActionButton
+                            variant="soft"
+                            className="flex-1 justify-center text-destructive hover:bg-destructive/10"
+                            disabled={acceptCoverPending || declineCoverPending}
+                            onClick={() => declineCover({ offerId: offer.id })}
+                          >
+                            {declineCoverPending ? <Loader2 className="size-3.5 animate-spin" /> : null}
+                            Decline
+                          </ActionButton>
+                        </div>
+                      )}
+                      {preg && (
+                        <p className="text-[10px] text-muted-foreground">Cannot accept — already pregnant</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
           <div>

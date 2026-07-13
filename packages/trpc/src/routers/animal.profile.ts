@@ -174,7 +174,7 @@ export const animalProfileRouter = router({
           stageActivityLogs: {
             orderBy: { cycleNumber: "desc" },
             take: 10,
-            include: { stageActivityDef: true },
+            include: { stageActivityDef: { include: { traitDef: true } } },
           },
 
           // pregnancy
@@ -190,6 +190,25 @@ export const animalProfileRouter = router({
               offspring: {
                 include: {
                   animal: { select: { id: true, sex: true, phenotypeDescription: true } },
+                },
+              },
+            },
+          },
+
+          // incoming cover offers (female)
+          coverOffersAsDam: {
+            where: { status: "PENDING" },
+            orderBy: { createdAt: "asc" as const },
+            select: {
+              id: true,
+              price: true,
+              createdAt: true,
+              sire: {
+                select: {
+                  id: true,
+                  name: true,
+                  breed: { select: { id: true, name: true } },
+                  playerAccount: { select: { id: true, username: true } },
                 },
               },
             },

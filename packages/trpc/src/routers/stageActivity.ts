@@ -1,6 +1,6 @@
 import { router, publicProcedure } from "../trpc.js"
 import { z } from "zod"
-import { applyStageActivity } from "@sim-engine/engine/stageActivity/apply"
+import { applyStageActivity } from "@sim-engine/engine"
 import { db } from "@sim-engine/db"
 
 export const stageActivityRouter = router({

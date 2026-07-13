@@ -200,6 +200,8 @@ model Animal {
   breedingListings                BreedingListing[]
   breedingRecordsAsSire           BreedingRecord[]                 @relation("BreedingSire")
   breedingRecordsAsDam            BreedingRecord[]                 @relation("BreedingDam")
+  coverOffersAsSire               CoverOffer[]                     @relation("CoverOfferSire")
+  coverOffersAsDam                CoverOffer[]                     @relation("CoverOfferDam")
   pregnancies                     Pregnancy[]
   pregnancyOffspring              PregnancyOffspring[]
   geneticMaterials                GeneticMaterial[]

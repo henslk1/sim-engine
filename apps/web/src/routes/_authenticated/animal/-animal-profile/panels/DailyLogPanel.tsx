@@ -53,7 +53,10 @@ export function DailyLogPanel({ animal }: { animal: AnimalProfile }) {
       cycleNumber: l.cycleNumber,
       type: "activity" as const,
       label: l.stageActivityDef.name,
-      vitals: l.stageActivityDef.energyCost > 0 ? [{ label: "energy", value: -l.stageActivityDef.energyCost }] : [],
+      vitals: [
+        ...(l.stageActivityDef.energyCost > 0 ? [{ label: "energy", value: -l.stageActivityDef.energyCost }] : []),
+        { label: l.stageActivityDef.traitDef.name, value: l.stageActivityDef.traitEffect },
+      ],
     })),
   ].sort((a, b) => b.cycleNumber - a.cycleNumber)
 

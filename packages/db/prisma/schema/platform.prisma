@@ -28,6 +28,7 @@ model Game {
   clinics                Clinic[]
   breedingRecords        BreedingRecord[]
   breedingListings       BreedingListing[]
+  coverOffers            CoverOffer[]
   geneticMaterials       GeneticMaterial[]
   disciplineDefs         DisciplineDef[]
   compTierDefs           CompetitionTierDef[]
