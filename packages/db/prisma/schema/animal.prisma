@@ -158,7 +158,7 @@ model Animal {
   isCastrated                     Boolean                          @default(false)
   isPinned                        Boolean                          @default(false)
   phenotypeDescription            String?
-  notes                           String?
+  notes                           Json?
   inbreedingCoefficient           Float                            @default(0)
   fertility                       Float
   isTutorialAnimal                Boolean                          @default(false)

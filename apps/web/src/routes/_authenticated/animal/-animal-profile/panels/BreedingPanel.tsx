@@ -2,6 +2,7 @@ import { useState } from "react"
 import type { AnimalProfile } from "../types"
 import { Panel, Badge, Meter, ActionButton } from "@/components/game/ui"
 import { Baby, Sparkles, Heart, Ban, Dna, Scissors, Send, Plus, Syringe, FlaskConical, Scan, Search, Loader2, ChevronDown, ChevronUp } from "lucide-react"
+import { CreateListingDialog } from "./CreateListingDialog"
 import { cn } from "@/lib/utils"
 import { getCOIColor, getFertilityDisplay, getActiveRestrictions } from "../utils"
 import { trpc } from "@/lib/trpc"
@@ -22,6 +23,7 @@ export function BreedingPanel({
   const [tab, setTab] = useState<BreedingTab>("info")
   const [storageType, setStorageType] = useState<StorageType>("PERSONAL")
   const [confirmCastrate, setConfirmCastrate] = useState(false)
+  const [listingDialogOpen, setListingDialogOpen] = useState(false)
   const [sendCoverOpen, setSendCoverOpen] = useState(false)
   const [coverTab, setCoverTab] = useState<CoverTab>("own")
   const [selectedDamId, setSelectedDamId] = useState("")
@@ -70,10 +72,14 @@ export function BreedingPanel({
       invalidate()
     },
   })
+  const { mutate: toggleListing, isPending: toggleListingPending } =
+    trpc.breeding.listing.toggleActive.useMutation({ onSettled: invalidate })
+
   const { mutate: acceptCover, isPending: acceptCoverPending } =
     trpc.breeding.cover.accept.useMutation({ onSettled: invalidate })
   const { mutate: declineCover, isPending: declineCoverPending } =
     trpc.breeding.cover.decline.useMutation({ onSettled: invalidate })
+  const listing = animal.breedingListings[0] ?? null
   const canBreed = animal.lifeStage.canBreed
   const canSurrogate = animal.lifeStage.canSurrogate
 
@@ -229,15 +235,55 @@ export function BreedingPanel({
 
           {/* Male stud listing */}
           {isMale && !readonly && (
-            <div className="space-y-1.5">
-              <ActionButton variant="soft" disabled className="w-full justify-center">
-                <Plus className="size-3.5" /> Add Breeding Slot
-              </ActionButton>
-              <div className="flex gap-2">
-                <ActionButton variant="soft" disabled className="flex-1 justify-center">Manage Listing</ActionButton>
-                <ActionButton variant="soft" disabled className="flex-1 justify-center">Toggle</ActionButton>
-              </div>
+            <div>
+              {listing ? (
+                <div className="rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-foreground">Breeding Listing</span>
+                    <Badge tone={listing.isActive ? "success" : "muted"}>
+                      {listing.isActive ? "Active" : "Inactive"}
+                    </Badge>
+                  </div>
+                  <div className="flex gap-3 text-[11px] text-muted-foreground">
+                    <span>
+                      {listing.pricePerSlot > 0
+                        ? `${listing.pricePerSlot}${listing.currencyDef?.symbol ? ` ${listing.currencyDef.symbol}` : ""} / slot`
+                        : "Free"}
+                    </span>
+                    <span>
+                      {listing.slots.filter((s) => s.status === "AVAILABLE").length} available ·{" "}
+                      {listing.slots.filter((s) => s.status === "USED").length} used
+                    </span>
+                  </div>
+                  <ActionButton
+                    variant="soft"
+                    className="w-full justify-center"
+                    disabled={toggleListingPending}
+                    onClick={() => toggleListing({ listingId: listing.id })}
+                  >
+                    {toggleListingPending && <Loader2 className="size-3.5 animate-spin" />}
+                    {listing.isActive ? "Deactivate Listing" : "Activate Listing"}
+                  </ActionButton>
+                </div>
+              ) : (
+                <ActionButton
+                  variant="soft"
+                  className="w-full justify-center"
+                  disabled={isRestricted}
+                  onClick={() => setListingDialogOpen(true)}
+                >
+                  <Plus className="size-3.5" /> Create Breeding Listing
+                </ActionButton>
+              )}
             </div>
+          )}
+
+          {listingDialogOpen && (
+            <CreateListingDialog
+              animal={animal}
+              onClose={() => setListingDialogOpen(false)}
+              onCreated={invalidate}
+            />
           )}
 
           {/* Send Cover (male) */}

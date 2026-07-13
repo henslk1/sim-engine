@@ -4,7 +4,7 @@ import { useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 
-const SERVICE_TYPES = ["EXAM", "PANEL_TEST", "GENETIC_COLLECTION", "GENETIC_STORAGE"] as const
+const SERVICE_TYPES = ["EXAM", "PANEL_TEST", "GENETIC_COLLECTION", "GENETIC_STORAGE", "CASTRATION", "ULTRASOUND"] as const
 type ServiceType = typeof SERVICE_TYPES[number]
 
 type VetServiceForm = {

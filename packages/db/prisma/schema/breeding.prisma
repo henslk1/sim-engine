@@ -28,10 +28,9 @@ model BreedingListing {
   gameId            String
   ownerPlayerId     String
   animalId          String
-  description       String?
+  description       Json?
   currencyDefId     String?
   pricePerSlot      Int
-  maxSlots          Int?
   breedRestrictions BreedingListingBreedRestriction[]
   statMinimums      BreedingListingStatMinimum[]
   slots             BreedingSlot[]

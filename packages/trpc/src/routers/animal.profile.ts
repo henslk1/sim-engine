@@ -195,6 +195,18 @@ export const animalProfileRouter = router({
             },
           },
 
+          // breeding listing (male)
+          breedingListings: {
+            take: 1,
+            select: {
+              id: true,
+              isActive: true,
+              pricePerSlot: true,
+              currencyDef: { select: { id: true, name: true, symbol: true } },
+              slots: { select: { id: true, status: true } },
+            },
+          },
+
           // incoming cover offers (female)
           coverOffersAsDam: {
             where: { status: "PENDING" },
@@ -247,6 +259,9 @@ export const animalProfileRouter = router({
               },
               healthCertificateDefs: {
                 select: { id: true, name: true, validForCycles: true, requiredForCompetition: true },
+              },
+              currencyDefs: {
+                select: { id: true, name: true, symbol: true },
               },
             },
           },

@@ -465,6 +465,7 @@ model GameConfig {
   lifeExpectancyBaseline    Int?
   maxLocusTestsPerCycle     Int      @default(2)
   ultrasoundOpenCycle       Int      @default(0)
+  maxBreedingSlots          Int?
   game                      Game     @relation(fields: [gameId], references: [id])
   createdAt                 DateTime @default(now())
   updatedAt                 DateTime @updatedAt

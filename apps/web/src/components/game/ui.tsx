@@ -1,4 +1,6 @@
-import type { ReactNode } from "react"
+import { type ReactNode, useEffect } from "react"
+import { createPortal } from "react-dom"
+import { X } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const toneBar: Record<string, string> = {
@@ -139,6 +141,54 @@ export function ActionButton({
     >
       {children}
     </button>
+  )
+}
+
+export function Dialog({
+  open,
+  onClose,
+  title,
+  children,
+  className,
+}: {
+  open: boolean
+  onClose: () => void
+  title: string
+  children: ReactNode
+  className?: string
+}) {
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose() }
+    window.addEventListener("keydown", handler)
+    return () => window.removeEventListener("keydown", handler)
+  }, [open, onClose])
+
+  if (!open) return null
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 pt-16">
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-[2px]" onClick={onClose} />
+      <div
+        className={cn(
+          "relative z-10 w-full max-w-xl rounded-lg border border-border bg-card shadow-xl",
+          className,
+        )}
+      >
+        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+          <h2 className="font-semibold text-foreground">{title}</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <X className="size-3.5" />
+          </button>
+        </div>
+        <div>{children}</div>
+      </div>
+    </div>,
+    document.body,
   )
 }
 
