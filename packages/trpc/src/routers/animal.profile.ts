@@ -57,10 +57,15 @@ export const animalProfileRouter = router({
           stats: { include: { statDef: true }, orderBy: { statDef: { name: "asc" } } },
 
           // personality
-          personality: { include: { traitDef: true } },
+          personality: {
+            include: {
+              traitDef: { include: { labelRanges: { select: { label: true, minValue: true, maxValue: true } } } },
+            },
+          },
 
           // genetics
           genotypes: {
+            orderBy: { id: "asc" },
             include: {
               locus: { include: { panelEntries: { include: { panelDef: true } } } },
               alleleOne: true,

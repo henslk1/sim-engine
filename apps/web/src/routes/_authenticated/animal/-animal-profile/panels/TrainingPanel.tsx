@@ -1,7 +1,7 @@
 import { useState } from "react"
 import type { AnimalProfile } from "../types"
 import { Panel, Badge, Meter, ActionButton } from "@/components/game/ui"
-import { Dumbbell, Ban, Loader2, Zap, TrendingUp, TrendingDown, HeartHandshake } from "lucide-react"
+import { Dumbbell, Ban, Loader2, Zap, HeartHandshake } from "lucide-react"
 import { getTrainingCap, getActiveRestrictions } from "../utils"
 import { cn } from "@/lib/utils"
 import { trpc } from "@/lib/trpc"
@@ -10,6 +10,11 @@ type Stat = AnimalProfile["stats"][number]
 type IntensityTier = AnimalProfile["game"]["intensityTierDefs"][number]
 type StageActivity = AnimalProfile["lifeStage"]["stageActivityDefs"][number]
 type Personality = AnimalProfile["personality"][number]
+type LabelRange = Personality["traitDef"]["labelRanges"][number]
+
+function labelForValue(value: number, ranges: LabelRange[]): string | null {
+  return ranges.find((r) => value >= r.minValue && value <= r.maxValue)?.label ?? null
+}
 
 export function TrainingPanel({
   animal,
@@ -24,11 +29,22 @@ export function TrainingPanel({
   const [selectedTier, setSelectedTier] = useState<Record<string, string>>({})
   const [pendingStatId, setPendingStatId] = useState<string | null>(null)
 
+  const [pendingActivityId, setPendingActivityId] = useState<string | null>(null)
+
   const utils = trpc.useUtils()
+  const invalidate = () => utils.animalProfile.get.invalidate({ animalId: animal.id })
+
   const { mutate: train } = trpc.training.perform.useMutation({
     onSettled: () => {
       setPendingStatId(null)
-      utils.animalProfile.get.invalidate({ animalId: animal.id })
+      invalidate()
+    },
+  })
+
+  const { mutate: perform } = trpc.stageActivity.perform.useMutation({
+    onSettled: () => {
+      setPendingActivityId(null)
+      invalidate()
     },
   })
 
@@ -58,6 +74,7 @@ export function TrainingPanel({
   )
 
   const canTrainStage = animal.lifeStage.canTrain
+  const hasUniqueActionSet = animal.lifeStage.hasUniqueActionSet
   const activities = animal.lifeStage.stageActivityDefs
 
   return (
@@ -67,79 +84,80 @@ export function TrainingPanel({
       action={canTrainStage && config ? <Badge tone="outline">Cap = innate × {config.trainingCeilingMultiplier}</Badge> : undefined}
     >
       {!canTrainStage ? (
-        <div className="space-y-3">
-          <p className="text-[11px] text-muted-foreground">
-            Training is not available at this life stage.
-          </p>
-
-          {activities.length > 0 && (
-            <>
-              {/* Personality */}
-              {animal.personality.length > 0 && (
-                <div>
-                  <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    Personality
-                  </h4>
-                  <div className="space-y-1.5">
-                    {animal.personality.map((trait: Personality) => (
-                      <div key={trait.traitDef.name}>
-                        <div className="mb-0.5 flex items-center justify-between">
-                          <span className="text-xs font-semibold text-foreground">{trait.traitDef.name}</span>
-                          <span className="text-[11px] text-muted-foreground">
-                            {trait.traitLabel && (
-                              <span className="mr-1.5 font-medium text-foreground">{trait.traitLabel}</span>
-                            )}
-                            <span className="tabular-nums">{Math.round(trait.value)}</span>
-                          </span>
-                        </div>
-                        <Meter value={trait.value} max={100} tone="mood" className="h-1" />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Stage activities */}
-              <div>
-                <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Stage Activities
-                </h4>
-                <div className="space-y-1.5">
-                  {activities.map((activity: StageActivity) => (
-                    <div
-                      key={activity.id}
-                      className="rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2"
-                    >
-                      <div className="mb-1 flex items-center justify-between gap-2">
-                        <span className="text-xs font-semibold text-foreground">{activity.name}</span>
-                        <div className="flex shrink-0 items-center gap-1.5">
-                          <span className={cn(
-                            "flex items-center gap-0.5 text-[11px] font-medium",
-                            activity.traitEffect > 0 ? "text-chart-2" : "text-destructive"
-                          )}>
-                            {activity.traitEffect > 0
-                              ? <TrendingUp className="size-3" />
-                              : <TrendingDown className="size-3" />
-                            }
-                            {activity.traitDef.name}
-                          </span>
-                          <Badge tone="muted">{Math.round(activity.energyCost)} energy</Badge>
-                        </div>
-                      </div>
-                      {activity.description && (
-                        <p className="mb-1.5 text-[11px] text-muted-foreground">{activity.description}</p>
-                      )}
-                      {!readonly && (
-                        <ActionButton variant="soft" disabled className="w-full justify-center">
-                          <Zap className="size-3.5" /> Perform
-                        </ActionButton>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </>
+        <div className="space-y-2">
+          {!hasUniqueActionSet && (
+            <p className="text-[11px] text-muted-foreground">
+              Training is not available at this life stage.
+            </p>
           )}
+
+          {hasUniqueActionSet && animal.personality.map((trait: Personality) => {
+            const traitActivities = activities.filter((a: StageActivity) => a.traitDef.id === trait.traitDef.id)
+            const effectiveValue = trait.value + trait.personalityModifier
+            const innateLabel = labelForValue(trait.value, trait.traitDef.labelRanges)
+            const currentLabel = labelForValue(effectiveValue, trait.traitDef.labelRanges)
+            const hasShifted = innateLabel !== currentLabel
+            return (
+              <div key={trait.traitDef.id} className="rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2">
+                <div className="mb-0.5 flex items-center justify-between">
+                  <span className="text-xs font-semibold text-foreground">{trait.traitDef.name}</span>
+                  <span className="text-[11px] text-muted-foreground">
+                    {trait.traitLabel && (
+                      <span className="mr-1.5 font-medium text-foreground">{trait.traitLabel}</span>
+                    )}
+                    <span className="tabular-nums">{Math.round(effectiveValue)}</span>
+                  </span>
+                </div>
+                <Meter value={effectiveValue} max={100} tone="mood" className="mb-2 h-1.5" />
+
+                {traitActivities.length > 0 && (
+                  <div className={cn("mt-1.5 gap-1.5", traitActivities.length > 1 ? "grid grid-cols-2" : "flex flex-col")}>
+                    {[...traitActivities].sort((a, b) => a.traitEffect - b.traitEffect).map((activity: StageActivity) => {
+                      const isPending = pendingActivityId === activity.id
+                      const hasEnergy = (animal.energy?.currentEnergy ?? 0) >= activity.energyCost
+                      const canPerform = !hasShifted && hasEnergy && !isPending
+                      return (
+                        <div key={activity.id} className={cn("rounded border border-border/50 bg-background/50 px-2 py-1.5", hasShifted && "opacity-50")}>
+                          <div className="mb-0.5 flex items-center justify-between gap-1">
+                            <span className="truncate text-[11px] font-semibold text-foreground">{activity.name}</span>
+                            <span className={cn(
+                              "shrink-0 text-[11px] font-semibold tabular-nums",
+                              activity.traitEffect > 0 ? "text-chart-2" : "text-destructive"
+                            )}>
+                              {activity.traitEffect > 0 ? "+" : ""}{activity.traitEffect}
+                            </span>
+                          </div>
+                          {activity.description && (
+                            <p className="mb-1 text-[10px] text-muted-foreground leading-tight">{activity.description}</p>
+                          )}
+                          <div className="flex items-center justify-between gap-1">
+                            <Badge tone="muted">{Math.round(activity.energyCost)} energy</Badge>
+                            {!readonly && (
+                              <ActionButton
+                                variant="soft"
+                                disabled={!canPerform}
+                                className="h-5 px-1.5 text-[10px]"
+                                onClick={() => {
+                                  if (!canPerform) return
+                                  setPendingActivityId(activity.id)
+                                  perform({ animalId: animal.id, stageActivityDefId: activity.id })
+                                }}
+                              >
+                                {isPending ? <Loader2 className="size-3 animate-spin" /> : <><Zap className="size-3" /> Perform</>}
+                              </ActionButton>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+                {hasShifted && (
+                  <p className="mt-1 text-[10px] text-muted-foreground">Label shifted — locked</p>
+                )}
+              </div>
+            )
+          })}
         </div>
       ) : (
         <>

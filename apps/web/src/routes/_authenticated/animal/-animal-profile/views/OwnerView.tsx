@@ -166,7 +166,9 @@ export function OwnerView({ animal, animalId }: { animal: AnimalProfile; animalI
               <DailyLogPanel animal={animal} />
             </div>
 
-            <PersonalityPanel animal={animal} />
+            {(animal.lifeStage.canTrain || !animal.lifeStage.hasUniqueActionSet) && (
+              <PersonalityPanel animal={animal} />
+            )}
             <NotesPanel animal={animal} animalId={animalId} />
           </div>
 

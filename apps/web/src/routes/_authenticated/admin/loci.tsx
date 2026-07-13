@@ -9,8 +9,9 @@ type LocusForm = {
   name: string
   displayGroup: string
   biasTarget: "FAVORABILITY" | "RARITY" | "NONE"
+  minTestCycle: number | null
 }
-const emptyLocus = (): LocusForm => ({ name: "", displayGroup: "", biasTarget: "NONE" })
+const emptyLocus = (): LocusForm => ({ name: "", displayGroup: "", biasTarget: "NONE", minTestCycle: null })
 
 type AlleleRow = { symbol: string; isAvailable: boolean }
 const emptyAllele = (): AlleleRow => ({ symbol: "", isAvailable: false })
@@ -60,7 +61,7 @@ function LociPage() {
   const [newAllele, setNewAllele] = useState<AlleleRow>(emptyAllele())
 
   function openEdit(locus: NonNullable<typeof loci>[number]) {
-    setEditing({ id: locus.id, name: locus.name, displayGroup: locus.displayGroup ?? "", biasTarget: locus.biasTarget })
+    setEditing({ id: locus.id, name: locus.name, displayGroup: locus.displayGroup ?? "", biasTarget: locus.biasTarget, minTestCycle: locus.minTestCycle ?? null })
     setFormExpanded(false)
     setEditingAlleleId(null)
     setEditingAllele(emptyAllele())
@@ -162,6 +163,26 @@ function LociPage() {
                   <option value="RARITY">Rarity</option>
                 </select>
               </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">
+                  Min Test Cycle{" "}
+                  <span className="font-normal">(optional — leave blank for no age gate)</span>
+                </label>
+                <Input
+                  type="number"
+                  step="1"
+                  min="0"
+                  value={editing.minTestCycle ?? ""}
+                  onChange={(e) =>
+                    setEditing({
+                      ...editing,
+                      minTestCycle: e.target.value === "" ? null : parseInt(e.target.value),
+                    })
+                  }
+                  placeholder="e.g. 6"
+                  className="mt-1"
+                />
+              </div>
               <div className="flex gap-2 pt-1">
                 <Button onClick={submitLocus} disabled={saveLocus.isPending || !editing.name.trim()}>
                   Save
@@ -188,6 +209,10 @@ function LociPage() {
               )}
               <p>
                 <span className="text-muted-foreground">Bias Target:</span> {editing.biasTarget}
+              </p>
+              <p>
+                <span className="text-muted-foreground">Min Test Cycle:</span>{" "}
+                {editing.minTestCycle != null ? `Cycle ${editing.minTestCycle}` : "None"}
               </p>
             </div>
           )}
@@ -385,6 +410,9 @@ function LociPage() {
               <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Bias Target
               </th>
+              <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Min Test Cycle
+              </th>
               <th className="px-4 py-2 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Alleles
               </th>
@@ -399,6 +427,9 @@ function LociPage() {
                 <td className="px-4 py-2 font-medium text-foreground">{l.name}</td>
                 <td className="px-4 py-2 text-muted-foreground">{l.displayGroup ?? "—"}</td>
                 <td className="px-4 py-2 text-muted-foreground">{l.biasTarget}</td>
+                <td className="px-4 py-2 text-muted-foreground">
+                  {l.minTestCycle != null ? `Cycle ${l.minTestCycle}` : "—"}
+                </td>
                 <td className="px-4 py-2 text-center text-muted-foreground">{l._count.alleles}</td>
                 <td className="px-4 py-2 text-right">
                   <Button size="sm" variant="ghost" onClick={() => openEdit(l)}>
@@ -409,7 +440,7 @@ function LociPage() {
             ))}
             {loci?.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-sm text-muted-foreground">
+                <td colSpan={6} className="px-4 py-6 text-center text-sm text-muted-foreground">
                   No loci yet. Add your first locus to get started.
                 </td>
               </tr>

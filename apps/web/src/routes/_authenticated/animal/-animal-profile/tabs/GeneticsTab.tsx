@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { cn } from "@/lib/utils"
 import type { AnimalProfile } from "../types"
-import { getTrainingCap } from "../utils"
+import { getTrainingCap, formatCycleAge } from "../utils"
 import { ActionButton, Badge } from "@/components/game/ui"
 import { FlaskConical, Loader2 } from "lucide-react"
 import { trpc } from "@/lib/trpc"
@@ -48,11 +48,15 @@ function GenotypeRow({
   genotype,
   testsRemaining,
   isTestingThis,
+  isAgeGated,
+  cycleToAge,
   onTest,
 }: {
   genotype: Genotype
   testsRemaining: number
   isTestingThis: boolean
+  isAgeGated: boolean
+  cycleToAge: (n: number) => string
   onTest: () => void
 }) {
   return (
@@ -67,11 +71,17 @@ function GenotypeRow({
           <span className="text-[11px] italic text-muted-foreground/60">?/?</span>
           <ActionButton
             variant="soft"
-            disabled={testsRemaining === 0 || isTestingThis}
+            disabled={isAgeGated || testsRemaining === 0 || isTestingThis}
             className="h-5 px-1.5 text-[10px]"
             onClick={onTest}
           >
-            {isTestingThis ? <Loader2 className="size-3 animate-spin" /> : "Test"}
+            {isTestingThis ? (
+              <Loader2 className="size-3 animate-spin" />
+            ) : isAgeGated ? (
+              `${cycleToAge(genotype.locus.minTestCycle!)}+`
+            ) : (
+              "Test"
+            )}
           </ActionButton>
         </div>
       )}
@@ -93,6 +103,8 @@ function GenotypeGrid({ genotypes, children }: { genotypes: Genotype[]; children
 function PanelGroup({
   panelDef,
   genotypes,
+  ageInCycles,
+  cycleToAge,
   testsRemaining,
   testingLocusId,
   testingPanelId,
@@ -101,14 +113,18 @@ function PanelGroup({
 }: {
   panelDef: PanelDef
   genotypes: Genotype[]
+  ageInCycles: number
+  cycleToAge: (n: number) => string
   testsRemaining: number
   testingLocusId: string | null
   testingPanelId: string | null
   onTestLocus: (locusId: string) => void
   onTestPanel: (panelDefId: string) => void
 }) {
-  const untestedCount = genotypes.filter((g) => !g.isTestedByOwner).length
-  const totalCost = untestedCount * panelDef.testCost
+  const eligibleUntested = genotypes.filter(
+    (g) => !g.isTestedByOwner && (g.locus.minTestCycle == null || ageInCycles >= g.locus.minTestCycle)
+  )
+  const totalCost = eligibleUntested.length * panelDef.testCost
   const isPending = testingPanelId === panelDef.id
 
   return (
@@ -117,7 +133,7 @@ function PanelGroup({
         <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           {panelDef.name}
         </span>
-        {untestedCount > 0 && (
+        {eligibleUntested.length > 0 && (
           <ActionButton
             variant="soft"
             className="h-6 px-2 text-[11px]"
@@ -140,6 +156,8 @@ function PanelGroup({
             genotype={g}
             testsRemaining={testsRemaining}
             isTestingThis={testingLocusId === g.locusId}
+            isAgeGated={g.locus.minTestCycle != null && ageInCycles < g.locus.minTestCycle}
+            cycleToAge={cycleToAge}
             onTest={() => onTestLocus(g.locusId)}
           />
         ))}
@@ -181,6 +199,7 @@ export function GeneticsTab({
   animal: AnimalProfile
   config: AnimalProfile["game"]["gameConfig"]
 }) {
+  const cycleToAge = (n: number) => formatCycleAge(n, config)
   const [subTab, setSubTab] = useState<GeneticsSubTab>("color")
 
   const utils = trpc.useUtils()
@@ -239,6 +258,8 @@ export function GeneticsTab({
                 <PanelGroup
                   panelDef={panelDef}
                   genotypes={genotypes}
+                  ageInCycles={animal.ageInCycles}
+                  cycleToAge={cycleToAge}
                   testsRemaining={testsRemaining}
                   testingLocusId={testingLocusId}
                   testingPanelId={testingPanelId}
@@ -256,6 +277,8 @@ export function GeneticsTab({
                       genotype={g}
                       testsRemaining={testsRemaining}
                       isTestingThis={testingLocusId === g.locusId}
+                      isAgeGated={g.locus.minTestCycle != null && animal.ageInCycles < g.locus.minTestCycle}
+                      cycleToAge={cycleToAge}
                       onTest={() => testLocus({ animalId: animal.id, locusId: g.locusId })}
                     />
                   ))}
@@ -276,6 +299,8 @@ export function GeneticsTab({
                 <PanelGroup
                   panelDef={panelDef}
                   genotypes={genotypes}
+                  ageInCycles={animal.ageInCycles}
+                  cycleToAge={cycleToAge}
                   testsRemaining={testsRemaining}
                   testingLocusId={testingLocusId}
                   testingPanelId={testingPanelId}
@@ -298,6 +323,8 @@ export function GeneticsTab({
                 <PanelGroup
                   panelDef={panelDef}
                   genotypes={genotypes}
+                  ageInCycles={animal.ageInCycles}
+                  cycleToAge={cycleToAge}
                   testsRemaining={testsRemaining}
                   testingLocusId={testingLocusId}
                   testingPanelId={testingPanelId}

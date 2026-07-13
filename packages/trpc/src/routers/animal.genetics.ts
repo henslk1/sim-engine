@@ -63,12 +63,16 @@ export const animalGeneticsRouter = router({
             locusId: { in: panelLocusIds },
             isTestedByOwner: false,
           },
-          select: { locusId: true },
+          select: { locusId: true, locus: { select: { minTestCycle: true } } },
         })
 
-        if (untestedGenotypes.length === 0) return { tested: 0, cost: 0 }
+        const eligibleGenotypes = untestedGenotypes.filter(
+          (g) => g.locus.minTestCycle == null || animal.ageInCycles >= g.locus.minTestCycle
+        )
 
-        const totalCost = untestedGenotypes.length * panelDef.testCost
+        if (eligibleGenotypes.length === 0) return { tested: 0, cost: 0 }
+
+        const totalCost = eligibleGenotypes.length * panelDef.testCost
 
         if (totalCost > 0) {
           const vetService = await tx.vetServiceDef.findFirstOrThrow({
@@ -109,12 +113,12 @@ export const animalGeneticsRouter = router({
         await tx.animalGenotype.updateMany({
           where: {
             animalId: input.animalId,
-            locusId: { in: untestedGenotypes.map((g) => g.locusId) },
+            locusId: { in: eligibleGenotypes.map((g) => g.locusId) },
           },
           data: { isTestedByOwner: true, testedAt: new Date(), testedCycle: animal.ageInCycles },
         })
 
-        return { tested: untestedGenotypes.length, cost: totalCost }
+        return { tested: eligibleGenotypes.length, cost: totalCost }
       })
     }),
 })

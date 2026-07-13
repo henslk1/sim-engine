@@ -8,6 +8,7 @@ import { animalAnimalRouter } from "./routers/animal.animal.js";
 import { animalGeneticsRouter } from "./routers/animal.genetics.js";
 import { playerRouter } from "./routers/player.js";
 import { breedingRouter } from "./routers/breeding.js";
+import { stageActivityRouter } from "./routers/stageActivity.js";
 
 export const appRouter = router({
   health: publicProcedure.query(() => ({ status: "ok" })),
@@ -20,6 +21,7 @@ export const appRouter = router({
   genetics: animalGeneticsRouter,
   player: playerRouter,
   breeding: breedingRouter,
+  stageActivity: stageActivityRouter,
 })
 
 export type AppRouter = typeof appRouter

@@ -20,10 +20,11 @@ export const locusAdminRouter = router({
       name: z.string().min(1),
       displayGroup: z.string().nullish(),
       biasTarget: z.enum(["FAVORABILITY", "RARITY", "NONE"]),
+      minTestCycle: z.number().int().min(0).nullish(),
     }))
     .mutation(({ input }) => {
-      const { id, gameId, displayGroup, ...rest } = input
-      const data = { ...rest, displayGroup: displayGroup ?? null }
+      const { id, gameId, displayGroup, minTestCycle, ...rest } = input
+      const data = { ...rest, displayGroup: displayGroup ?? null, minTestCycle: minTestCycle ?? null }
       if (id) return db.locus.update({ where: { id }, data })
       return db.locus.create({ data: { gameId, ...data } })
     }),

@@ -100,13 +100,14 @@ model PersonalityLabelRange {
 }
 
 model AnimalPersonality {
-  id         String              @id @default(cuid())
-  animalId   String
-  traitDefId String
-  value      Float
-  traitLabel String?
-  animal     Animal              @relation(fields: [animalId], references: [id])
-  traitDef   PersonalityTraitDef @relation(fields: [traitDefId], references: [id])
+  id                  String              @id @default(cuid())
+  animalId            String
+  traitDefId          String
+  value               Float
+  personalityModifier Float               @default(0)
+  traitLabel          String?
+  animal              Animal              @relation(fields: [animalId], references: [id])
+  traitDef            PersonalityTraitDef @relation(fields: [traitDefId], references: [id])
 
   @@unique([animalId, traitDefId])
 }
