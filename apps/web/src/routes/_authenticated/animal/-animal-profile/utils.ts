@@ -1,11 +1,21 @@
 import type { AnimalProfile } from "./types"
 
 export const BREEDING_GRADE_COLOR: Record<string, string> = {
-  A: "text-amber-400",
+  S: "text-red-500",
+  A: "text-yellow-600",
   B: "text-violet-500",
-  C: "text-sky-500",
-  D: "text-emerald-500",
+  C: "text-sky-600",
+  D: "text-emerald-600",
   F: "text-zinc-400",
+}
+
+export const BREEDING_GRADE_BG: Record<string, string> = {
+  S: "bg-red-500/15 border border-red-500/30",
+  A: "bg-yellow-600/15 border border-yellow-600/30",
+  B: "bg-violet-500/15 border border-violet-500/30",
+  C: "bg-sky-600/15 border border-sky-600/30",
+  D: "bg-emerald-600/15 border border-emerald-600/30",
+  F: "bg-zinc-400/10 border border-zinc-400/20",
 }
 
 export function getCOIColor(coefficient: number): string {
@@ -108,9 +118,21 @@ export function computeBreedingGrade(
     components.push(avg / 100)
   }
 
+  const healthLoci = animal.genotypes.filter((g) =>
+    g.locus.panelEntries.some((e) => e.panelDef.panelType === "HEALTH")
+)
+  if (healthLoci.length > 0) {
+    const tested = healthLoci.filter((g) => g.isTestedByOwner).length
+    components.push(tested / healthLoci.length)
+  }
+
+  const activeConditions = animal.healthRecords.filter((r) => r.isActive).length
+  components.push(Math.max(0, 1 - activeConditions * 0.15))
+
   const pct = (components.reduce((a, b) => a + b, 0) / components.length) * 100
 
   switch (true) {
+    case pct >= 100: return "S"
     case pct >= 85: return "A"
     case pct >= 70: return "B"
     case pct >= 55: return "C"

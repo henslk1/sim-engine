@@ -11,6 +11,7 @@ const stageInput = z.object({
   ageCap: z.number().int().min(0),
   canCompete: z.boolean(),
   canBreed: z.boolean(),
+  canSurrogate: z.boolean().default(false),
   canTrain: z.boolean(),
   canReceiveCare: z.boolean(),
   hasUniqueActionSet: z.boolean(),

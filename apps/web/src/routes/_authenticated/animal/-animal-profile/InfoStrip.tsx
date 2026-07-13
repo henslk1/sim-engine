@@ -3,7 +3,7 @@ import type { AnimalProfile } from "./types"
 import { Badge } from "@/components/game/ui"
 import { cn } from "@/lib/utils"
 import { GitBranch, Trophy, Award, Star } from "lucide-react"
-import { BREEDING_GRADE_COLOR } from "./utils"
+import { BREEDING_GRADE_COLOR, BREEDING_GRADE_BG } from "./utils"
 
 export function InfoStrip({
   animal,
@@ -29,7 +29,7 @@ export function InfoStrip({
         <BrandChip key={b.id} path={b.playerBrand.path} />
       ))}
       <span
-        className="inline-flex items-center justify-center rounded-md bg-secondary/60 px-2 py-1"
+        className={cn("inline-flex items-center justify-center rounded-md px-2 py-1", BREEDING_GRADE_BG[breedingGrade])}
         title={`Breeding quality: ${breedingGrade}`}
       >
         <Star className={cn("size-3", BREEDING_GRADE_COLOR[breedingGrade])} fill="currentColor" />

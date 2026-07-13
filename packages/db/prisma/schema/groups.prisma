@@ -96,6 +96,7 @@ model Group {
   isOpen               Boolean                   @default(true)
   maxMembers           Int?
   isActive             Boolean                   @default(true)
+  geneticStorageCapacity Int                       @default(0)
   disbandedAt          DateTime?
   foundedByPlayerId    String?
   members              GroupMember[]

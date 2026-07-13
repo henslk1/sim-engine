@@ -80,4 +80,58 @@ export const animalAnimalRouter = router({
           select: { id: true, isPinned: true },
         })
       }),
+
+    castrate: publicProcedure
+      .input(z.object({ animalId: z.string() }))
+      .mutation(async ({ input }) => {
+        return db.$transaction(async (tx) => {
+          const animal = await tx.animal.findUniqueOrThrow({
+            where: { id: input.animalId },
+            select: { gameId: true, playerAccountId: true, ageInCycles: true, isCastrated: true },
+          })
+
+          if (animal.isCastrated) throw new Error("Animal is already castrated")
+
+          const vetService = await tx.vetServiceDef.findFirstOrThrow({
+            where: { gameId: animal.gameId, serviceType: "CASTRATION" },
+            select: { id: true, baseCost: true, currencyDefId: true },
+          })
+
+          if (vetService.baseCost > 0) {
+            await tx.playerBalance.update({
+              where: {
+                playerAccountId_currencyDefId: {
+                  playerAccountId: animal.playerAccountId,
+                  currencyDefId: vetService.currencyDefId,
+                },
+              },
+              data: { balance: { decrement: vetService.baseCost } },
+            })
+            await tx.transaction.create({
+              data: {
+                gameId: animal.gameId,
+                fromPlayerAccountId: animal.playerAccountId,
+                currencyDefId: vetService.currencyDefId,
+                amount: vetService.baseCost,
+                txnType: "VET_SERVICE_FEE",
+              },
+            })
+          }
+
+          await tx.vetVisitLog.create({
+            data: {
+              animalId: input.animalId,
+              playerAccountId: animal.playerAccountId,
+              vetServiceDefId: vetService.id,
+              visitCycle: animal.ageInCycles,
+            },
+          })
+
+          return tx.animal.update({
+            where: { id: input.animalId },
+            data: { isCastrated: true },
+            select: { id: true, isCastrated: true },
+          })
+        })
+      }),
 })

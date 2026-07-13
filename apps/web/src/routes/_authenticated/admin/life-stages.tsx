@@ -12,6 +12,7 @@ type StageForm = {
   maxCycle: number
   canCompete: boolean
   canBreed: boolean
+  canSurrogate: boolean
   canTrain: boolean
   canReceiveCare: boolean
   hasUniqueActionSet: boolean
@@ -28,6 +29,7 @@ const emptyForm: StageForm = {
   maxCycle: 0,
   canCompete: false,
   canBreed: false,
+  canSurrogate: false,
   canTrain: false,
   canReceiveCare: false,
   hasUniqueActionSet: false,
@@ -40,6 +42,7 @@ const emptyForm: StageForm = {
 const checkboxFields: [keyof StageForm, string][] = [
   ["canCompete", "Can Compete"],
   ["canBreed", "Can Breed"],
+  ["canSurrogate", "Can Surrogate"],
   ["canTrain", "Can Train"],
   ["canReceiveCare", "Can Receive Care"],
   ["hasUniqueActionSet", "Has Unique Action Set"],
@@ -76,6 +79,7 @@ function LifeStagePage() {
       maxCycle: stage.ageCap,
       canCompete: stage.canCompete,
       canBreed: stage.canBreed,
+      canSurrogate: stage.canSurrogate,
       canTrain: stage.canTrain,
       canReceiveCare: stage.canReceiveCare,
       hasUniqueActionSet: stage.hasUniqueActionSet,
@@ -212,6 +216,7 @@ function LifeStagePage() {
               <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cycles</th>
               <th className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">Compete</th>
               <th className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">Breed</th>
+              <th className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">Surrogate</th>
               <th className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">Train</th>
               <th className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">Care</th>
               <th className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">Unique</th>
@@ -227,6 +232,7 @@ function LifeStagePage() {
                 <td className="px-3 py-2 text-muted-foreground">{s.minCycle}–{s.maxCycle}</td>
                 <td className="px-3 py-2 text-center">{s.canCompete ? <span className="text-primary">✓</span> : <span className="text-muted-foreground">—</span>}</td>
                 <td className="px-3 py-2 text-center">{s.canBreed ? <span className="text-primary">✓</span> : <span className="text-muted-foreground">—</span>}</td>
+                <td className="px-3 py-2 text-center">{s.canSurrogate ? <span className="text-primary">✓</span> : <span className="text-muted-foreground">—</span>}</td>
                 <td className="px-3 py-2 text-center">{s.canTrain ? <span className="text-primary">✓</span> : <span className="text-muted-foreground">—</span>}</td>
                 <td className="px-3 py-2 text-center">{s.canReceiveCare ? <span className="text-primary">✓</span> : <span className="text-muted-foreground">—</span>}</td>
                 <td className="px-3 py-2 text-center">{s.hasUniqueActionSet ? <span className="text-primary">✓</span> : <span className="text-muted-foreground">—</span>}</td>
@@ -239,7 +245,7 @@ function LifeStagePage() {
             ))}
             {stages?.length === 0 && (
               <tr>
-                <td colSpan={10} className="px-3 py-6 text-center text-sm text-muted-foreground">No life stages defined yet.</td>
+                <td colSpan={11} className="px-3 py-6 text-center text-sm text-muted-foreground">No life stages defined yet.</td>
               </tr>
             )}
           </tbody>

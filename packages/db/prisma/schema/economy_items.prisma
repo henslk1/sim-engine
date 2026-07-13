@@ -91,13 +91,16 @@ model AnimalAppliedItem {
 model PlayerCapacity {
   id                       String        @id @default(cuid())
   playerAccountId          String        @unique
-  animalSlotBase           Int
-  animalSlotSubscription   Int           @default(0)
-  animalSlotPurchased      Int           @default(0)
-  subContainerBase         Int
-  subContainerSubscription Int           @default(0)
-  subContainerPurchased    Int           @default(0)
-  playerAccount            PlayerAccount @relation(fields: [playerAccountId], references: [id])
+  animalSlotBase               Int
+  animalSlotSubscription       Int           @default(0)
+  animalSlotPurchased          Int           @default(0)
+  subContainerBase             Int
+  subContainerSubscription     Int           @default(0)
+  subContainerPurchased        Int           @default(0)
+  geneticStorageBase           Int           @default(50)
+  geneticStorageSubscription   Int           @default(0)
+  geneticStoragePurchased      Int           @default(0)
+  playerAccount                PlayerAccount @relation(fields: [playerAccountId], references: [id])
 }
 
 model SubContainer {

@@ -1,11 +1,13 @@
 import { useState } from "react"
 import type { AnimalProfile } from "../types"
 import { Panel, Badge, Meter, ActionButton } from "@/components/game/ui"
-import { Baby, Sparkles, Heart, Ban, Dna, Scissors, Send, Plus, Syringe, FlaskConical, Scan, Search } from "lucide-react"
+import { Baby, Sparkles, Heart, Ban, Dna, Scissors, Send, Plus, Syringe, FlaskConical, Scan, Search, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getCOIColor, getFertilityDisplay, getActiveRestrictions } from "../utils"
+import { trpc } from "@/lib/trpc"
 
 type BreedingTab = "info" | "covers"
+type StorageType = "PERSONAL" | "VET" | "GROUP"
 
 export function BreedingPanel({
   animal,
@@ -17,6 +19,23 @@ export function BreedingPanel({
   readonly?: boolean
 }) {
   const [tab, setTab] = useState<BreedingTab>("info")
+  const [storageType, setStorageType] = useState<StorageType>("PERSONAL")
+  const [confirmCastrate, setConfirmCastrate] = useState(false)
+
+  const utils = trpc.useUtils()
+  const invalidate = () => utils.animalProfile.get.invalidate({ animalId: animal.id })
+
+  const { mutate: flushEmbryo, isPending: flushPending } =
+    trpc.breeding.material.flushEmbryo.useMutation({ onSettled: invalidate })
+  const { mutate: ultrasound, isPending: ultrasoundPending } =
+    trpc.breeding.pregnancy.ultrasound.useMutation({ onSettled: invalidate })
+  const { mutate: collectMaterial, isPending: collectPending } =
+    trpc.breeding.material.collectMaterial.useMutation({ onSettled: invalidate })
+  const { mutate: castrate, isPending: castratePending } =
+    trpc.animal.castrate.useMutation({
+      onSuccess: () => setConfirmCastrate(false),
+      onSettled: invalidate,
+    })
 
   const preg = animal.pregnancies[0]
   const coiColor = getCOIColor(animal.inbreedingCoefficient)
@@ -25,9 +44,12 @@ export function BreedingPanel({
   const isRestricted = restrictions.has("BREEDING") || restrictions.has("ALL")
   const isMale = animal.sex === "MALE"
   const isFemale = animal.sex === "FEMALE"
-
-  const isConceptionCycle = preg && preg.currentCycles === 0
   const canBreed = animal.lifeStage.canBreed
+  const canSurrogate = animal.lifeStage.canSurrogate
+
+  const openCycle = animal.game.gameConfig?.ultrasoundOpenCycle ?? 0
+  const ultrasoundWindowOpen = !!preg && preg.currentCycles >= openCycle
+  const canUltrasound = !!preg && !preg.ultrasoundUsed && !isRestricted && ultrasoundWindowOpen
 
   return (
     <Panel
@@ -43,9 +65,7 @@ export function BreedingPanel({
                 onClick={() => setTab(t)}
                 className={cn(
                   "rounded px-2 py-0.5 text-[11px] font-semibold transition-colors",
-                  tab === t
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground"
+                  tab === t ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
                 )}
               >
                 {t === "info" ? "Overview" : isFemale ? "Covers & Storage" : "Storage"}
@@ -86,21 +106,20 @@ export function BreedingPanel({
         </div>
       )}
 
-      {!canBreed ? (
-        <p className="text-[11px] text-muted-foreground">Not available at this life stage.</p>
-      ) : animal.isCastrated ? (
-        <p className="text-[11px] text-muted-foreground">Not eligible for breeding</p>
-      ) : tab === "info" ? (
+      {animal.isCastrated || (!canBreed && !canSurrogate) ? (
+        <p className="text-[11px] text-muted-foreground">
+          {animal.isCastrated ? "Not eligible for breeding." : "Not available at this life stage."}
+        </p>
+      ) : canBreed && tab === "info" ? (
         <div className="space-y-2">
-          {/* Pregnancy status (female) */}
+
+          {/* Pregnancy block (female) */}
           {isFemale && (
             preg ? (
               <div className="rounded-md border border-border/70 bg-secondary/30 px-3 py-2.5">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-foreground">Active Pregnancy</span>
-                  <Badge tone="accent">
-                    <Sparkles className="size-3" /> Expecting
-                  </Badge>
+                  <Badge tone="accent"><Sparkles className="size-3" /> Expecting</Badge>
                 </div>
                 {preg.breedingRecord.sire && (
                   <p className="mt-1 text-[11px] text-muted-foreground">
@@ -116,15 +135,52 @@ export function BreedingPanel({
                   </div>
                   <Meter value={preg.currentCycles} max={preg.requiredCycles} tone="mood" className="h-1.5" />
                 </div>
+
+                {preg.ultrasoundUsed && preg.offspring.length > 0 && (
+                  <div className="mt-2 space-y-1 border-t border-border/50 pt-2">
+                    <span className="text-[11px] font-semibold text-muted-foreground">Ultrasound</span>
+                    {preg.offspring.map((o) => (
+                      <div key={o.animal.id} className="flex items-center gap-1.5 text-[11px]">
+                        <Sparkles className="size-3 shrink-0 text-accent-foreground" />
+                        <span className="font-medium capitalize text-foreground">{o.animal.sex.toLowerCase()}</span>
+                        {o.animal.phenotypeDescription && (
+                          <span className="text-muted-foreground">· {o.animal.phenotypeDescription}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 {!readonly && (
                   <div className="mt-2 flex gap-2">
-                    {isConceptionCycle && (
-                      <ActionButton variant="soft" disabled className="flex-1 justify-center">
-                        <FlaskConical className="size-3.5" /> Flush Embryo
+                    {preg.currentCycles === 0 && (
+                      <ActionButton
+                        variant="soft"
+                        className="flex-1 justify-center"
+                        disabled={flushPending || isRestricted}
+                        onClick={() => flushEmbryo({ pregnancyId: preg.id })}
+                      >
+                        {flushPending
+                          ? <Loader2 className="size-3.5 animate-spin" />
+                          : <FlaskConical className="size-3.5" />}
+                        Flush Embryo
                       </ActionButton>
                     )}
-                    <ActionButton variant="soft" disabled className="flex-1 justify-center">
-                      <Scan className="size-3.5" /> Ultrasound
+                    <ActionButton
+                      variant="soft"
+                      className="flex-1 justify-center"
+                      disabled={!canUltrasound || ultrasoundPending}
+                      title={!ultrasoundWindowOpen && !preg.ultrasoundUsed ? `Available at gestation cycle ${openCycle}` : undefined}
+                      onClick={() => ultrasound({ pregnancyId: preg.id })}
+                    >
+                      {ultrasoundPending
+                        ? <Loader2 className="size-3.5 animate-spin" />
+                        : <Scan className="size-3.5" />}
+                      {preg.ultrasoundUsed
+                        ? "Ultrasound Used"
+                        : !ultrasoundWindowOpen
+                        ? `Ultrasound (cycle ${openCycle})`
+                        : "Ultrasound"}
                     </ActionButton>
                   </div>
                 )}
@@ -148,12 +204,8 @@ export function BreedingPanel({
                 <Plus className="size-3.5" /> Add Breeding Slot
               </ActionButton>
               <div className="flex gap-2">
-                <ActionButton variant="soft" disabled className="flex-1 justify-center">
-                  Manage Listing
-                </ActionButton>
-                <ActionButton variant="soft" disabled className="flex-1 justify-center">
-                  Toggle
-                </ActionButton>
+                <ActionButton variant="soft" disabled className="flex-1 justify-center">Manage Listing</ActionButton>
+                <ActionButton variant="soft" disabled className="flex-1 justify-center">Toggle</ActionButton>
               </div>
             </div>
           )}
@@ -165,37 +217,91 @@ export function BreedingPanel({
             </ActionButton>
           )}
 
-          {/* Genetic material */}
+          {/* Genetic material collect */}
           {!readonly && (
             <div className="rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2">
-              <div className="mb-1.5 flex items-center justify-between">
+              <div className="mb-2 flex items-center justify-between">
                 <span className="text-xs font-semibold text-foreground">Genetic Material</span>
-                <ActionButton variant="soft" disabled className="h-6 px-2 text-[11px]">
-                  View Storage
-                </ActionButton>
+                <ActionButton variant="soft" disabled className="h-6 px-2 text-[11px]">View Storage</ActionButton>
               </div>
-              <ActionButton variant="soft" disabled className="w-full justify-center">
-                <Syringe className="size-3.5" />
-                {isMale ? "Collect Sperm" : "Collect Egg / Embryo"}
+              <div className="mb-2 flex gap-0.5">
+                {(["PERSONAL", "VET", "GROUP"] as StorageType[]).map((st) => (
+                  <button
+                    key={st}
+                    type="button"
+                    onClick={() => setStorageType(st)}
+                    className={cn(
+                      "flex-1 rounded px-1.5 py-0.5 text-[10px] font-semibold transition-colors",
+                      storageType === st
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {st.charAt(0) + st.slice(1).toLowerCase()}
+                  </button>
+                ))}
+              </div>
+              <ActionButton
+                variant="soft"
+                className="w-full justify-center"
+                disabled={collectPending || isRestricted || (isFemale && !!preg)}
+                onClick={() => collectMaterial({
+                  animalId: animal.id,
+                  materialType: isMale ? "SPERM" : "EGG",
+                  storageType,
+                })}
+              >
+                {collectPending
+                  ? <Loader2 className="size-3.5 animate-spin" />
+                  : <Syringe className="size-3.5" />}
+                {isMale ? "Collect Sperm" : "Collect Egg"}
               </ActionButton>
+              {isFemale && !!preg && (
+                <p className="mt-1.5 text-[11px] text-muted-foreground">Unavailable during pregnancy</p>
+              )}
             </div>
           )}
 
-          {/* Castrate (male only) */}
+          {/* Castrate */}
           {isMale && !readonly && (
-            <ActionButton
-              variant="soft"
-              disabled
-              className="w-full justify-center text-destructive hover:bg-destructive/10"
-            >
-              <Scissors className="size-3.5" /> Castrate
-            </ActionButton>
+            confirmCastrate ? (
+              <div className="space-y-2 rounded-md border border-destructive/30 bg-destructive/5 px-2.5 py-2">
+                <p className="text-[11px] font-medium text-destructive">This is permanent and cannot be undone.</p>
+                <div className="flex gap-2">
+                  <ActionButton
+                    variant="soft"
+                    className="flex-1 justify-center text-destructive hover:bg-destructive/10"
+                    disabled={castratePending}
+                    onClick={() => castrate({ animalId: animal.id })}
+                  >
+                    {castratePending ? <Loader2 className="size-3.5 animate-spin" /> : <Scissors className="size-3.5" />}
+                    Confirm Castrate
+                  </ActionButton>
+                  <ActionButton
+                    variant="soft"
+                    className="flex-1 justify-center"
+                    disabled={castratePending}
+                    onClick={() => setConfirmCastrate(false)}
+                  >
+                    Cancel
+                  </ActionButton>
+                </div>
+              </div>
+            ) : (
+              <ActionButton
+                variant="soft"
+                className="w-full justify-center text-destructive hover:bg-destructive/10"
+                onClick={() => setConfirmCastrate(true)}
+              >
+                <Scissors className="size-3.5" /> Castrate
+              </ActionButton>
+            )
           )}
         </div>
       ) : (
-        /* Tab 2 — Covers & Storage */
+        /* Storage — shown for covers tab or non-breedable animals (e.g. seniors who can be surrogates) */
         <div className="space-y-2">
-          {isFemale && (
+          {canBreed && isFemale && (
             <div>
               <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 Incoming Covers

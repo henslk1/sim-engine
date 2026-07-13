@@ -35,6 +35,7 @@ model LifeStageDef {
   ageCap                Int
   canCompete            Boolean
   canBreed              Boolean
+  canSurrogate          Boolean            @default(false)
   canTrain              Boolean
   canReceiveCare        Boolean
   hasUniqueActionSet    Boolean            @default(false)
