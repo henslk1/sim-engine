@@ -38,7 +38,11 @@ export async function applyTrainingAction(
       }
     }
 
-    const energyUsed = tier.energyCost
+    const animalStage = await tx.animal.findUniqueOrThrow({
+      where: { id: animalId },
+      select: { lifeStage: { select: { energyCostMultiplier: true } } },
+    })
+    const energyUsed = tier.energyCost * animalStage.lifeStage.energyCostMultiplier
     const energy = await tx.animalEnergy.findUnique({ where: { animalId } })
     if (!energy) throw new Error(`No energy record for animal ${animalId}`)
     if (energy.currentEnergy < energyUsed) throw new Error("Not enough energy")

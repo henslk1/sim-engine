@@ -68,14 +68,19 @@ export async function enterCompetition(
       }
     }
 
-    const energyUsed = tier.tierDef.energyCost
+    const baseEnergyCost = tier.tierDef.energyCost
     const entryFee = tier.tierDef.entryFee
 
     const [energy, animal] = await Promise.all([
       tx.animalEnergy.findUnique({ where: { animalId } }),
-      tx.animal.findUniqueOrThrow({ where: { id: animalId }, select: { ageInCycles: true } }),
+      tx.animal.findUniqueOrThrow({
+        where: { id: animalId },
+        select: { ageInCycles: true, lifeStage: { select: { energyCostMultiplier: true } } },
+      }),
     ])
     if (!energy) throw new Error(`No energy record for animal ${animalId}`)
+
+    const energyUsed = baseEnergyCost * animal.lifeStage.energyCostMultiplier
 
     await tx.animalEnergy.update({
       where: { animalId },

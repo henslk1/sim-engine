@@ -50,6 +50,7 @@ const parentSelect = {
   fertility: true,
   inbreedingCoefficient: true,
   breedGeneration: true,
+  breedingCooldownUntilCycle: true,
   stats: { select: { statDefId: true, innateValue: true } },
   energy: { select: { currentEnergy: true } },
   mood: { select: { value: true } },
@@ -210,6 +211,14 @@ export const breedingCoverRouter = router({
           where: { animalId: offer.damId, isCompleted: false },
         })
         if (activePregnancy > 0) throw new Error("Dam is already pregnant")
+
+        const damCooldownCheck = await tx.animal.findUnique({
+          where: { id: offer.damId },
+          select: { ageInCycles: true, breedingCooldownUntilCycle: true },
+        })
+        if ((damCooldownCheck?.breedingCooldownUntilCycle ?? 0) > (damCooldownCheck?.ageInCycles ?? 0)) {
+          throw new Error(`Dam is on a breeding cooldown until cycle ${damCooldownCheck!.breedingCooldownUntilCycle}`)
+        }
 
         const [sire, dam, gameConfig, gameInnateMax, gradeBread, firstLifeStage, damCareScore] =
           await Promise.all([

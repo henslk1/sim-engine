@@ -333,6 +333,7 @@ export const animalProfileRouter = router({
             status: true,
             image: true,
             ageInCycles: true,
+            breedingCooldownUntilCycle: true,
             bornAt: true,
             breed: { select: { id: true, name: true } },
             breedComposition: { select: { breedId: true, percentage: true } },

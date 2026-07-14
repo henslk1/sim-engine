@@ -65,12 +65,14 @@ export const breedingMaterialRouter = router({
             },
             energy: { select: { currentEnergy: true } },
             groupAnimals: { select: { groupId: true }, take: 1 },
+            geneticCollectionCooldownUntilCycle: true,
             game: {
               select: {
                 gameConfig: {
                   select: {
                     trainingCeilingMultiplier: true,
                     breedingEnergyCost: true,
+                    geneticCollectionCooldownCycles: true,
                   },
                 },
               },
@@ -89,6 +91,10 @@ export const breedingMaterialRouter = router({
             where: { animalId: input.animalId },
             data: { currentEnergy: { decrement: energyCost } },
           })
+        }
+
+        if ((animal.geneticCollectionCooldownUntilCycle ?? 0) > animal.ageInCycles) {
+          throw new Error(`Genetic material collection on cooldown until cycle ${animal.geneticCollectionCooldownUntilCycle}`)
         }
 
         if (input.storageType === "PERSONAL" || input.storageType === "VET") {
@@ -238,7 +244,7 @@ export const breedingMaterialRouter = router({
           collectedAtCycle: animal.ageInCycles,
         }
 
-        return tx.geneticMaterial.create({
+        const material = await tx.geneticMaterial.create({
           data: {
             gameId: animal.gameId,
             animalId: input.animalId,
@@ -250,6 +256,16 @@ export const breedingMaterialRouter = router({
           },
           select: { id: true, materialType: true, storageType: true },
         })
+
+        const cooldownCycles = config?.geneticCollectionCooldownCycles ?? 0
+        if (cooldownCycles > 0) {
+          await tx.animal.update({
+            where: { id: input.animalId },
+            data: { geneticCollectionCooldownUntilCycle: animal.ageInCycles + cooldownCycles },
+          })
+        }
+
+        return material
       })
     }),
 
@@ -338,6 +354,17 @@ export const breedingMaterialRouter = router({
 
         await tx.pregnancyOffspring.deleteMany({ where: { pregnancyId: input.pregnancyId } })
         await tx.pregnancy.delete({ where: { id: input.pregnancyId } })
+
+        const gameConfig = await tx.gameConfig.findUnique({
+          where: { gameId },
+          select: { breedingCooldownCycles: true },
+        })
+        if ((gameConfig?.breedingCooldownCycles ?? 0) > 0) {
+          await tx.animal.update({
+            where: { id: pregnancy.animalId },
+            data: { breedingCooldownUntilCycle: ageInCycles + gameConfig!.breedingCooldownCycles },
+          })
+        }
 
         return { embryoId: embryo.id }
       })

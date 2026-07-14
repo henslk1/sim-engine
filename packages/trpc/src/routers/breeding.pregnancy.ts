@@ -134,7 +134,7 @@ export const breedingPregnancyRouter = router({
           where: { id: input.pregnancyId },
           select: {
             isCompleted: true,
-            animal: { select: { id: true, gameId: true } },
+            animal: { select: { id: true, gameId: true, ageInCycles: true } },
             offspring: {
               select: { animal: { select: { id: true, status: true } } },
             },
@@ -145,10 +145,16 @@ export const breedingPregnancyRouter = router({
 
         const nameMap = new Map(input.names?.map((n) => [n.animalId, n.name]) ?? [])
 
-        const ltcDefs = await tx.longTermCareActionDef.findMany({
-          where: { gameId: pregnancy.animal.gameId },
-          select: { id: true, intervalCycles: true },
-        })
+        const [ltcDefs, gameConfig] = await Promise.all([
+          tx.longTermCareActionDef.findMany({
+            where: { gameId: pregnancy.animal.gameId },
+            select: { id: true, intervalCycles: true },
+          }),
+          tx.gameConfig.findUnique({
+            where: { gameId: pregnancy.animal.gameId },
+            select: { breedingCooldownCycles: true },
+          }),
+        ])
 
         const unborn = pregnancy.offspring.filter((o) => o.animal.status === "EMBRYO_STORED")
         for (const o of unborn) {
@@ -170,7 +176,103 @@ export const breedingPregnancyRouter = router({
           }
         }
 
+        if ((gameConfig?.breedingCooldownCycles ?? 0) > 0) {
+          await tx.animal.update({
+            where: { id: pregnancy.animal.id },
+            data: { breedingCooldownUntilCycle: pregnancy.animal.ageInCycles + gameConfig!.breedingCooldownCycles },
+          })
+        }
+
         return { damId: pregnancy.animal.id, born: unborn.length }
+      })
+    }),
+
+  abort: publicProcedure
+    .input(z.object({ pregnancyId: z.string() }))
+    .mutation(async ({ input }) => {
+      return db.$transaction(async (tx) => {
+        const pregnancy = await tx.pregnancy.findUniqueOrThrow({
+          where: { id: input.pregnancyId },
+          select: {
+            isCompleted: true,
+            animalId: true,
+            animal: { select: { gameId: true, playerAccountId: true, ageInCycles: true } },
+            offspring: { select: { animalId: true } },
+          },
+        })
+
+        if (pregnancy.isCompleted) throw new Error("Pregnancy is already completed")
+
+        const { gameId, playerAccountId, ageInCycles } = pregnancy.animal
+
+        const vetService = await tx.vetServiceDef.findFirstOrThrow({
+          where: { gameId, serviceType: "PREGNANCY_ABORT" },
+          select: { id: true, baseCost: true, currencyDefId: true },
+        })
+
+        if (vetService.baseCost > 0) {
+          await tx.playerBalance.update({
+            where: {
+              playerAccountId_currencyDefId: {
+                playerAccountId,
+                currencyDefId: vetService.currencyDefId,
+              },
+            },
+            data: { balance: { decrement: vetService.baseCost } },
+          })
+          await tx.transaction.create({
+            data: {
+              gameId,
+              fromPlayerAccountId: playerAccountId,
+              currencyDefId: vetService.currencyDefId,
+              amount: vetService.baseCost,
+              txnType: "VET_SERVICE_FEE",
+            },
+          })
+        }
+
+        await tx.vetVisitLog.create({
+          data: {
+            animalId: pregnancy.animalId,
+            playerAccountId,
+            vetServiceDefId: vetService.id,
+            visitCycle: ageInCycles,
+          },
+        })
+
+        const offspringAnimalIds = pregnancy.offspring.map((o) => o.animalId)
+
+        await tx.pregnancyOffspring.deleteMany({ where: { pregnancyId: input.pregnancyId } })
+
+        if (offspringAnimalIds.length > 0) {
+          await Promise.all([
+            tx.animalAncestor.deleteMany({ where: { animalId: { in: offspringAnimalIds } } }),
+            tx.animalStat.deleteMany({ where: { animalId: { in: offspringAnimalIds } } }),
+            tx.animalGenotype.deleteMany({ where: { animalId: { in: offspringAnimalIds } } }),
+            tx.animalBreedComposition.deleteMany({ where: { animalId: { in: offspringAnimalIds } } }),
+            tx.animalEnergy.deleteMany({ where: { animalId: { in: offspringAnimalIds } } }),
+            tx.animalMood.deleteMany({ where: { animalId: { in: offspringAnimalIds } } }),
+            tx.animalCondition.deleteMany({ where: { animalId: { in: offspringAnimalIds } } }),
+            tx.animalCareScore.deleteMany({ where: { animalId: { in: offspringAnimalIds } } }),
+            tx.animalImmunity.deleteMany({ where: { animalId: { in: offspringAnimalIds } } }),
+          ])
+          await tx.animal.deleteMany({ where: { id: { in: offspringAnimalIds } } })
+        }
+
+        await tx.pregnancy.delete({ where: { id: input.pregnancyId } })
+
+        const gameConfig = await tx.gameConfig.findUnique({
+          where: { gameId },
+          select: { breedingCooldownCycles: true },
+        })
+        if ((gameConfig?.breedingCooldownCycles ?? 0) > 0) {
+          await tx.animal.update({
+            where: { id: pregnancy.animalId },
+            data: { breedingCooldownUntilCycle: ageInCycles + gameConfig!.breedingCooldownCycles },
+          })
+        }
+
+        return { damId: pregnancy.animalId }
       })
     }),
 })

@@ -44,7 +44,7 @@ model LifeStageDef {
   immunityCapMultiplier Float              @default(1.0)
   deathChanceStartCycle Int?
   deathChancePerCycle     Float?
-  energyRestoreMultiplier Float              @default(1)
+  energyCostMultiplier    Float              @default(1)
   animals                 Animal[]
   stageActivityDefs     StageActivityDef[]
   game                  Game               @relation(fields: [gameId], references: [id])

@@ -24,6 +24,7 @@ export function BreedingPanel({
   const [tab, setTab] = useState<BreedingTab>("info")
   const [storageType, setStorageType] = useState<StorageType>("PERSONAL")
   const [confirmCastrate, setConfirmCastrate] = useState(false)
+  const [confirmAbort, setConfirmAbort] = useState(false)
   const [actioningOfferId, setActioningOfferId] = useState<string | null>(null)
   const [listingDialogOpen, setListingDialogOpen] = useState(false)
   const [editListingOpen, setEditListingOpen] = useState(false)
@@ -40,6 +41,10 @@ export function BreedingPanel({
 
   const { mutate: flushEmbryo, isPending: flushPending } =
     trpc.breeding.material.flushEmbryo.useMutation({ onSettled: invalidate })
+  const { mutate: abortPregnancy, isPending: abortPending } =
+    trpc.breeding.pregnancy.abort.useMutation({
+      onSuccess: () => { setConfirmAbort(false); invalidate() },
+    })
   const { mutate: ultrasound, isPending: ultrasoundPending } =
     trpc.breeding.pregnancy.ultrasound.useMutation({ onSettled: invalidate })
   const { mutate: collectMaterial, isPending: collectPending, error: collectError } =
@@ -232,7 +237,43 @@ export function BreedingPanel({
                         ? `Ultrasound (cycle ${openCycle})`
                         : "Ultrasound"}
                     </ActionButton>
+                    <ActionButton
+                      variant="soft"
+                      className="flex-1 justify-center text-destructive hover:bg-destructive/10"
+                      disabled={abortPending}
+                      onClick={() => setConfirmAbort(true)}
+                    >
+                      <Ban className="size-3.5" /> Abort
+                    </ActionButton>
                   </div>
+                )}
+                {confirmAbort && (
+                  <Dialog open onClose={() => setConfirmAbort(false)} title="Abort this pregnancy?">
+                    <div className="space-y-4 p-4">
+                      <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-3 space-y-2">
+                        <p className="text-sm font-bold text-destructive">This cannot be undone.</p>
+                        <ul className="space-y-1 text-[11px] text-destructive/90 list-disc list-inside">
+                          <li>All offspring will be permanently lost</li>
+                          <li>A vet fee will be charged for the procedure</li>
+                          <li>A breeding cooldown will apply after the abortion</li>
+                        </ul>
+                      </div>
+                      <div className="flex justify-end gap-2 border-t border-border pt-3">
+                        <ActionButton variant="soft" onClick={() => setConfirmAbort(false)} disabled={abortPending}>
+                          Cancel
+                        </ActionButton>
+                        <ActionButton
+                          variant="soft"
+                          className="text-destructive hover:bg-destructive/10"
+                          disabled={abortPending}
+                          onClick={() => abortPregnancy({ pregnancyId: preg.id })}
+                        >
+                          {abortPending ? <Loader2 className="size-3.5 animate-spin" /> : <Ban className="size-3.5" />}
+                          Abort Pregnancy
+                        </ActionButton>
+                      </div>
+                    </div>
+                  </Dialog>
                 )}
               </div>
             ) : (
@@ -606,14 +647,21 @@ export function BreedingPanel({
                       </div>
                       {!readonly && !preg && (
                         <div className="flex gap-1.5">
-                          <ActionButton
-                            variant="soft"
-                            className="flex-1 justify-center"
-                            disabled={actioningOfferId === offer.id}
-                            onClick={() => navigate({ to: "/breeding/$offerId", params: { offerId: offer.id } })}
-                          >
-                            Accept
-                          </ActionButton>
+                          {(() => {
+                            const onCooldown = (animal.breedingCooldownUntilCycle ?? 0) > animal.ageInCycles
+                            return (
+                              <span className="flex-1" title={onCooldown ? `Breeding cooldown active until cycle ${animal.breedingCooldownUntilCycle}` : undefined}>
+                                <ActionButton
+                                  variant="soft"
+                                  className="w-full justify-center"
+                                  disabled={actioningOfferId === offer.id || onCooldown}
+                                  onClick={() => navigate({ to: "/breeding/$offerId", params: { offerId: offer.id } })}
+                                >
+                                  Accept
+                                </ActionButton>
+                              </span>
+                            )
+                          })()}
                           <ActionButton
                             variant="soft"
                             className="flex-1 justify-center text-destructive hover:bg-destructive/10"
