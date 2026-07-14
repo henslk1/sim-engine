@@ -257,23 +257,37 @@ export function BreedingPanel({
                       {listing.slots.filter((s) => s.status === "USED").length} used
                     </span>
                   </div>
-                  <ActionButton
-                    variant="soft"
-                    className="w-full justify-center"
-                    disabled={addSlotPending || !listing.isActive || isRestricted}
-                    onClick={() => addSlot({ listingId: listing.id })}
-                  >
-                    {addSlotPending ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
-                    Add Slot
-                    {(animal.game.gameConfig?.breedingEnergyCost ?? 0) > 0 && (
-                      <span className="ml-auto text-[10px] text-muted-foreground">
-                        -{animal.game.gameConfig!.breedingEnergyCost} energy
-                      </span>
-                    )}
-                  </ActionButton>
-                  {addSlotError && (
-                    <p className="text-[11px] text-destructive">{addSlotError.message}</p>
-                  )}
+                  {(() => {
+                    const availableSlots = listing.slots.filter((s) => s.status === "AVAILABLE").length
+                    const maxSlots = animal.game.gameConfig?.maxBreedingSlots ?? null
+                    const atCap = maxSlots !== null && availableSlots >= maxSlots
+                    return (
+                      <>
+                        <ActionButton
+                          variant="soft"
+                          className="w-full justify-center"
+                          disabled={addSlotPending || !listing.isActive || isRestricted || atCap}
+                          onClick={() => addSlot({ listingId: listing.id })}
+                        >
+                          {addSlotPending ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
+                          Add Slot
+                          {(animal.game.gameConfig?.breedingEnergyCost ?? 0) > 0 && (
+                            <span className="ml-auto text-[10px] text-muted-foreground">
+                              -{animal.game.gameConfig!.breedingEnergyCost} energy
+                            </span>
+                          )}
+                        </ActionButton>
+                        {atCap && (
+                          <p className="text-[11px] text-muted-foreground">
+                            Maximum slots reached ({maxSlots}/{maxSlots}). Use an item to raise the cap.
+                          </p>
+                        )}
+                        {addSlotError && (
+                          <p className="text-[11px] text-destructive">{addSlotError.message}</p>
+                        )}
+                      </>
+                    )
+                  })()}
                   <div className="flex gap-1.5">
                     <ActionButton
                       variant="soft"

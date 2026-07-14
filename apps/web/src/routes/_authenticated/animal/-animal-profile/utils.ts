@@ -1,5 +1,12 @@
 import type { AnimalProfile } from "./types"
 
+export function displaySex(sex: string, isCastrated: boolean): string {
+  if (sex === "MALE" && isCastrated) return "Gelding"
+  if (sex === "MALE") return "Male"
+  if (sex === "FEMALE") return "Female"
+  return sex
+}
+
 export const BREEDING_GRADE_COLOR: Record<string, string> = {
   S: "text-red-500",
   A: "text-yellow-600",

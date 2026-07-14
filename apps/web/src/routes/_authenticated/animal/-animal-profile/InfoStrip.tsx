@@ -3,14 +3,7 @@ import type { AnimalProfile } from "./types"
 import { Badge } from "@/components/game/ui"
 import { cn } from "@/lib/utils"
 import { GitBranch, Trophy, Award, Star } from "lucide-react"
-import { BREEDING_GRADE_COLOR, BREEDING_GRADE_BG } from "./utils"
-
-function displaySex(sex: string, isCastrated: boolean) {
-  if (sex === "MALE" && isCastrated) return "Gelding"
-  if (sex === "MALE") return "Male"
-  if (sex === "FEMALE") return "Female"
-  return sex
-}
+import { BREEDING_GRADE_COLOR, BREEDING_GRADE_BG, displaySex } from "./utils"
 
 export function InfoStrip({
   animal,

@@ -1,5 +1,5 @@
 import type { AnimalProfile } from "../types"
-import { formatCycleAge, formatBreedLabel } from "../utils"
+import { formatCycleAge, formatBreedLabel, displaySex } from "../utils"
 import { Badge } from "@/components/game/ui"
 import { Skull } from "lucide-react"
 
@@ -28,7 +28,7 @@ export function BuriedView({ animal }: { animal: AnimalProfile }) {
             <Badge tone="muted">Buried</Badge>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            {breedLabel} · {animal.sex}
+            {breedLabel} · {displaySex(animal.sex, animal.isCastrated)}
             {animal.breedGeneration !== null && ` · Gen ${animal.breedGeneration}`}
           </p>
         </div>

@@ -123,13 +123,13 @@ export async function applyCareAction(
       if (mood) {
         await tx.animalMood.update({
           where: { animalId: animalId },
-          data: { value: Math.min(mood.value + action.moodBoost, 1) },
+          data: { value: Math.min(mood.value + action.moodBoost, 100) },
         })
       } else {
         await tx.animalMood.create({
           data: {
             animalId: animalId,
-            value: Math.min(action.moodBoost, 1),
+            value: Math.min(action.moodBoost, 100),
           },
         })
       }

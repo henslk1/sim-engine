@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import type { AnimalProfile } from "../types"
-import { formatCycleAge, formatBreedLabel } from "../utils"
+import { formatCycleAge, formatBreedLabel, displaySex } from "../utils"
 import { Badge, ActionButton } from "@/components/game/ui"
 import { Skull, Archive, AlertTriangle } from "lucide-react"
 import { trpc } from "@/lib/trpc"
@@ -72,7 +72,7 @@ export function DeceasedPendingView({ animal }: { animal: AnimalProfile; animalI
               <Badge tone="danger">Deceased</Badge>
             </div>
             <p className="mt-0.5 text-sm text-muted-foreground">
-              {breedLabel} · {animal.sex}
+              {breedLabel} · {displaySex(animal.sex, animal.isCastrated)}
               {animal.breedGeneration !== null && ` · Gen ${animal.breedGeneration}`}
               {" · "}{cycleToAge(animal.ageInCycles)} old
             </p>
