@@ -179,9 +179,10 @@ model TitleDef {
   description     String?
   disciplineDefId String?
   rankOrder       Int
-  animalTitles    AnimalTitle[]
-  game            Game           @relation(fields: [gameId], references: [id])
-  disciplineDef   DisciplineDef? @relation(fields: [disciplineDefId], references: [id])
+  animalTitles     AnimalTitle[]
+  breedingListings BreedingListing[]
+  game             Game           @relation(fields: [gameId], references: [id])
+  disciplineDef    DisciplineDef? @relation(fields: [disciplineDefId], references: [id])
 }
 
 model AnimalTitle {

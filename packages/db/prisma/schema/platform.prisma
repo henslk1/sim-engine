@@ -73,6 +73,7 @@ model Game {
   nightlyUpdateLogs      NightlyUpdateLog[]
   personalityTraitDefs   PersonalityTraitDef[]
   conformationSections   ConformationSection[]
+  predictorUsages        PlayerPredictorUsage[]
   isActive               Boolean                 @default(false)
   createdAt              DateTime                @default(now())
 }
@@ -226,6 +227,7 @@ model PlayerAccount {
   tutorialProgress           TutorialProgress[]
   achievements               PlayerAchievement[]
   profileVisibilitySettings  ProfileVisibilitySetting[]
+  predictorUsages            PlayerPredictorUsage[]
   game                       Game                       @relation(fields: [gameId], references: [id])
   user                       User                       @relation(fields: [userId], references: [id])
   createdAt                  DateTime                   @default(now())
@@ -465,8 +467,29 @@ model GameConfig {
   lifeExpectancyBaseline    Int?
   maxLocusTestsPerCycle     Int      @default(2)
   ultrasoundOpenCycle       Int      @default(0)
-  maxBreedingSlots          Int?
-  game                      Game     @relation(fields: [gameId], references: [id])
-  createdAt                 DateTime @default(now())
-  updatedAt                 DateTime @updatedAt
+  maxBreedingSlots             Int?
+  breedingBaseGain             Float    @default(30)
+  breedingMinGain              Float    @default(4)
+  breedingVarianceFactor       Float    @default(0)
+  gestationCareFloor           Float    @default(0.7)
+  predictorCost                Int      @default(0)
+  predictorDailyLimitSubscriber Int     @default(0)
+  multiplesBirthCap            Int      @default(1)
+  multiplesChance              Float    @default(0)
+  identicalMultiplesChance     Float    @default(0)
+  game                         Game     @relation(fields: [gameId], references: [id])
+  createdAt                    DateTime @default(now())
+  updatedAt                    DateTime @updatedAt
+}
+
+model PlayerPredictorUsage {
+  id              String        @id @default(cuid())
+  playerAccountId String
+  gameId          String
+  date            DateTime
+  usageCount      Int           @default(0)
+  playerAccount   PlayerAccount @relation(fields: [playerAccountId], references: [id])
+  game            Game          @relation(fields: [gameId], references: [id])
+
+  @@unique([playerAccountId, gameId, date])
 }

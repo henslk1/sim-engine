@@ -31,10 +31,14 @@ model BreedingListing {
   description       Json?
   currencyDefId     String?
   pricePerSlot      Int
-  breedRestrictions BreedingListingBreedRestriction[]
-  statMinimums      BreedingListingStatMinimum[]
-  slots             BreedingSlot[]
-  isActive          Boolean                           @default(true)
+  title              String?
+  pureBredOnly       Boolean                           @default(false)
+  requiredTitleDefId String?
+  breedRestrictions  BreedingListingBreedRestriction[]
+  statMinimums       BreedingListingStatMinimum[]
+  slots              BreedingSlot[]
+  isActive           Boolean                           @default(true)
+  requiredTitleDef   TitleDef?                         @relation(fields: [requiredTitleDefId], references: [id])
   animal            Animal                            @relation(fields: [animalId], references: [id])
   ownerPlayer       PlayerAccount                     @relation(fields: [ownerPlayerId], references: [id])
   currencyDef       CurrencyDef?                      @relation(fields: [currencyDefId], references: [id])
