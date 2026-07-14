@@ -43,8 +43,9 @@ model LifeStageDef {
   profileLayout         String
   immunityCapMultiplier Float              @default(1.0)
   deathChanceStartCycle Int?
-  deathChancePerCycle   Float?
-  animals               Animal[]
+  deathChancePerCycle     Float?
+  energyRestoreMultiplier Float              @default(1)
+  animals                 Animal[]
   stageActivityDefs     StageActivityDef[]
   game                  Game               @relation(fields: [gameId], references: [id])
 
@@ -164,8 +165,10 @@ model Animal {
   fertility                       Float
   isTutorialAnimal                Boolean                          @default(false)
   breedGeneration                 Int?
-  lifeExpectancy                  Int?
-  disciplineDefId                 String?
+  lifeExpectancy                          Int?
+  disciplineDefId                         String?
+  breedingCooldownUntilCycle              Int?
+  geneticCollectionCooldownUntilCycle     Int?
   subContainerId                  String?
   stats                           AnimalStat[]
   statHistory                     AnimalStatHistory[]

@@ -304,6 +304,16 @@ export const breedingCoverRouter = router({
               ...(offer.price > 0 ? { context: { price: offer.price } } : {}),
             },
           })
+          await tx.animalDailyLog.create({
+            data: {
+              animalId: offer.sireId,
+              cycleNumber: sire.ageInCycles,
+              eventType: "COVER_ACCEPTED",
+              partnerAnimalId: offer.damId,
+              outcome: "NOT_CONCEIVED",
+              ...(offer.price > 0 ? { context: { price: offer.price } } : {}),
+            },
+          })
           return { breedingRecordId: breedingRecord.id, conceived: false as const }
         }
 
@@ -410,6 +420,16 @@ export const breedingCoverRouter = router({
             ...(offer.price > 0 ? { context: { price: offer.price } } : {}),
           },
         })
+        await tx.animalDailyLog.create({
+          data: {
+            animalId: offer.sireId,
+            cycleNumber: sire.ageInCycles,
+            eventType: "COVER_ACCEPTED",
+            partnerAnimalId: offer.damId,
+            outcome: "CONCEIVED",
+            ...(offer.price > 0 ? { context: { price: offer.price } } : {}),
+          },
+        })
 
         return {
           breedingRecordId: breedingRecord.id,
@@ -426,9 +446,32 @@ export const breedingCoverRouter = router({
     .mutation(async ({ input }) => {
       const offer = await db.coverOffer.findUniqueOrThrow({
         where: { id: input.offerId },
-        select: { status: true },
+        select: { status: true, sireId: true, damId: true },
       })
       if (offer.status !== "PENDING") throw new Error("Offer is no longer pending")
+
+      const [sireAnimal, damAnimal] = await Promise.all([
+        db.animal.findUnique({ where: { id: offer.sireId }, select: { ageInCycles: true } }),
+        db.animal.findUnique({ where: { id: offer.damId }, select: { ageInCycles: true } }),
+      ])
+
+      await db.animalDailyLog.createMany({
+        data: [
+          {
+            animalId: offer.sireId,
+            cycleNumber: sireAnimal?.ageInCycles ?? 0,
+            eventType: "COVER_DECLINED",
+            partnerAnimalId: offer.damId,
+          },
+          {
+            animalId: offer.damId,
+            cycleNumber: damAnimal?.ageInCycles ?? 0,
+            eventType: "COVER_DECLINED",
+            partnerAnimalId: offer.sireId,
+          },
+        ],
+      })
+
       return db.coverOffer.update({
         where: { id: input.offerId },
         data: { status: "DECLINED" },

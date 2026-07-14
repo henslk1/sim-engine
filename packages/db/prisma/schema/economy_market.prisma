@@ -12,6 +12,7 @@ enum VetServiceType {
   CASTRATION
   NATURAL_COVER
   ULTRASOUND
+  PREGNANCY_ABORT
 }
 
 enum ListingType {

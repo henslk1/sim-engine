@@ -476,8 +476,11 @@ model GameConfig {
   predictorDailyLimitSubscriber Int     @default(0)
   multiplesBirthCap            Int      @default(1)
   multiplesChance              Float    @default(0)
-  identicalMultiplesChance     Float    @default(0)
-  game                         Game     @relation(fields: [gameId], references: [id])
+  identicalMultiplesChance              Float    @default(0)
+  breedingCooldownCycles                Int      @default(0)
+  geneticCollectionCooldownCycles       Int      @default(0)
+  conformationInspectionMinCycle        Int      @default(0)
+  game                                  Game     @relation(fields: [gameId], references: [id])
   createdAt                    DateTime @default(now())
   updatedAt                    DateTime @updatedAt
 }

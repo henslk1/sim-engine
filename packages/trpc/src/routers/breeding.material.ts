@@ -17,7 +17,6 @@ export const breedingMaterialRouter = router({
             gameId: true,
             playerAccountId: true,
             ageInCycles: true,
-            groupId: true,
             name: true,
             sex: true,
             breedId: true,
@@ -47,8 +46,8 @@ export const breedingMaterialRouter = router({
                     },
                   },
                 },
-                alleleOne: { select: { id: true, name: true, symbol: true } },
-                alleleTwo: { select: { id: true, name: true, symbol: true } },
+                alleleOne: { select: { id: true, symbol: true } },
+                alleleTwo: { select: { id: true, symbol: true } },
               },
             },
             careScore: { select: { score: true } },
@@ -65,6 +64,7 @@ export const breedingMaterialRouter = router({
               },
             },
             energy: { select: { currentEnergy: true } },
+            groupAnimals: { select: { groupId: true }, take: 1 },
             game: {
               select: {
                 gameConfig: {
@@ -79,6 +79,7 @@ export const breedingMaterialRouter = router({
         })
 
         const config = animal.game.gameConfig
+        const groupId = animal.groupAnimals[0]?.groupId ?? null
         const energyCost = config?.breedingEnergyCost ?? 0
         if (energyCost > 0) {
           if ((animal.energy?.currentEnergy ?? 0) < energyCost) {
@@ -114,15 +115,15 @@ export const breedingMaterialRouter = router({
             if (used >= maxSlots) throw new Error("Vet genetic storage is full")
           }
         } else {
-          if (!animal.groupId) throw new Error("Animal is not in a group")
+          if (!groupId) throw new Error("Animal is not in a group")
           const group = await tx.group.findUnique({
-            where: { id: animal.groupId },
+            where: { id: groupId },
             select: { geneticStorageCapacity: true },
           })
           const maxSlots = group?.geneticStorageCapacity ?? 0
           if (maxSlots === 0) throw new Error("Group has no genetic storage capacity")
           const used = await tx.geneticMaterial.count({
-            where: { groupId: animal.groupId, storageType: "GROUP", isUsed: false },
+            where: { groupId, storageType: "GROUP", isUsed: false },
           })
           if (used >= maxSlots) throw new Error("Group genetic storage is full")
         }
@@ -224,10 +225,8 @@ export const breedingMaterialRouter = router({
             locusName: g.locus.name,
             panelTypes: g.locus.panelEntries.map((e) => e.panelDef.panelType),
             alleleOneId: g.alleleOneId,
-            alleleOneName: g.alleleOne.name,
             alleleOneSymbol: g.alleleOne.symbol,
             alleleTwoId: g.alleleTwoId,
-            alleleTwoName: g.alleleTwo.name,
             alleleTwoSymbol: g.alleleTwo.symbol,
             isTestedByOwner: g.isTestedByOwner,
           })),
@@ -246,7 +245,7 @@ export const breedingMaterialRouter = router({
             ownerPlayerId: animal.playerAccountId,
             materialType: input.materialType,
             storageType: input.storageType,
-            groupId: input.storageType === "GROUP" ? animal.groupId : null,
+            groupId: input.storageType === "GROUP" ? groupId : null,
             donorSnapshot,
           },
           select: { id: true, materialType: true, storageType: true },

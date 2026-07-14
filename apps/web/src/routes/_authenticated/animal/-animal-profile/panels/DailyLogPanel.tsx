@@ -6,11 +6,11 @@ import { cn } from "@/lib/utils"
 type VitalChange = { label: string; value: number }
 
 type LogEntry =
-  | { key: string; cycleNumber: number; type: "care"; label: string; vitals: VitalChange[] }
-  | { key: string; cycleNumber: number; type: "training"; label: string; subLabel: string; statGained: number; statName: string; vitals: VitalChange[] }
-  | { key: string; cycleNumber: number; type: "vet"; label: string; notes: string | null; vitals: VitalChange[] }
-  | { key: string; cycleNumber: number; type: "activity"; label: string; vitals: VitalChange[] }
-  | { key: string; cycleNumber: number; type: "breeding"; label: string; subLabel?: string; vitals: VitalChange[] }
+  | { key: string; cycleNumber: number; createdAt: Date; type: "care"; label: string; vitals: VitalChange[] }
+  | { key: string; cycleNumber: number; createdAt: Date; type: "training"; label: string; subLabel: string; statGained: number; statName: string; vitals: VitalChange[] }
+  | { key: string; cycleNumber: number; createdAt: Date; type: "vet"; label: string; notes: string | null; vitals: VitalChange[] }
+  | { key: string; cycleNumber: number; createdAt: Date; type: "activity"; label: string; vitals: VitalChange[] }
+  | { key: string; cycleNumber: number; createdAt: Date; type: "breeding"; label: string; subLabel?: string; vitals: VitalChange[] }
 
 const DOT: Record<string, string> = {
   care: "bg-violet-400",
@@ -24,11 +24,35 @@ export function DailyLogPanel({ animal }: { animal: AnimalProfile }) {
   const cycle = animal.ageInCycles
 
   const entries: LogEntry[] = [
+    ...animal.dailyLogs
+      .filter((l) => l.cycleNumber === cycle)
+      .map((l: AnimalProfile["dailyLogs"][number]) => {
+        const ctx = l.context as { price?: number } | null
+        const label =
+          l.eventType === "COVER_SENT" ? "Cover Sent"
+          : l.eventType === "COVER_ACCEPTED" ? "Cover Accepted"
+          : l.eventType === "COVER_DECLINED" ? "Cover Declined"
+          : l.eventType
+        const subLabel =
+          l.eventType === "COVER_ACCEPTED" && l.outcome === "CONCEIVED" ? "Conceived"
+          : l.eventType === "COVER_ACCEPTED" && l.outcome === "NOT_CONCEIVED" ? "No conception"
+          : l.partner?.name
+        return {
+          key: `breeding-${l.id}`,
+          cycleNumber: l.cycleNumber,
+          createdAt: new Date(l.createdAt),
+          type: "breeding" as const,
+          label,
+          subLabel: subLabel ?? l.partner?.name,
+          vitals: (ctx?.price ?? 0) > 0 ? [{ label: "G", value: -(ctx!.price!) }] : [] as VitalChange[],
+        }
+      }),
     ...animal.careLogs
       .filter((l) => l.cycleNumber === cycle)
       .map((l: AnimalProfile["careLogs"][number]) => ({
         key: `care-${l.id}`,
         cycleNumber: l.cycleNumber,
+        createdAt: new Date(l.createdAt),
         type: "care" as const,
         label: l.careActionDef.name,
         vitals: [
@@ -41,6 +65,7 @@ export function DailyLogPanel({ animal }: { animal: AnimalProfile }) {
       .map((l: AnimalProfile["trainingLogs"][number]) => ({
         key: `train-${l.id}`,
         cycleNumber: l.cycleNumber,
+        createdAt: new Date(l.createdAt),
         type: "training" as const,
         label: l.trainingActionDef.name,
         subLabel: l.intensityTierDef.name,
@@ -53,6 +78,7 @@ export function DailyLogPanel({ animal }: { animal: AnimalProfile }) {
       .map((l: AnimalProfile["vetVisitLogs"][number]) => ({
         key: `vet-${l.id}`,
         cycleNumber: l.visitCycle,
+        createdAt: new Date(l.createdAt),
         type: "vet" as const,
         label: l.vetServiceDef?.name ?? "Vet Visit",
         notes: l.notes,
@@ -65,6 +91,7 @@ export function DailyLogPanel({ animal }: { animal: AnimalProfile }) {
       .map((l: AnimalProfile["stageActivityLogs"][number]) => ({
         key: `activity-${l.id}`,
         cycleNumber: l.cycleNumber,
+        createdAt: new Date(l.createdAt),
         type: "activity" as const,
         label: l.stageActivityDef.name,
         vitals: [
@@ -72,28 +99,7 @@ export function DailyLogPanel({ animal }: { animal: AnimalProfile }) {
           { label: l.stageActivityDef.traitDef.name, value: l.stageActivityDef.traitEffect },
         ],
       })),
-    ...animal.dailyLogs
-      .filter((l) => l.cycleNumber === cycle)
-      .map((l: AnimalProfile["dailyLogs"][number]) => {
-        const ctx = l.context as { price?: number } | null
-        const label =
-          l.eventType === "COVER_SENT" ? "Cover Sent"
-          : l.eventType === "COVER_ACCEPTED" ? "Cover Accepted"
-          : l.eventType
-        const subLabel =
-          l.eventType === "COVER_ACCEPTED" && l.outcome === "CONCEIVED" ? "Conceived"
-          : l.eventType === "COVER_ACCEPTED" && l.outcome === "NOT_CONCEIVED" ? "No conception"
-          : l.partner?.name
-        return {
-          key: `breeding-${l.id}`,
-          cycleNumber: l.cycleNumber,
-          type: "breeding" as const,
-          label,
-          subLabel: subLabel ?? l.partner?.name,
-          vitals: (ctx?.price ?? 0) > 0 ? [{ label: "G", value: -(ctx!.price!) }] : [] as VitalChange[],
-        }
-      }),
-  ].sort((a, b) => b.cycleNumber - a.cycleNumber)
+  ].sort((a, b) => b.cycleNumber - a.cycleNumber || b.createdAt.getTime() - a.createdAt.getTime())
 
   return (
     <Panel title="Daily Log" icon={<ScrollText className="size-4 text-muted-foreground" />}>

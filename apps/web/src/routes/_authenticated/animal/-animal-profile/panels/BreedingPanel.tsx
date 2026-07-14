@@ -42,7 +42,7 @@ export function BreedingPanel({
     trpc.breeding.material.flushEmbryo.useMutation({ onSettled: invalidate })
   const { mutate: ultrasound, isPending: ultrasoundPending } =
     trpc.breeding.pregnancy.ultrasound.useMutation({ onSettled: invalidate })
-  const { mutate: collectMaterial, isPending: collectPending } =
+  const { mutate: collectMaterial, isPending: collectPending, error: collectError } =
     trpc.breeding.material.collectMaterial.useMutation({ onSettled: invalidate })
   const { mutate: castrate, isPending: castratePending } =
     trpc.animal.castrate.useMutation({
@@ -65,7 +65,7 @@ export function BreedingPanel({
     { username: usernameSearch, gameId: animal.gameId, excludePlayerAccountId: animal.playerAccountId },
     { enabled: isMale && sendCoverOpen && coverTab === "player" && usernameSearch.length > 0 }
   )
-  const { mutate: sendCover, isPending: sendCoverPending } = trpc.breeding.cover.send.useMutation({
+  const { mutate: sendCover, isPending: sendCoverPending, error: sendCoverError } = trpc.breeding.cover.send.useMutation({
     onSuccess: () => {
       setSendCoverOpen(false)
       setSelectedDamId("")
@@ -109,7 +109,16 @@ export function BreedingPanel({
                   tab === t ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                {t === "info" ? "Overview" : isFemale ? "Covers & Storage" : "Pending Covers"}
+                {t === "info" ? "Overview" : (
+                  <>
+                    {isFemale ? "Covers & Storage" : "Pending Covers"}
+                    {(isFemale ? animal.coverOffersAsDam.length : animal.coverOffersAsSire.length) > 0 && (
+                      <span className="ml-1 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground">
+                        {isFemale ? animal.coverOffersAsDam.length : animal.coverOffersAsSire.length}
+                      </span>
+                    )}
+                  </>
+                )}
               </button>
             ))}
           </div>
@@ -466,6 +475,9 @@ export function BreedingPanel({
                   )}
                 </div>
               )}
+              {sendCoverError && (
+                <p className="mt-1 text-[11px] text-destructive">{sendCoverError.message}</p>
+              )}
             </div>
           )}
 
@@ -510,6 +522,9 @@ export function BreedingPanel({
               </ActionButton>
               {isFemale && !!preg && (
                 <p className="mt-1.5 text-[11px] text-muted-foreground">Unavailable during pregnancy</p>
+              )}
+              {collectError && (
+                <p className="mt-1.5 text-[11px] text-destructive">{collectError.message}</p>
               )}
             </div>
           )}
