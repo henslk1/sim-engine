@@ -15,6 +15,7 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
+import { Route as AuthenticatedBreedingOfferIdRouteImport } from './routes/_authenticated/breeding/$offerId'
 import { Route as AuthenticatedAnimalAnimalIdRouteImport } from './routes/_authenticated/animal/$animalId'
 import { Route as AuthenticatedAdminVetServicesRouteImport } from './routes/_authenticated/admin/vet-services'
 import { Route as AuthenticatedAdminTutorialStepsRouteImport } from './routes/_authenticated/admin/tutorial-steps'
@@ -74,6 +75,12 @@ const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedAdminRoute,
 } as any)
+const AuthenticatedBreedingOfferIdRoute =
+  AuthenticatedBreedingOfferIdRouteImport.update({
+    id: '/breeding/$offerId',
+    path: '/breeding/$offerId',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedAnimalAnimalIdRoute =
   AuthenticatedAnimalAnimalIdRouteImport.update({
     id: '/animal/$animalId',
@@ -280,6 +287,7 @@ export interface FileRoutesByFullPath {
   '/admin/tutorial-steps': typeof AuthenticatedAdminTutorialStepsRoute
   '/admin/vet-services': typeof AuthenticatedAdminVetServicesRoute
   '/animal/$animalId': typeof AuthenticatedAnimalAnimalIdRoute
+  '/breeding/$offerId': typeof AuthenticatedBreedingOfferIdRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
 }
 export interface FileRoutesByTo {
@@ -315,6 +323,7 @@ export interface FileRoutesByTo {
   '/admin/tutorial-steps': typeof AuthenticatedAdminTutorialStepsRoute
   '/admin/vet-services': typeof AuthenticatedAdminVetServicesRoute
   '/animal/$animalId': typeof AuthenticatedAnimalAnimalIdRoute
+  '/breeding/$offerId': typeof AuthenticatedBreedingOfferIdRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
 }
 export interface FileRoutesById {
@@ -353,6 +362,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/tutorial-steps': typeof AuthenticatedAdminTutorialStepsRoute
   '/_authenticated/admin/vet-services': typeof AuthenticatedAdminVetServicesRoute
   '/_authenticated/animal/$animalId': typeof AuthenticatedAnimalAnimalIdRoute
+  '/_authenticated/breeding/$offerId': typeof AuthenticatedBreedingOfferIdRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
 }
 export interface FileRouteTypes {
@@ -391,6 +401,7 @@ export interface FileRouteTypes {
     | '/admin/tutorial-steps'
     | '/admin/vet-services'
     | '/animal/$animalId'
+    | '/breeding/$offerId'
     | '/admin/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -426,6 +437,7 @@ export interface FileRouteTypes {
     | '/admin/tutorial-steps'
     | '/admin/vet-services'
     | '/animal/$animalId'
+    | '/breeding/$offerId'
     | '/admin'
   id:
     | '__root__'
@@ -463,6 +475,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/tutorial-steps'
     | '/_authenticated/admin/vet-services'
     | '/_authenticated/animal/$animalId'
+    | '/_authenticated/breeding/$offerId'
     | '/_authenticated/admin/'
   fileRoutesById: FileRoutesById
 }
@@ -515,6 +528,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/'
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/breeding/$offerId': {
+      id: '/_authenticated/breeding/$offerId'
+      path: '/breeding/$offerId'
+      fullPath: '/breeding/$offerId'
+      preLoaderRoute: typeof AuthenticatedBreedingOfferIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/animal/$animalId': {
       id: '/_authenticated/animal/$animalId'
@@ -804,12 +824,14 @@ interface AuthenticatedRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedAnimalAnimalIdRoute: typeof AuthenticatedAnimalAnimalIdRoute
+  AuthenticatedBreedingOfferIdRoute: typeof AuthenticatedBreedingOfferIdRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedAnimalAnimalIdRoute: AuthenticatedAnimalAnimalIdRoute,
+  AuthenticatedBreedingOfferIdRoute: AuthenticatedBreedingOfferIdRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(

@@ -1,7 +1,23 @@
 import { db } from "@sim-engine/db"
 import { router, publicProcedure } from "../trpc.js"
 import { z } from "zod"
-import { generateOffspring } from "@sim-engine/engine"
+import { generateOffspring, type ParentData } from "@sim-engine/engine"
+
+function computeCOI(
+  sireAncestors: ParentData["ancestors"],
+  damAncestors: ParentData["ancestors"],
+): number {
+  const sireMap = new Map(sireAncestors.map((a) => [a.ancestorId, a]))
+  let coi = 0
+  for (const damEntry of damAncestors) {
+    const sireEntry = sireMap.get(damEntry.ancestorId)
+    if (sireEntry !== undefined) {
+      const fa = sireEntry.ancestor.inbreedingCoefficient
+      coi += Math.pow(0.5, sireEntry.depth + damEntry.depth + 1) * (1 + fa)
+    }
+  }
+  return Math.min(1, coi)
+}
 
 const eligibleFemaleSelect = {
   id: true,
@@ -308,6 +324,7 @@ export const breedingCoverRouter = router({
               inbreedingCoefficient: offspring.inbreedingCoefficient,
               breedGeneration: offspring.breedGeneration,
               lifeExpectancy,
+              status: "EMBRYO_STORED",
             },
             select: { id: true },
           })
@@ -365,6 +382,7 @@ export const breedingCoverRouter = router({
           conceived: true as const,
           pregnancyId: pregnancy.id,
           offspringCount: result.offspring.length,
+          requiredCycles: gameConfig.gestationCycles,
         }
       })
     }),
@@ -381,5 +399,116 @@ export const breedingCoverRouter = router({
         where: { id: input.offerId },
         data: { status: "DECLINED" },
       })
+    }),
+
+  getForBreeding: publicProcedure
+    .input(z.object({ offerId: z.string() }))
+    .query(async ({ input }) => {
+      const ancestorSelect = {
+        ancestorId: true,
+        depth: true,
+        ancestor: { select: { inbreedingCoefficient: true } },
+      } as const
+
+      const animalSelect = {
+        id: true,
+        name: true,
+        sex: true,
+        fertility: true,
+        inbreedingCoefficient: true,
+        breedId: true,
+        breed: { select: { id: true, name: true } },
+        playerAccount: { select: { id: true, username: true } },
+        lifeStage: { select: { name: true } },
+        mood: { select: { value: true } },
+        personality: {
+          select: { value: true, traitDef: { select: { conceptionModifier: true } } },
+        },
+        careScore: { select: { score: true } },
+        ancestors: { select: ancestorSelect },
+        // grade components
+        compTiers: { select: { tierDef: { select: { tierIndex: true } } }, orderBy: { tierDef: { tierIndex: "desc" as const } }, take: 1 },
+        stats: { select: { innateValue: true, trainedValue: true } },
+        breedComposition: { select: { breedId: true } },
+        conformationScores: { select: { score: true } },
+        genotypes: {
+          select: {
+            isTestedByOwner: true,
+            locus: { select: { panelEntries: { select: { panelDef: { select: { panelType: true } } } } } },
+          },
+        },
+        healthRecords: { select: { isActive: true } },
+      } as const
+
+      const [offer, gameConfig] = await Promise.all([
+        db.coverOffer.findUniqueOrThrow({
+          where: { id: input.offerId },
+          select: {
+            id: true,
+            status: true,
+            price: true,
+            gameId: true,
+            sire: { select: animalSelect },
+            dam: { select: animalSelect },
+          },
+        }),
+        db.gameConfig.findFirst({
+          where: { game: { coverOffers: { some: { id: input.offerId } } } },
+          select: { trainingCeilingMultiplier: true },
+        }),
+      ])
+
+      function computeGrade(a: typeof offer.sire): string {
+        const parts: number[] = []
+        parts.push((a.careScore?.score ?? 0) / 100)
+        const topTier = a.compTiers[0]?.tierDef.tierIndex ?? -1
+        parts.push(topTier < 0 ? 0 : Math.min((topTier + 1) / 10, 1))
+        parts.push(Math.max(0, 1 - a.inbreedingCoefficient / 0.25))
+        if (a.stats.length > 0 && gameConfig) {
+          const avg = a.stats.reduce((sum, s) => {
+            const cap = s.innateValue * gameConfig.trainingCeilingMultiplier
+            return sum + Math.min(s.trainedValue / cap, 1)
+          }, 0) / a.stats.length
+          parts.push(avg)
+        } else {
+          parts.push(0)
+        }
+        const isCross = a.breedComposition.length > 1
+        if (!isCross && a.conformationScores.length > 0) {
+          parts.push(a.conformationScores.reduce((s, c) => s + c.score, 0) / a.conformationScores.length / 100)
+        }
+        const healthLoci = a.genotypes.filter((g) =>
+          g.locus.panelEntries.some((e) => e.panelDef.panelType === "HEALTH")
+        )
+        if (healthLoci.length > 0) {
+          parts.push(healthLoci.filter((g) => g.isTestedByOwner).length / healthLoci.length)
+        }
+        parts.push(Math.max(0, 1 - a.healthRecords.filter((r) => r.isActive).length * 0.15))
+        const pct = (parts.reduce((a, b) => a + b, 0) / parts.length) * 100
+        return pct >= 100 ? "S" : pct >= 85 ? "A" : pct >= 70 ? "B" : pct >= 55 ? "C" : pct >= 40 ? "D" : "F"
+      }
+
+      const base =
+        (offer.sire.fertility * 100 +
+          offer.dam.fertility * 100 +
+          (offer.sire.mood?.value ?? 50) +
+          (offer.dam.mood?.value ?? 50)) /
+        4
+
+      const personalityOffset = [
+        ...offer.sire.personality,
+        ...offer.dam.personality,
+      ].reduce((acc, p) => acc + p.traitDef.conceptionModifier * p.value, 0)
+
+      const conceptionChance = Math.max(10, Math.min(100, base + personalityOffset))
+      const offspringCOI = computeCOI(offer.sire.ancestors, offer.dam.ancestors)
+
+      return {
+        ...offer,
+        conceptionChance: Math.round(conceptionChance),
+        offspringCOI,
+        sireGrade: computeGrade(offer.sire),
+        damGrade: computeGrade(offer.dam),
+      }
     }),
 })

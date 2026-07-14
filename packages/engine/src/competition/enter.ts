@@ -71,7 +71,10 @@ export async function enterCompetition(
     const energyUsed = tier.tierDef.energyCost
     const entryFee = tier.tierDef.entryFee
 
-    const energy = await tx.animalEnergy.findUnique({ where: { animalId } })
+    const [energy, animal] = await Promise.all([
+      tx.animalEnergy.findUnique({ where: { animalId } }),
+      tx.animal.findUniqueOrThrow({ where: { id: animalId }, select: { ageInCycles: true } }),
+    ])
     if (!energy) throw new Error(`No energy record for animal ${animalId}`)
 
     await tx.animalEnergy.update({
@@ -119,6 +122,7 @@ export async function enterCompetition(
         animalId,
         playerAccountId,
         tierDefId: tier.tierDefId,
+        cycleNumber: animal.ageInCycles,
       },
     })
 

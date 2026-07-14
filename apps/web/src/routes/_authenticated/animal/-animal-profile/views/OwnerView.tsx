@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react"
 import type { AnimalProfile } from "../types"
 import { formatCycleAge, computeBreedingGrade } from "../utils"
 import { Badge, Meter } from "@/components/game/ui"
@@ -18,6 +19,7 @@ import { PersonalityPanel } from "../panels/PersonalityPanel"
 import { NotesPanel } from "../panels/NotesPanel"
 import { EquippedPanel } from "../panels/EquippedPanel"
 import { ConformationPanel } from "../panels/ConformationPanel"
+import { BirthDialog } from "../BirthDialog"
 
 
 export function OwnerView({ animal, animalId }: { animal: AnimalProfile; animalId: string }) {
@@ -26,13 +28,36 @@ export function OwnerView({ animal, animalId }: { animal: AnimalProfile; animalI
   const breedingGrade = computeBreedingGrade(animal, config)
   const activeConditions = animal.healthRecords.filter((r) => r.isActive)
 
+  const [birthPregnancyId, setBirthPregnancyId] = useState<string | null>(null)
+
+  // Auto-open if there's already a completed pregnancy with unborn offspring (e.g. navigated away mid-flow)
+  useEffect(() => {
+    const pending = animal.pregnancies.find(
+      (p) => p.isCompleted && p.offspring.some((o) => o.animal.status === "EMBRYO_STORED")
+    )
+    if (pending) setBirthPregnancyId(pending.id)
+  }, [animal.id])
+
   const utils = trpc.useUtils()
+  const invalidate = () => utils.animalProfile.get.invalidate({ animalId })
+
   const { mutate: advanceAge, isPending: advancePending } = trpc.animal.advanceAge.useMutation({
-    onSettled: () => utils.animalProfile.get.invalidate({ animalId }),
+    onSuccess: (data) => {
+      if (data?.pregnancyCompleted) setBirthPregnancyId(data.pregnancyCompleted)
+      invalidate()
+    },
   })
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-transparent text-foreground">
+
+      {birthPregnancyId && (
+        <BirthDialog
+          pregnancyId={birthPregnancyId}
+          onClose={() => setBirthPregnancyId(null)}
+          onBorn={invalidate}
+        />
+      )}
 
       {/* Header */}
       <div className="flex shrink-0 flex-col items-center gap-3 border-b border-border bg-card px-4 py-4">

@@ -92,4 +92,71 @@ export const breedingPregnancyRouter = router({
         }
       })
     }),
+
+  getForBirth: publicProcedure
+    .input(z.object({ pregnancyId: z.string() }))
+    .query(({ input }) =>
+      db.pregnancy.findUniqueOrThrow({
+        where: { id: input.pregnancyId },
+        select: {
+          id: true,
+          isCompleted: true,
+          requiredCycles: true,
+          animal: {
+            select: {
+              id: true,
+              name: true,
+              breed: { select: { name: true } },
+            },
+          },
+          offspring: {
+            orderBy: { birthOrder: "asc" },
+            select: {
+              birthOrder: true,
+              animal: { select: { id: true, sex: true, status: true, phenotypeDescription: true } },
+            },
+          },
+        },
+      })
+    ),
+
+  birth: publicProcedure
+    .input(z.object({
+      pregnancyId: z.string(),
+      names: z.array(z.object({
+        animalId: z.string(),
+        name: z.string().min(1).max(100).trim(),
+      })).optional(),
+    }))
+    .mutation(async ({ input }) => {
+      return db.$transaction(async (tx) => {
+        const pregnancy = await tx.pregnancy.findUniqueOrThrow({
+          where: { id: input.pregnancyId },
+          select: {
+            isCompleted: true,
+            animal: { select: { id: true } },
+            offspring: {
+              select: { animal: { select: { id: true, status: true } } },
+            },
+          },
+        })
+
+        if (!pregnancy.isCompleted) throw new Error("Pregnancy is not complete yet")
+
+        const nameMap = new Map(input.names?.map((n) => [n.animalId, n.name]) ?? [])
+
+        const unborn = pregnancy.offspring.filter((o) => o.animal.status === "EMBRYO_STORED")
+        for (const o of unborn) {
+          await tx.animal.update({
+            where: { id: o.animal.id },
+            data: {
+              status: "ALIVE",
+              name: nameMap.get(o.animal.id) ?? "Unnamed Foal",
+            },
+          })
+        }
+
+        return { damId: pregnancy.animal.id, born: unborn.length }
+      })
+    }),
 })

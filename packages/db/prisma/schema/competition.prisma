@@ -241,6 +241,7 @@ model CompetitionEntry {
   playerAccountId String
   tierDefId       String
   enteredAt       DateTime           @default(now())
+  cycleNumber     Int?
   result          CompetitionResult?
   tierDef         CompetitionTierDef @relation(fields: [tierDefId], references: [id])
   playerAccount   PlayerAccount      @relation(fields: [playerAccountId], references: [id])

@@ -177,9 +177,14 @@ export const animalProfileRouter = router({
             include: { stageActivityDef: { include: { traitDef: true } } },
           },
 
-          // pregnancy
+          // pregnancy (active, or completed but offspring not yet born)
           pregnancies: {
-            where: { isCompleted: false },
+            where: {
+              OR: [
+                { isCompleted: false },
+                { isCompleted: true, offspring: { some: { animal: { status: "EMBRYO_STORED" } } } },
+              ],
+            },
             take: 1,
             include: {
               breedingRecord: {
@@ -188,8 +193,9 @@ export const animalProfileRouter = router({
                 },
               },
               offspring: {
+                orderBy: { birthOrder: "asc" },
                 include: {
-                  animal: { select: { id: true, sex: true, phenotypeDescription: true } },
+                  animal: { select: { id: true, sex: true, phenotypeDescription: true, status: true } },
                 },
               },
             },

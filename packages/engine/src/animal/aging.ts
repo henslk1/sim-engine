@@ -2,7 +2,7 @@ import { db } from "@sim-engine/db";
 
 type Client = typeof db
 
-export async function advanceAnimalAging(client: Client, animalId: string) {
+export async function advanceAnimalAging(client: Client, animalId: string): Promise<{ pregnancyCompleted?: string }> {
   return client.$transaction(async (tx) => {
     const animal = await tx.animal.findUniqueOrThrow({
       where: { id: animalId },
@@ -28,7 +28,7 @@ export async function advanceAnimalAging(client: Client, animalId: string) {
         where: { id: animalId },
         data: { ageInCycles: newAge, status: "DECEASED", diedAt: new Date(), causeOfDeath: "old_age" },
       })
-      return
+      return {}
     }
 
     // Death roll
@@ -45,7 +45,7 @@ export async function advanceAnimalAging(client: Client, animalId: string) {
           where: { id: animalId },
           data: { ageInCycles: newAge, status: "DECEASED", diedAt: new Date(), causeOfDeath: "natural" },
         })
-        return
+        return {}
       }
     }
 
@@ -61,14 +61,14 @@ export async function advanceAnimalAging(client: Client, animalId: string) {
           where: { id: animalId },
           data: { ageInCycles: newAge, status: "DECEASED", diedAt: new Date(), causeOfDeath: record.conditionDef.name },
         })
-        return
+        return {}
       }
       if (record.conditionDef.fatalityChance !== null && Math.random() < record.conditionDef.fatalityChance) {
         await tx.animal.update({
           where: { id: animalId },
           data: { ageInCycles: newAge, status: "DECEASED", diedAt: new Date(), causeOfDeath: record.conditionDef.name },
         })
-        return
+        return {}
       }
     }
 
@@ -139,22 +139,27 @@ export async function advanceAnimalAging(client: Client, animalId: string) {
       where: { animalId, isCompleted: false },
     })
 
+    let pregnancyCompleted: string | undefined
     if (pregnancy) {
       const newCycles = pregnancy.currentCycles + 1
+      const justCompleted = newCycles >= pregnancy.requiredCycles
       await tx.pregnancy.update({
         where: { id: pregnancy.id },
         data: {
           currentCycles: newCycles,
-          ...(newCycles >= pregnancy.requiredCycles && {
-            isCompleted: true,
-            completedAt: new Date(),
-          }),
+          ...(justCompleted && { isCompleted: true, completedAt: new Date() }),
         },
       })
+      if (justCompleted) pregnancyCompleted = pregnancy.id
     }
 
-    // Fetch vitals and active health conditions
-    const [energy, mood, condition, careScore, activeHealthRecords] = await Promise.all([
+    // Check if work was done this cycle — suppresses condition decay
+    const currentCycle = animal.ageInCycles
+    const [workedThisCycle, energy, mood, condition, careScore, activeHealthRecords] = await Promise.all([
+      Promise.all([
+        tx.trainingLog.count({ where: { animalId, cycleNumber: currentCycle } }),
+        tx.competitionEntry.count({ where: { animalId, cycleNumber: currentCycle } }),
+      ]).then(([t, c]) => t + c > 0),
       tx.animalEnergy.findUnique({ where: { animalId } }),
       tx.animalMood.findUnique({ where: { animalId } }),
       tx.animalCondition.findUnique({ where: { animalId } }),
@@ -183,7 +188,7 @@ export async function advanceAnimalAging(client: Client, animalId: string) {
           where: { id: animalId },
           data: { ageInCycles: newAge, status: "DECEASED", diedAt: new Date(), causeOfDeath: "neglect" },
         })
-        return
+        return {}
       }
     }
 
@@ -196,7 +201,7 @@ export async function advanceAnimalAging(client: Client, animalId: string) {
         where: { animalId },
         data: { value: Math.max(0, mood.value - gameConfig.moodDecayRate) },
       }),
-      condition && tx.animalCondition.update({
+      condition && !workedThisCycle && tx.animalCondition.update({
         where: { animalId },
         data: { value: Math.max(0, condition.value - gameConfig.conditionDecayRate) },
       }),
@@ -209,5 +214,7 @@ export async function advanceAnimalAging(client: Client, animalId: string) {
         data: { value: Math.max(0, immunity.value - gameConfig.immunityDecayRate) },
       }),
     ].filter(Boolean))
+
+    return { pregnancyCompleted }
   })
 }

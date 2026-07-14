@@ -6,7 +6,7 @@ import { CreateListingDialog } from "./CreateListingDialog"
 import { cn } from "@/lib/utils"
 import { getCOIColor, getFertilityDisplay, getActiveRestrictions } from "../utils"
 import { trpc } from "@/lib/trpc"
-import { Link } from "@tanstack/react-router"
+import { Link, useNavigate } from "@tanstack/react-router"
 
 type BreedingTab = "info" | "covers"
 type StorageType = "PERSONAL" | "VET" | "GROUP"
@@ -35,6 +35,7 @@ export function BreedingPanel({
   const [coverPrice, setCoverPrice] = useState(0)
 
   const utils = trpc.useUtils()
+  const navigate = useNavigate()
   const invalidate = () => utils.animalProfile.get.invalidate({ animalId: animal.id })
 
   const { mutate: flushEmbryo, isPending: flushPending } =
@@ -48,7 +49,7 @@ export function BreedingPanel({
       onSuccess: () => { setConfirmCastrate(false); invalidate() },
     })
 
-  const preg = animal.pregnancies[0]
+  const preg = animal.pregnancies.find((p) => !p.isCompleted) ?? null
   const coiColor = getCOIColor(animal.inbreedingCoefficient)
   const fertility = getFertilityDisplay(animal.fertility)
   const restrictions = getActiveRestrictions(animal)
@@ -79,8 +80,6 @@ export function BreedingPanel({
   const { mutate: addSlot, isPending: addSlotPending, error: addSlotError } =
     trpc.breeding.listing.addSlot.useMutation({ onSettled: invalidate })
 
-  const { mutate: acceptCover, isPending: acceptCoverPending } =
-    trpc.breeding.cover.accept.useMutation({ onSettled: invalidate })
   const { mutate: declineCover } =
     trpc.breeding.cover.decline.useMutation({
       onSettled: () => { setActioningOfferId(null); invalidate() },
@@ -595,16 +594,15 @@ export function BreedingPanel({
                           <ActionButton
                             variant="soft"
                             className="flex-1 justify-center"
-                            disabled={acceptCoverPending || actioningOfferId === offer.id}
-                            onClick={() => acceptCover({ offerId: offer.id })}
+                            disabled={actioningOfferId === offer.id}
+                            onClick={() => navigate({ to: "/breeding/$offerId", params: { offerId: offer.id } })}
                           >
-                            {acceptCoverPending ? <Loader2 className="size-3.5 animate-spin" /> : null}
                             Accept
                           </ActionButton>
                           <ActionButton
                             variant="soft"
                             className="flex-1 justify-center text-destructive hover:bg-destructive/10"
-                            disabled={acceptCoverPending || actioningOfferId === offer.id}
+                            disabled={actioningOfferId === offer.id}
                             onClick={() => { setActioningOfferId(offer.id); declineCover({ offerId: offer.id }) }}
                           >
                             {actioningOfferId === offer.id ? <Loader2 className="size-3.5 animate-spin" /> : null}
