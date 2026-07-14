@@ -167,12 +167,6 @@ export function TrainingPanel({
               Training restricted due to active treatment
             </div>
           )}
-          {(moodBlocksAll || conditionBlocksAll) && (
-            <div className="mb-2 flex flex-wrap gap-1.5">
-              {moodBlocksAll && <Badge tone="danger">Mood too low</Badge>}
-              {conditionBlocksAll && <Badge tone="danger">Condition too low</Badge>}
-            </div>
-          )}
           <div className="space-y-2">
             {animal.stats.map((stat: Stat) => {
               const cap = getTrainingCap(stat.innateValue, config)
@@ -213,29 +207,36 @@ export function TrainingPanel({
                           (maxAllowedTierIndex != null && t.tierIndex > maxAllowedTierIndex) ||
                           (t.minMood != null && (animal.mood?.value ?? 0) < t.minMood) ||
                           (t.minCondition != null && (animal.condition?.value ?? 0) < t.minCondition)
+                        const tierBlockReason =
+                          isRestricted ? "Vet restriction"
+                          : maxAllowedTierIndex != null && t.tierIndex > maxAllowedTierIndex ? "Vet restriction"
+                          : t.minMood != null && (animal.mood?.value ?? 0) < t.minMood ? "Mood too low"
+                          : t.minCondition != null && (animal.condition?.value ?? 0) < t.minCondition ? "Condition too low"
+                          : null
                         return (
-                          <button
-                            key={t.id}
-                            type="button"
-                            disabled={locked || isRestricted}
-                            onClick={() => setSelectedTier((prev) => ({ ...prev, [stat.statDef.id]: t.id }))}
-                            className={cn(
-                              "flex-1 rounded px-1.5 py-1 text-[11px] font-semibold transition-colors",
-                              tierId === t.id
-                                ? "bg-primary text-primary-foreground"
-                                : "bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground",
-                              (locked || isRestricted) && "cursor-not-allowed opacity-40"
-                            )}
-                          >
-                            {t.name}
-                          </button>
+                          <span key={t.id} title={tierBlockReason ?? undefined} className="flex-1">
+                            <button
+                              type="button"
+                              disabled={locked || isRestricted}
+                              onClick={() => setSelectedTier((prev) => ({ ...prev, [stat.statDef.id]: t.id }))}
+                              className={cn(
+                                "w-full rounded px-1.5 py-1 text-[11px] font-semibold transition-colors",
+                                tierId === t.id
+                                  ? "bg-primary text-primary-foreground"
+                                  : "bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground",
+                                (locked || isRestricted) && "cursor-not-allowed opacity-40"
+                              )}
+                            >
+                              {t.name}
+                            </button>
+                          </span>
                         )
                       })}
                     </div>
                   )}
 
                   {!readonly && (
-                    <>
+                    <span title={!canTrain && blockReason ? blockReason : undefined} className="w-full">
                       <ActionButton
                         variant="soft"
                         disabled={!canTrain}
@@ -255,12 +256,7 @@ export function TrainingPanel({
                           </>
                         )}
                       </ActionButton>
-                      {!isPending && !canTrain && blockReason && (
-                        <div className="mt-1 flex">
-                          <Badge tone="muted">{blockReason}</Badge>
-                        </div>
-                      )}
-                    </>
+                    </span>
                   )}
                 </div>
               )

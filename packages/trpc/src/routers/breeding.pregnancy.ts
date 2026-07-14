@@ -134,7 +134,7 @@ export const breedingPregnancyRouter = router({
           where: { id: input.pregnancyId },
           select: {
             isCompleted: true,
-            animal: { select: { id: true } },
+            animal: { select: { id: true, gameId: true } },
             offspring: {
               select: { animal: { select: { id: true, status: true } } },
             },
@@ -145,6 +145,11 @@ export const breedingPregnancyRouter = router({
 
         const nameMap = new Map(input.names?.map((n) => [n.animalId, n.name]) ?? [])
 
+        const ltcDefs = await tx.longTermCareActionDef.findMany({
+          where: { gameId: pregnancy.animal.gameId },
+          select: { id: true, intervalCycles: true },
+        })
+
         const unborn = pregnancy.offspring.filter((o) => o.animal.status === "EMBRYO_STORED")
         for (const o of unborn) {
           await tx.animal.update({
@@ -154,6 +159,15 @@ export const breedingPregnancyRouter = router({
               name: nameMap.get(o.animal.id) ?? "Unnamed Foal",
             },
           })
+          if (ltcDefs.length > 0) {
+            await tx.animalLongTermCareRecord.createMany({
+              data: ltcDefs.map((def) => ({
+                animalId: o.animal.id,
+                longTermCareActionDefId: def.id,
+                nextDueCycle: def.intervalCycles,
+              })),
+            })
+          }
         }
 
         return { damId: pregnancy.animal.id, born: unborn.length }

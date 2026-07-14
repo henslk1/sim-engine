@@ -177,6 +177,15 @@ export const animalProfileRouter = router({
             include: { stageActivityDef: { include: { traitDef: true } } },
           },
 
+          // breeding events
+          dailyLogs: {
+            orderBy: { createdAt: "desc" },
+            take: 10,
+            include: {
+              partner: { select: { id: true, name: true } },
+            },
+          },
+
           // pregnancy (active, or completed but offspring not yet born)
           pregnancies: {
             where: {

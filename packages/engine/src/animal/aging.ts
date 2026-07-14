@@ -2,7 +2,7 @@ import { db } from "@sim-engine/db";
 
 type Client = typeof db
 
-export async function advanceAnimalAging(client: Client, animalId: string): Promise<{ pregnancyCompleted?: string }> {
+export async function advanceAnimalAging(client: Client, animalId: string): Promise<{ pregnancyCompleted?: string | undefined }> {
   return client.$transaction(async (tx) => {
     const animal = await tx.animal.findUniqueOrThrow({
       where: { id: animalId },

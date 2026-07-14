@@ -45,6 +45,7 @@ const parentSelect = {
   generation: true,
   playerAccountId: true,
   breedId: true,
+  ageInCycles: true,
   breed: { select: { name: true } },
   fertility: true,
   inbreedingCoefficient: true,
@@ -138,7 +139,7 @@ export const breedingCoverRouter = router({
         db.animal.findUniqueOrThrow({
           where: { id: input.sireId },
           select: {
-            sex: true, gameId: true,
+            sex: true, gameId: true, ageInCycles: true,
             lifeStage: { select: { canBreed: true } },
             isCastrated: true,
             energy: { select: { currentEnergy: true } },
@@ -171,7 +172,7 @@ export const breedingCoverRouter = router({
         })
       }
 
-      return db.coverOffer.create({
+      const offer = await db.coverOffer.create({
         data: {
           gameId: sire.gameId,
           sireId: input.sireId,
@@ -180,6 +181,18 @@ export const breedingCoverRouter = router({
         },
         select: { id: true, status: true },
       })
+
+      await db.animalDailyLog.create({
+        data: {
+          animalId: input.sireId,
+          cycleNumber: sire.ageInCycles,
+          eventType: "COVER_SENT",
+          partnerAnimalId: input.damId,
+          ...(input.price > 0 ? { context: { price: input.price } } : {}),
+        },
+      })
+
+      return offer
     }),
 
   accept: publicProcedure
@@ -281,6 +294,16 @@ export const breedingCoverRouter = router({
         })
 
         if (!result.conceived) {
+          await tx.animalDailyLog.create({
+            data: {
+              animalId: offer.damId,
+              cycleNumber: dam.ageInCycles,
+              eventType: "COVER_ACCEPTED",
+              partnerAnimalId: offer.sireId,
+              outcome: "NOT_CONCEIVED",
+              ...(offer.price > 0 ? { context: { price: offer.price } } : {}),
+            },
+          })
           return { breedingRecordId: breedingRecord.id, conceived: false as const }
         }
 
@@ -376,6 +399,17 @@ export const breedingCoverRouter = router({
             }),
           ])
         }
+
+        await tx.animalDailyLog.create({
+          data: {
+            animalId: offer.damId,
+            cycleNumber: dam.ageInCycles,
+            eventType: "COVER_ACCEPTED",
+            partnerAnimalId: offer.sireId,
+            outcome: "CONCEIVED",
+            ...(offer.price > 0 ? { context: { price: offer.price } } : {}),
+          },
+        })
 
         return {
           breedingRecordId: breedingRecord.id,
