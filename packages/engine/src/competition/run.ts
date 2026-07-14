@@ -110,7 +110,7 @@ export async function runCompetition(
 
     // prizes per tier group
     for (const [, entries] of byTier) {
-      const tierDef = entries[0].tierDef
+      const tierDef = entries[0]!.tierDef
       const prizes = tierDef.tierPrizes.filter(
         p => p.isInvitational === competition.isInvitational
       )

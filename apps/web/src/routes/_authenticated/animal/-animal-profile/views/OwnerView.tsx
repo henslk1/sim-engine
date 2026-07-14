@@ -2,7 +2,8 @@ import type { AnimalProfile } from "../types"
 import { formatCycleAge, computeBreedingGrade } from "../utils"
 import { Badge, Meter } from "@/components/game/ui"
 import { ActionButton } from "@/components/game/ui"
-import { Stethoscope, Clock } from "lucide-react"
+import { Stethoscope, Clock, Loader2 } from "lucide-react"
+import { trpc } from "@/lib/trpc"
 import { InfoStrip } from "../InfoStrip"
 import { AlertBanner } from "../AlertBanner"
 import { OwnerActionList } from "../OwnerActions"
@@ -25,6 +26,11 @@ export function OwnerView({ animal, animalId }: { animal: AnimalProfile; animalI
   const breedingGrade = computeBreedingGrade(animal, config)
   const activeConditions = animal.healthRecords.filter((r) => r.isActive)
 
+  const utils = trpc.useUtils()
+  const { mutate: advanceAge, isPending: advancePending } = trpc.animal.advanceAge.useMutation({
+    onSettled: () => utils.animalProfile.get.invalidate({ animalId }),
+  })
+
   return (
     <div className="flex h-full flex-col overflow-hidden bg-transparent text-foreground">
 
@@ -41,8 +47,12 @@ export function OwnerView({ animal, animalId }: { animal: AnimalProfile; animalI
           )}
         </div>
 
-        <ActionButton variant="soft" disabled>
-          <Clock className="size-3.5" />
+        <ActionButton
+          variant="soft"
+          disabled={advancePending || animal.status !== "ALIVE"}
+          onClick={() => advanceAge({ animalId: animal.id })}
+        >
+          {advancePending ? <Loader2 className="size-3.5 animate-spin" /> : <Clock className="size-3.5" />}
           Advance Age
         </ActionButton>
 

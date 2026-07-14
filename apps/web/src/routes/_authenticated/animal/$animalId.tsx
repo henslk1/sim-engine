@@ -27,6 +27,7 @@ function AnimalProfilePage() {
   if (!animal) return <div className="p-8 text-sm">Animal not found</div>
   const isOwner = !!me && me.id === animal.playerAccount.id
 
+  if (animal.status === "EMBRYO_STORED") return <div className="p-8 text-sm text-muted-foreground">This animal is stored as an embryo.</div>
   if (animal.status === "DECEASED") return <DeceasedPendingView animal={animal} animalId={animalId} />
   if (animal.status === "BURIED") return <BuriedView animal={animal} />
   if (animal.status === "ARCHIVED") return <ArchivedView animal={animal} animalId={animalId} />

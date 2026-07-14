@@ -1,11 +1,12 @@
 import { useState } from "react"
 import type { AnimalProfile } from "../types"
 import { Panel, Badge, Meter, ActionButton, Dialog } from "@/components/game/ui"
-import { Baby, Sparkles, Heart, Ban, Dna, Scissors, Send, Plus, Syringe, FlaskConical, Scan, Search, Loader2, ChevronDown, ChevronUp } from "lucide-react"
+import { Baby, Sparkles, Heart, Ban, Dna, Scissors, Send, Plus, Syringe, FlaskConical, Scan, Search, Loader2, ChevronDown, ChevronUp, X } from "lucide-react"
 import { CreateListingDialog } from "./CreateListingDialog"
 import { cn } from "@/lib/utils"
 import { getCOIColor, getFertilityDisplay, getActiveRestrictions } from "../utils"
 import { trpc } from "@/lib/trpc"
+import { Link } from "@tanstack/react-router"
 
 type BreedingTab = "info" | "covers"
 type StorageType = "PERSONAL" | "VET" | "GROUP"
@@ -23,6 +24,7 @@ export function BreedingPanel({
   const [tab, setTab] = useState<BreedingTab>("info")
   const [storageType, setStorageType] = useState<StorageType>("PERSONAL")
   const [confirmCastrate, setConfirmCastrate] = useState(false)
+  const [actioningOfferId, setActioningOfferId] = useState<string | null>(null)
   const [listingDialogOpen, setListingDialogOpen] = useState(false)
   const [editListingOpen, setEditListingOpen] = useState(false)
   const [sendCoverOpen, setSendCoverOpen] = useState(false)
@@ -79,8 +81,10 @@ export function BreedingPanel({
 
   const { mutate: acceptCover, isPending: acceptCoverPending } =
     trpc.breeding.cover.accept.useMutation({ onSettled: invalidate })
-  const { mutate: declineCover, isPending: declineCoverPending } =
-    trpc.breeding.cover.decline.useMutation({ onSettled: invalidate })
+  const { mutate: declineCover } =
+    trpc.breeding.cover.decline.useMutation({
+      onSettled: () => { setActioningOfferId(null); invalidate() },
+    })
   const listing = animal.breedingListings[0] ?? null
   const canBreed = animal.lifeStage.canBreed
   const canSurrogate = animal.lifeStage.canSurrogate
@@ -106,7 +110,7 @@ export function BreedingPanel({
                   tab === t ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                {t === "info" ? "Overview" : isFemale ? "Covers & Storage" : "Storage"}
+                {t === "info" ? "Overview" : isFemale ? "Covers & Storage" : "Pending Covers"}
               </button>
             ))}
           </div>
@@ -572,7 +576,13 @@ export function BreedingPanel({
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <span className="text-[11px] font-semibold text-foreground">{offer.sire.name}</span>
+                          <Link
+                            to="/animal/$animalId"
+                            params={{ animalId: offer.sire.id }}
+                            className="text-[11px] font-semibold text-foreground hover:underline"
+                          >
+                            {offer.sire.name}
+                          </Link>
                           <span className="ml-1.5 text-[11px] text-muted-foreground">· {offer.sire.breed.name}</span>
                           <p className="text-[10px] text-muted-foreground">from {offer.sire.playerAccount.username}</p>
                         </div>
@@ -585,7 +595,7 @@ export function BreedingPanel({
                           <ActionButton
                             variant="soft"
                             className="flex-1 justify-center"
-                            disabled={acceptCoverPending || declineCoverPending}
+                            disabled={acceptCoverPending || actioningOfferId === offer.id}
                             onClick={() => acceptCover({ offerId: offer.id })}
                           >
                             {acceptCoverPending ? <Loader2 className="size-3.5 animate-spin" /> : null}
@@ -594,10 +604,10 @@ export function BreedingPanel({
                           <ActionButton
                             variant="soft"
                             className="flex-1 justify-center text-destructive hover:bg-destructive/10"
-                            disabled={acceptCoverPending || declineCoverPending}
-                            onClick={() => declineCover({ offerId: offer.id })}
+                            disabled={acceptCoverPending || actioningOfferId === offer.id}
+                            onClick={() => { setActioningOfferId(offer.id); declineCover({ offerId: offer.id }) }}
                           >
-                            {declineCoverPending ? <Loader2 className="size-3.5 animate-spin" /> : null}
+                            {actioningOfferId === offer.id ? <Loader2 className="size-3.5 animate-spin" /> : null}
                             Decline
                           </ActionButton>
                         </div>
@@ -611,15 +621,65 @@ export function BreedingPanel({
               )}
             </div>
           )}
-          <div>
-            <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Genetic Storage
-            </h4>
-            <div className="flex items-center gap-2 rounded-md border border-border/70 bg-secondary/30 px-2.5 py-1.5">
-              <Dna className="size-3.5 text-muted-foreground" />
-              <span className="text-[11px] text-muted-foreground">No stored material</span>
+          {isMale && (
+            <div>
+              <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Pending Covers
+              </h4>
+              {animal.coverOffersAsSire.length === 0 ? (
+                <p className="text-[11px] text-muted-foreground">No pending cover offers</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {animal.coverOffersAsSire.map((offer) => (
+                    <div
+                      key={offer.id}
+                      className="rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2 space-y-1.5"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <Link
+                            to="/animal/$animalId"
+                            params={{ animalId: offer.dam.id }}
+                            className="text-[11px] font-semibold text-foreground hover:underline"
+                          >
+                            {offer.dam.name}
+                          </Link>
+                          <span className="ml-1.5 text-[11px] text-muted-foreground">· {offer.dam.breed.name}</span>
+                          <p className="text-[10px] text-muted-foreground">to {offer.dam.playerAccount.username}</p>
+                        </div>
+                        {offer.price > 0 && (
+                          <span className="shrink-0 text-[11px] font-semibold text-foreground">{offer.price}g</span>
+                        )}
+                      </div>
+                      {!readonly && (
+                        <ActionButton
+                          variant="soft"
+                          className="w-full justify-center text-destructive hover:bg-destructive/10"
+                          disabled={actioningOfferId === offer.id}
+                          onClick={() => { setActioningOfferId(offer.id); declineCover({ offerId: offer.id }) }}
+                        >
+                          {actioningOfferId === offer.id ? <Loader2 className="size-3.5 animate-spin" /> : <X className="size-3.5" />}
+                          Cancel
+                        </ActionButton>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          </div>
+          )}
+
+          {isFemale && (
+            <div>
+              <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Genetic Storage
+              </h4>
+              <div className="flex items-center gap-2 rounded-md border border-border/70 bg-secondary/30 px-2.5 py-1.5">
+                <Dna className="size-3.5 text-muted-foreground" />
+                <span className="text-[11px] text-muted-foreground">No stored material</span>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </Panel>

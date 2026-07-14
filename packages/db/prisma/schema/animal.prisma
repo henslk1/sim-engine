@@ -3,6 +3,7 @@ enum AnimalStatus {
   DECEASED
   ARCHIVED
   BURIED
+  EMBRYO_STORED
 }
 
 enum AnimalSex {

@@ -38,6 +38,16 @@ function GameConfigPage() {
     energyLowCareThreshold: 0,
     energyLowCarePenalty: 0,
     lifeExpectancyBaseline: "",
+    breedingBaseGain: 30,
+    breedingMinGain: 4,
+    breedingVarianceFactor: 0,
+    gestationCareFloor: 0.7,
+    predictorCost: 0,
+    predictorDailyLimitSubscriber: 0,
+    multiplesBirthCap: 1,
+    multiplesChance: 0,
+    identicalMultiplesChance: 0,
+    ultrasoundOpenCycle: 0,
   })
 
   useEffect(() => {
@@ -69,6 +79,16 @@ function GameConfigPage() {
           energyLowCareThreshold: data.gameConfig.energyLowCareThreshold,
           energyLowCarePenalty: data.gameConfig.energyLowCarePenalty,
           lifeExpectancyBaseline: data.gameConfig.lifeExpectancyBaseline?.toString() ?? "",
+          breedingBaseGain: data.gameConfig.breedingBaseGain,
+          breedingMinGain: data.gameConfig.breedingMinGain,
+          breedingVarianceFactor: data.gameConfig.breedingVarianceFactor,
+          gestationCareFloor: data.gameConfig.gestationCareFloor,
+          predictorCost: data.gameConfig.predictorCost,
+          predictorDailyLimitSubscriber: data.gameConfig.predictorDailyLimitSubscriber,
+          multiplesBirthCap: data.gameConfig.multiplesBirthCap,
+          multiplesChance: data.gameConfig.multiplesChance,
+          identicalMultiplesChance: data.gameConfig.identicalMultiplesChance,
+          ultrasoundOpenCycle: data.gameConfig.ultrasoundOpenCycle,
         })
       }
     }
@@ -275,6 +295,72 @@ function GameConfigPage() {
                 <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Max</label>
                 <Input type="number" step="0.1" value={configForm.immunityMax}
                   onChange={(e) => setConfigForm(f => ({ ...f, immunityMax: parseFloat(e.target.value) }))} />
+              </div>
+            </div>
+
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground pt-2">Breeding Engine</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Base Gain</label>
+                <p className="text-[11px] text-muted-foreground">Stat gain multiplier per generation (headroom curve)</p>
+                <Input type="number" step="0.1" min="0" value={configForm.breedingBaseGain}
+                  onChange={(e) => setConfigForm(f => ({ ...f, breedingBaseGain: parseFloat(e.target.value) }))} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Min Gain</label>
+                <p className="text-[11px] text-muted-foreground">Floor gain when at the top of the server; bootstraps early game</p>
+                <Input type="number" step="0.1" min="0" value={configForm.breedingMinGain}
+                  onChange={(e) => setConfigForm(f => ({ ...f, breedingMinGain: parseFloat(e.target.value) }))} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Variance Factor</label>
+                <p className="text-[11px] text-muted-foreground">±fraction of computed gain applied as random variance (0–1)</p>
+                <Input type="number" step="0.01" min="0" max="1" value={configForm.breedingVarianceFactor}
+                  onChange={(e) => setConfigForm(f => ({ ...f, breedingVarianceFactor: parseFloat(e.target.value) }))} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Gestation Care Floor</label>
+                <p className="text-[11px] text-muted-foreground">Minimum care multiplier applied to offspring stats at birth (0–1)</p>
+                <Input type="number" step="0.01" min="0" max="1" value={configForm.gestationCareFloor}
+                  onChange={(e) => setConfigForm(f => ({ ...f, gestationCareFloor: parseFloat(e.target.value) }))} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Predictor Cost</label>
+                <p className="text-[11px] text-muted-foreground">Currency cost per predictor use (charged regardless of subscription)</p>
+                <Input type="number" step="1" min="0" value={configForm.predictorCost}
+                  onChange={(e) => setConfigForm(f => ({ ...f, predictorCost: parseInt(e.target.value) }))} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Predictor Daily Limit (Subscriber)</label>
+                <p className="text-[11px] text-muted-foreground">0 = unlimited for subscribers</p>
+                <Input type="number" step="1" min="0" value={configForm.predictorDailyLimitSubscriber}
+                  onChange={(e) => setConfigForm(f => ({ ...f, predictorDailyLimitSubscriber: parseInt(e.target.value) }))} />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Multiples Birth Cap</label>
+                <p className="text-[11px] text-muted-foreground">Max offspring per birth (1 = singles only)</p>
+                <Input type="number" step="1" min="1" value={configForm.multiplesBirthCap}
+                  onChange={(e) => setConfigForm(f => ({ ...f, multiplesBirthCap: parseInt(e.target.value) }))} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Multiples Chance</label>
+                <p className="text-[11px] text-muted-foreground">Probability of producing more than 1 offspring (0–1)</p>
+                <Input type="number" step="0.01" min="0" max="1" value={configForm.multiplesChance}
+                  onChange={(e) => setConfigForm(f => ({ ...f, multiplesChance: parseFloat(e.target.value) }))} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Identical Multiples Chance</label>
+                <p className="text-[11px] text-muted-foreground">Of all multiples, fraction that share genetics (0–1)</p>
+                <Input type="number" step="0.01" min="0" max="1" value={configForm.identicalMultiplesChance}
+                  onChange={(e) => setConfigForm(f => ({ ...f, identicalMultiplesChance: parseFloat(e.target.value) }))} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Ultrasound Open Cycle</label>
+                <p className="text-[11px] text-muted-foreground">Gestation cycle at which ultrasound becomes available (0 = immediate)</p>
+                <Input type="number" step="1" min="0" value={configForm.ultrasoundOpenCycle}
+                  onChange={(e) => setConfigForm(f => ({ ...f, ultrasoundOpenCycle: parseInt(e.target.value) || 0 }))} />
               </div>
             </div>
 

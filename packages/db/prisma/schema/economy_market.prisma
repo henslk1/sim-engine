@@ -10,6 +10,8 @@ enum VetServiceType {
   GENETIC_COLLECTION
   GENETIC_STORAGE
   CASTRATION
+  NATURAL_COVER
+  ULTRASOUND
 }
 
 enum ListingType {

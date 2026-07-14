@@ -246,7 +246,7 @@ export const breedingMaterialRouter = router({
             ownerPlayerId: animal.playerAccountId,
             materialType: input.materialType,
             storageType: input.storageType,
-            groupId: input.storageType === "GROUP" ? animal.groupId : undefined,
+            groupId: input.storageType === "GROUP" ? animal.groupId : null,
             donorSnapshot,
           },
           select: { id: true, materialType: true, storageType: true },
@@ -328,6 +328,14 @@ export const breedingMaterialRouter = router({
           },
           select: { id: true },
         })
+
+        const offspringAnimalIds = pregnancy.offspring.map((o) => o.animalId)
+        if (offspringAnimalIds.length > 0) {
+          await tx.animal.updateMany({
+            where: { id: { in: offspringAnimalIds } },
+            data: { status: "EMBRYO_STORED" },
+          })
+        }
 
         await tx.pregnancyOffspring.deleteMany({ where: { pregnancyId: input.pregnancyId } })
         await tx.pregnancy.delete({ where: { id: input.pregnancyId } })

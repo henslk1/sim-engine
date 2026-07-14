@@ -1,6 +1,6 @@
 import type { AnimalProfile } from "./types"
 import { getActiveRestrictions } from "./utils"
-import { Stethoscope, Clock, Ban, Skull, Baby, Package, ShieldAlert } from "lucide-react"
+import { Stethoscope, Clock, Ban, Skull, Baby, Package, ShieldAlert, AlertTriangle } from "lucide-react"
 import type { ReactNode } from "react"
 
 const RESTRICTION_LABEL: Record<string, string> = {
@@ -50,7 +50,22 @@ export function AlertBanner({ animal }: { animal: AnimalProfile }) {
     )
   }
 
-  // Priority 2: Long-term care overdue (past grace period)
+  // Priority 2: Neglect death risk — energy at 0 while careScore below threshold
+  const config = animal.game.gameConfig
+  const neglectActive =
+    animal.status === "ALIVE" &&
+    (config?.energyLowCarePenalty ?? 0) > 0 &&
+    (animal.energy?.currentEnergy ?? 0) === 0 &&
+    (animal.careScore?.score ?? 0) < (config?.energyLowCareThreshold ?? 0)
+  if (neglectActive) {
+    banners.push(
+      <Banner key="neglect" tone="danger" icon={<AlertTriangle className="size-3.5 shrink-0" />}>
+        {animal.name} may die from neglect — restore energy immediately
+      </Banner>
+    )
+  }
+
+  // Priority 3: Long-term care overdue (past grace period)
   const overdue = animal.longTermCareRecords.filter(
     (r) => animal.ageInCycles > r.nextDueCycle + r.longTermCareActionDef.gracePeriodCycles
   )

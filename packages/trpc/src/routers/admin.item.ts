@@ -1,5 +1,5 @@
 import { router, publicProcedure } from "../trpc.js"
-import { db } from "@sim-engine/db"
+import { db, Prisma } from "@sim-engine/db"
 import { z } from "zod"
 
 export const itemAdminRouter = router({
@@ -30,7 +30,7 @@ export const itemAdminRouter = router({
         ...rest,
         description: description ?? null,
         effectType: effectType ?? null,
-        effects: effects ?? null,
+        effects: effects != null ? (effects as Prisma.InputJsonValue) : Prisma.DbNull,
       }
       if (id) return db.itemDef.update({ where: { id }, data })
       return db.itemDef.create({ data: { gameId, ...data } })

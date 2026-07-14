@@ -209,6 +209,25 @@ export const animalProfileRouter = router({
             },
           },
 
+          // outgoing cover offers (male)
+          coverOffersAsSire: {
+            where: { status: "PENDING" },
+            orderBy: { createdAt: "asc" as const },
+            select: {
+              id: true,
+              price: true,
+              createdAt: true,
+              dam: {
+                select: {
+                  id: true,
+                  name: true,
+                  breed: { select: { id: true, name: true } },
+                  playerAccount: { select: { id: true, username: true } },
+                },
+              },
+            },
+          },
+
           // incoming cover offers (female)
           coverOffersAsDam: {
             where: { status: "PENDING" },

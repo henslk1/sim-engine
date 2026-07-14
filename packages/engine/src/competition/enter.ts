@@ -79,6 +79,20 @@ export async function enterCompetition(
       data: { currentEnergy: Math.max(energy.currentEnergy - energyUsed, 0) },
     })
 
+    const gameConfig = await tx.gameConfig.findFirst({
+      where: { gameId: competition.gameId },
+      select: { conditionWorkGain: true },
+    })
+    if (gameConfig && gameConfig.conditionWorkGain > 0) {
+      const condition = await tx.animalCondition.findUnique({ where: { animalId } })
+      if (condition) {
+        await tx.animalCondition.update({
+          where: { animalId },
+          data: { value: Math.min(100, condition.value + gameConfig.conditionWorkGain) },
+        })
+      }
+    }
+
     const baseCurrency = await tx.currencyDef.findFirstOrThrow({
       where: { gameId: competition.gameId, currencyType: "BASE" },
       select: { id: true },

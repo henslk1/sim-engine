@@ -53,6 +53,16 @@ export const gameAdminRouter = router({
         energyLowCareThreshold: z.number().default(0),
         energyLowCarePenalty: z.number().default(0),
         lifeExpectancyBaseline: z.number().int().nullish(),
+        breedingBaseGain: z.number().min(0).default(30),
+        breedingMinGain: z.number().min(0).default(4),
+        breedingVarianceFactor: z.number().min(0).max(1).default(0),
+        gestationCareFloor: z.number().min(0).max(1).default(0.7),
+        predictorCost: z.number().int().min(0).default(0),
+        predictorDailyLimitSubscriber: z.number().int().min(0).default(0),
+        multiplesBirthCap: z.number().int().min(1).default(1),
+        multiplesChance: z.number().min(0).max(1).default(0),
+        identicalMultiplesChance: z.number().min(0).max(1).default(0),
+        ultrasoundOpenCycle: z.number().int().min(0).default(0),
       }))
       .mutation(({ input }) => {
         const { gameId, containerLabel, subContainerLabel, lifeExpectancyBaseline, maxBreedingSlots, ...rest } = input

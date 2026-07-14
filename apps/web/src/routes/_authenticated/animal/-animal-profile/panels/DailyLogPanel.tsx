@@ -19,45 +19,55 @@ const DOT: Record<string, string> = {
 }
 
 export function DailyLogPanel({ animal }: { animal: AnimalProfile }) {
+  const cycle = animal.ageInCycles
+
   const entries: LogEntry[] = [
-    ...animal.careLogs.map((l: AnimalProfile["careLogs"][number]) => ({
-      key: `care-${l.id}`,
-      cycleNumber: l.cycleNumber,
-      type: "care" as const,
-      label: l.careActionDef.name,
-      vitals: [
-        ...(l.careActionDef.energyRestore > 0 ? [{ label: "energy", value: l.careActionDef.energyRestore }] : []),
-        ...(l.careActionDef.moodBoost > 0 ? [{ label: "mood", value: l.careActionDef.moodBoost }] : []),
-      ],
-    })),
-    ...animal.trainingLogs.map((l: AnimalProfile["trainingLogs"][number]) => ({
-      key: `train-${l.id}`,
-      cycleNumber: l.cycleNumber,
-      type: "training" as const,
-      label: l.trainingActionDef.name,
-      subLabel: l.intensityTierDef.name,
-      statGained: l.statGained,
-      statName: l.trainingActionDef.statDef.name,
-      vitals: l.energyUsed > 0 ? [{ label: "energy", value: -l.energyUsed }] : [],
-    })),
-    ...animal.vetVisitLogs.map((l: AnimalProfile["vetVisitLogs"][number]) => ({
-      key: `vet-${l.id}`,
-      cycleNumber: l.visitCycle,
-      type: "vet" as const,
-      label: l.vetServiceDef?.name ?? "Vet Visit",
-      notes: l.notes,
-      vitals: [] as VitalChange[],
-    })),
-    ...animal.stageActivityLogs.map((l: AnimalProfile["stageActivityLogs"][number]) => ({
-      key: `activity-${l.id}`,
-      cycleNumber: l.cycleNumber,
-      type: "activity" as const,
-      label: l.stageActivityDef.name,
-      vitals: [
-        ...(l.stageActivityDef.energyCost > 0 ? [{ label: "energy", value: -l.stageActivityDef.energyCost }] : []),
-        { label: l.stageActivityDef.traitDef.name, value: l.stageActivityDef.traitEffect },
-      ],
-    })),
+    ...animal.careLogs
+      .filter((l) => l.cycleNumber === cycle)
+      .map((l: AnimalProfile["careLogs"][number]) => ({
+        key: `care-${l.id}`,
+        cycleNumber: l.cycleNumber,
+        type: "care" as const,
+        label: l.careActionDef.name,
+        vitals: [
+          ...(l.careActionDef.energyRestore > 0 ? [{ label: "energy", value: l.careActionDef.energyRestore }] : []),
+          ...(l.careActionDef.moodBoost > 0 ? [{ label: "mood", value: l.careActionDef.moodBoost }] : []),
+        ],
+      })),
+    ...animal.trainingLogs
+      .filter((l) => l.cycleNumber === cycle)
+      .map((l: AnimalProfile["trainingLogs"][number]) => ({
+        key: `train-${l.id}`,
+        cycleNumber: l.cycleNumber,
+        type: "training" as const,
+        label: l.trainingActionDef.name,
+        subLabel: l.intensityTierDef.name,
+        statGained: l.statGained,
+        statName: l.trainingActionDef.statDef.name,
+        vitals: l.energyUsed > 0 ? [{ label: "energy", value: -l.energyUsed }] : [],
+      })),
+    ...animal.vetVisitLogs
+      .filter((l) => l.visitCycle === cycle)
+      .map((l: AnimalProfile["vetVisitLogs"][number]) => ({
+        key: `vet-${l.id}`,
+        cycleNumber: l.visitCycle,
+        type: "vet" as const,
+        label: l.vetServiceDef?.name ?? "Vet Visit",
+        notes: l.notes,
+        vitals: [] as VitalChange[],
+      })),
+    ...animal.stageActivityLogs
+      .filter((l) => l.cycleNumber === cycle)
+      .map((l: AnimalProfile["stageActivityLogs"][number]) => ({
+        key: `activity-${l.id}`,
+        cycleNumber: l.cycleNumber,
+        type: "activity" as const,
+        label: l.stageActivityDef.name,
+        vitals: [
+          ...(l.stageActivityDef.energyCost > 0 ? [{ label: "energy", value: -l.stageActivityDef.energyCost }] : []),
+          { label: l.stageActivityDef.traitDef.name, value: l.stageActivityDef.traitEffect },
+        ],
+      })),
   ].sort((a, b) => b.cycleNumber - a.cycleNumber)
 
   return (

@@ -26,6 +26,8 @@ enum TransactionType {
   GROUP_TREASURY_PAYOUT
   GROUP_CARE_CHARGE
   GROUP_FEE_SHARE
+  STUD_FEE
+  ENTRY_FEE_SHARE
 }
 
 model CurrencyDef {

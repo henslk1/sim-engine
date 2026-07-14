@@ -1,6 +1,7 @@
 import { db } from "@sim-engine/db"
 import { router, publicProcedure } from "../trpc.js"
 import { z } from "zod"
+import { generateOffspring } from "@sim-engine/engine"
 
 const eligibleFemaleSelect = {
   id: true,
@@ -21,6 +22,59 @@ function eligibleFemaleWhere(playerAccountId: string, gameId: string) {
     pregnancies: { none: { isCompleted: false } },
   }
 }
+
+const parentSelect = {
+  id: true,
+  name: true,
+  generation: true,
+  playerAccountId: true,
+  breedId: true,
+  breed: { select: { name: true } },
+  fertility: true,
+  inbreedingCoefficient: true,
+  breedGeneration: true,
+  stats: { select: { statDefId: true, innateValue: true } },
+  energy: { select: { currentEnergy: true } },
+  mood: { select: { value: true } },
+  personality: {
+    select: {
+      value: true,
+      traitDef: { select: { conceptionModifier: true } },
+    },
+  },
+  genotypes: {
+    select: {
+      locusId: true,
+      alleleOneId: true,
+      alleleTwoId: true,
+      alleleOne: { select: { id: true, symbol: true } },
+      alleleTwo: { select: { id: true, symbol: true } },
+    },
+  },
+  breedComposition: { select: { breedId: true, percentage: true } },
+  immunity: { select: { innateMax: true } },
+  ancestors: {
+    select: {
+      ancestorId: true,
+      depth: true,
+      ancestor: { select: { inbreedingCoefficient: true } },
+    },
+  },
+} as const
+
+const gameConfigBreedingSelect = {
+  defaultInnateRatio: true,
+  breedingBaseGain: true,
+  breedingMinGain: true,
+  breedingVarianceFactor: true,
+  gestationCareFloor: true,
+  multiplesBirthCap: true,
+  multiplesChance: true,
+  identicalMultiplesChance: true,
+  gestationCycles: true,
+  lifeExpectancyBaseline: true,
+  breedingEnergyCost: true,
+} as const
 
 export const breedingCoverRouter = router({
   listEligibleOwn: publicProcedure
@@ -64,21 +118,25 @@ export const breedingCoverRouter = router({
       price: z.number().min(0).default(0),
     }))
     .mutation(async ({ input }) => {
-      const sire = await db.animal.findUniqueOrThrow({
-        where: { id: input.sireId },
-        select: {
-          sex: true, gameId: true,
-          lifeStage: { select: { canBreed: true } },
-          isCastrated: true,
-        },
-      })
-      const dam = await db.animal.findUniqueOrThrow({
-        where: { id: input.damId },
-        select: {
-          sex: true, gameId: true,
-          lifeStage: { select: { canBreed: true } },
-        },
-      })
+      const [sire, dam] = await Promise.all([
+        db.animal.findUniqueOrThrow({
+          where: { id: input.sireId },
+          select: {
+            sex: true, gameId: true,
+            lifeStage: { select: { canBreed: true } },
+            isCastrated: true,
+            energy: { select: { currentEnergy: true } },
+            game: { select: { gameConfig: { select: { breedingEnergyCost: true } } } },
+          },
+        }),
+        db.animal.findUniqueOrThrow({
+          where: { id: input.damId },
+          select: {
+            sex: true, gameId: true,
+            lifeStage: { select: { canBreed: true } },
+          },
+        }),
+      ])
 
       if (sire.sex !== "MALE") throw new Error("Sire must be male")
       if (dam.sex !== "FEMALE") throw new Error("Dam must be female")
@@ -87,10 +145,15 @@ export const breedingCoverRouter = router({
       if (!dam.lifeStage.canBreed) throw new Error("Dam cannot breed at this life stage")
       if (sire.gameId !== dam.gameId) throw new Error("Animals must be in the same game")
 
-      const existing = await db.coverOffer.findFirst({
-        where: { sireId: input.sireId, damId: input.damId, status: "PENDING" },
-      })
-      if (existing) throw new Error("A pending cover offer already exists for this pair")
+      const energyCost = sire.game.gameConfig?.breedingEnergyCost ?? 0
+      if (energyCost > 0) {
+        if ((sire.energy?.currentEnergy ?? 0) < energyCost)
+          throw new Error("Sire does not have enough energy to send a cover offer")
+        await db.animalEnergy.update({
+          where: { animalId: input.sireId },
+          data: { currentEnergy: { decrement: energyCost } },
+        })
+      }
 
       return db.coverOffer.create({
         data: {
@@ -109,11 +172,7 @@ export const breedingCoverRouter = router({
       return db.$transaction(async (tx) => {
         const offer = await tx.coverOffer.findUniqueOrThrow({
           where: { id: input.offerId },
-          select: {
-            status: true, gameId: true, sireId: true, damId: true, price: true,
-            sire: { select: { name: true, breedId: true, breed: { select: { name: true } }, playerAccountId: true } },
-            dam: { select: { name: true, breedId: true, breed: { select: { name: true } }, playerAccountId: true } },
-          },
+          select: { status: true, gameId: true, sireId: true, damId: true, price: true },
         })
 
         if (offer.status !== "PENDING") throw new Error("Offer is no longer pending")
@@ -123,6 +182,35 @@ export const breedingCoverRouter = router({
         })
         if (activePregnancy > 0) throw new Error("Dam is already pregnant")
 
+        const [sire, dam, gameConfig, gameInnateMax, gradeBread, firstLifeStage, damCareScore] =
+          await Promise.all([
+            tx.animal.findUniqueOrThrow({ where: { id: offer.sireId }, select: parentSelect }),
+            tx.animal.findUniqueOrThrow({ where: { id: offer.damId }, select: parentSelect }),
+            tx.gameConfig.findUniqueOrThrow({ where: { gameId: offer.gameId }, select: gameConfigBreedingSelect }),
+            tx.gameInnateMax.findFirst({
+              where: { gameId: offer.gameId },
+              select: { maxTotalInnate: true, averageTotalInnate: true },
+            }),
+            tx.breed.findFirst({
+              where: { gameId: offer.gameId, isUnregistered: true },
+              select: { id: true, lifeExpectancyBaseline: true },
+            }),
+            tx.lifeStageDef.findFirst({
+              where: { gameId: offer.gameId },
+              orderBy: { stageIndex: "asc" },
+              select: { id: true },
+            }),
+            tx.animalCareScore.findFirst({
+              where: { animalId: offer.damId },
+              select: { score: true },
+            }),
+          ])
+
+        if (!firstLifeStage) throw new Error("No life stages configured for this game")
+
+        const isCrossBreed = sire.breedId !== dam.breedId
+        if (isCrossBreed && !gradeBread) throw new Error("No grade breed configured for this game — add one via Admin > Breeds")
+
         if (offer.price > 0) {
           const vetService = await tx.vetServiceDef.findFirst({
             where: { gameId: offer.gameId, serviceType: "NATURAL_COVER" },
@@ -131,18 +219,18 @@ export const breedingCoverRouter = router({
           const currencyDefId = vetService?.currencyDefId
           if (currencyDefId) {
             await tx.playerBalance.update({
-              where: { playerAccountId_currencyDefId: { playerAccountId: offer.dam.playerAccountId, currencyDefId } },
+              where: { playerAccountId_currencyDefId: { playerAccountId: dam.playerAccountId, currencyDefId } },
               data: { balance: { decrement: offer.price } },
             })
             await tx.playerBalance.update({
-              where: { playerAccountId_currencyDefId: { playerAccountId: offer.sire.playerAccountId, currencyDefId } },
+              where: { playerAccountId_currencyDefId: { playerAccountId: sire.playerAccountId, currencyDefId } },
               data: { balance: { increment: offer.price } },
             })
             await tx.transaction.create({
               data: {
                 gameId: offer.gameId,
-                fromPlayerAccountId: offer.dam.playerAccountId,
-                toPlayerAccountId: offer.sire.playerAccountId,
+                fromPlayerAccountId: dam.playerAccountId,
+                toPlayerAccountId: sire.playerAccountId,
                 currencyDefId,
                 amount: offer.price,
                 txnType: "STUD_FEE",
@@ -156,16 +244,128 @@ export const breedingCoverRouter = router({
           data: { status: "ACCEPTED" },
         })
 
-        return tx.breedingRecord.create({
+        const breedingRecord = await tx.breedingRecord.create({
           data: {
             gameId: offer.gameId,
             sireId: offer.sireId,
             damId: offer.damId,
-            sireSnapshot: { animalId: offer.sireId, name: offer.sire.name, breedId: offer.sire.breedId, breedName: offer.sire.breed.name },
-            damSnapshot: { animalId: offer.damId, name: offer.dam.name, breedId: offer.dam.breedId, breedName: offer.dam.breed.name },
+            sireSnapshot: { animalId: offer.sireId, name: sire.name, breedId: sire.breedId, breedName: sire.breed.name },
+            damSnapshot: { animalId: offer.damId, name: dam.name, breedId: dam.breedId, breedName: dam.breed.name },
           },
           select: { id: true },
         })
+
+        const result = generateOffspring({
+          sire,
+          dam,
+          damCareScore: damCareScore?.score ?? 100,
+          gameConfig,
+          gameInnateMax: gameInnateMax ?? { maxTotalInnate: 2000, averageTotalInnate: 1000 },
+          gradeBreedId: gradeBread?.id ?? sire.breedId,
+        })
+
+        if (!result.conceived) {
+          return { breedingRecordId: breedingRecord.id, conceived: false as const }
+        }
+
+        const pregnancy = await tx.pregnancy.create({
+          data: {
+            animalId: offer.damId,
+            breedingRecordId: breedingRecord.id,
+            requiredCycles: gameConfig.gestationCycles,
+          },
+          select: { id: true },
+        })
+
+        const lifeExpectancy =
+          gradeBread?.lifeExpectancyBaseline ?? gameConfig.lifeExpectancyBaseline ?? 120
+        const offspringGeneration = Math.max(sire.generation, dam.generation) + 1
+
+        // Build ancestor map: take minimum depth when sire/dam share ancestors
+        const ancestorEntries = new Map<string, number>([
+          [offer.sireId, 1],
+          [offer.damId, 1],
+        ])
+        for (const a of [...sire.ancestors, ...dam.ancestors]) {
+          const d = a.depth + 1
+          const existing = ancestorEntries.get(a.ancestorId)
+          if (existing === undefined || d < existing) ancestorEntries.set(a.ancestorId, d)
+        }
+
+        for (const [i, offspring] of result.offspring.entries()) {
+          const animal = await tx.animal.create({
+            data: {
+              gameId: offer.gameId,
+              playerAccountId: dam.playerAccountId,
+              breederId: dam.playerAccountId,
+              breedId: offspring.breedId,
+              name: "Unnamed Foal",
+              sex: offspring.sex,
+              lifeStageId: firstLifeStage.id,
+              generation: offspringGeneration,
+              ageInCycles: 0,
+              fertility: offspring.fertility,
+              inbreedingCoefficient: offspring.inbreedingCoefficient,
+              breedGeneration: offspring.breedGeneration,
+              lifeExpectancy,
+            },
+            select: { id: true },
+          })
+
+          await Promise.all([
+            tx.animalEnergy.create({ data: { animalId: animal.id, currentEnergy: 100, maxEnergy: 100 } }),
+            tx.animalMood.create({ data: { animalId: animal.id, value: 50 } }),
+            tx.animalCondition.create({ data: { animalId: animal.id, value: 70 } }),
+            tx.animalCareScore.create({ data: { animalId: animal.id, score: 100 } }),
+            tx.animalImmunity.create({
+              data: {
+                animalId: animal.id,
+                value: offspring.immunity.startingValue,
+                innateMax: offspring.immunity.innateMax,
+              },
+            }),
+            tx.animalStat.createMany({
+              data: offspring.stats.map((s) => ({
+                animalId: animal.id,
+                statDefId: s.statDefId,
+                innateValue: s.innateValue,
+                trainedValue: 0,
+              })),
+            }),
+            tx.animalGenotype.createMany({
+              data: offspring.genotypes.map((g) => ({
+                animalId: animal.id,
+                locusId: g.locusId,
+                alleleOneId: g.alleleOneId,
+                alleleTwoId: g.alleleTwoId,
+              })),
+            }),
+            tx.animalBreedComposition.createMany({
+              data: offspring.breedComposition.map((c) => ({
+                animalId: animal.id,
+                breedId: c.breedId,
+                percentage: c.percentage,
+              })),
+            }),
+            tx.animalAncestor.createMany({
+              data: Array.from(ancestorEntries.entries()).map(([ancestorId, depth]) => ({
+                animalId: animal.id,
+                ancestorId,
+                depth,
+              })),
+            }),
+            tx.pregnancyOffspring.create({
+              data: { pregnancyId: pregnancy.id, animalId: animal.id, birthOrder: i + 1 },
+            }),
+          ])
+        }
+
+        return {
+          breedingRecordId: breedingRecord.id,
+          conceived: true as const,
+          pregnancyId: pregnancy.id,
+          offspringCount: result.offspring.length,
+        }
       })
     }),
 

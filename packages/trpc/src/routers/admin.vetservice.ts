@@ -20,7 +20,7 @@ export const vetServiceAdminRouter = router({
       id: z.string().optional(),
       gameId: z.string(),
       name: z.string().min(1),
-      serviceType: z.enum(["EXAM", "PANEL_TEST", "GENETIC_COLLECTION", "GENETIC_STORAGE", "CASTRATION", "ULTRASOUND"]),
+      serviceType: z.enum(["EXAM", "PANEL_TEST", "GENETIC_COLLECTION", "GENETIC_STORAGE", "CASTRATION", "ULTRASOUND", "NATURAL_COVER"]),
       baseCost: z.number().int().min(0),
       currencyDefId: z.string().min(1),
       hasSubscriberDiscount: z.boolean().default(false),

@@ -50,7 +50,7 @@ export async function applyTrainingAction(
 
     const config = await tx.gameConfig.findUniqueOrThrow({
       where: { gameId: action.gameId },
-      select: { trainingCeilingMultiplier: true },
+      select: { trainingCeilingMultiplier: true, conditionWorkGain: true },
     })
 
     const cap = currentStat.innateValue * config.trainingCeilingMultiplier
@@ -63,6 +63,16 @@ export async function applyTrainingAction(
       where: { animalId },
       data: { currentEnergy: energy.currentEnergy - energyUsed },
     })
+
+    if (config.conditionWorkGain > 0) {
+      const condition = await tx.animalCondition.findUnique({ where: { animalId } })
+      if (condition) {
+        await tx.animalCondition.update({
+          where: { animalId },
+          data: { value: Math.min(100, condition.value + config.conditionWorkGain) },
+        })
+      }
+    }
 
     const stat = await tx.animalStat.update({
       where: { animalId_statDefId: { animalId, statDefId: action.statDefId } },

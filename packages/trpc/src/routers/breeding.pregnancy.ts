@@ -42,7 +42,7 @@ export const breedingPregnancyRouter = router({
         const { gameId, playerAccountId, ageInCycles } = pregnancy.animal
 
         const vetService = await tx.vetServiceDef.findFirstOrThrow({
-          where: { gameId, serviceType: "EXAM" },
+          where: { gameId, serviceType: "ULTRASOUND" },
           select: { id: true, baseCost: true, currencyDefId: true },
         })
 
@@ -83,6 +83,7 @@ export const breedingPregnancyRouter = router({
 
         return {
           pregnancyId: input.pregnancyId,
+          offspringCount: pregnancy.offspring.length,
           offspring: pregnancy.offspring.map((o) => ({
             animalId: o.animal.id,
             sex: o.animal.sex,

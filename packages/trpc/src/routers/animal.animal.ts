@@ -1,10 +1,12 @@
-import { db } from "@sim-engine/db"
+import { db, Prisma } from "@sim-engine/db"
 import { router, publicProcedure } from "../trpc.js"
 import { z } from "zod"
+import { advanceAnimalAging } from "@sim-engine/engine"
 
 export const animalAnimalRouter = router({
   list: publicProcedure.query(() =>
     db.animal.findMany({
+      where: { status: { not: "EMBRYO_STORED" } },
       orderBy: { name: "asc" },
       select: {
         id: true,
@@ -62,7 +64,7 @@ export const animalAnimalRouter = router({
     .mutation(({ input }) =>
       db.animal.update({
         where: { id: input.animalId },
-        data: { notes: input.notes.trim() || null },
+        data: { notes: input.notes.trim() || Prisma.DbNull },
         select: { id: true, notes: true },
       })
     ),
@@ -80,6 +82,10 @@ export const animalAnimalRouter = router({
           select: { id: true, isPinned: true },
         })
       }),
+
+    advanceAge: publicProcedure
+      .input(z.object({ animalId: z.string() }))
+      .mutation(({ input }) => advanceAnimalAging(db, input.animalId)),
 
     castrate: publicProcedure
       .input(z.object({ animalId: z.string() }))
