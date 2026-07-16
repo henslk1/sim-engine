@@ -1,6 +1,7 @@
 import { db } from "@sim-engine/db"
 import { router, publicProcedure } from "../trpc.js"
 import { z } from "zod"
+import { generateOffspring, computePhenotypeDescription } from "@sim-engine/engine"
 
 export const breedingMaterialRouter = router({
   myStorage: publicProcedure
@@ -314,6 +315,220 @@ export const breedingMaterialRouter = router({
         }
 
         return material
+      })
+    }),
+
+  createEmbryo: publicProcedure
+    .input(z.object({
+      spermId: z.string(),
+      eggId: z.string(),
+      playerAccountId: z.string(),
+    }))
+    .mutation(async ({ input }) => {
+      return db.$transaction(async (tx) => {
+        const [sperm, egg] = await Promise.all([
+          tx.geneticMaterial.findUniqueOrThrow({
+            where: { id: input.spermId },
+            select: { id: true, materialType: true, isUsed: true, gameId: true, animalId: true },
+          }),
+          tx.geneticMaterial.findUniqueOrThrow({
+            where: { id: input.eggId },
+            select: { id: true, materialType: true, isUsed: true, gameId: true, animalId: true },
+          }),
+        ])
+
+        if (sperm.materialType !== "SPERM") throw new Error("First material must be of type SPERM")
+        if (egg.materialType !== "EGG") throw new Error("Second material must be of type EGG")
+        if (sperm.isUsed) throw new Error("Sperm sample has already been used")
+        if (egg.isUsed) throw new Error("Egg sample has already been used")
+        if (sperm.gameId !== egg.gameId) throw new Error("Materials must be from the same game")
+
+        const gameId = sperm.gameId
+
+        const parentSelect = {
+          id: true,
+          name: true,
+          generation: true,
+          breedId: true,
+          ageInCycles: true,
+          breed: { select: { name: true } },
+          fertility: true,
+          inbreedingCoefficient: true,
+          breedGeneration: true,
+          stats: { select: { statDefId: true, innateValue: true } },
+          genotypes: {
+            select: {
+              locusId: true,
+              alleleOneId: true,
+              alleleTwoId: true,
+              alleleOne: { select: { id: true, symbol: true } },
+              alleleTwo: { select: { id: true, symbol: true } },
+            },
+          },
+          breedComposition: { select: { breedId: true, percentage: true } },
+          immunity: { select: { innateMax: true } },
+          ancestors: {
+            select: {
+              ancestorId: true,
+              depth: true,
+              ancestor: { select: { inbreedingCoefficient: true } },
+            },
+          },
+        } as const
+
+        const [sire, dam, gameConfig, gameInnateMax, gradeBread, firstLifeStage, expressionRules, personalityLabelRanges] =
+          await Promise.all([
+            tx.animal.findUniqueOrThrow({ where: { id: sperm.animalId }, select: parentSelect }),
+            tx.animal.findUniqueOrThrow({ where: { id: egg.animalId }, select: parentSelect }),
+            tx.gameConfig.findUniqueOrThrow({
+              where: { gameId },
+              select: {
+                defaultInnateRatio: true,
+                breedingBaseGain: true,
+                breedingMinGain: true,
+                breedingVarianceFactor: true,
+                gestationCareFloor: true,
+                multiplesBirthCap: true,
+                multiplesChance: true,
+                identicalMultiplesChance: true,
+                gestationCycles: true,
+                lifeExpectancyBaseline: true,
+              },
+            }),
+            tx.gameInnateMax.findFirst({
+              where: { gameId },
+              select: { maxTotalInnate: true, averageTotalInnate: true },
+            }),
+            tx.breed.findFirst({
+              where: { gameId, isUnregistered: true },
+              select: { id: true, lifeExpectancyBaseline: true },
+            }),
+            tx.lifeStageDef.findFirst({
+              where: { gameId },
+              orderBy: { stageIndex: "asc" },
+              select: { id: true },
+            }),
+            tx.expressionRule.findMany({
+              where: { locus: { gameId } },
+              select: { locusId: true, alleleOneId: true, alleleTwoId: true, phenotype: true },
+            }),
+            tx.personalityLabelRange.findMany({
+              where: { traitDef: { gameId } },
+              select: { traitDefId: true, label: true, minValue: true, maxValue: true },
+            }),
+          ])
+
+        if (!firstLifeStage) throw new Error("No life stages configured for this game")
+
+        const isCrossBreed = sire.breedId !== dam.breedId
+        if (isCrossBreed && !gradeBread) throw new Error("No grade breed configured for this game")
+
+        // Force guaranteed conception — IVF bypasses the natural conception roll
+        const result = generateOffspring({
+          sire: { ...sire, fertility: 1, mood: { value: 100 }, personality: [] },
+          dam:  { ...dam,  fertility: 1, mood: { value: 100 }, personality: [] },
+          damCareScore: 100,
+          gameConfig,
+          gameInnateMax: gameInnateMax ?? { maxTotalInnate: 2000, averageTotalInnate: 1000 },
+          gradeBreedId: gradeBread?.id ?? sire.breedId,
+        })
+
+        if (!result.conceived) throw new Error("Embryo creation failed — please try again")
+
+        const breedingRecord = await tx.breedingRecord.create({
+          data: {
+            gameId,
+            sireId: sperm.animalId,
+            damId: egg.animalId,
+            sireSnapshot: { animalId: sperm.animalId, name: sire.name, breedId: sire.breedId, breedName: sire.breed.name },
+            damSnapshot: { animalId: egg.animalId, name: dam.name, breedId: dam.breedId, breedName: dam.breed.name },
+          },
+          select: { id: true },
+        })
+
+        const lifeExpectancy = gradeBread?.lifeExpectancyBaseline ?? gameConfig.lifeExpectancyBaseline ?? 120
+        const offspringGeneration = Math.max(sire.generation, dam.generation) + 1
+
+        const ancestorEntries = new Map<string, number>([[sperm.animalId, 1], [egg.animalId, 1]])
+        for (const a of [...sire.ancestors, ...dam.ancestors]) {
+          const d = a.depth + 1
+          const existing = ancestorEntries.get(a.ancestorId)
+          if (existing === undefined || d < existing) ancestorEntries.set(a.ancestorId, d)
+        }
+
+        const offspringSnapshot: { animalId: string }[] = []
+
+        for (const offspring of result.offspring) {
+          const phenotypeDescription = computePhenotypeDescription(offspring.genotypes, expressionRules)
+          const animal = await tx.animal.create({
+            data: {
+              gameId,
+              playerAccountId: input.playerAccountId,
+              breederId: input.playerAccountId,
+              breedId: offspring.breedId,
+              name: "Unnamed Foal",
+              sex: offspring.sex,
+              lifeStageId: firstLifeStage.id,
+              generation: offspringGeneration,
+              ageInCycles: 0,
+              fertility: offspring.fertility,
+              inbreedingCoefficient: offspring.inbreedingCoefficient,
+              breedGeneration: offspring.breedGeneration,
+              lifeExpectancy,
+              status: "EMBRYO_STORED",
+              phenotypeDescription,
+            },
+            select: { id: true },
+          })
+
+          await Promise.all([
+            tx.animalEnergy.create({ data: { animalId: animal.id, currentEnergy: 100, maxEnergy: 100 } }),
+            tx.animalMood.create({ data: { animalId: animal.id, value: 50 } }),
+            tx.animalCondition.create({ data: { animalId: animal.id, value: 70 } }),
+            tx.animalCareScore.create({ data: { animalId: animal.id, score: 100 } }),
+            tx.animalImmunity.create({
+              data: {
+                animalId: animal.id,
+                value: offspring.immunity.startingValue,
+                innateMax: offspring.immunity.innateMax,
+              },
+            }),
+            tx.animalStat.createMany({
+              data: offspring.stats.map((s) => ({ animalId: animal.id, statDefId: s.statDefId, innateValue: s.innateValue, trainedValue: 0 })),
+            }),
+            tx.animalGenotype.createMany({
+              data: offspring.genotypes.map((g) => ({ animalId: animal.id, locusId: g.locusId, alleleOneId: g.alleleOneId, alleleTwoId: g.alleleTwoId })),
+            }),
+            tx.animalBreedComposition.createMany({
+              data: offspring.breedComposition.map((c) => ({ animalId: animal.id, breedId: c.breedId, percentage: c.percentage })),
+            }),
+            tx.animalAncestor.createMany({
+              data: Array.from(ancestorEntries.entries()).map(([ancestorId, depth]) => ({ animalId: animal.id, ancestorId, depth })),
+            }),
+          ])
+
+          offspringSnapshot.push({ animalId: animal.id })
+        }
+
+        const embryo = await tx.geneticMaterial.create({
+          data: {
+            gameId,
+            animalId: egg.animalId,
+            ownerPlayerId: input.playerAccountId,
+            materialType: "EMBRYO",
+            storageType: "PERSONAL",
+            producedByBreedingRecordId: breedingRecord.id,
+            offspringSnapshot,
+          },
+          select: { id: true },
+        })
+
+        await Promise.all([
+          tx.geneticMaterial.update({ where: { id: input.spermId }, data: { isUsed: true } }),
+          tx.geneticMaterial.update({ where: { id: input.eggId }, data: { isUsed: true } }),
+        ])
+
+        return { embryoId: embryo.id, offspringCount: result.offspring.length }
       })
     }),
 

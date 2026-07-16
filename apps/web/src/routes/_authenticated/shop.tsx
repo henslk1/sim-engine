@@ -350,7 +350,7 @@ function ShopPage() {
       </div>
 
       {/* Tabs */}
-      <div className="mt-6 flex items-center gap-1 overflow-x-auto border-b border-border">
+      <div className="mt-6 flex items-center gap-1 border-b border-border">
         {tabConfig.map((t) => {
           const badge =
             t.id === "inventory" && inventoryCount > 0
