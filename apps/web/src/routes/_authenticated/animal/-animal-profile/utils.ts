@@ -100,8 +100,13 @@ export function computeBreedingGrade(
 
   components.push((animal.careScore?.score ?? 0) / 100)
 
-  const tierIndex = animal.compTiers[0]?.tierDef.tierIndex ?? -1
-  components.push(tierIndex < 0 ? 0 : Math.min((tierIndex + 1) / 10, 1))
+  const topTier = [...animal.compTiers].sort((a, b) => b.tierDef.tierIndex - a.tierDef.tierIndex)[0]
+  if (topTier) {
+    const maxTierIndex = topTier.disciplineDef.compTierDefs[0]?.tierIndex ?? topTier.tierDef.tierIndex
+    components.push((topTier.tierDef.tierIndex + 1) / (maxTierIndex + 1))
+  } else {
+    components.push(0)
+  }
 
   components.push(Math.max(0, 1 - animal.inbreedingCoefficient / 0.25))
 

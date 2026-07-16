@@ -537,7 +537,22 @@ export const breedingCoverRouter = router({
         careScore: { select: { score: true } },
         ancestors: { select: ancestorSelect },
         // grade components
-        compTiers: { select: { tierDef: { select: { tierIndex: true } } }, orderBy: { tierDef: { tierIndex: "desc" as const } }, take: 1 },
+        compTiers: {
+          select: {
+            tierDef: { select: { tierIndex: true } },
+            disciplineDef: {
+              select: {
+                compTierDefs: {
+                  select: { tierIndex: true },
+                  orderBy: { tierIndex: "desc" as const },
+                  take: 1,
+                },
+              },
+            },
+          },
+          orderBy: { tierDef: { tierIndex: "desc" as const } },
+          take: 1,
+        },
         stats: { select: { innateValue: true, trainedValue: true } },
         breedComposition: { select: { breedId: true } },
         conformationScores: { select: { score: true } },
@@ -571,8 +586,13 @@ export const breedingCoverRouter = router({
       function computeGrade(a: typeof offer.sire): string {
         const parts: number[] = []
         parts.push((a.careScore?.score ?? 0) / 100)
-        const topTier = a.compTiers[0]?.tierDef.tierIndex ?? -1
-        parts.push(topTier < 0 ? 0 : Math.min((topTier + 1) / 10, 1))
+        const topTierEntry = a.compTiers[0]
+        if (!topTierEntry) {
+          parts.push(0)
+        } else {
+          const maxTierIndex = topTierEntry.disciplineDef.compTierDefs[0]?.tierIndex ?? topTierEntry.tierDef.tierIndex
+          parts.push((topTierEntry.tierDef.tierIndex + 1) / (maxTierIndex + 1))
+        }
         parts.push(Math.max(0, 1 - a.inbreedingCoefficient / 0.25))
         if (a.stats.length > 0 && gameConfig) {
           const avg = a.stats.reduce((sum, s) => {

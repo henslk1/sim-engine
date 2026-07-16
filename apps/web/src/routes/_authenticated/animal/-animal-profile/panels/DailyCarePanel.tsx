@@ -1,10 +1,11 @@
 import { useState } from "react"
 import type { AnimalProfile } from "../types"
 import { Badge, ActionButton } from "@/components/game/ui"
-import { Heart, CheckCircle, Ban, CalendarClock, AlertTriangle, Loader2, CheckCircle2 } from "lucide-react"
+import { Heart, CheckCircle, Ban, CalendarClock, AlertTriangle, Loader2, CheckCircle2, Store } from "lucide-react"
 import { getActiveRestrictions } from "../utils"
 import { cn } from "@/lib/utils"
 import { trpc } from "@/lib/trpc"
+import { Link } from "@tanstack/react-router"
 
 type CareAction = AnimalProfile["game"]["careActionDefs"][number]
 type LTRecord = AnimalProfile["longTermCareRecords"][number]
@@ -41,6 +42,16 @@ export function DailyCarePanel({ animal, playerAccountId }: { animal: AnimalProf
       invalidate()
     },
   })
+
+  const { data: inventory } = trpc.inventory.mine.useQuery({ playerAccountId })
+
+  function hasItems(action: CareAction) {
+    if (action.costType !== "ITEM" || !inventory) return true
+    return action.items.every((i) => {
+      const slot = inventory.find((s) => s.itemDef.id === i.itemDef.id)
+      return slot && slot.quantity >= i.quantity
+    })
+  }
 
   const restrictions = getActiveRestrictions(animal)
   const careRestricted = restrictions.has("CARE_ACTION") || restrictions.has("ALL")
@@ -110,6 +121,12 @@ export function DailyCarePanel({ animal, playerAccountId }: { animal: AnimalProf
                       <CostBadge action={action} />
                       {isDone ? (
                         <span className="text-[11px] font-medium text-chart-2">Done</span>
+                      ) : !careRestricted && !hasItems(action) ? (
+                        <Link to="/shop">
+                          <ActionButton variant="soft" disabled className="h-6 px-2 text-[11px]">
+                            <Store className="size-3" /> Visit Store
+                          </ActionButton>
+                        </Link>
                       ) : !careRestricted ? (
                         <ActionButton
                           variant="soft"

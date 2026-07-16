@@ -152,6 +152,11 @@ export const animalProfileRouter = router({
                       itemDef: { select: { id: true, name: true } },
                     },
                   },
+                  compTierDefs: {
+                    select: { tierIndex: true },
+                    orderBy: { tierIndex: "desc" },
+                    take: 1,
+                  },
                 },
               },
               tierDef: true,

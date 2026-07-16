@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import { trpc } from "@/lib/trpc"
 import { useState } from "react"
-import { Stethoscope, ChevronLeft, CheckCircle, Dna, Syringe, Package, ShieldCheck, ShieldAlert, ShieldX, FlaskConical, ShoppingCart } from "lucide-react"
+import { Stethoscope, ChevronLeft, CheckCircle, Dna, Syringe, Package, ShieldCheck, ShieldAlert, ShieldX, FlaskConical, ShoppingCart, HeartCrack } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 export const Route = createFileRoute("/_authenticated/vet")({
@@ -37,6 +37,9 @@ function VetPage() {
 
   const [selectedAnimalId, setSelectedAnimalId] = useState(initialAnimalId ?? "")
   const [selectedExamServiceId, setSelectedExamServiceId] = useState("")
+  const [confirmEuthanize, setConfirmEuthanize] = useState(false)
+
+  const navigate = useNavigate()
 
   const utils = trpc.useUtils()
 
@@ -83,6 +86,15 @@ function VetPage() {
     onSuccess: () => {
       utils.vet.animalHealth.invalidate({ animalId: selectedAnimalId })
       utils.player.balances.invalidate({ playerAccountId: playerAccountId! })
+    },
+  })
+
+  const euthanize = trpc.vet.euthanize.useMutation({
+    onSuccess: () => {
+      utils.animal.list.invalidate()
+      setSelectedAnimalId("")
+      setConfirmEuthanize(false)
+      navigate({ to: "/vet" })
     },
   })
 
@@ -187,7 +199,7 @@ function VetPage() {
               {exam.data && (
                 <div className="flex items-center gap-2 rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-foreground">
                   <CheckCircle className="size-4 text-primary" />
-                  Exam complete — {exam.data.treatedCount} condition{exam.data.treatedCount !== 1 ? "s" : ""} treated
+                  Exam complete — {exam.data.treatedCount} condition{exam.data.treatedCount !== 1 ? "s" : ""} diagnosed
                 </div>
               )}
               {exam.error && (
@@ -336,6 +348,45 @@ function VetPage() {
               )}
             </section>
           )}
+
+          {/* Euthanize */}
+          <section className="rounded-lg border border-destructive/30 bg-card">
+            <div className="border-b border-destructive/20 px-4 py-3">
+              <h2 className="text-sm font-semibold text-destructive flex items-center gap-2">
+                <HeartCrack className="size-4" /> Euthanasia
+              </h2>
+            </div>
+            <div className="p-4">
+              {euthanize.error && (
+                <p className="mb-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                  {euthanize.error.message}
+                </p>
+              )}
+              {confirmEuthanize ? (
+                <div className="space-y-3">
+                  <p className="text-sm text-foreground">
+                    This will permanently mark the animal as deceased. This cannot be undone.
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="destructive"
+                      disabled={euthanize.isPending}
+                      onClick={() => euthanize.mutate({ animalId: selectedAnimalId })}
+                    >
+                      {euthanize.isPending ? "Processing…" : "Confirm Euthanasia"}
+                    </Button>
+                    <Button variant="outline" onClick={() => setConfirmEuthanize(false)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Button variant="outline" className="border-destructive/40 text-destructive hover:bg-destructive/10" onClick={() => setConfirmEuthanize(true)}>
+                  <HeartCrack className="size-4 mr-2" /> Euthanize Animal
+                </Button>
+              )}
+            </div>
+          </section>
 
           {/* Genetic & Breeding Services */}
           <section className="rounded-lg border border-border bg-card">

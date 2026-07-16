@@ -83,7 +83,18 @@ export const breedingMaterialRouter = router({
             },
             careScore: { select: { score: true } },
             compTiers: {
-              select: { tierDef: { select: { tierIndex: true, name: true } } },
+              select: {
+                tierDef: { select: { tierIndex: true, name: true } },
+                disciplineDef: {
+                  select: {
+                    compTierDefs: {
+                      select: { tierIndex: true },
+                      orderBy: { tierIndex: "desc" },
+                      take: 1,
+                    },
+                  },
+                },
+              },
             },
             conformationScores: { select: { score: true } },
             healthRecords: { select: { isActive: true } },
@@ -205,9 +216,13 @@ export const breedingMaterialRouter = router({
         // Mirrors computeBreedingGrade in web utils.ts — keep in sync if formula changes
         const gradeComponents: number[] = []
         gradeComponents.push(Math.min((animal.careScore?.score ?? 0) / 100, 1))
-        const topTier = animal.compTiers.sort((a, b) => b.tierDef.tierIndex - a.tierDef.tierIndex)[0]
-        const tierIndex = topTier?.tierDef.tierIndex ?? -1
-        gradeComponents.push(tierIndex < 0 ? 0 : Math.min((tierIndex + 1) / 10, 1))
+        const topTier = [...animal.compTiers].sort((a, b) => b.tierDef.tierIndex - a.tierDef.tierIndex)[0]
+        if (topTier) {
+          const maxTierIndex = topTier.disciplineDef.compTierDefs[0]?.tierIndex ?? topTier.tierDef.tierIndex
+          gradeComponents.push((topTier.tierDef.tierIndex + 1) / (maxTierIndex + 1))
+        } else {
+          gradeComponents.push(0)
+        }
         gradeComponents.push(Math.max(0, 1 - animal.inbreedingCoefficient / 0.25))
         if (animal.stats.length > 0 && config) {
           const avg = animal.stats.reduce((sum, s) => {

@@ -75,15 +75,38 @@ export async function applyCareAction(
         }
 
         for (const item of action.items) {
-          await tx.playerInventory.update({
+          const inv = await tx.playerInventory.findUnique({
             where: {
               playerAccountId_itemDefId: {
                 playerAccountId: performedByPlayerId,
                 itemDefId: item.itemDefId,
               },
             },
-            data: { quantity: { decrement: item.quantity } },
+            select: { quantity: true },
           })
+          if (!inv || inv.quantity < item.quantity) {
+            throw new Error("Not enough items in inventory to perform this care action")
+          }
+          if (inv.quantity <= item.quantity) {
+            await tx.playerInventory.delete({
+              where: {
+                playerAccountId_itemDefId: {
+                  playerAccountId: performedByPlayerId,
+                  itemDefId: item.itemDefId,
+                },
+              },
+            })
+          } else {
+            await tx.playerInventory.update({
+              where: {
+                playerAccountId_itemDefId: {
+                  playerAccountId: performedByPlayerId,
+                  itemDefId: item.itemDefId,
+                },
+              },
+              data: { quantity: { decrement: item.quantity } },
+            })
+          }
         }
 
         break

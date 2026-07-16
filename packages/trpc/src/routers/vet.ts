@@ -158,7 +158,7 @@ export const vetRouter = router({
             vetServiceDefId: input.vetServiceDefId,
             visitCycle: animal.ageInCycles,
             notes: treatedCount > 0
-              ? `Exam: ${treatedCount} condition${treatedCount !== 1 ? "s" : ""} treated.`
+              ? `Exam: ${treatedCount} condition${treatedCount !== 1 ? "s" : ""} diagnosed.`
               : "Exam: no untreated conditions found.",
           },
         })
@@ -222,26 +222,44 @@ export const vetRouter = router({
           }
         }
 
-        await tx.animalTreatmentRecord.update({
-          where: { id: input.treatmentRecordId },
-          data: {
-            isActive: false,
-            completedCycle: record.animal.ageInCycles,
-            completedAt: new Date(),
-          },
-        })
-
-        const remaining = await tx.animalTreatmentRecord.count({
-          where: { healthRecordId: record.healthRecord.id, isActive: true },
-        })
-        if (remaining === 0) {
-          await tx.animalHealthRecord.update({
-            where: { id: record.healthRecord.id },
-            data: { isActive: false },
+        if (record.treatmentDef.treatmentType === "VET_PROCEDURE") {
+          await tx.animalTreatmentRecord.update({
+            where: { id: input.treatmentRecordId },
+            data: { isActive: false, completedCycle: record.animal.ageInCycles, completedAt: new Date() },
+          })
+          const remaining = await tx.animalTreatmentRecord.count({
+            where: { healthRecordId: record.healthRecord.id, isActive: true },
+          })
+          if (remaining === 0) {
+            await tx.animalHealthRecord.update({
+              where: { id: record.healthRecord.id },
+              data: { isActive: false, resolvedCycle: record.animal.ageInCycles, resolvedAt: new Date() },
+            })
+          }
+        } else {
+          await tx.animalTreatmentRecord.update({
+            where: { id: input.treatmentRecordId },
+            data: { lastAdministeredCycle: record.animal.ageInCycles },
           })
         }
 
         return { success: true }
+      })
+    ),
+
+  euthanize: publicProcedure
+    .input(z.object({ animalId: z.string() }))
+    .mutation(({ input }) =>
+      db.$transaction(async (tx) => {
+        const animal = await tx.animal.findUniqueOrThrow({
+          where: { id: input.animalId },
+          select: { status: true },
+        })
+        if (animal.status !== "ALIVE") throw new Error("Animal is not alive")
+        return tx.animal.update({
+          where: { id: input.animalId },
+          data: { status: "DECEASED", diedAt: new Date(), causeOfDeath: "euthanasia" },
+        })
       })
     ),
 

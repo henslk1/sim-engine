@@ -1,6 +1,6 @@
 import type { AnimalProfile } from "../types"
 import { Panel, Badge, ActionButton } from "@/components/game/ui"
-import { Stethoscope, ShieldCheck, ShieldAlert, CalendarClock, Pill, FlaskConical, Footprints } from "lucide-react"
+import { Stethoscope, ShieldCheck, ShieldAlert, CalendarClock, Pill, FlaskConical, Footprints, CheckCircle2 } from "lucide-react"
 import { Link } from "@tanstack/react-router"
 import { trpc } from "@/lib/trpc"
 
@@ -120,43 +120,62 @@ export function HealthPanel({
                         )
                       })}
 
-                      {!readonly && playerAccountId && treatmentType !== "ACTIVITY_RESTRICTION" && (
-                        <div className="mt-1.5">
-                          {treatmentType === "OTC" && missing.length > 0 ? (
-                            <div className="space-y-1">
-                              <p className="text-[11px] text-destructive">
-                                Missing: {missing.map((m) => m.itemDef.name).join(", ")}
-                              </p>
-                              <Link to="/vet" search={{ animalId: animal.id }}>
-                                <ActionButton variant="soft" className="w-full justify-center">
-                                  <FlaskConical className="size-3.5" /> Buy at Vet
-                                </ActionButton>
-                              </Link>
+                      {!readonly && playerAccountId && treatmentType !== "ACTIVITY_RESTRICTION" && (() => {
+                        const isTimeBased = treatmentType === "OTC" || treatmentType === "PRESCRIPTION" || treatmentType === "PLAYER_ACTION"
+                        const administeredToday = isTimeBased && (t as typeof t & { lastAdministeredCycle?: number | null }).lastAdministeredCycle === animal.ageInCycles
+                        const cyclesRemaining = t.treatmentDef.durationCycles != null
+                          ? (t.startedCycle + t.treatmentDef.durationCycles) - animal.ageInCycles
+                          : null
+
+                        if (administeredToday) {
+                          return (
+                            <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-chart-2">
+                              <CheckCircle2 className="size-3.5 shrink-0" />
+                              <span>
+                                Administered{cyclesRemaining != null ? ` · ${cyclesRemaining} cycle${cyclesRemaining !== 1 ? "s" : ""} remaining` : ""}
+                              </span>
                             </div>
-                          ) : (
-                            <ActionButton
-                              variant="soft"
-                              className="w-full justify-center"
-                              disabled={isPending || (treatmentType === "OTC" && !canAdminister)}
-                              onClick={() =>
-                                administer.mutate({ treatmentRecordId: t.id, playerAccountId })
-                              }
-                            >
-                              {isPending ? (
-                                "Applying…"
-                              ) : treatmentType === "OTC" ? (
-                                <><FlaskConical className="size-3.5" /> Administer OTC</>
-                              ) : treatmentType === "PRESCRIPTION" ? (
-                                <><Pill className="size-3.5" /> Administer Rx</>
-                              ) : treatmentType === "VET_PROCEDURE" ? (
-                                <><CalendarClock className="size-3.5" /> Book Procedure</>
-                              ) : (
-                                <><Footprints className="size-3.5" /> Perform Care</>
-                              )}
-                            </ActionButton>
-                          )}
-                        </div>
-                      )}
+                          )
+                        }
+
+                        return (
+                          <div className="mt-1.5">
+                            {treatmentType === "OTC" && missing.length > 0 ? (
+                              <div className="space-y-1">
+                                <p className="text-[11px] text-destructive">
+                                  Missing: {missing.map((m) => m.itemDef.name).join(", ")}
+                                </p>
+                                <Link to="/vet" search={{ animalId: animal.id }}>
+                                  <ActionButton variant="soft" className="w-full justify-center">
+                                    <FlaskConical className="size-3.5" /> Buy at Vet
+                                  </ActionButton>
+                                </Link>
+                              </div>
+                            ) : (
+                              <ActionButton
+                                variant="soft"
+                                className="w-full justify-center"
+                                disabled={isPending || (treatmentType === "OTC" && !canAdminister)}
+                                onClick={() =>
+                                  administer.mutate({ treatmentRecordId: t.id, playerAccountId })
+                                }
+                              >
+                                {isPending ? (
+                                  "Applying…"
+                                ) : treatmentType === "OTC" ? (
+                                  <><FlaskConical className="size-3.5" /> Administer OTC</>
+                                ) : treatmentType === "PRESCRIPTION" ? (
+                                  <><Pill className="size-3.5" /> Administer Rx</>
+                                ) : treatmentType === "VET_PROCEDURE" ? (
+                                  <><CalendarClock className="size-3.5" /> Book Procedure</>
+                                ) : (
+                                  <><Footprints className="size-3.5" /> Perform Care</>
+                                )}
+                              </ActionButton>
+                            )}
+                          </div>
+                        )
+                      })()}
                     </div>
                   )
                 })}

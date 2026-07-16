@@ -122,10 +122,10 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
       const condDef = rule.healthConditionDef
       if (condDef.onsetMinCycle !== null && newAge < condDef.onsetMinCycle) continue
 
-      const alreadyActive = await tx.animalHealthRecord.findFirst({
-        where: { animalId, conditionDefId: condDef.id, isActive: true },
+      const alreadyExists = await tx.animalHealthRecord.findFirst({
+        where: { animalId, conditionDefId: condDef.id },
       })
-      if (alreadyActive) continue
+      if (alreadyExists) continue
 
       if (Math.random() < (rule.penetrance ?? 1.0)) {
         await tx.animalHealthRecord.create({
@@ -151,6 +151,60 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
         },
       })
       if (justCompleted) pregnancyCompleted = pregnancy.id
+    }
+
+    // Advance active treatment records
+    const activeTreatments = await tx.animalTreatmentRecord.findMany({
+      where: { animalId, isActive: true },
+      select: {
+        id: true,
+        startedCycle: true,
+        healthRecordId: true,
+        treatmentDef: { select: { treatmentType: true, durationCycles: true } },
+        activityRestriction: {
+          where: { isActive: true },
+          select: { id: true, remainingCycles: true },
+        },
+      },
+    })
+
+    for (const treatment of activeTreatments) {
+      const { treatmentType, durationCycles } = treatment.treatmentDef
+
+      for (const restriction of treatment.activityRestriction) {
+        const newRemaining = restriction.remainingCycles - 1
+        await tx.activityRestriction.update({
+          where: { id: restriction.id },
+          data: newRemaining <= 0
+            ? { remainingCycles: 0, isActive: false }
+            : { remainingCycles: newRemaining },
+        })
+      }
+
+      let shouldClose = false
+      if (treatmentType === "ACTIVITY_RESTRICTION") {
+        const allDone = treatment.activityRestriction.length === 0 ||
+          treatment.activityRestriction.every(r => r.remainingCycles <= 1)
+        if (allDone) shouldClose = true
+      } else if (durationCycles !== null) {
+        if (newAge >= treatment.startedCycle + durationCycles) shouldClose = true
+      }
+
+      if (shouldClose) {
+        await tx.animalTreatmentRecord.update({
+          where: { id: treatment.id },
+          data: { isActive: false, completedCycle: newAge, completedAt: new Date() },
+        })
+        const remaining = await tx.animalTreatmentRecord.count({
+          where: { healthRecordId: treatment.healthRecordId, isActive: true, id: { not: treatment.id } },
+        })
+        if (remaining === 0) {
+          await tx.animalHealthRecord.update({
+            where: { id: treatment.healthRecordId },
+            data: { isActive: false, resolvedCycle: newAge, resolvedAt: new Date() },
+          })
+        }
+      }
     }
 
     // Check if work was done this cycle — suppresses condition decay
