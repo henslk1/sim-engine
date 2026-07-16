@@ -51,11 +51,12 @@ export function getTrainingCap(innateValue: number, config: AnimalProfile["game"
 }
 
 export function getFertilityDisplay(fertility: number): { hearts: number; label: string } {
-  if (fertility === 0) return { hearts: 0, label: "Infertile" }
-  if (fertility <= 20) return { hearts: 1, label: "Low" }
-  if (fertility <= 40) return { hearts: 2, label: "Moderate" }
-  if (fertility <= 60) return { hearts: 3, label: "Good" }
-  if (fertility <= 80) return { hearts: 4, label: "High" }
+  const pct = fertility * 100
+  if (pct === 0) return { hearts: 0, label: "Infertile" }
+  if (pct <= 20) return { hearts: 1, label: "Low" }
+  if (pct <= 40) return { hearts: 2, label: "Moderate" }
+  if (pct <= 60) return { hearts: 3, label: "Good" }
+  if (pct <= 80) return { hearts: 4, label: "High" }
   return { hearts: 5, label: "Excellent" }
 }
 
@@ -116,13 +117,17 @@ export function computeBreedingGrade(
   }
 
   const isCross = animal.breedComposition.length > 1
-  if (!isCross && animal.conformationScores.length > 0) {
-    const avg =
-      animal.conformationScores.reduce(
-        (sum: number, s: AnimalProfile["conformationScores"][number]) => sum + s.score,
-        0
-      ) / animal.conformationScores.length
-    components.push(avg / 100)
+  if (!isCross) {
+    if (animal.conformationScores.length > 0) {
+      const avg =
+        animal.conformationScores.reduce(
+          (sum: number, s: AnimalProfile["conformationScores"][number]) => sum + s.score,
+          0
+        ) / animal.conformationScores.length
+      components.push(avg / 100)
+    } else {
+      components.push(0)
+    }
   }
 
   const healthLoci = animal.genotypes.filter((g) =>

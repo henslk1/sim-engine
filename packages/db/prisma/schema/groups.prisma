@@ -86,49 +86,49 @@ enum GroupSpendingCategory {
 }
 
 model Group {
-  id                   String                    @id @default(cuid())
-  gameId               String
-  name                 String
-  tag                  String
-  description          String?
-  image                String?
-  breedId              String?
-  isOpen               Boolean                   @default(true)
-  maxMembers           Int?
-  isActive             Boolean                   @default(true)
+  id                     String                    @id @default(cuid())
+  gameId                 String
+  name                   String
+  tag                    String
+  description            String?
+  image                  String?
+  breedId                String?
+  isOpen                 Boolean                   @default(true)
+  maxMembers             Int?
+  isActive               Boolean                   @default(true)
   geneticStorageCapacity Int                       @default(0)
-  disbandedAt          DateTime?
-  foundedByPlayerId    String?
-  members              GroupMember[]
-  roles                GroupRole[]
-  groupAnimals         GroupAnimal[]
-  spendingRules        GroupAnimalSpendingRule[]
-  saleProtectionRules  GroupSaleProtectionRule[]
-  entryRequirements    GroupEntryRequirement[]
-  finance              GroupFinance[]
-  inventory            GroupInventory[]
-  prestige             GroupPrestige?
-  prestigeLogs         GroupPrestigeLog[]
-  channels             GroupChannel[]
-  activityLogs         GroupActivityLog[]
-  venues               Venue[]
-  clinics              Clinic[]
-  raffles              Raffle[]
-  seasonRankings       SeasonRanking[]
-  recordEntries        RecordEntry[]
-  transactionsFrom     Transaction[]             @relation("TxnFromGroup")
-  transactionsTo       Transaction[]             @relation("TxnToGroup")
-  geneticMaterials     GeneticMaterial[]
-  followers            Follow[]
-  forumThreadsAuthored ForumThread[]
-  forumPostsAuthored   ForumPost[]
-  userReports          UserReport[]
-  createdAt            DateTime                  @default(now())
-  foundedBy            PlayerAccount?            @relation(fields: [foundedByPlayerId], references: [id])
-  breed                Breed?                    @relation(fields: [breedId], references: [id])
-  game                 Game                      @relation(fields: [gameId], references: [id])
-  disciplineDef        DisciplineDef?            @relation(fields: [disciplineDefId], references: [id])
-  disciplineDefId      String?
+  disbandedAt            DateTime?
+  foundedByPlayerId      String?
+  members                GroupMember[]
+  roles                  GroupRole[]
+  groupAnimals           GroupAnimal[]
+  spendingRules          GroupAnimalSpendingRule[]
+  saleProtectionRules    GroupSaleProtectionRule[]
+  entryRequirements      GroupEntryRequirement[]
+  finance                GroupFinance[]
+  inventory              GroupInventory[]
+  prestige               GroupPrestige?
+  prestigeLogs           GroupPrestigeLog[]
+  channels               GroupChannel[]
+  activityLogs           GroupActivityLog[]
+  venues                 Venue[]
+  clinics                Clinic[]
+  raffles                Raffle[]
+  seasonRankings         SeasonRanking[]
+  recordEntries          RecordEntry[]
+  transactionsFrom       Transaction[]             @relation("TxnFromGroup")
+  transactionsTo         Transaction[]             @relation("TxnToGroup")
+  geneticMaterials       GeneticMaterial[]
+  followers              Follow[]
+  forumThreadsAuthored   ForumThread[]
+  forumPostsAuthored     ForumPost[]
+  userReports            UserReport[]
+  createdAt              DateTime                  @default(now())
+  foundedBy              PlayerAccount?            @relation(fields: [foundedByPlayerId], references: [id])
+  breed                  Breed?                    @relation(fields: [breedId], references: [id])
+  game                   Game                      @relation(fields: [gameId], references: [id])
+  disciplineDef          DisciplineDef?            @relation(fields: [disciplineDefId], references: [id])
+  disciplineDefId        String?
 }
 
 model GroupMember {

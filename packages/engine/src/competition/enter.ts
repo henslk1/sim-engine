@@ -29,12 +29,22 @@ export async function enterCompetition(
       throw new Error("Competition is not open")
     }
 
-    const tier = await tx.animalCompetitionTier.findUnique({
+    let tier = await tx.animalCompetitionTier.findUnique({
       where: { animalId_disciplineDefId: { animalId, disciplineDefId: competition.disciplineDefId } },
       include: { tierDef: true }
     })
 
-    if (!tier) throw new Error("Animal has no competition tier for this discipline")
+    if (!tier) {
+      const lowestTierDef = await tx.competitionTierDef.findFirst({
+        where: { disciplineDefId: competition.disciplineDefId },
+        orderBy: { tierIndex: "asc" },
+      })
+      if (!lowestTierDef) throw new Error("No competition tiers configured for this discipline")
+      tier = await tx.animalCompetitionTier.create({
+        data: { animalId, disciplineDefId: competition.disciplineDefId, tierDefId: lowestTierDef.id },
+        include: { tierDef: true },
+      })
+    }
 
     // equipment check
     const equipmentRequirements = competition.disciplineDef.equipmentRequirements
@@ -66,6 +76,11 @@ export async function enterCompetition(
           throw new Error("Animal does not meet minimum weekly points for this invitational")
         }
       }
+    }
+
+    if (competition.disciplineDef.isConformation) {
+      const conformationScore = await tx.animalConformationScore.findFirst({ where: { animalId } })
+      if (!conformationScore) throw new Error("Animal must have a conformation score to enter this competition")
     }
 
     const baseEnergyCost = tier.tierDef.energyCost

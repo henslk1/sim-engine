@@ -33,5 +33,5 @@ function AnimalProfilePage() {
   if (animal.status === "ARCHIVED") return <ArchivedView animal={animal} animalId={animalId} />
   // TODO: restore visitor routing once player accounts are set up
   // if (!isOwner) return <VisitorView animal={animal} animalId={animalId} />
-  return <OwnerView animal={animal} animalId={animalId} />
+  return <OwnerView animal={animal} animalId={animalId} playerAccountId={me?.id ?? ""} />
 }

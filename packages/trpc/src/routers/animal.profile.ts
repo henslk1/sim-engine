@@ -94,7 +94,12 @@ export const animalProfileRouter = router({
               conditionDef: true,
               treatmentRecords: {
                 include: {
-                  treatmentDef: { include: { restrictionDefs: true } },
+                  treatmentDef: {
+                    include: {
+                      restrictionDefs: true,
+                      items: { include: { itemDef: { select: { id: true, name: true } } } },
+                    },
+                  },
                   activityRestriction: true,
                 },
               },
@@ -114,6 +119,7 @@ export const animalProfileRouter = router({
           // care
           longTermCareRecords: {
             include: { longTermCareActionDef: true },
+            orderBy: { id: "asc" },
           },
           careLogs: {
             orderBy: { cycleNumber: "desc" },
@@ -138,6 +144,7 @@ export const animalProfileRouter = router({
                 select: {
                   id: true,
                   name: true,
+                  isConformation: true,
                   equipmentRequirements: {
                     select: {
                       id: true,
@@ -199,6 +206,12 @@ export const animalProfileRouter = router({
               breedingRecord: {
                 include: {
                   sire: { select: { id: true, name: true } },
+                  dam: { select: { id: true, name: true } },
+                },
+              },
+              surrogacyRecord: {
+                select: {
+                  biologicalDam: { select: { id: true, name: true } },
                 },
               },
               offspring: {
@@ -279,6 +292,7 @@ export const animalProfileRouter = router({
                   ultrasoundOpenCycle: true,
                   breedingEnergyCost: true,
                   maxBreedingSlots: true,
+                  conformationInspectionMinCycle: true,
                 },
               },
               careActionDefs: {

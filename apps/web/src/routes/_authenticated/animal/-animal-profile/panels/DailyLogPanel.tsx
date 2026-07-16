@@ -11,6 +11,8 @@ type LogEntry =
   | { key: string; cycleNumber: number; createdAt: Date; type: "vet"; label: string; notes: string | null; vitals: VitalChange[] }
   | { key: string; cycleNumber: number; createdAt: Date; type: "activity"; label: string; vitals: VitalChange[] }
   | { key: string; cycleNumber: number; createdAt: Date; type: "breeding"; label: string; subLabel?: string; vitals: VitalChange[] }
+  | { key: string; cycleNumber: number; createdAt: Date; type: "competition"; label: string; subLabel?: string; vitals: VitalChange[] }
+  | { key: string; cycleNumber: number; createdAt: Date; type: "birth"; label: string; vitals: VitalChange[] }
 
 const DOT: Record<string, string> = {
   care: "bg-violet-400",
@@ -18,6 +20,8 @@ const DOT: Record<string, string> = {
   vet: "bg-destructive",
   activity: "bg-chart-5",
   breeding: "bg-rose-400",
+  competition: "bg-chart-1",
+  birth: "bg-pink-400",
 }
 
 export function DailyLogPanel({ animal }: { animal: AnimalProfile }) {
@@ -25,7 +29,20 @@ export function DailyLogPanel({ animal }: { animal: AnimalProfile }) {
 
   const entries: LogEntry[] = [
     ...animal.dailyLogs
-      .filter((l) => l.cycleNumber === cycle)
+      .filter((l) => l.cycleNumber === cycle && l.eventType === "LTC_PERFORMED")
+      .map((l: AnimalProfile["dailyLogs"][number]) => {
+        const ctx = l.context as { name?: string; nextDueCycle?: number } | null
+        return {
+          key: `ltc-${l.id}`,
+          cycleNumber: l.cycleNumber,
+          createdAt: new Date(l.createdAt),
+          type: "care" as const,
+          label: ctx?.name ?? "Long-term care",
+          vitals: [] as VitalChange[],
+        }
+      }),
+    ...animal.dailyLogs
+      .filter((l) => l.cycleNumber === cycle && ["COVER_SENT", "COVER_ACCEPTED", "COVER_DECLINED"].includes(l.eventType))
       .map((l: AnimalProfile["dailyLogs"][number]) => {
         const ctx = l.context as { price?: number } | null
         const label =
@@ -78,10 +95,10 @@ export function DailyLogPanel({ animal }: { animal: AnimalProfile }) {
       .map((l: AnimalProfile["vetVisitLogs"][number]) => ({
         key: `vet-${l.id}`,
         cycleNumber: l.visitCycle,
-        createdAt: new Date(l.createdAt),
+        createdAt: new Date(l.visitedAt),
         type: "vet" as const,
         label: l.vetServiceDef?.name ?? "Vet Visit",
-        notes: l.notes,
+        notes: l.notes ?? (l.conditionDef ? `Condition: ${l.conditionDef.name}` : null),
         vitals: (l.vetServiceDef?.baseCost ?? 0) > 0
           ? [{ label: "G", value: -(l.vetServiceDef!.baseCost) }]
           : [] as VitalChange[],
@@ -99,6 +116,68 @@ export function DailyLogPanel({ animal }: { animal: AnimalProfile }) {
           { label: l.stageActivityDef.traitDef.name, value: l.stageActivityDef.traitEffect },
         ],
       })),
+    ...animal.competitionEntries
+      .filter((e) => e.cycleNumber === cycle)
+      .map((e: AnimalProfile["competitionEntries"][number]) => {
+        const placement = e.result?.placement
+        const score = e.result?.score
+        const vitals: VitalChange[] = []
+        return {
+          key: `comp-${e.id}`,
+          cycleNumber: e.cycleNumber,
+          createdAt: new Date(e.enteredAt),
+          type: "competition" as const,
+          label: `${e.competition.venue.name}`,
+          subLabel: placement != null
+            ? `${e.tierDef.name} · #${placement}${score != null ? ` · ${Math.round(score)} pts` : ""}`
+            : e.tierDef.name,
+          vitals,
+        }
+      }),
+    ...animal.dailyLogs
+      .filter((l) => l.cycleNumber === cycle && l.eventType === "TIER_ADVANCED")
+      .map((l: AnimalProfile["dailyLogs"][number]) => {
+        const ctx = l.context as { newTierName?: string; disciplineName?: string } | null
+        return {
+          key: `tier-${l.id}`,
+          cycleNumber: l.cycleNumber,
+          createdAt: new Date(l.createdAt),
+          type: "competition" as const,
+          label: `Advanced to ${ctx?.newTierName ?? "next tier"}`,
+          subLabel: ctx?.disciplineName,
+          vitals: [] as VitalChange[],
+        }
+      }),
+    ...animal.dailyLogs
+      .filter((l) => l.cycleNumber === cycle && l.eventType === "EMBRYO_IMPLANTED")
+      .map((l: AnimalProfile["dailyLogs"][number]) => {
+        const ctx = l.context as { sireName?: string; biologicalDamName?: string } | null
+        return {
+          key: `implant-${l.id}`,
+          cycleNumber: l.cycleNumber,
+          createdAt: new Date(l.createdAt),
+          type: "breeding" as const,
+          label: "Embryo Implanted",
+          subLabel: ctx?.sireName && ctx?.biologicalDamName
+            ? `by ${ctx.sireName} × ${ctx.biologicalDamName}`
+            : undefined,
+          vitals: [] as VitalChange[],
+        }
+      }),
+    ...animal.dailyLogs
+      .filter((l) => l.cycleNumber === cycle && l.eventType === "BIRTH")
+      .map((l: AnimalProfile["dailyLogs"][number]) => {
+        const ctx = l.context as { offspringCount?: number } | null
+        const count = ctx?.offspringCount ?? 1
+        return {
+          key: `birth-${l.id}`,
+          cycleNumber: l.cycleNumber,
+          createdAt: new Date(l.createdAt),
+          type: "birth" as const,
+          label: count === 1 ? "Gave birth" : `Gave birth to ${count} foals`,
+          vitals: [] as VitalChange[],
+        }
+      }),
   ].sort((a, b) => b.cycleNumber - a.cycleNumber || b.createdAt.getTime() - a.createdAt.getTime())
 
   return (
@@ -128,7 +207,7 @@ export function DailyLogPanel({ animal }: { animal: AnimalProfile }) {
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                     {e.type}
-                    {(e.type === "training" || e.type === "breeding") && e.subLabel && (
+                    {(e.type === "training" || e.type === "breeding" || e.type === "competition") && "subLabel" in e && e.subLabel && (
                       <span className="font-normal normal-case tracking-normal"> · {e.subLabel}</span>
                     )}
                   </p>

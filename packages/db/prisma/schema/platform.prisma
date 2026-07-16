@@ -440,49 +440,49 @@ model NightlyUpdateLog {
 }
 
 model GameConfig {
-  id                        String   @id @default(cuid())
-  gameId                    String   @unique
-  defaultInnateRatio        Float
-  trainingCeilingMultiplier Float
-  pedigreeDisplayDepth      Int
-  predictorDailyLimitFree   Int
-  containerLabel            String?
-  subContainerLabel         String?
-  breedingEnergyCost        Float    @default(0)
-  gestationCycles           Int      @default(12)
-  moodDecayRate             Float    @default(0)
-  conditionDecayRate        Float    @default(0)
-  conditionWorkGain         Float    @default(0)
-  careScoreDecayRate        Float    @default(0)
-  careScoreFloor            Float    @default(0)
-  careScoreCeiling          Float    @default(100)
-  careScoreRecoveryRate     Float    @default(0)
-  immunityDecayRate         Float    @default(0)
-  immunityRecoveryRate      Float    @default(0)
-  immunityMin               Float    @default(0)
-  immunityMax               Float    @default(100)
-  energyLowCareThreshold    Float    @default(0)
-  energyLowCarePenalty      Float    @default(0)
-  cyclesPerYear             Int      @default(12)
-  lifeExpectancyBaseline    Int?
-  maxLocusTestsPerCycle     Int      @default(2)
-  ultrasoundOpenCycle       Int      @default(0)
-  maxBreedingSlots             Int?
-  breedingBaseGain             Float    @default(30)
-  breedingMinGain              Float    @default(4)
-  breedingVarianceFactor       Float    @default(0)
-  gestationCareFloor           Float    @default(0.7)
-  predictorCost                Int      @default(0)
-  predictorDailyLimitSubscriber Int     @default(0)
-  multiplesBirthCap            Int      @default(1)
-  multiplesChance              Float    @default(0)
-  identicalMultiplesChance              Float    @default(0)
-  breedingCooldownCycles                Int      @default(0)
-  geneticCollectionCooldownCycles       Int      @default(0)
-  conformationInspectionMinCycle        Int      @default(0)
-  game                                  Game     @relation(fields: [gameId], references: [id])
-  createdAt                    DateTime @default(now())
-  updatedAt                    DateTime @updatedAt
+  id                              String   @id @default(cuid())
+  gameId                          String   @unique
+  defaultInnateRatio              Float
+  trainingCeilingMultiplier       Float
+  pedigreeDisplayDepth            Int
+  predictorDailyLimitFree         Int
+  containerLabel                  String?
+  subContainerLabel               String?
+  breedingEnergyCost              Float    @default(0)
+  gestationCycles                 Int      @default(12)
+  moodDecayRate                   Float    @default(0)
+  conditionDecayRate              Float    @default(0)
+  conditionWorkGain               Float    @default(0)
+  careScoreDecayRate              Float    @default(0)
+  careScoreFloor                  Float    @default(0)
+  careScoreCeiling                Float    @default(100)
+  careScoreRecoveryRate           Float    @default(0)
+  immunityDecayRate               Float    @default(0)
+  immunityRecoveryRate            Float    @default(0)
+  immunityMin                     Float    @default(0)
+  immunityMax                     Float    @default(100)
+  energyLowCareThreshold          Float    @default(0)
+  energyLowCarePenalty            Float    @default(0)
+  cyclesPerYear                   Int      @default(12)
+  lifeExpectancyBaseline          Int?
+  maxLocusTestsPerCycle           Int      @default(2)
+  ultrasoundOpenCycle             Int      @default(0)
+  maxBreedingSlots                Int?
+  breedingBaseGain                Float    @default(30)
+  breedingMinGain                 Float    @default(4)
+  breedingVarianceFactor          Float    @default(0)
+  gestationCareFloor              Float    @default(0.7)
+  predictorCost                   Int      @default(0)
+  predictorDailyLimitSubscriber   Int      @default(0)
+  multiplesBirthCap               Int      @default(1)
+  multiplesChance                 Float    @default(0)
+  identicalMultiplesChance        Float    @default(0)
+  breedingCooldownCycles          Int      @default(0)
+  geneticCollectionCooldownCycles Int      @default(0)
+  conformationInspectionMinCycle  Int      @default(0)
+  game                            Game     @relation(fields: [gameId], references: [id])
+  createdAt                       DateTime @default(now())
+  updatedAt                       DateTime @updatedAt
 }
 
 model PlayerPredictorUsage {

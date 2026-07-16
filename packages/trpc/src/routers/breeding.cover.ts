@@ -1,7 +1,7 @@
 import { db } from "@sim-engine/db"
 import { router, publicProcedure } from "../trpc.js"
 import { z } from "zod"
-import { generateOffspring, type ParentData } from "@sim-engine/engine"
+import { generateOffspring, computePhenotypeDescription, type ParentData } from "@sim-engine/engine"
 
 function computeCOI(
   sireAncestors: ParentData["ancestors"],
@@ -56,6 +56,7 @@ const parentSelect = {
   mood: { select: { value: true } },
   personality: {
     select: {
+      traitDefId: true,
       value: true,
       traitDef: { select: { conceptionModifier: true } },
     },
@@ -220,7 +221,7 @@ export const breedingCoverRouter = router({
           throw new Error(`Dam is on a breeding cooldown until cycle ${damCooldownCheck!.breedingCooldownUntilCycle}`)
         }
 
-        const [sire, dam, gameConfig, gameInnateMax, gradeBread, firstLifeStage, damCareScore] =
+        const [sire, dam, gameConfig, gameInnateMax, gradeBread, firstLifeStage, damCareScore, expressionRules, personalityLabelRanges] =
           await Promise.all([
             tx.animal.findUniqueOrThrow({ where: { id: offer.sireId }, select: parentSelect }),
             tx.animal.findUniqueOrThrow({ where: { id: offer.damId }, select: parentSelect }),
@@ -241,6 +242,14 @@ export const breedingCoverRouter = router({
             tx.animalCareScore.findFirst({
               where: { animalId: offer.damId },
               select: { score: true },
+            }),
+            tx.expressionRule.findMany({
+              where: { locus: { gameId: offer.gameId } },
+              select: { locusId: true, alleleOneId: true, alleleTwoId: true, phenotype: true },
+            }),
+            tx.personalityLabelRange.findMany({
+              where: { traitDef: { gameId: offer.gameId } },
+              select: { traitDefId: true, label: true, minValue: true, maxValue: true },
             }),
           ])
 
@@ -351,6 +360,7 @@ export const breedingCoverRouter = router({
         }
 
         for (const [i, offspring] of result.offspring.entries()) {
+          const phenotypeDescription = computePhenotypeDescription(offspring.genotypes, expressionRules)
           const animal = await tx.animal.create({
             data: {
               gameId: offer.gameId,
@@ -367,8 +377,19 @@ export const breedingCoverRouter = router({
               breedGeneration: offspring.breedGeneration,
               lifeExpectancy,
               status: "EMBRYO_STORED",
+              phenotypeDescription,
             },
             select: { id: true },
+          })
+
+          const personalityData = sire.personality.map((sp) => {
+            const dp = dam.personality.find((d) => d.traitDefId === sp.traitDefId)
+            const raw = (sp.value + (dp?.value ?? sp.value)) / 2 + (Math.random() - 0.5) * 10
+            const value = Math.max(0, Math.min(100, raw))
+            const traitLabel = personalityLabelRanges.find(
+              (r) => r.traitDefId === sp.traitDefId && value >= r.minValue && value < r.maxValue
+            )?.label ?? null
+            return { animalId: animal.id, traitDefId: sp.traitDefId, value, traitLabel }
           })
 
           await Promise.all([
@@ -416,6 +437,9 @@ export const breedingCoverRouter = router({
             tx.pregnancyOffspring.create({
               data: { pregnancyId: pregnancy.id, animalId: animal.id, birthOrder: i + 1 },
             }),
+            ...(personalityData.length > 0
+              ? [tx.animalPersonality.createMany({ data: personalityData })]
+              : []),
           ])
         }
 

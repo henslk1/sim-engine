@@ -1,20 +1,22 @@
 import { useState } from "react"
 import { Pin, Package, LayoutGrid, Pencil, Users, Stethoscope, Store, Gift } from "lucide-react"
+import { Link } from "@tanstack/react-router"
 import { trpc } from "@/lib/trpc"
 import { Input } from "@/components/ui/input"
 
 type Props = {
-  animal: { 
-    id: string 
-    name: string 
-    isPinned: boolean 
+  animal: {
+    id: string
+    name: string
+    isPinned: boolean
     subContainerId: string | null
-    playerAccount: { id: string } 
-    game: { gameConfig: { subContainerLabel: string | null } | null} 
+    playerAccount: { id: string }
+    game: { gameConfig: { subContainerLabel: string | null } | null}
   }
+  playerAccountId: string
 }
 
-export function OwnerActionList({ animal }: Props) {
+export function OwnerActionList({ animal, playerAccountId }: Props) {
   const utils = trpc.useUtils()
   const [renaming, setRenaming] = useState(false)
   const [nameInput, setNameInput] = useState(animal.name)
@@ -27,7 +29,8 @@ export function OwnerActionList({ animal }: Props) {
   })
 
   const { data: subContainers } = trpc.player.listSubContainers.useQuery(
-    { playerAccountId: animal.playerAccount.id }
+    { playerAccountId },
+    { enabled: !!playerAccountId },
   )
 
   const moveToSubContainer = trpc.animal.moveToSubContainer.useMutation({
@@ -108,25 +111,25 @@ export function OwnerActionList({ animal }: Props) {
         </select>
       </div>
 
-      {/* Equip / Unequip — stub until inventory modal */}
+      {/* Equip / Unequip */}
       <button
         type="button"
-        disabled
-        className="flex w-full items-center gap-3 px-3 py-3 text-left text-sm font-medium text-foreground transition-colors hover:bg-secondary/50 disabled:cursor-not-allowed disabled:opacity-50"
+        onClick={() => document.getElementById("equipped-section")?.scrollIntoView({ behavior: "smooth", block: "center" })}
+        className="flex w-full items-center gap-3 px-3 py-3 text-left text-sm font-medium text-foreground transition-colors hover:bg-secondary/50"
       >
         <Package className="size-5 shrink-0 text-muted-foreground" />
         <span className="flex-1">Equip / Unequip Item</span>
       </button>
 
-      {/* Visit Vet — leads to other page */}
-      <button
-        type="button"
-        disabled
-        className="flex w-full items-center gap-3 px-3 py-3 text-left text-sm font-medium text-foreground transition-colors hover:bg-secondary/50 disabled:cursor-not-allowed disabled:opacity-50"
+      {/* Visit Vet */}
+      <Link
+        to="/vet"
+        search={{ animalId: animal.id }}
+        className="flex w-full items-center gap-3 px-3 py-3 text-left text-sm font-medium text-foreground transition-colors hover:bg-secondary/50"
       >
         <Stethoscope className="size-5 shrink-0 text-muted-foreground" />
         <span className="flex-1">Visit Vet</span>
-      </button>
+      </Link>
 
       {/* List on Marketplace — leads to other page */}
       <button

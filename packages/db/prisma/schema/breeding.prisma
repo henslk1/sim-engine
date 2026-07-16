@@ -24,13 +24,13 @@ enum GeneticStorageType {
 }
 
 model BreedingListing {
-  id                String                            @id @default(cuid())
-  gameId            String
-  ownerPlayerId     String
-  animalId          String
-  description       Json?
-  currencyDefId     String?
-  pricePerSlot      Int
+  id                 String                            @id @default(cuid())
+  gameId             String
+  ownerPlayerId      String
+  animalId           String
+  description        Json?
+  currencyDefId      String?
+  pricePerSlot       Int
   title              String?
   pureBredOnly       Boolean                           @default(false)
   requiredTitleDefId String?
@@ -39,12 +39,12 @@ model BreedingListing {
   slots              BreedingSlot[]
   isActive           Boolean                           @default(true)
   requiredTitleDef   TitleDef?                         @relation(fields: [requiredTitleDefId], references: [id])
-  animal            Animal                            @relation(fields: [animalId], references: [id])
-  ownerPlayer       PlayerAccount                     @relation(fields: [ownerPlayerId], references: [id])
-  currencyDef       CurrencyDef?                      @relation(fields: [currencyDefId], references: [id])
-  game              Game                              @relation(fields: [gameId], references: [id])
-  createdAt         DateTime                          @default(now())
-  updatedAt         DateTime                          @updatedAt
+  animal             Animal                            @relation(fields: [animalId], references: [id])
+  ownerPlayer        PlayerAccount                     @relation(fields: [ownerPlayerId], references: [id])
+  currencyDef        CurrencyDef?                      @relation(fields: [currencyDefId], references: [id])
+  game               Game                              @relation(fields: [gameId], references: [id])
+  createdAt          DateTime                          @default(now())
+  updatedAt          DateTime                          @updatedAt
 }
 
 model BreedingListingBreedRestriction {

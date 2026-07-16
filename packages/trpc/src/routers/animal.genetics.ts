@@ -115,7 +115,7 @@ export const animalGeneticsRouter = router({
             animalId: input.animalId,
             locusId: { in: eligibleGenotypes.map((g) => g.locusId) },
           },
-          data: { isTestedByOwner: true, testedAt: new Date(), testedCycle: animal.ageInCycles },
+          data: { isTestedByOwner: true, testedAt: new Date() },
         })
 
         return { tested: eligibleGenotypes.length, cost: totalCost }

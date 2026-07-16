@@ -27,6 +27,11 @@ import { vetServiceAdminRouter } from "./admin.vetservice.js";
 import { notificationTopicAdminRouter } from "./admin.notificationtopic.js";
 import { directoryFilterAdminRouter } from "./admin.directoryfilter.js";
 import { tutorialStepAdminRouter } from "./admin.tutorialstep.js";
+import { venueAdminRouter } from "./admin.venue.js";
+import { storeListingAdminRouter } from "./admin.storelisting.js";
+import { gameShopAdminRouter } from "./admin.gameshop.js";
+import { groupPrestigeAdminRouter } from "./admin.groupprestige.js"
+import { playerAdminRouter } from "./admin.player.js";
 
 export const adminRouter = router({
   game: gameAdminRouter,
@@ -57,4 +62,9 @@ export const adminRouter = router({
   notificationTopic: notificationTopicAdminRouter,
   directoryFilter: directoryFilterAdminRouter,
   tutorialStep: tutorialStepAdminRouter,
+  venue: venueAdminRouter,
+  storeListing: storeListingAdminRouter,
+  gameShop: gameShopAdminRouter,
+  groupPrestige: groupPrestigeAdminRouter,
+  player: playerAdminRouter,
 })

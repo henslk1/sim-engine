@@ -43,9 +43,9 @@ model LifeStageDef {
   profileLayout         String
   immunityCapMultiplier Float              @default(1.0)
   deathChanceStartCycle Int?
-  deathChancePerCycle     Float?
-  energyCostMultiplier    Float              @default(1)
-  animals                 Animal[]
+  deathChancePerCycle   Float?
+  energyCostMultiplier  Float              @default(1)
+  animals               Animal[]
   stageActivityDefs     StageActivityDef[]
   game                  Game               @relation(fields: [gameId], references: [id])
 
@@ -141,100 +141,100 @@ model BreedPersonalityProfile {
 }
 
 model Animal {
-  id                              String                           @id @default(cuid())
-  gameId                          String
-  playerAccountId                 String
-  breedId                         String
-  breederId                       String?
-  name                            String
-  sex                             AnimalSex
-  lifeStageId                     String
-  image                           String?
-  generation                      Int                              @default(1)
-  ageInCycles                     Int                              @default(0)
-  bornAt                          DateTime                         @default(now())
-  diedAt                          DateTime?
-  causeOfDeath                    String?
-  status                          AnimalStatus                     @default(ALIVE)
-  deletedAt                       DateTime?
-  isCastrated                     Boolean                          @default(false)
-  isPinned                        Boolean                          @default(false)
-  phenotypeDescription            String?
-  notes                           Json?
-  inbreedingCoefficient           Float                            @default(0)
-  fertility                       Float
-  isTutorialAnimal                Boolean                          @default(false)
-  breedGeneration                 Int?
-  lifeExpectancy                          Int?
-  disciplineDefId                         String?
-  breedingCooldownUntilCycle              Int?
-  geneticCollectionCooldownUntilCycle     Int?
-  subContainerId                  String?
-  stats                           AnimalStat[]
-  statHistory                     AnimalStatHistory[]
-  ancestors                       AnimalAncestor[]                 @relation("AnimalLineage")
-  offspring                       AnimalAncestor[]                 @relation("AncestorAnimals")
-  breedComposition                AnimalBreedComposition[]
-  brands                          AnimalBrand[]
-  dailyLogs                       AnimalDailyLog[]                 @relation("DailyLogAnimal")
-  partnerLogs                     AnimalDailyLog[]                 @relation("DailyLogPartner")
-  genotypes                       AnimalGenotype[]
-  conformationScores              AnimalConformationScore[]
-  conformationSectionScores       AnimalConformationSectionScore[]
-  careScore                       AnimalCareScore?
-  longTermCareRecords             AnimalLongTermCareRecord[]
-  behaviorEvents                  AnimalBehaviorEvent[]
-  healthRecords                   AnimalHealthRecord[]
-  treatmentRecords                AnimalTreatmentRecord[]
-  activityRestrictions            ActivityRestriction[]
-  testResults                     AnimalTestResult[]
-  healthCertificates              HealthCertificate[]
-  vetVisitLogs                    VetVisitLog[]
-  immunity                        AnimalImmunity?
-  careLogs                        CareLog[]
-  trainingLogs                    TrainingLog[]
-  energy                          AnimalEnergy?
-  condition                       AnimalCondition?
-  mood                            AnimalMood?
-  personality                     AnimalPersonality[]
-  stageActivityLogs               StageActivityLog[]
-  clinicEntries                   ClinicEntry[]
-  titles                          AnimalTitle[]
-  equipment                       AnimalEquipment[]
-  breedingListings                BreedingListing[]
-  breedingRecordsAsSire           BreedingRecord[]                 @relation("BreedingSire")
-  breedingRecordsAsDam            BreedingRecord[]                 @relation("BreedingDam")
-  coverOffersAsSire               CoverOffer[]                     @relation("CoverOfferSire")
-  coverOffersAsDam                CoverOffer[]                     @relation("CoverOfferDam")
-  pregnancies                     Pregnancy[]
-  pregnancyOffspring              PregnancyOffspring[]
-  geneticMaterials                GeneticMaterial[]
-  surrogacyRecordsAsBiologicalDam SurrogacyRecord[]
-  compTiers                       AnimalCompetitionTier[]
-  weeklyPoints                    AnimalWeeklyPoints[]
-  competitionEntries              CompetitionEntry[]
-  recordEntries                   RecordEntry[]
-  subContainer                    SubContainer?                    @relation(fields: [subContainerId], references: [id])
-  appliedItems                    AnimalAppliedItem[]
-  marketplaceListings             MarketplaceListingAnimal[]
-  marketplaceOfferAnimals         MarketplaceOfferAnimal[]
-  gifts                           Gift[]
-  gameShopAnimal                  GameShopAnimal?
-  rafflePrizeAnimals              RafflePrizeAnimal[]
-  groupAnimals                    GroupAnimal[]
-  jobContractAnimals              JobContractAnimal[]
-  campaignContributions           CampaignContribution[]
-  foundationAnimalRecords         FoundationAnimal[]
-  followers                       Follow[]
-  userReports                     UserReport[]
-  game                            Game                             @relation(fields: [gameId], references: [id])
-  playerAccount                   PlayerAccount                    @relation("AnimalOwner", fields: [playerAccountId], references: [id])
-  breeder                         PlayerAccount?                   @relation("AnimalBreeder", fields: [breederId], references: [id])
-  breed                           Breed                            @relation(fields: [breedId], references: [id])
-  lifeStage                       LifeStageDef                     @relation(fields: [lifeStageId], references: [id])
-  disciplineDef                   DisciplineDef?                   @relation(fields: [disciplineDefId], references: [id])
-  createdAt                       DateTime                         @default(now())
-  updatedAt                       DateTime                         @updatedAt
+  id                                  String                           @id @default(cuid())
+  gameId                              String
+  playerAccountId                     String
+  breedId                             String
+  breederId                           String?
+  name                                String
+  sex                                 AnimalSex
+  lifeStageId                         String
+  image                               String?
+  generation                          Int                              @default(1)
+  ageInCycles                         Int                              @default(0)
+  bornAt                              DateTime                         @default(now())
+  diedAt                              DateTime?
+  causeOfDeath                        String?
+  status                              AnimalStatus                     @default(ALIVE)
+  deletedAt                           DateTime?
+  isCastrated                         Boolean                          @default(false)
+  isPinned                            Boolean                          @default(false)
+  phenotypeDescription                String?
+  notes                               Json?
+  inbreedingCoefficient               Float                            @default(0)
+  fertility                           Float
+  isTutorialAnimal                    Boolean                          @default(false)
+  breedGeneration                     Int?
+  lifeExpectancy                      Int?
+  disciplineDefId                     String?
+  breedingCooldownUntilCycle          Int?
+  geneticCollectionCooldownUntilCycle Int?
+  subContainerId                      String?
+  stats                               AnimalStat[]
+  statHistory                         AnimalStatHistory[]
+  ancestors                           AnimalAncestor[]                 @relation("AnimalLineage")
+  offspring                           AnimalAncestor[]                 @relation("AncestorAnimals")
+  breedComposition                    AnimalBreedComposition[]
+  brands                              AnimalBrand[]
+  dailyLogs                           AnimalDailyLog[]                 @relation("DailyLogAnimal")
+  partnerLogs                         AnimalDailyLog[]                 @relation("DailyLogPartner")
+  genotypes                           AnimalGenotype[]
+  conformationScores                  AnimalConformationScore[]
+  conformationSectionScores           AnimalConformationSectionScore[]
+  careScore                           AnimalCareScore?
+  longTermCareRecords                 AnimalLongTermCareRecord[]
+  behaviorEvents                      AnimalBehaviorEvent[]
+  healthRecords                       AnimalHealthRecord[]
+  treatmentRecords                    AnimalTreatmentRecord[]
+  activityRestrictions                ActivityRestriction[]
+  testResults                         AnimalTestResult[]
+  healthCertificates                  HealthCertificate[]
+  vetVisitLogs                        VetVisitLog[]
+  immunity                            AnimalImmunity?
+  careLogs                            CareLog[]
+  trainingLogs                        TrainingLog[]
+  energy                              AnimalEnergy?
+  condition                           AnimalCondition?
+  mood                                AnimalMood?
+  personality                         AnimalPersonality[]
+  stageActivityLogs                   StageActivityLog[]
+  clinicEntries                       ClinicEntry[]
+  titles                              AnimalTitle[]
+  equipment                           AnimalEquipment[]
+  breedingListings                    BreedingListing[]
+  breedingRecordsAsSire               BreedingRecord[]                 @relation("BreedingSire")
+  breedingRecordsAsDam                BreedingRecord[]                 @relation("BreedingDam")
+  coverOffersAsSire                   CoverOffer[]                     @relation("CoverOfferSire")
+  coverOffersAsDam                    CoverOffer[]                     @relation("CoverOfferDam")
+  pregnancies                         Pregnancy[]
+  pregnancyOffspring                  PregnancyOffspring[]
+  geneticMaterials                    GeneticMaterial[]
+  surrogacyRecordsAsBiologicalDam     SurrogacyRecord[]
+  compTiers                           AnimalCompetitionTier[]
+  weeklyPoints                        AnimalWeeklyPoints[]
+  competitionEntries                  CompetitionEntry[]
+  recordEntries                       RecordEntry[]
+  subContainer                        SubContainer?                    @relation(fields: [subContainerId], references: [id])
+  appliedItems                        AnimalAppliedItem[]
+  marketplaceListings                 MarketplaceListingAnimal[]
+  marketplaceOfferAnimals             MarketplaceOfferAnimal[]
+  gifts                               Gift[]
+  gameShopAnimal                      GameShopAnimal?
+  rafflePrizeAnimals                  RafflePrizeAnimal[]
+  groupAnimals                        GroupAnimal[]
+  jobContractAnimals                  JobContractAnimal[]
+  campaignContributions               CampaignContribution[]
+  foundationAnimalRecords             FoundationAnimal[]
+  followers                           Follow[]
+  userReports                         UserReport[]
+  game                                Game                             @relation(fields: [gameId], references: [id])
+  playerAccount                       PlayerAccount                    @relation("AnimalOwner", fields: [playerAccountId], references: [id])
+  breeder                             PlayerAccount?                   @relation("AnimalBreeder", fields: [breederId], references: [id])
+  breed                               Breed                            @relation(fields: [breedId], references: [id])
+  lifeStage                           LifeStageDef                     @relation(fields: [lifeStageId], references: [id])
+  disciplineDef                       DisciplineDef?                   @relation(fields: [disciplineDefId], references: [id])
+  createdAt                           DateTime                         @default(now())
+  updatedAt                           DateTime                         @updatedAt
 }
 
 model AnimalStat {

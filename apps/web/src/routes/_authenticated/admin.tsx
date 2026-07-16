@@ -47,16 +47,25 @@ const navGroups = [
     links: [
       { to: "/admin/disciplines", label: "Disciplines" },
       { to: "/admin/competition-tiers", label: "Competition Tiers" },
+      { to: "/admin/venues", label: "Venues" },
       { to: "/admin/season-categories", label: "Season Categories" },
       { to: "/admin/records", label: "Records" },
     ],
   },
   {
-    label: "Economy", 
+    label: "Economy",
     links: [
       { to: "/admin/currencies", label: "Currencies" },
       { to: "/admin/items", label: "Items" },
       { to: "/admin/vet-services", label: "Vet Services" },
+      { to: "/admin/store-listings", label: "Store Listings" },
+      { to: "/admin/game-shop", label: "Game Shop" },
+    ],
+  },
+  {
+    label: "Groups",
+    links: [
+      { to: "/admin/group-prestige-tiers", label: "Prestige Tiers" },
     ],
   },
   {

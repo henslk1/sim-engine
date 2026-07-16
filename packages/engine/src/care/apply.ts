@@ -25,7 +25,7 @@ export async function applyCareAction(
       case "FREE":
         break
       
-      case "CURRENCY":{ 
+      case "CURRENCY":{
 
         if (!performedByPlayerId || !action.currencyAmount) {
           throw new Error("CURRENCY care action requires a player and currencyAmount")
@@ -35,6 +35,14 @@ export async function applyCareAction(
           where: { gameId: action.gameId, currencyType: "BASE" },
           select: { id: true },
         })
+
+        const balance = await tx.playerBalance.findUnique({
+          where: { playerAccountId_currencyDefId: { playerAccountId: performedByPlayerId, currencyDefId: baseCurrency.id } },
+          select: { balance: true },
+        })
+        if (!balance || balance.balance < action.currencyAmount) {
+          throw new Error("Insufficient funds to perform this care action")
+        }
 
         await tx.playerBalance.update({
           where: {
@@ -135,10 +143,17 @@ export async function applyCareAction(
       }
     }
 
+    const gameConfig = await tx.gameConfig.findFirst({
+      where: { gameId: action.gameId },
+      select: { careScoreCeiling: true },
+    })
+    const ceiling = gameConfig?.careScoreCeiling ?? 100
+    const currentCareScore = await tx.animalCareScore.findUnique({ where: { animalId } })
+    const newCareScore = Math.min((currentCareScore?.score ?? 0) + action.careScoreGain, ceiling)
     await tx.animalCareScore.upsert({
       where: { animalId: animalId },
-      create: { animalId: animalId, score: action.careScoreGain },
-      update: { score: { increment: action.careScoreGain } },
+      create: { animalId: animalId, score: Math.min(action.careScoreGain, ceiling) },
+      update: { score: newCareScore },
     })
 
     return careLog

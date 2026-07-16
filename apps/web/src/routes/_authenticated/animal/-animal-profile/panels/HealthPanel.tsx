@@ -1,6 +1,8 @@
 import type { AnimalProfile } from "../types"
 import { Panel, Badge, ActionButton } from "@/components/game/ui"
-import { Stethoscope, ShieldCheck, ShieldAlert, FlaskConical, CalendarClock, Pill } from "lucide-react"
+import { Stethoscope, ShieldCheck, ShieldAlert, CalendarClock, Pill, FlaskConical, Footprints } from "lucide-react"
+import { Link } from "@tanstack/react-router"
+import { trpc } from "@/lib/trpc"
 
 type HealthRecord = AnimalProfile["healthRecords"][number]
 type TreatmentRecord = HealthRecord["treatmentRecords"][number]
@@ -22,13 +24,47 @@ const RESTRICTION_LABEL: Record<string, string> = {
   ALL: "All activities",
 }
 
-export function HealthPanel({ animal, readonly = false }: { animal: AnimalProfile; readonly?: boolean }) {
+export function HealthPanel({
+  animal,
+  playerAccountId,
+  readonly = false,
+}: {
+  animal: AnimalProfile
+  playerAccountId?: string
+  readonly?: boolean
+}) {
+  const utils = trpc.useUtils()
   const activeConditions = animal.healthRecords.filter((r) => r.isActive)
-  const hasOTCTreatment = activeConditions.some((r) =>
-    r.treatmentRecords.some((t) => t.isActive && t.treatmentDef.treatmentType === "OTC")
+
+  const { data: inventory } = trpc.inventory.mine.useQuery(
+    { playerAccountId: playerAccountId! },
+    { enabled: !!playerAccountId && !readonly },
   )
 
+  const administer = trpc.vet.administerTreatment.useMutation({
+    onSuccess: () => {
+      utils.animalProfile.get.invalidate({ animalId: animal.id })
+      if (playerAccountId) utils.inventory.mine.invalidate({ playerAccountId })
+    },
+  })
+
   const certDefs = animal.game.healthCertificateDefs
+
+  function hasItems(items: TreatmentRecord["treatmentDef"]["items"]) {
+    if (!inventory || items.length === 0) return true
+    return items.every((item) => {
+      const inv = inventory.find((i) => i.itemDef.id === item.itemDef.id)
+      return inv && inv.quantity >= item.quantity
+    })
+  }
+
+  function missingItems(items: TreatmentRecord["treatmentDef"]["items"]) {
+    if (!inventory) return []
+    return items.filter((item) => {
+      const inv = inventory.find((i) => i.itemDef.id === item.itemDef.id)
+      return !inv || inv.quantity < item.quantity
+    })
+  }
 
   return (
     <Panel title="Health" icon={<Stethoscope className="size-4 text-destructive" />}>
@@ -50,14 +86,16 @@ export function HealthPanel({ animal, readonly = false }: { animal: AnimalProfil
                 </div>
 
                 {activeTreatments.map((t: TreatmentRecord) => {
-                  const needsAction =
-                    t.treatmentDef.treatmentType === "PRESCRIPTION" ||
-                    t.treatmentDef.treatmentType === "VET_PROCEDURE"
+                  const { treatmentType, items } = t.treatmentDef
+                  const isPending = administer.isPending && administer.variables?.treatmentRecordId === t.id
+                  const canAdminister = hasItems(items)
+                  const missing = missingItems(items)
+
                   return (
                     <div key={t.id} className="border-t border-destructive/15 bg-destructive/5 px-3 py-2">
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-[11px] font-medium text-foreground">{t.treatmentDef.name}</span>
-                        <Badge tone="muted">{TREATMENT_LABEL[t.treatmentDef.treatmentType]}</Badge>
+                        <Badge tone="muted">{TREATMENT_LABEL[treatmentType]}</Badge>
                       </div>
                       {t.treatmentDef.durationCycles != null && (
                         <p className="mt-0.5 text-[11px] text-muted-foreground">
@@ -81,15 +119,42 @@ export function HealthPanel({ animal, readonly = false }: { animal: AnimalProfil
                           </p>
                         )
                       })}
-                      {needsAction && !readonly && (
+
+                      {!readonly && playerAccountId && treatmentType !== "ACTIVITY_RESTRICTION" && (
                         <div className="mt-1.5">
-                          <ActionButton variant="soft" disabled className="w-full justify-center">
-                            {t.treatmentDef.treatmentType === "PRESCRIPTION" ? (
-                              <><Pill className="size-3.5" /> Administer Medication</>
-                            ) : (
-                              <><CalendarClock className="size-3.5" /> Book Procedure</>
-                            )}
-                          </ActionButton>
+                          {treatmentType === "OTC" && missing.length > 0 ? (
+                            <div className="space-y-1">
+                              <p className="text-[11px] text-destructive">
+                                Missing: {missing.map((m) => m.itemDef.name).join(", ")}
+                              </p>
+                              <Link to="/vet" search={{ animalId: animal.id }}>
+                                <ActionButton variant="soft" className="w-full justify-center">
+                                  <FlaskConical className="size-3.5" /> Buy at Vet
+                                </ActionButton>
+                              </Link>
+                            </div>
+                          ) : (
+                            <ActionButton
+                              variant="soft"
+                              className="w-full justify-center"
+                              disabled={isPending || (treatmentType === "OTC" && !canAdminister)}
+                              onClick={() =>
+                                administer.mutate({ treatmentRecordId: t.id, playerAccountId })
+                              }
+                            >
+                              {isPending ? (
+                                "Applying…"
+                              ) : treatmentType === "OTC" ? (
+                                <><FlaskConical className="size-3.5" /> Administer OTC</>
+                              ) : treatmentType === "PRESCRIPTION" ? (
+                                <><Pill className="size-3.5" /> Administer Rx</>
+                              ) : treatmentType === "VET_PROCEDURE" ? (
+                                <><CalendarClock className="size-3.5" /> Book Procedure</>
+                              ) : (
+                                <><Footprints className="size-3.5" /> Perform Care</>
+                              )}
+                            </ActionButton>
+                          )}
                         </div>
                       )}
                     </div>
@@ -101,13 +166,10 @@ export function HealthPanel({ animal, readonly = false }: { animal: AnimalProfil
         </div>
       )}
 
-      {hasOTCTreatment && !readonly && (
-        <div className="mt-3">
-          <ActionButton variant="soft" disabled className="w-full justify-center">
-            <FlaskConical className="size-3.5" />
-            Buy OTC Meds
-          </ActionButton>
-        </div>
+      {administer.error && (
+        <p className="mt-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          {administer.error.message}
+        </p>
       )}
 
       {certDefs.length > 0 && (
@@ -146,9 +208,11 @@ export function HealthPanel({ animal, readonly = false }: { animal: AnimalProfil
                       </span>
                     )}
                     {!readonly && (
-                      <ActionButton variant="soft" disabled className="h-6 px-2 text-[11px]">
-                        Book Testing
-                      </ActionButton>
+                      <Link to="/vet" search={{ animalId: animal.id }}>
+                        <ActionButton variant="soft" className="h-6 px-2 text-[11px]">
+                          Book Testing
+                        </ActionButton>
+                      </Link>
                     )}
                   </div>
                 </div>

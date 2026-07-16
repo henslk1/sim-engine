@@ -4,9 +4,10 @@ import { trpcServer } from "@hono/trpc-server"
 import { appRouter } from "@sim-engine/trpc"
 import { auth } from "./auth.js"
 import { cors } from "hono/cors"
-import { nightlyQueue, competitionQueue, venueRotationQueue, nightlyDispatchQueue } from "./jobs/queue.js"
+import { competitionDispatchQueue, venueRotationDispatchQueue, nightlyDispatchQueue } from "./jobs/queue.js"
 import "./jobs/nightly.dispatcher.js"
 import "./jobs/nightly.worker.js"
+import "./jobs/competition.dispatcher.js"
 import "./jobs/competition.worker.js"
 import "./jobs/venue-rotation.worker.js"
 
@@ -36,13 +37,13 @@ serve({ fetch: app.fetch, port: 3000 }, async () => {
   pattern: "0 0 * * *",
 }, { name: "nightly-dispatch", data: {} })
 
-  await competitionQueue.upsertJobScheduler("competition-cron", {
+  await competitionDispatchQueue.upsertJobScheduler("competition-dispatch-cron", {
     pattern: "0 * * * *",
-  }, { name: "competition-check", data: { gameId: "PLACEHOLDER" } })
+  }, { name: "competition-dispatch", data: {} })
 
-  await venueRotationQueue.upsertJobScheduler("venue-rotation-cron", {
+  await venueRotationDispatchQueue.upsertJobScheduler("venue-rotation-dispatch-cron", {
     pattern: "0 0 * * 5",
-  }, { name: "venue-rotation", data: { gameId: "PLACEHOLDER" } })
+  }, { name: "venue-rotation-dispatch", data: {} })
 
   console.log("Job schedulers registered")
 })

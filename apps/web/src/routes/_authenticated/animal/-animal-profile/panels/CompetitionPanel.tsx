@@ -1,6 +1,9 @@
 import type { AnimalProfile } from "../types"
 import { Panel, ActionButton, Meter } from "@/components/game/ui"
-import { Trophy, CheckCircle, XCircle, Ban, MapPin } from "lucide-react"
+import { Trophy, CheckCircle, XCircle, Ban, MapPin, Ruler } from "lucide-react"
+import { Link } from "@tanstack/react-router"
+import { useState } from "react"
+import { trpc } from "@/lib/trpc"
 import { getActiveRestrictions } from "../utils"
 
 type Cert = AnimalProfile["healthCertificates"][number]
@@ -17,11 +20,32 @@ function InfoCard({ label, value }: { label: string; value: string }) {
 export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalProfile; readonly?: boolean }) {
   const canCompete = animal.lifeStage.canCompete
   const currentTier = animal.compTiers[0]
+  const [selectedDisciplineId, setSelectedDisciplineId] = useState("")
+
+  const { data: allDisciplines } = trpc.admin.discipline.list.useQuery(
+    { gameId: animal.gameId },
+    { enabled: !animal.disciplineDef && canCompete && !readonly },
+  )
+  const disciplines = allDisciplines?.filter((d) => !d.isConformation)
+
+  const utils = trpc.useUtils()
+  const setDiscipline = trpc.animal.setDiscipline.useMutation({
+    onSuccess: () => utils.animalProfile.get.invalidate({ animalId: animal.id }),
+  })
   const latestWeeklyPoints = animal.weeklyPoints[0]?.points
   const restrictions = getActiveRestrictions(animal)
   const isRestricted = restrictions.has("COMPETITION") || restrictions.has("ALL")
 
   const requiredCertDefs = animal.game.healthCertificateDefs.filter((d) => d.requiredForCompetition)
+
+  const allEquipmentMet = (currentTier?.disciplineDef.equipmentRequirements ?? []).every(
+    (req) => animal.equipment.filter((eq) => eq.itemDef.id === req.itemDef.id).length >= req.quantity
+  )
+  const allCertsMet = requiredCertDefs.every((def) => {
+    const cert = animal.healthCertificates.find((c: Cert) => c.certDef.id === def.id)
+    return !!cert && cert.isValid && cert.expiresAtCycle > animal.ageInCycles
+  })
+  const canBrowseVenues = !isRestricted && allEquipmentMet && allCertsMet
 
   return (
     <Panel title="Competition" icon={<Trophy className="size-4 text-chart-1" />}>
@@ -65,10 +89,22 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
           </div>
 
           {!readonly && (
-            <ActionButton variant="soft" disabled className="w-full justify-center">
-              <MapPin className="size-3.5" />
-              Browse Venues
-            </ActionButton>
+            canBrowseVenues ? (
+              <Link
+                to="/venues"
+                search={{ animalId: animal.id, disciplineDefId: animal.disciplineDef?.id, from: "animal" as const }}
+              >
+                <ActionButton variant="soft" className="w-full justify-center">
+                  <MapPin className="size-3.5" />
+                  Browse Venues
+                </ActionButton>
+              </Link>
+            ) : (
+              <ActionButton variant="soft" className="w-full justify-center" disabled>
+                <MapPin className="size-3.5" />
+                Browse Venues
+              </ActionButton>
+            )
           )}
 
           {(currentTier?.disciplineDef.equipmentRequirements.length ?? 0) > 0 || requiredCertDefs.length > 0 ? (
@@ -128,8 +164,75 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
           ) : null}
 
         </>
-      ) : (
+      ) : readonly ? (
         <p className="text-[11px] text-muted-foreground">No discipline assigned</p>
+      ) : (
+        <div className="space-y-2">
+          <p className="text-[11px] text-muted-foreground">No discipline assigned yet.</p>
+          <div className="flex gap-2">
+            <select
+              value={selectedDisciplineId}
+              onChange={(e) => setSelectedDisciplineId(e.target.value)}
+              className="flex-1 rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+            >
+              <option value="">Choose discipline…</option>
+              {disciplines?.map((d) => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </select>
+            <ActionButton
+              variant="soft"
+              disabled={!selectedDisciplineId || setDiscipline.isPending}
+              onClick={() => selectedDisciplineId && setDiscipline.mutate({ animalId: animal.id, disciplineDefId: selectedDisciplineId })}
+            >
+              {setDiscipline.isPending ? "Saving…" : "Confirm"}
+            </ActionButton>
+          </div>
+          {setDiscipline.error && (
+            <p className="text-[11px] text-destructive">{setDiscipline.error.message}</p>
+          )}
+        </div>
+      )}
+      {/* Conformation shows — available to any animal with a conformation score */}
+      {canCompete && animal.conformationScores.length > 0 && (
+        <div className="mt-3 border-t border-border/50 pt-3">
+          <div className="mb-1.5 flex items-center gap-1.5">
+            <Ruler className="size-3 text-muted-foreground" />
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Conformation Shows</span>
+          </div>
+          {(() => {
+            const conformationTier = animal.compTiers.find((t) => t.disciplineDef.isConformation)
+            if (!conformationTier) return null
+            const conformationPoints = animal.weeklyPoints.find(
+              (p) => p.disciplineDefId === conformationTier.disciplineDefId
+            )
+            return (
+              <div className="mb-2 grid grid-cols-2 gap-2">
+                <InfoCard label="Current Tier" value={conformationTier.tierDef.name} />
+                <InfoCard
+                  label="Weekly Points"
+                  value={conformationPoints !== undefined ? `${Math.round(conformationPoints.points)} pts` : "—"}
+                />
+              </div>
+            )
+          })()}
+          {!readonly && !isRestricted ? (
+            <Link
+              to="/venues"
+              search={{ animalId: animal.id, isConformation: true, from: "animal" as const }}
+            >
+              <ActionButton variant="soft" className="w-full justify-center">
+                <MapPin className="size-3.5" />
+                Browse Conformation Shows
+              </ActionButton>
+            </Link>
+          ) : (
+            <ActionButton variant="soft" className="w-full justify-center" disabled>
+              <MapPin className="size-3.5" />
+              Browse Conformation Shows
+            </ActionButton>
+          )}
+        </div>
       )}
       </>
       )}

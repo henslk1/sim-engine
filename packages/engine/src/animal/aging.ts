@@ -155,11 +155,15 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
 
     // Check if work was done this cycle — suppresses condition decay
     const currentCycle = animal.ageInCycles
-    const [workedThisCycle, energy, mood, condition, careScore, activeHealthRecords] = await Promise.all([
+    const [workedThisCycle, allCareDone, energy, mood, condition, careScore, activeHealthRecords] = await Promise.all([
       Promise.all([
         tx.trainingLog.count({ where: { animalId, cycleNumber: currentCycle } }),
         tx.competitionEntry.count({ where: { animalId, cycleNumber: currentCycle } }),
       ]).then(([t, c]) => t + c > 0),
+      Promise.all([
+        tx.careActionDef.count({ where: { gameId: animal.gameId } }),
+        tx.careLog.count({ where: { animalId, cycleNumber: currentCycle } }),
+      ]).then(([total, done]) => total === 0 || done >= total),
       tx.animalEnergy.findUnique({ where: { animalId } }),
       tx.animalMood.findUnique({ where: { animalId } }),
       tx.animalCondition.findUnique({ where: { animalId } }),
@@ -205,13 +209,17 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
         where: { animalId },
         data: { value: Math.max(0, condition.value - gameConfig.conditionDecayRate) },
       }),
-      careScore && tx.animalCareScore.update({
+      careScore && !allCareDone && tx.animalCareScore.update({
         where: { animalId },
         data: { score: Math.max(gameConfig.careScoreFloor, careScore.score - gameConfig.careScoreDecayRate) },
       }),
       immunity && tx.animalImmunity.update({
         where: { animalId },
-        data: { value: Math.max(0, immunity.value - gameConfig.immunityDecayRate) },
+        data: {
+          value: allCareDone
+            ? Math.min(immunity.innateMax, immunity.value + gameConfig.immunityRecoveryRate)
+            : Math.max(gameConfig.immunityMin, immunity.value - gameConfig.immunityDecayRate),
+        },
       }),
     ].filter(Boolean))
 

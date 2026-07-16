@@ -41,12 +41,12 @@ export const breedingPregnancyRouter = router({
 
         const { gameId, playerAccountId, ageInCycles } = pregnancy.animal
 
-        const vetService = await tx.vetServiceDef.findFirstOrThrow({
+        const vetService = await tx.vetServiceDef.findFirst({
           where: { gameId, serviceType: "ULTRASOUND" },
           select: { id: true, baseCost: true, currencyDefId: true },
         })
 
-        if (vetService.baseCost > 0) {
+        if (vetService && vetService.baseCost > 0) {
           await tx.playerBalance.update({
             where: {
               playerAccountId_currencyDefId: {
@@ -67,14 +67,16 @@ export const breedingPregnancyRouter = router({
           })
         }
 
-        await tx.vetVisitLog.create({
-          data: {
-            animalId: pregnancy.animalId,
-            playerAccountId,
-            vetServiceDefId: vetService.id,
-            visitCycle: ageInCycles,
-          },
-        })
+        if (vetService) {
+          await tx.vetVisitLog.create({
+            data: {
+              animalId: pregnancy.animalId,
+              playerAccountId,
+              vetServiceDefId: vetService.id,
+              visitCycle: ageInCycles,
+            },
+          })
+        }
 
         await tx.pregnancy.update({
           where: { id: input.pregnancyId },
@@ -183,6 +185,17 @@ export const breedingPregnancyRouter = router({
           })
         }
 
+        if (unborn.length > 0) {
+          await tx.animalDailyLog.create({
+            data: {
+              animalId: pregnancy.animal.id,
+              cycleNumber: pregnancy.animal.ageInCycles,
+              eventType: "BIRTH",
+              context: { offspringCount: unborn.length },
+            },
+          })
+        }
+
         return { damId: pregnancy.animal.id, born: unborn.length }
       })
     }),
@@ -205,12 +218,12 @@ export const breedingPregnancyRouter = router({
 
         const { gameId, playerAccountId, ageInCycles } = pregnancy.animal
 
-        const vetService = await tx.vetServiceDef.findFirstOrThrow({
+        const vetService = await tx.vetServiceDef.findFirst({
           where: { gameId, serviceType: "PREGNANCY_ABORT" },
           select: { id: true, baseCost: true, currencyDefId: true },
         })
 
-        if (vetService.baseCost > 0) {
+        if (vetService && vetService.baseCost > 0) {
           await tx.playerBalance.update({
             where: {
               playerAccountId_currencyDefId: {
@@ -231,14 +244,16 @@ export const breedingPregnancyRouter = router({
           })
         }
 
-        await tx.vetVisitLog.create({
-          data: {
-            animalId: pregnancy.animalId,
-            playerAccountId,
-            vetServiceDefId: vetService.id,
-            visitCycle: ageInCycles,
-          },
-        })
+        if (vetService) {
+          await tx.vetVisitLog.create({
+            data: {
+              animalId: pregnancy.animalId,
+              playerAccountId,
+              vetServiceDefId: vetService.id,
+              visitCycle: ageInCycles,
+            },
+          })
+        }
 
         const offspringAnimalIds = pregnancy.offspring.map((o) => o.animalId)
 

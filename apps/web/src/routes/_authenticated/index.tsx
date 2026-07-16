@@ -1,5 +1,6 @@
-import { createFileRoute, Link } from "@tanstack/react-router"
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import { trpc } from "@/lib/trpc"
+import { useEffect } from "react"
 import { Settings, Skull, Archive, BookMarked } from "lucide-react"
 
 export const Route = createFileRoute("/_authenticated/")({
@@ -14,12 +15,28 @@ const STATUS_META: Record<string, { label: string; color: string }> = {
 }
 
 function LandingPage() {
+  const navigate = useNavigate()
+  const { data: gameData } = trpc.admin.game.get.useQuery()
+  const gameId = gameData?.id
+  const { data: me, isLoading: meLoading } = trpc.player.me.useQuery(
+    { gameId: gameId! },
+    { enabled: !!gameId },
+  )
+
+  useEffect(() => {
+    if (!meLoading && gameId && me === null) {
+      navigate({ to: "/setup" })
+    }
+  }, [me, meLoading, gameId, navigate])
+
   const { data: animals, isLoading } = trpc.animal.list.useQuery()
 
   const alive    = animals?.filter((a) => a.status === "ALIVE") ?? []
   const deceased = animals?.filter((a) => a.status === "DECEASED") ?? []
   const archived = animals?.filter((a) => a.status === "ARCHIVED") ?? []
   const buried   = animals?.filter((a) => a.status === "BURIED") ?? []
+
+  if (!gameId || meLoading) return <p className="p-8 text-sm text-muted-foreground">Loading…</p>
 
   return (
     <div className="mx-auto max-w-5xl space-y-8 p-8">

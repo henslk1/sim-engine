@@ -96,4 +96,39 @@ export const careAdminRouter = router({
   removeLongTerm: publicProcedure
     .input(z.object({ id: z.string() }))
     .mutation(({ input }) => db.longTermCareActionDef.delete({ where: { id: input.id } })),
+
+  initLtcRecords: publicProcedure
+    .input(z.object({ gameId: z.string() }))
+    .mutation(async ({ input }) => {
+      const [animals, ltcDefs] = await Promise.all([
+        db.animal.findMany({
+          where: { gameId: input.gameId, status: "ALIVE" },
+          select: { id: true },
+        }),
+        db.longTermCareActionDef.findMany({
+          where: { gameId: input.gameId },
+          select: { id: true, intervalCycles: true },
+        }),
+      ])
+
+      if (ltcDefs.length === 0) return { initialized: 0, skipped: 0 }
+
+      let initialized = 0
+      let skipped = 0
+
+      for (const animal of animals) {
+        for (const def of ltcDefs) {
+          const existing = await db.animalLongTermCareRecord.findUnique({
+            where: { animalId_longTermCareActionDefId: { animalId: animal.id, longTermCareActionDefId: def.id } },
+          })
+          if (existing) { skipped++; continue }
+          await db.animalLongTermCareRecord.create({
+            data: { animalId: animal.id, longTermCareActionDefId: def.id, nextDueCycle: def.intervalCycles },
+          })
+          initialized++
+        }
+      }
+
+      return { initialized, skipped }
+    }),
 })

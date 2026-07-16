@@ -13,15 +13,22 @@ import { Route as SignupRouteImport } from './routes/signup'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
+import { Route as AuthenticatedVetRouteImport } from './routes/_authenticated/vet'
+import { Route as AuthenticatedVenuesRouteImport } from './routes/_authenticated/venues'
+import { Route as AuthenticatedTownRouteImport } from './routes/_authenticated/town'
+import { Route as AuthenticatedShopRouteImport } from './routes/_authenticated/shop'
+import { Route as AuthenticatedSetupRouteImport } from './routes/_authenticated/setup'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
 import { Route as AuthenticatedBreedingOfferIdRouteImport } from './routes/_authenticated/breeding/$offerId'
 import { Route as AuthenticatedAnimalAnimalIdRouteImport } from './routes/_authenticated/animal/$animalId'
 import { Route as AuthenticatedAdminVetServicesRouteImport } from './routes/_authenticated/admin/vet-services'
+import { Route as AuthenticatedAdminVenuesRouteImport } from './routes/_authenticated/admin/venues'
 import { Route as AuthenticatedAdminTutorialStepsRouteImport } from './routes/_authenticated/admin/tutorial-steps'
 import { Route as AuthenticatedAdminTreatmentsRouteImport } from './routes/_authenticated/admin/treatments'
 import { Route as AuthenticatedAdminTrainingActionsRouteImport } from './routes/_authenticated/admin/training-actions'
 import { Route as AuthenticatedAdminTitlesRouteImport } from './routes/_authenticated/admin/titles'
+import { Route as AuthenticatedAdminStoreListingsRouteImport } from './routes/_authenticated/admin/store-listings'
 import { Route as AuthenticatedAdminStatsRouteImport } from './routes/_authenticated/admin/stats'
 import { Route as AuthenticatedAdminStageActivitiesRouteImport } from './routes/_authenticated/admin/stage-activities'
 import { Route as AuthenticatedAdminSpeciesRouteImport } from './routes/_authenticated/admin/species'
@@ -35,7 +42,9 @@ import { Route as AuthenticatedAdminItemsRouteImport } from './routes/_authentic
 import { Route as AuthenticatedAdminIntensityTiersRouteImport } from './routes/_authenticated/admin/intensity-tiers'
 import { Route as AuthenticatedAdminHealthConditionsRouteImport } from './routes/_authenticated/admin/health-conditions'
 import { Route as AuthenticatedAdminHealthCertificatesRouteImport } from './routes/_authenticated/admin/health-certificates'
+import { Route as AuthenticatedAdminGroupPrestigeTiersRouteImport } from './routes/_authenticated/admin/group-prestige-tiers'
 import { Route as AuthenticatedAdminGeneticPanelsRouteImport } from './routes/_authenticated/admin/genetic-panels'
+import { Route as AuthenticatedAdminGameShopRouteImport } from './routes/_authenticated/admin/game-shop'
 import { Route as AuthenticatedAdminGameConfigRouteImport } from './routes/_authenticated/admin/game-config'
 import { Route as AuthenticatedAdminExpressionRulesRouteImport } from './routes/_authenticated/admin/expression-rules'
 import { Route as AuthenticatedAdminDisciplinesRouteImport } from './routes/_authenticated/admin/disciplines'
@@ -63,6 +72,31 @@ const AuthenticatedRoute = AuthenticatedRouteImport.update({
 const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedVetRoute = AuthenticatedVetRouteImport.update({
+  id: '/vet',
+  path: '/vet',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedVenuesRoute = AuthenticatedVenuesRouteImport.update({
+  id: '/venues',
+  path: '/venues',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedTownRoute = AuthenticatedTownRouteImport.update({
+  id: '/town',
+  path: '/town',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedShopRoute = AuthenticatedShopRouteImport.update({
+  id: '/shop',
+  path: '/shop',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedSetupRoute = AuthenticatedSetupRouteImport.update({
+  id: '/setup',
+  path: '/setup',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
@@ -93,6 +127,12 @@ const AuthenticatedAdminVetServicesRoute =
     path: '/vet-services',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminVenuesRoute =
+  AuthenticatedAdminVenuesRouteImport.update({
+    id: '/venues',
+    path: '/venues',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedAdminTutorialStepsRoute =
   AuthenticatedAdminTutorialStepsRouteImport.update({
     id: '/tutorial-steps',
@@ -115,6 +155,12 @@ const AuthenticatedAdminTitlesRoute =
   AuthenticatedAdminTitlesRouteImport.update({
     id: '/titles',
     path: '/titles',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminStoreListingsRoute =
+  AuthenticatedAdminStoreListingsRouteImport.update({
+    id: '/store-listings',
+    path: '/store-listings',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
 const AuthenticatedAdminStatsRoute = AuthenticatedAdminStatsRouteImport.update({
@@ -192,10 +238,22 @@ const AuthenticatedAdminHealthCertificatesRoute =
     path: '/health-certificates',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminGroupPrestigeTiersRoute =
+  AuthenticatedAdminGroupPrestigeTiersRouteImport.update({
+    id: '/group-prestige-tiers',
+    path: '/group-prestige-tiers',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedAdminGeneticPanelsRoute =
   AuthenticatedAdminGeneticPanelsRouteImport.update({
     id: '/genetic-panels',
     path: '/genetic-panels',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminGameShopRoute =
+  AuthenticatedAdminGameShopRouteImport.update({
+    id: '/game-shop',
+    path: '/game-shop',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
 const AuthenticatedAdminGameConfigRoute =
@@ -258,6 +316,11 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/setup': typeof AuthenticatedSetupRoute
+  '/shop': typeof AuthenticatedShopRoute
+  '/town': typeof AuthenticatedTownRoute
+  '/venues': typeof AuthenticatedVenuesRoute
+  '/vet': typeof AuthenticatedVetRoute
   '/admin/breeds': typeof AuthenticatedAdminBreedsRoute
   '/admin/care-actions': typeof AuthenticatedAdminCareActionsRoute
   '/admin/competition-tiers': typeof AuthenticatedAdminCompetitionTiersRoute
@@ -267,7 +330,9 @@ export interface FileRoutesByFullPath {
   '/admin/disciplines': typeof AuthenticatedAdminDisciplinesRoute
   '/admin/expression-rules': typeof AuthenticatedAdminExpressionRulesRoute
   '/admin/game-config': typeof AuthenticatedAdminGameConfigRoute
+  '/admin/game-shop': typeof AuthenticatedAdminGameShopRoute
   '/admin/genetic-panels': typeof AuthenticatedAdminGeneticPanelsRoute
+  '/admin/group-prestige-tiers': typeof AuthenticatedAdminGroupPrestigeTiersRoute
   '/admin/health-certificates': typeof AuthenticatedAdminHealthCertificatesRoute
   '/admin/health-conditions': typeof AuthenticatedAdminHealthConditionsRoute
   '/admin/intensity-tiers': typeof AuthenticatedAdminIntensityTiersRoute
@@ -281,10 +346,12 @@ export interface FileRoutesByFullPath {
   '/admin/species': typeof AuthenticatedAdminSpeciesRoute
   '/admin/stage-activities': typeof AuthenticatedAdminStageActivitiesRoute
   '/admin/stats': typeof AuthenticatedAdminStatsRoute
+  '/admin/store-listings': typeof AuthenticatedAdminStoreListingsRoute
   '/admin/titles': typeof AuthenticatedAdminTitlesRoute
   '/admin/training-actions': typeof AuthenticatedAdminTrainingActionsRoute
   '/admin/treatments': typeof AuthenticatedAdminTreatmentsRoute
   '/admin/tutorial-steps': typeof AuthenticatedAdminTutorialStepsRoute
+  '/admin/venues': typeof AuthenticatedAdminVenuesRoute
   '/admin/vet-services': typeof AuthenticatedAdminVetServicesRoute
   '/animal/$animalId': typeof AuthenticatedAnimalAnimalIdRoute
   '/breeding/$offerId': typeof AuthenticatedBreedingOfferIdRoute
@@ -293,6 +360,11 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/setup': typeof AuthenticatedSetupRoute
+  '/shop': typeof AuthenticatedShopRoute
+  '/town': typeof AuthenticatedTownRoute
+  '/venues': typeof AuthenticatedVenuesRoute
+  '/vet': typeof AuthenticatedVetRoute
   '/': typeof AuthenticatedIndexRoute
   '/admin/breeds': typeof AuthenticatedAdminBreedsRoute
   '/admin/care-actions': typeof AuthenticatedAdminCareActionsRoute
@@ -303,7 +375,9 @@ export interface FileRoutesByTo {
   '/admin/disciplines': typeof AuthenticatedAdminDisciplinesRoute
   '/admin/expression-rules': typeof AuthenticatedAdminExpressionRulesRoute
   '/admin/game-config': typeof AuthenticatedAdminGameConfigRoute
+  '/admin/game-shop': typeof AuthenticatedAdminGameShopRoute
   '/admin/genetic-panels': typeof AuthenticatedAdminGeneticPanelsRoute
+  '/admin/group-prestige-tiers': typeof AuthenticatedAdminGroupPrestigeTiersRoute
   '/admin/health-certificates': typeof AuthenticatedAdminHealthCertificatesRoute
   '/admin/health-conditions': typeof AuthenticatedAdminHealthConditionsRoute
   '/admin/intensity-tiers': typeof AuthenticatedAdminIntensityTiersRoute
@@ -317,10 +391,12 @@ export interface FileRoutesByTo {
   '/admin/species': typeof AuthenticatedAdminSpeciesRoute
   '/admin/stage-activities': typeof AuthenticatedAdminStageActivitiesRoute
   '/admin/stats': typeof AuthenticatedAdminStatsRoute
+  '/admin/store-listings': typeof AuthenticatedAdminStoreListingsRoute
   '/admin/titles': typeof AuthenticatedAdminTitlesRoute
   '/admin/training-actions': typeof AuthenticatedAdminTrainingActionsRoute
   '/admin/treatments': typeof AuthenticatedAdminTreatmentsRoute
   '/admin/tutorial-steps': typeof AuthenticatedAdminTutorialStepsRoute
+  '/admin/venues': typeof AuthenticatedAdminVenuesRoute
   '/admin/vet-services': typeof AuthenticatedAdminVetServicesRoute
   '/animal/$animalId': typeof AuthenticatedAnimalAnimalIdRoute
   '/breeding/$offerId': typeof AuthenticatedBreedingOfferIdRoute
@@ -332,6 +408,11 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/_authenticated/setup': typeof AuthenticatedSetupRoute
+  '/_authenticated/shop': typeof AuthenticatedShopRoute
+  '/_authenticated/town': typeof AuthenticatedTownRoute
+  '/_authenticated/venues': typeof AuthenticatedVenuesRoute
+  '/_authenticated/vet': typeof AuthenticatedVetRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/admin/breeds': typeof AuthenticatedAdminBreedsRoute
   '/_authenticated/admin/care-actions': typeof AuthenticatedAdminCareActionsRoute
@@ -342,7 +423,9 @@ export interface FileRoutesById {
   '/_authenticated/admin/disciplines': typeof AuthenticatedAdminDisciplinesRoute
   '/_authenticated/admin/expression-rules': typeof AuthenticatedAdminExpressionRulesRoute
   '/_authenticated/admin/game-config': typeof AuthenticatedAdminGameConfigRoute
+  '/_authenticated/admin/game-shop': typeof AuthenticatedAdminGameShopRoute
   '/_authenticated/admin/genetic-panels': typeof AuthenticatedAdminGeneticPanelsRoute
+  '/_authenticated/admin/group-prestige-tiers': typeof AuthenticatedAdminGroupPrestigeTiersRoute
   '/_authenticated/admin/health-certificates': typeof AuthenticatedAdminHealthCertificatesRoute
   '/_authenticated/admin/health-conditions': typeof AuthenticatedAdminHealthConditionsRoute
   '/_authenticated/admin/intensity-tiers': typeof AuthenticatedAdminIntensityTiersRoute
@@ -356,10 +439,12 @@ export interface FileRoutesById {
   '/_authenticated/admin/species': typeof AuthenticatedAdminSpeciesRoute
   '/_authenticated/admin/stage-activities': typeof AuthenticatedAdminStageActivitiesRoute
   '/_authenticated/admin/stats': typeof AuthenticatedAdminStatsRoute
+  '/_authenticated/admin/store-listings': typeof AuthenticatedAdminStoreListingsRoute
   '/_authenticated/admin/titles': typeof AuthenticatedAdminTitlesRoute
   '/_authenticated/admin/training-actions': typeof AuthenticatedAdminTrainingActionsRoute
   '/_authenticated/admin/treatments': typeof AuthenticatedAdminTreatmentsRoute
   '/_authenticated/admin/tutorial-steps': typeof AuthenticatedAdminTutorialStepsRoute
+  '/_authenticated/admin/venues': typeof AuthenticatedAdminVenuesRoute
   '/_authenticated/admin/vet-services': typeof AuthenticatedAdminVetServicesRoute
   '/_authenticated/animal/$animalId': typeof AuthenticatedAnimalAnimalIdRoute
   '/_authenticated/breeding/$offerId': typeof AuthenticatedBreedingOfferIdRoute
@@ -372,6 +457,11 @@ export interface FileRouteTypes {
     | '/login'
     | '/signup'
     | '/admin'
+    | '/setup'
+    | '/shop'
+    | '/town'
+    | '/venues'
+    | '/vet'
     | '/admin/breeds'
     | '/admin/care-actions'
     | '/admin/competition-tiers'
@@ -381,7 +471,9 @@ export interface FileRouteTypes {
     | '/admin/disciplines'
     | '/admin/expression-rules'
     | '/admin/game-config'
+    | '/admin/game-shop'
     | '/admin/genetic-panels'
+    | '/admin/group-prestige-tiers'
     | '/admin/health-certificates'
     | '/admin/health-conditions'
     | '/admin/intensity-tiers'
@@ -395,10 +487,12 @@ export interface FileRouteTypes {
     | '/admin/species'
     | '/admin/stage-activities'
     | '/admin/stats'
+    | '/admin/store-listings'
     | '/admin/titles'
     | '/admin/training-actions'
     | '/admin/treatments'
     | '/admin/tutorial-steps'
+    | '/admin/venues'
     | '/admin/vet-services'
     | '/animal/$animalId'
     | '/breeding/$offerId'
@@ -407,6 +501,11 @@ export interface FileRouteTypes {
   to:
     | '/login'
     | '/signup'
+    | '/setup'
+    | '/shop'
+    | '/town'
+    | '/venues'
+    | '/vet'
     | '/'
     | '/admin/breeds'
     | '/admin/care-actions'
@@ -417,7 +516,9 @@ export interface FileRouteTypes {
     | '/admin/disciplines'
     | '/admin/expression-rules'
     | '/admin/game-config'
+    | '/admin/game-shop'
     | '/admin/genetic-panels'
+    | '/admin/group-prestige-tiers'
     | '/admin/health-certificates'
     | '/admin/health-conditions'
     | '/admin/intensity-tiers'
@@ -431,10 +532,12 @@ export interface FileRouteTypes {
     | '/admin/species'
     | '/admin/stage-activities'
     | '/admin/stats'
+    | '/admin/store-listings'
     | '/admin/titles'
     | '/admin/training-actions'
     | '/admin/treatments'
     | '/admin/tutorial-steps'
+    | '/admin/venues'
     | '/admin/vet-services'
     | '/animal/$animalId'
     | '/breeding/$offerId'
@@ -445,6 +548,11 @@ export interface FileRouteTypes {
     | '/login'
     | '/signup'
     | '/_authenticated/admin'
+    | '/_authenticated/setup'
+    | '/_authenticated/shop'
+    | '/_authenticated/town'
+    | '/_authenticated/venues'
+    | '/_authenticated/vet'
     | '/_authenticated/'
     | '/_authenticated/admin/breeds'
     | '/_authenticated/admin/care-actions'
@@ -455,7 +563,9 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/disciplines'
     | '/_authenticated/admin/expression-rules'
     | '/_authenticated/admin/game-config'
+    | '/_authenticated/admin/game-shop'
     | '/_authenticated/admin/genetic-panels'
+    | '/_authenticated/admin/group-prestige-tiers'
     | '/_authenticated/admin/health-certificates'
     | '/_authenticated/admin/health-conditions'
     | '/_authenticated/admin/intensity-tiers'
@@ -469,10 +579,12 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/species'
     | '/_authenticated/admin/stage-activities'
     | '/_authenticated/admin/stats'
+    | '/_authenticated/admin/store-listings'
     | '/_authenticated/admin/titles'
     | '/_authenticated/admin/training-actions'
     | '/_authenticated/admin/treatments'
     | '/_authenticated/admin/tutorial-steps'
+    | '/_authenticated/admin/venues'
     | '/_authenticated/admin/vet-services'
     | '/_authenticated/animal/$animalId'
     | '/_authenticated/breeding/$offerId'
@@ -515,6 +627,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/vet': {
+      id: '/_authenticated/vet'
+      path: '/vet'
+      fullPath: '/vet'
+      preLoaderRoute: typeof AuthenticatedVetRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/venues': {
+      id: '/_authenticated/venues'
+      path: '/venues'
+      fullPath: '/venues'
+      preLoaderRoute: typeof AuthenticatedVenuesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/town': {
+      id: '/_authenticated/town'
+      path: '/town'
+      fullPath: '/town'
+      preLoaderRoute: typeof AuthenticatedTownRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/shop': {
+      id: '/_authenticated/shop'
+      path: '/shop'
+      fullPath: '/shop'
+      preLoaderRoute: typeof AuthenticatedShopRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/setup': {
+      id: '/_authenticated/setup'
+      path: '/setup'
+      fullPath: '/setup'
+      preLoaderRoute: typeof AuthenticatedSetupRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/admin': {
       id: '/_authenticated/admin'
       path: '/admin'
@@ -550,6 +697,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminVetServicesRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/venues': {
+      id: '/_authenticated/admin/venues'
+      path: '/venues'
+      fullPath: '/admin/venues'
+      preLoaderRoute: typeof AuthenticatedAdminVenuesRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/tutorial-steps': {
       id: '/_authenticated/admin/tutorial-steps'
       path: '/tutorial-steps'
@@ -576,6 +730,13 @@ declare module '@tanstack/react-router' {
       path: '/titles'
       fullPath: '/admin/titles'
       preLoaderRoute: typeof AuthenticatedAdminTitlesRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/store-listings': {
+      id: '/_authenticated/admin/store-listings'
+      path: '/store-listings'
+      fullPath: '/admin/store-listings'
+      preLoaderRoute: typeof AuthenticatedAdminStoreListingsRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
     '/_authenticated/admin/stats': {
@@ -669,11 +830,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminHealthCertificatesRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/group-prestige-tiers': {
+      id: '/_authenticated/admin/group-prestige-tiers'
+      path: '/group-prestige-tiers'
+      fullPath: '/admin/group-prestige-tiers'
+      preLoaderRoute: typeof AuthenticatedAdminGroupPrestigeTiersRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/genetic-panels': {
       id: '/_authenticated/admin/genetic-panels'
       path: '/genetic-panels'
       fullPath: '/admin/genetic-panels'
       preLoaderRoute: typeof AuthenticatedAdminGeneticPanelsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/game-shop': {
+      id: '/_authenticated/admin/game-shop'
+      path: '/game-shop'
+      fullPath: '/admin/game-shop'
+      preLoaderRoute: typeof AuthenticatedAdminGameShopRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
     '/_authenticated/admin/game-config': {
@@ -752,7 +927,9 @@ interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminDisciplinesRoute: typeof AuthenticatedAdminDisciplinesRoute
   AuthenticatedAdminExpressionRulesRoute: typeof AuthenticatedAdminExpressionRulesRoute
   AuthenticatedAdminGameConfigRoute: typeof AuthenticatedAdminGameConfigRoute
+  AuthenticatedAdminGameShopRoute: typeof AuthenticatedAdminGameShopRoute
   AuthenticatedAdminGeneticPanelsRoute: typeof AuthenticatedAdminGeneticPanelsRoute
+  AuthenticatedAdminGroupPrestigeTiersRoute: typeof AuthenticatedAdminGroupPrestigeTiersRoute
   AuthenticatedAdminHealthCertificatesRoute: typeof AuthenticatedAdminHealthCertificatesRoute
   AuthenticatedAdminHealthConditionsRoute: typeof AuthenticatedAdminHealthConditionsRoute
   AuthenticatedAdminIntensityTiersRoute: typeof AuthenticatedAdminIntensityTiersRoute
@@ -766,10 +943,12 @@ interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminSpeciesRoute: typeof AuthenticatedAdminSpeciesRoute
   AuthenticatedAdminStageActivitiesRoute: typeof AuthenticatedAdminStageActivitiesRoute
   AuthenticatedAdminStatsRoute: typeof AuthenticatedAdminStatsRoute
+  AuthenticatedAdminStoreListingsRoute: typeof AuthenticatedAdminStoreListingsRoute
   AuthenticatedAdminTitlesRoute: typeof AuthenticatedAdminTitlesRoute
   AuthenticatedAdminTrainingActionsRoute: typeof AuthenticatedAdminTrainingActionsRoute
   AuthenticatedAdminTreatmentsRoute: typeof AuthenticatedAdminTreatmentsRoute
   AuthenticatedAdminTutorialStepsRoute: typeof AuthenticatedAdminTutorialStepsRoute
+  AuthenticatedAdminVenuesRoute: typeof AuthenticatedAdminVenuesRoute
   AuthenticatedAdminVetServicesRoute: typeof AuthenticatedAdminVetServicesRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
 }
@@ -788,7 +967,10 @@ const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminExpressionRulesRoute:
     AuthenticatedAdminExpressionRulesRoute,
   AuthenticatedAdminGameConfigRoute: AuthenticatedAdminGameConfigRoute,
+  AuthenticatedAdminGameShopRoute: AuthenticatedAdminGameShopRoute,
   AuthenticatedAdminGeneticPanelsRoute: AuthenticatedAdminGeneticPanelsRoute,
+  AuthenticatedAdminGroupPrestigeTiersRoute:
+    AuthenticatedAdminGroupPrestigeTiersRoute,
   AuthenticatedAdminHealthCertificatesRoute:
     AuthenticatedAdminHealthCertificatesRoute,
   AuthenticatedAdminHealthConditionsRoute:
@@ -808,11 +990,13 @@ const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminStageActivitiesRoute:
     AuthenticatedAdminStageActivitiesRoute,
   AuthenticatedAdminStatsRoute: AuthenticatedAdminStatsRoute,
+  AuthenticatedAdminStoreListingsRoute: AuthenticatedAdminStoreListingsRoute,
   AuthenticatedAdminTitlesRoute: AuthenticatedAdminTitlesRoute,
   AuthenticatedAdminTrainingActionsRoute:
     AuthenticatedAdminTrainingActionsRoute,
   AuthenticatedAdminTreatmentsRoute: AuthenticatedAdminTreatmentsRoute,
   AuthenticatedAdminTutorialStepsRoute: AuthenticatedAdminTutorialStepsRoute,
+  AuthenticatedAdminVenuesRoute: AuthenticatedAdminVenuesRoute,
   AuthenticatedAdminVetServicesRoute: AuthenticatedAdminVetServicesRoute,
   AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
 }
@@ -822,6 +1006,11 @@ const AuthenticatedAdminRouteWithChildren =
 
 interface AuthenticatedRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
+  AuthenticatedSetupRoute: typeof AuthenticatedSetupRoute
+  AuthenticatedShopRoute: typeof AuthenticatedShopRoute
+  AuthenticatedTownRoute: typeof AuthenticatedTownRoute
+  AuthenticatedVenuesRoute: typeof AuthenticatedVenuesRoute
+  AuthenticatedVetRoute: typeof AuthenticatedVetRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedAnimalAnimalIdRoute: typeof AuthenticatedAnimalAnimalIdRoute
   AuthenticatedBreedingOfferIdRoute: typeof AuthenticatedBreedingOfferIdRoute
@@ -829,6 +1018,11 @@ interface AuthenticatedRouteChildren {
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
+  AuthenticatedSetupRoute: AuthenticatedSetupRoute,
+  AuthenticatedShopRoute: AuthenticatedShopRoute,
+  AuthenticatedTownRoute: AuthenticatedTownRoute,
+  AuthenticatedVenuesRoute: AuthenticatedVenuesRoute,
+  AuthenticatedVetRoute: AuthenticatedVetRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedAnimalAnimalIdRoute: AuthenticatedAnimalAnimalIdRoute,
   AuthenticatedBreedingOfferIdRoute: AuthenticatedBreedingOfferIdRoute,

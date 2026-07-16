@@ -1,12 +1,15 @@
 import { db, Prisma } from "@sim-engine/db"
 import { router, publicProcedure } from "../trpc.js"
 import { z } from "zod"
-import { advanceAnimalAging } from "@sim-engine/engine"
+import { advanceAnimalAging, runConformationInspection, pruneAnimalData } from "@sim-engine/engine"
 
 export const animalAnimalRouter = router({
   list: publicProcedure.query(() =>
     db.animal.findMany({
-      where: { status: { not: "EMBRYO_STORED" } },
+      where: {
+        status: { not: "EMBRYO_STORED" },
+        NOT: { gameShopAnimal: { isAvailable: true } },
+      },
       orderBy: { name: "asc" },
       select: {
         id: true,
@@ -31,13 +34,15 @@ export const animalAnimalRouter = router({
 
   bury: publicProcedure
     .input(z.object({ animalId: z.string() }))
-    .mutation(({ input }) =>
-      db.animal.update({
+    .mutation(async ({ input }) => {
+      const result = await db.animal.update({
         where: { id: input.animalId },
         data: { status: "BURIED" },
         select: { id: true, status: true },
       })
-    ),
+      pruneAnimalData(input.animalId).catch(console.error)
+      return result
+    }),
 
   moveToSubContainer: publicProcedure
     .input(z.object({ animalId: z.string(), subContainerId: z.string().nullable() }))
@@ -140,4 +145,35 @@ export const animalAnimalRouter = router({
           })
         })
       }),
+
+    setDiscipline: publicProcedure
+      .input(z.object({ animalId: z.string(), disciplineDefId: z.string() }))
+      .mutation(async ({ input }) => {
+        const lowestTier = await db.competitionTierDef.findFirst({
+          where: { disciplineDefId: input.disciplineDefId },
+          orderBy: { tierIndex: "asc" },
+          select: { id: true },
+        })
+
+        return db.$transaction(async (tx) => {
+          await tx.animal.update({
+            where: { id: input.animalId },
+            data: { disciplineDefId: input.disciplineDefId },
+          })
+
+          if (lowestTier) {
+            await tx.animalCompetitionTier.upsert({
+              where: { animalId_disciplineDefId: { animalId: input.animalId, disciplineDefId: input.disciplineDefId } },
+              create: { animalId: input.animalId, disciplineDefId: input.disciplineDefId, tierDefId: lowestTier.id },
+              update: {},
+            })
+          }
+
+          return { animalId: input.animalId, disciplineDefId: input.disciplineDefId }
+        })
+      }),
+
+    conformationInspect: publicProcedure
+      .input(z.object({ animalId: z.string() }))
+      .mutation(({ input }) => runConformationInspection(db, input.animalId)),
 })

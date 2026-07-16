@@ -18,6 +18,7 @@ type StageForm = {
   hasUniqueActionSet: boolean
   profileLayout: string
   immunityCapMultiplier: number
+  energyCostMultiplier: number
   deathChanceStartCycle: string
   deathChancePerCycle: string
 }
@@ -35,6 +36,7 @@ const emptyForm: StageForm = {
   hasUniqueActionSet: false,
   profileLayout: "",
   immunityCapMultiplier: 1.0,
+  energyCostMultiplier: 1,
   deathChanceStartCycle: "",
   deathChancePerCycle: "",
 }
@@ -85,6 +87,7 @@ function LifeStagePage() {
       hasUniqueActionSet: stage.hasUniqueActionSet,
       profileLayout: stage.profileLayout,
       immunityCapMultiplier: stage.immunityCapMultiplier,
+      energyCostMultiplier: stage.energyCostMultiplier,
       deathChanceStartCycle: stage.deathChanceStartCycle?.toString() ?? "",
       deathChancePerCycle: stage.deathChancePerCycle?.toString() ?? "",
     })
@@ -160,6 +163,11 @@ function LifeStagePage() {
                 <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Immunity Cap Multiplier</label>
                 <p className="text-[11px] text-muted-foreground">Max immunity as a fraction of innate max (1.0 = no cap reduction)</p>
                 <Input type="number" step="0.01" min="0" max="1" value={editing.immunityCapMultiplier} onChange={(e) => update("immunityCapMultiplier", parseFloat(e.target.value))} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Energy Cost Multiplier</label>
+                <p className="text-[11px] text-muted-foreground">Multiply training and competition energy costs (1.0 = normal, 1.5 = 50% more expensive)</p>
+                <Input type="number" step="0.05" min="0" value={editing.energyCostMultiplier} onChange={(e) => update("energyCostMultiplier", parseFloat(e.target.value))} />
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Death Chance Start Cycle <span className="font-normal text-muted-foreground">(optional)</span></label>

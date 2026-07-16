@@ -63,6 +63,9 @@ export const gameAdminRouter = router({
         multiplesChance: z.number().min(0).max(1).default(0),
         identicalMultiplesChance: z.number().min(0).max(1).default(0),
         ultrasoundOpenCycle: z.number().int().min(0).default(0),
+        breedingCooldownCycles: z.number().int().min(0).default(0),
+        geneticCollectionCooldownCycles: z.number().int().min(0).default(0),
+        conformationInspectionMinCycle: z.number().int().min(0).default(0),
       }))
       .mutation(({ input }) => {
         const { gameId, containerLabel, subContainerLabel, lifeExpectancyBaseline, maxBreedingSlots, ...rest } = input

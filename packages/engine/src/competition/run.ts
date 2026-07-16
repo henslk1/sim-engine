@@ -178,6 +178,76 @@ export async function runCompetition(
       })
     }
 
+    // tier advancement — check every competing animal's weekly total against their tier's threshold
+    const uniqueAnimalIds = [...new Set(allRanked.map((e) => e.animalId))]
+    for (const animalId of uniqueAnimalIds) {
+      const animalTier = await tx.animalCompetitionTier.findUnique({
+        where: { animalId_disciplineDefId: { animalId, disciplineDefId: competition.disciplineDefId } },
+        include: {
+          tierDef: { select: { tierIndex: true, advancementThreshold: true } },
+        },
+      })
+      if (!animalTier || animalTier.tierDef.advancementThreshold == null) continue
+
+      const weeklyRecord = await tx.animalWeeklyPoints.findUnique({
+        where: { animalId_disciplineDefId_weekStart: { animalId, disciplineDefId: competition.disciplineDefId, weekStart } },
+      })
+      if (!weeklyRecord || weeklyRecord.points < animalTier.tierDef.advancementThreshold) continue
+
+      const nextTier = await tx.competitionTierDef.findFirst({
+        where: {
+          disciplineDefId: competition.disciplineDefId,
+          tierIndex: { gt: animalTier.tierDef.tierIndex },
+        },
+        orderBy: { tierIndex: "asc" },
+        select: { id: true, name: true },
+      })
+      if (!nextTier) continue
+
+      await tx.animalCompetitionTier.update({
+        where: { animalId_disciplineDefId: { animalId, disciplineDefId: competition.disciplineDefId } },
+        data: { tierDefId: nextTier.id },
+      })
+
+      const entryForCycle = allRanked.find((e) => e.animalId === animalId)
+      const entryRecord = entryForCycle
+        ? competition.entries.find((e) => e.animalId === animalId)
+        : null
+      await tx.animalDailyLog.create({
+        data: {
+          animalId,
+          cycleNumber: (entryRecord as { cycleNumber?: number } | null)?.cycleNumber ?? 0,
+          eventType: "TIER_ADVANCED",
+          context: {
+            newTierName: nextTier.name,
+            disciplineName: competition.disciplineDef.name,
+          },
+        },
+      })
+    }
+
+    // Award titles based on placement matching rankOrder
+    for (const entry of allRanked) {
+      const titleDef = await tx.titleDef.findFirst({
+        where: {
+          disciplineDefId: competition.disciplineDefId,
+          rankOrder: entry.placement,
+          animalTitles: { none: { animalId: entry.animalId } },
+        },
+        select: { id: true },
+      })
+      if (titleDef) {
+        const entryRecord = competition.entries.find((e) => e.animalId === entry.animalId)
+        await tx.animalTitle.create({
+          data: {
+            animalId: entry.animalId,
+            titleDefId: titleDef.id,
+            cycleNumber: (entryRecord as { cycleNumber?: number } | null)?.cycleNumber ?? 0,
+          },
+        })
+      }
+    }
+
     await tx.competition.update({
       where: { id: competitionId },
       data: { status: "COMPLETED" },

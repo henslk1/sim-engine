@@ -22,7 +22,7 @@ import { ConformationPanel } from "../panels/ConformationPanel"
 import { BirthDialog } from "../BirthDialog"
 
 
-export function OwnerView({ animal, animalId }: { animal: AnimalProfile; animalId: string }) {
+export function OwnerView({ animal, animalId, playerAccountId }: { animal: AnimalProfile; animalId: string; playerAccountId: string }) {
   const config = animal.game.gameConfig
   const cycleToAge = (n: number) => formatCycleAge(n, config)
   const breedingGrade = computeBreedingGrade(animal, config)
@@ -118,7 +118,7 @@ export function OwnerView({ animal, animalId }: { animal: AnimalProfile; animalI
           {/* Col 1 — Breeding / Health */}
           <div className="flex min-h-0 flex-col gap-3 min-[1400px]:grid min-[1400px]:grid-rows-[auto_minmax(0,1fr)]">
             <BreedingPanel animal={animal} breedingGrade={breedingGrade} />
-            <HealthPanel animal={animal} />
+            <HealthPanel animal={animal} playerAccountId={playerAccountId} />
           </div>
 
           {/* Col 2 — Training / Competition */}
@@ -142,7 +142,7 @@ export function OwnerView({ animal, animalId }: { animal: AnimalProfile; animalI
 
           {/* Col 4+5 — Care / Owner Actions / Equipped / Conformation / DailyLog / Personality / Notes */}
           <div className="flex min-h-0 flex-col gap-3 min-[1400px]:col-span-2 min-[1400px]:grid min-[1400px]:grid-flow-row-dense min-[1400px]:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] min-[1400px]:grid-rows-[auto_auto_auto_minmax(0,1fr)]">
-            <DailyCarePanel animal={animal} />
+            <DailyCarePanel animal={animal} playerAccountId={playerAccountId} />
 
             {/* Owner Actions */}
             <div className="flex min-h-0 shrink-0 flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm">
@@ -150,13 +150,13 @@ export function OwnerView({ animal, animalId }: { animal: AnimalProfile; animalI
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">Owner Actions</h3>
               </header>
               <div className="min-h-0 flex-1 divide-y divide-border/50 overflow-y-auto">
-                <OwnerActionList animal={animal} />
+                <OwnerActionList animal={animal} playerAccountId={playerAccountId} />
               </div>
             </div>
 
             {/* Equipped — pinned to col 2, directly under Owner Actions */}
-            <div className="min-[1400px]:col-start-2">
-              <EquippedPanel animal={animal} />
+            <div id="equipped-section" className="min-[1400px]:col-start-2">
+              <EquippedPanel animal={animal} playerAccountId={playerAccountId} />
             </div>
 
             <ConformationPanel animal={animal} />

@@ -1,7 +1,7 @@
 import { useState } from "react"
 import type { AnimalProfile } from "../types"
 import { Badge, ActionButton } from "@/components/game/ui"
-import { Heart, CheckCircle, Ban, CalendarClock, AlertTriangle, Loader2 } from "lucide-react"
+import { Heart, CheckCircle, Ban, CalendarClock, AlertTriangle, Loader2, CheckCircle2 } from "lucide-react"
 import { getActiveRestrictions } from "../utils"
 import { cn } from "@/lib/utils"
 import { trpc } from "@/lib/trpc"
@@ -22,14 +22,23 @@ function CostBadge({ action }: { action: CareAction }) {
   return <Badge tone="muted">{action.costType}</Badge>
 }
 
-export function DailyCarePanel({ animal }: { animal: AnimalProfile }) {
+export function DailyCarePanel({ animal, playerAccountId }: { animal: AnimalProfile; playerAccountId: string }) {
   const [pendingId, setPendingId] = useState<string | null>(null)
+  const [ltcPendingId, setLtcPendingId] = useState<string | null>(null)
   const utils = trpc.useUtils()
+  const invalidate = () => utils.animalProfile.get.invalidate({ animalId: animal.id })
   const { mutate: performCare } = trpc.care.perform.useMutation({
     onMutate: ({ careActionDefId }) => setPendingId(careActionDefId),
     onSettled: () => {
       setPendingId(null)
-      utils.animalProfile.get.invalidate({ animalId: animal.id })
+      invalidate()
+    },
+  })
+  const { mutate: performLtc } = trpc.care.performLtc.useMutation({
+    onMutate: ({ ltcRecordId }) => setLtcPendingId(ltcRecordId),
+    onSettled: () => {
+      setLtcPendingId(null)
+      invalidate()
     },
   })
 
@@ -101,12 +110,16 @@ export function DailyCarePanel({ animal }: { animal: AnimalProfile }) {
                       <CostBadge action={action} />
                       {isDone ? (
                         <span className="text-[11px] font-medium text-chart-2">Done</span>
-                      ) : isFree && !careRestricted ? (
+                      ) : !careRestricted ? (
                         <ActionButton
                           variant="soft"
                           disabled={isPending}
                           className="h-6 px-2 text-[11px]"
-                          onClick={() => performCare({ animalId: animal.id, careActionDefId: action.id })}
+                          onClick={() => performCare({
+                            animalId: animal.id,
+                            careActionDefId: action.id,
+                            playerAccountId: isFree ? undefined : playerAccountId,
+                          })}
                         >
                           {isPending ? <Loader2 className="size-3 animate-spin" /> : "Perform"}
                         </ActionButton>
@@ -148,9 +161,24 @@ export function DailyCarePanel({ animal }: { animal: AnimalProfile }) {
                           in {record.nextDueCycle - animal.ageInCycles} cycles
                         </span>
                       )}
-                      <ActionButton variant="soft" disabled className="h-6 px-2 text-[11px]">
-                        <CalendarClock className="size-3" /> Book
-                      </ActionButton>
+                      {record.longTermCareActionDef.currencyAmount != null && record.longTermCareActionDef.currencyAmount > 0 && (
+                        <span className="text-[10px] text-muted-foreground">{record.longTermCareActionDef.currencyAmount}G</span>
+                      )}
+                      {animal.ageInCycles >= record.nextDueCycle ? (
+                        <ActionButton
+                          variant="soft"
+                          className="h-6 px-2 text-[11px]"
+                          disabled={ltcPendingId === record.id || careRestricted}
+                          onClick={() => performLtc({ animalId: animal.id, ltcRecordId: record.id, playerAccountId })}
+                        >
+                          {ltcPendingId === record.id
+                            ? <Loader2 className="size-3 animate-spin" />
+                            : <CheckCircle2 className="size-3" />}
+                          Perform
+                        </ActionButton>
+                      ) : (
+                        <span className="text-[11px] font-medium text-chart-2">Done</span>
+                      )}
                     </div>
                   </div>
                 )

@@ -17,6 +17,7 @@ const stageInput = z.object({
   hasUniqueActionSet: z.boolean(),
   profileLayout: z.string().min(1),
   immunityCapMultiplier: z.number().default(1.0),
+  energyCostMultiplier: z.number().min(0).default(1),
   deathChanceStartCycle: z.number().int().nullish(),
   deathChancePerCycle: z.number().min(0).max(1).nullish(),
 })

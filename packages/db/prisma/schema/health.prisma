@@ -105,19 +105,20 @@ model AnimalHealthRecord {
 }
 
 model AnimalTreatmentRecord {
-  id                  String                @id @default(cuid())
-  animalId            String
-  treatmentDefId      String
-  healthRecordId      String
-  startedCycle        Int
-  startedAt           DateTime              @default(now())
-  completedCycle      Int?
-  completedAt         DateTime?
-  isActive            Boolean               @default(true)
-  activityRestriction ActivityRestriction[]
-  animal              Animal                @relation(fields: [animalId], references: [id])
-  treatmentDef        TreatmentDef          @relation(fields: [treatmentDefId], references: [id])
-  healthRecord        AnimalHealthRecord    @relation(fields: [healthRecordId], references: [id])
+  id                    String                @id @default(cuid())
+  animalId              String
+  treatmentDefId        String
+  healthRecordId        String
+  startedCycle          Int
+  startedAt             DateTime              @default(now())
+  lastAdministeredCycle Int?
+  completedCycle        Int?
+  completedAt           DateTime?
+  isActive              Boolean               @default(true)
+  activityRestriction   ActivityRestriction[]
+  animal                Animal                @relation(fields: [animalId], references: [id])
+  treatmentDef          TreatmentDef          @relation(fields: [treatmentDefId], references: [id])
+  healthRecord          AnimalHealthRecord    @relation(fields: [healthRecordId], references: [id])
 }
 
 model ActivityRestriction {

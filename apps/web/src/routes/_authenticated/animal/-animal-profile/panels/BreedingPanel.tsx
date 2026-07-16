@@ -173,14 +173,43 @@ export function BreedingPanel({
             preg ? (
               <div className="rounded-md border border-border/70 bg-secondary/30 px-3 py-2.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-foreground">Active Pregnancy</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-semibold text-foreground">Active Pregnancy</span>
+                    {preg.surrogacyRecord && (
+                      <Badge tone="muted">Surrogate</Badge>
+                    )}
+                  </div>
                   <Badge tone="accent"><Sparkles className="size-3" /> Expecting</Badge>
                 </div>
                 {preg.breedingRecord.sire && (
                   <p className="mt-1 text-[11px] text-muted-foreground">
-                    Sire: <span className="font-medium text-foreground">{preg.breedingRecord.sire.name}</span>
+                    Sire:{" "}
+                    <Link
+                      to="/animal/$animalId"
+                      params={{ animalId: preg.breedingRecord.sire.id }}
+                      className="font-medium text-foreground hover:underline"
+                    >
+                      {preg.breedingRecord.sire.name}
+                    </Link>
                   </p>
                 )}
+                {(() => {
+                  const biologicalDam = preg.surrogacyRecord?.biologicalDam ?? preg.breedingRecord.dam
+                  const isCurrentAnimal = biologicalDam?.id === animal.id
+                  if (!biologicalDam || isCurrentAnimal) return null
+                  return (
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">
+                      Dam:{" "}
+                      <Link
+                        to="/animal/$animalId"
+                        params={{ animalId: biologicalDam.id }}
+                        className="font-medium text-foreground hover:underline"
+                      >
+                        {biologicalDam.name}
+                      </Link>
+                    </p>
+                  )
+                })()}
                 <div className="mt-2">
                   <div className="mb-1 flex items-center justify-between">
                     <span className="text-[11px] text-muted-foreground">Gestation</span>
@@ -522,52 +551,20 @@ export function BreedingPanel({
             </div>
           )}
 
-          {/* Genetic material collect */}
+          {/* Genetic material collect + storage */}
           {!readonly && (
-            <div className="rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2">
-              <div className="mb-2 flex items-center justify-between">
-                <span className="text-xs font-semibold text-foreground">Genetic Material</span>
-                <ActionButton variant="soft" disabled className="h-6 px-2 text-[11px]">View Storage</ActionButton>
-              </div>
-              <div className="mb-2 flex gap-0.5">
-                {(["PERSONAL", "VET", "GROUP"] as StorageType[]).map((st) => (
-                  <button
-                    key={st}
-                    type="button"
-                    onClick={() => setStorageType(st)}
-                    className={cn(
-                      "flex-1 rounded px-1.5 py-0.5 text-[10px] font-semibold transition-colors",
-                      storageType === st
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    {st.charAt(0) + st.slice(1).toLowerCase()}
-                  </button>
-                ))}
-              </div>
-              <ActionButton
-                variant="soft"
-                className="w-full justify-center"
-                disabled={collectPending || isRestricted || (isFemale && !!preg)}
-                onClick={() => collectMaterial({
-                  animalId: animal.id,
-                  materialType: isMale ? "SPERM" : "EGG",
-                  storageType,
-                })}
-              >
-                {collectPending
-                  ? <Loader2 className="size-3.5 animate-spin" />
-                  : <Syringe className="size-3.5" />}
-                {isMale ? "Collect Sperm" : "Collect Egg"}
-              </ActionButton>
-              {isFemale && !!preg && (
-                <p className="mt-1.5 text-[11px] text-muted-foreground">Unavailable during pregnancy</p>
-              )}
-              {collectError && (
-                <p className="mt-1.5 text-[11px] text-destructive">{collectError.message}</p>
-              )}
-            </div>
+            <GeneticMaterialSection
+              animal={animal}
+              storageType={storageType}
+              setStorageType={setStorageType}
+              isMale={isMale}
+              isFemale={isFemale}
+              preg={preg}
+              isRestricted={isRestricted}
+              collectPending={collectPending}
+              collectError={collectError ?? null}
+              collectMaterial={collectMaterial}
+            />
           )}
 
           {/* Castrate */}
@@ -731,18 +728,157 @@ export function BreedingPanel({
           )}
 
           {isFemale && (
-            <div>
-              <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Genetic Storage
-              </h4>
-              <div className="flex items-center gap-2 rounded-md border border-border/70 bg-secondary/30 px-2.5 py-1.5">
-                <Dna className="size-3.5 text-muted-foreground" />
-                <span className="text-[11px] text-muted-foreground">No stored material</span>
-              </div>
-            </div>
+            <StorageSummary playerAccountId={animal.playerAccountId} animalId={animal.id} />
           )}
         </div>
       )}
     </Panel>
+  )
+}
+
+function StorageSummary({ playerAccountId, animalId }: { playerAccountId: string; animalId: string }) {
+  const utils = trpc.useUtils()
+  const { data, refetch } = trpc.breeding.material.myStorage.useQuery({ playerAccountId })
+  const { mutate: implant, isPending: implantPending, variables: implantVars } =
+    trpc.breeding.material.implant.useMutation({
+      onSettled: () => {
+        refetch()
+        utils.animalProfile.get.invalidate({ animalId })
+      },
+    })
+
+  const materials = data?.materials ?? []
+  const capacity = data?.capacity
+
+  const personalMax = (capacity?.geneticStorageBase ?? 0) + (capacity?.geneticStorageSubscription ?? 0)
+  const personalUsed = materials.filter((m) => m.storageType === "PERSONAL").length
+
+  if (materials.length === 0 && personalMax === 0) return null
+
+  return (
+    <div>
+      <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        Genetic Storage
+      </h4>
+      {materials.length === 0 ? (
+        <div className="flex items-center gap-2 rounded-md border border-border/70 bg-secondary/30 px-2.5 py-1.5">
+          <Dna className="size-3.5 text-muted-foreground" />
+          <span className="text-[11px] text-muted-foreground">No stored material</span>
+          {personalMax > 0 && (
+            <span className="ml-auto text-[10px] text-muted-foreground">{personalUsed}/{personalMax} slots</span>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-1">
+          {personalMax > 0 && (
+            <p className="text-[10px] text-muted-foreground">{personalUsed}/{personalMax} personal slots used</p>
+          )}
+          {materials.map((m) => {
+            const snapshot = m.donorSnapshot as { name?: string; breedName?: string } | null
+            const label = snapshot?.name ?? m.animal?.name ?? "Unknown"
+            const breed = snapshot?.breedName ?? m.animal?.breed?.name ?? ""
+            const isImplanting = implantPending && implantVars?.embryoId === m.id
+            return (
+              <div key={m.id} className="flex items-center gap-2 rounded-md border border-border/70 bg-secondary/30 px-2.5 py-1.5">
+                <Dna className="size-3 shrink-0 text-muted-foreground" />
+                <span className="min-w-0 truncate text-[11px] font-medium text-foreground">{label}</span>
+                {breed && <span className="shrink-0 text-[10px] text-muted-foreground">{breed}</span>}
+                <span className="ml-auto shrink-0 text-[10px] text-muted-foreground capitalize">{m.materialType.toLowerCase()}</span>
+                {m.materialType === "EMBRYO" && (
+                  <ActionButton
+                    variant="soft"
+                    disabled={isImplanting || implantPending}
+                    className="h-5 px-1.5 text-[10px]"
+                    onClick={() => implant({ embryoId: m.id, surrogateAnimalId: animalId })}
+                  >
+                    {isImplanting ? <Loader2 className="size-3 animate-spin" /> : "Implant"}
+                  </ActionButton>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+type GeneticMaterialSectionProps = {
+  animal: AnimalProfile
+  storageType: StorageType
+  setStorageType: (t: StorageType) => void
+  isMale: boolean
+  isFemale: boolean
+  preg: AnimalProfile["pregnancies"][number] | null
+  isRestricted: boolean
+  collectPending: boolean
+  collectError: { message: string } | null
+  collectMaterial: (args: { animalId: string; materialType: "SPERM" | "EGG"; storageType: StorageType }) => void
+}
+
+function GeneticMaterialSection({
+  animal, storageType, setStorageType, isMale, isFemale, preg,
+  isRestricted, collectPending, collectError, collectMaterial,
+}: GeneticMaterialSectionProps) {
+  const { data, refetch } = trpc.breeding.material.myStorage.useQuery(
+    { playerAccountId: animal.playerAccountId, storageType },
+    { enabled: !!animal.playerAccountId }
+  )
+  const materials = data?.materials ?? []
+  const capacity = data?.capacity
+  const personalMax = (capacity?.geneticStorageBase ?? 0) + (capacity?.geneticStorageSubscription ?? 0)
+  const vetMax = capacity?.geneticStoragePurchased ?? 0
+  const maxForType = storageType === "PERSONAL" ? personalMax : storageType === "VET" ? vetMax : null
+
+  return (
+    <div className="rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-xs font-semibold text-foreground">Genetic Material</span>
+        {maxForType !== null && (
+          <span className="text-[10px] text-muted-foreground">{materials.length}/{maxForType} slots</span>
+        )}
+      </div>
+      <div className="mb-2 flex gap-0.5">
+        {(["PERSONAL", "VET", "GROUP"] as StorageType[]).map((st) => (
+          <button
+            key={st}
+            type="button"
+            onClick={() => setStorageType(st)}
+            className={cn(
+              "flex-1 rounded px-1.5 py-0.5 text-[10px] font-semibold transition-colors",
+              storageType === st
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {st.charAt(0) + st.slice(1).toLowerCase()}
+          </button>
+        ))}
+      </div>
+      <ActionButton
+        variant="soft"
+        className="w-full justify-center"
+        disabled={collectPending || isRestricted || (isFemale && !!preg)}
+        onClick={() => {
+          collectMaterial({
+            animalId: animal.id,
+            materialType: isMale ? "SPERM" : "EGG",
+            storageType,
+          })
+          refetch()
+        }}
+      >
+        {collectPending
+          ? <Loader2 className="size-3.5 animate-spin" />
+          : <Syringe className="size-3.5" />}
+        {isMale ? "Collect Sperm" : "Collect Egg"}
+      </ActionButton>
+      {isFemale && !!preg && (
+        <p className="mt-1.5 text-[11px] text-muted-foreground">Unavailable during pregnancy</p>
+      )}
+      {collectError && (
+        <p className="mt-1.5 text-[11px] text-destructive">{collectError.message}</p>
+      )}
+    </div>
   )
 }

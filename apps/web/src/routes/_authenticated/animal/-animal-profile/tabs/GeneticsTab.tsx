@@ -44,7 +44,7 @@ function groupByAnyPanel(genotypes: Genotype[]) {
   return { panels: Array.from(panelMap.values()), ungrouped }
 }
 
-function GenotypeRow({
+function GenotypeCard({
   genotype,
   testsRemaining,
   isTestingThis,
@@ -60,15 +60,15 @@ function GenotypeRow({
   onTest: () => void
 }) {
   return (
-    <div className="flex items-center justify-between bg-card px-2.5 py-1.5">
-      <span className="text-[11px] font-medium text-foreground">{genotype.locus.name}</span>
+    <div className="rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2">
+      <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{genotype.locus.name}</p>
       {genotype.isTestedByOwner ? (
-        <span className="inline-block rounded bg-chart-5/12 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-chart-5">
+        <span className="font-mono text-sm font-semibold text-chart-5">
           {genotype.alleleOne.symbol}/{genotype.alleleTwo.symbol}
         </span>
       ) : (
-        <div className="flex items-center gap-1.5">
-          <span className="text-[11px] italic text-muted-foreground/60">?/?</span>
+        <div className="flex items-center justify-between">
+          <span className="text-sm italic text-muted-foreground/60">?/?</span>
           <ActionButton
             variant="soft"
             disabled={isAgeGated || testsRemaining === 0 || isTestingThis}
@@ -89,12 +89,9 @@ function GenotypeRow({
   )
 }
 
-function GenotypeGrid({ genotypes, children }: { genotypes: Genotype[]; children: React.ReactNode }) {
+function GenotypeGrid({ children }: { children: React.ReactNode }) {
   return (
-    <div className={cn(
-      "grid gap-px overflow-hidden rounded-md border border-border/70 bg-border/60",
-      genotypes.length >= 8 ? "grid-cols-2" : "grid-cols-1"
-    )}>
+    <div className="grid grid-cols-3 gap-2">
       {children}
     </div>
   )
@@ -128,8 +125,8 @@ function PanelGroup({
   const isPending = testingPanelId === panelDef.id
 
   return (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between">
+    <div className="rounded-md border border-border bg-card">
+      <div className="flex items-center justify-between border-b border-border/60 px-3 py-2">
         <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           {panelDef.name}
         </span>
@@ -149,19 +146,21 @@ function PanelGroup({
           </ActionButton>
         )}
       </div>
-      <GenotypeGrid genotypes={genotypes}>
-        {genotypes.map((g) => (
-          <GenotypeRow
-            key={g.locusId}
-            genotype={g}
-            testsRemaining={testsRemaining}
-            isTestingThis={testingLocusId === g.locusId}
-            isAgeGated={g.locus.minTestCycle != null && ageInCycles < g.locus.minTestCycle}
-            cycleToAge={cycleToAge}
-            onTest={() => onTestLocus(g.locusId)}
-          />
-        ))}
-      </GenotypeGrid>
+      <div className="p-2">
+        <GenotypeGrid>
+          {genotypes.map((g) => (
+            <GenotypeCard
+              key={g.locusId}
+              genotype={g}
+              testsRemaining={testsRemaining}
+              isTestingThis={testingLocusId === g.locusId}
+              isAgeGated={g.locus.minTestCycle != null && ageInCycles < g.locus.minTestCycle}
+              cycleToAge={cycleToAge}
+              onTest={() => onTestLocus(g.locusId)}
+            />
+          ))}
+        </GenotypeGrid>
+      </div>
     </div>
   )
 }
@@ -171,19 +170,17 @@ function InnateStats({ animal, config }: { animal: AnimalProfile; config: Animal
     <div>
       <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Innate Stats</h4>
       <p className="mb-2 text-[11px] text-muted-foreground">Sets the training cap for each stat.</p>
-      <div className="space-y-1.5">
+      <div className="grid grid-cols-3 gap-2">
         {animal.stats.map((s: AnimalProfile["stats"][number]) => {
           const cap = getTrainingCap(s.innateValue, config)
           return (
             <div
               key={s.statDef.name}
-              className="flex items-center justify-between rounded-md border border-border/70 bg-secondary/30 px-2.5 py-1.5"
+              className="rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2"
             >
-              <span className="text-xs font-medium text-foreground">{s.statDef.name}</span>
-              <span className="text-xs tabular-nums text-muted-foreground">
-                <span className="font-semibold text-foreground">{Math.round(s.innateValue)}</span>
-                {" "}→ cap {Math.round(cap)}
-              </span>
+              <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{s.statDef.name}</p>
+              <p className="text-sm font-semibold text-foreground">{Math.round(s.innateValue)}</p>
+              <p className="text-[10px] text-muted-foreground">cap {Math.round(cap)}</p>
             </div>
           )
         })}
@@ -269,20 +266,25 @@ export function GeneticsTab({
               </div>
             ))}
             {colorUngrouped.length > 0 && (
-              <div className="min-w-[200px] flex-1">
-                <GenotypeGrid genotypes={colorUngrouped}>
-                  {colorUngrouped.map((g) => (
-                    <GenotypeRow
-                      key={g.locusId}
-                      genotype={g}
-                      testsRemaining={testsRemaining}
-                      isTestingThis={testingLocusId === g.locusId}
-                      isAgeGated={g.locus.minTestCycle != null && animal.ageInCycles < g.locus.minTestCycle}
-                      cycleToAge={cycleToAge}
-                      onTest={() => testLocus({ animalId: animal.id, locusId: g.locusId })}
-                    />
-                  ))}
-                </GenotypeGrid>
+              <div className="min-w-[200px] flex-1 rounded-md border border-border bg-card">
+                <div className="border-b border-border/60 px-3 py-2">
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Other</span>
+                </div>
+                <div className="p-2">
+                  <GenotypeGrid>
+                    {colorUngrouped.map((g) => (
+                      <GenotypeCard
+                        key={g.locusId}
+                        genotype={g}
+                        testsRemaining={testsRemaining}
+                        isTestingThis={testingLocusId === g.locusId}
+                        isAgeGated={g.locus.minTestCycle != null && animal.ageInCycles < g.locus.minTestCycle}
+                        cycleToAge={cycleToAge}
+                        onTest={() => testLocus({ animalId: animal.id, locusId: g.locusId })}
+                      />
+                    ))}
+                  </GenotypeGrid>
+                </div>
               </div>
             )}
           </div>
