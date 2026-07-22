@@ -40,9 +40,40 @@ export const animalCompetitionRouter = router({
                   itemDef: { select: { id: true, name: true } },
                 },
               },
+              statWeights: {
+                select: {
+                  weight: true,
+                  statDef: { select: { id: true, name: true } },
+                },
+                orderBy: { weight: "desc" },
+              },
             },
           },
           venue: { select: { id: true, name: true } },
+          tierDef: { select: { id: true, name: true, tierIndex: true, entryFee: true } },
+          breed: { select: { id: true, name: true } },
+          entries: {
+            orderBy: { enteredAt: "asc" },
+            select: {
+              animal: {
+                select: {
+                  id: true,
+                  name: true,
+                  breed: { select: { name: true } },
+                  conformationScores: {
+                    select: { score: true, breedId: true },
+                  },
+                },
+              },
+              entryStats: {
+                select: {
+                  trainedValue: true,
+                  statDef: { select: { id: true } },
+                },
+              },
+              playerAccount: { select: { username: true } },
+            },
+          },
           _count: { select: { entries: true } },
         },
         orderBy: { expiresAt: "asc" },
@@ -90,7 +121,11 @@ export const animalCompetitionRouter = router({
           where: { gameId: input.gameId, requiredForCompetition: true },
           select: { id: true, name: true },
         }),
-      ]).then(([animal, requiredCertDefs]) => ({ animal, requiredCertDefs }))
+        db.animalCompetitionTier.findMany({
+          where: { animalId: input.animalId },
+          select: { disciplineDefId: true, tierDefId: true },
+        }),
+      ]).then(([animal, requiredCertDefs, compTiers]) => ({ animal, requiredCertDefs, compTiers }))
     ),
 
   enter: publicProcedure
@@ -111,4 +146,26 @@ export const animalCompetitionRouter = router({
       competitionId: z.string(),
     }))
     .mutation(({ input }) => runCompetition(db, input)),
+
+  get: publicProcedure
+    .input(z.object({ competitionId: z.string() }))
+    .query(({ input }) =>
+      db.competition.findUniqueOrThrow({
+        where: { id: input.competitionId },
+        include: {
+          venue: { select: { id: true, name: true } },
+          disciplineDef: { select: { id: true, name: true, isConformation: true } },
+          entries: {
+            orderBy: [{ result: { placement: "asc" } }, { enteredAt: "asc" }],
+            include: {
+              animal: { select: { id: true, name: true, sex: true, breed: { select: { name: true } } } },
+              playerAccount: { select: { id: true, username: true } },
+              tierDef: { select: { name: true } },
+              result: true,
+            },
+          },
+          _count: { select: { entries: true } },
+        },
+      })
+    ),
 })

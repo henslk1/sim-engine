@@ -38,6 +38,20 @@ export async function applyTrainingAction(
       }
     }
 
+    const trainingRestrictions = await tx.activityRestriction.findMany({
+      where: { animalId, isActive: true, restrictionType: { in: ["TRAINING", "ALL"] } },
+      select: { maxIntensityTier: true },
+    })
+    for (const restriction of trainingRestrictions) {
+      if (restriction.maxIntensityTier !== null) {
+        if (tier.tierIndex > restriction.maxIntensityTier) {
+          throw new Error(`Training is restricted to intensity tier ${restriction.maxIntensityTier} or lower`)
+        }
+      } else {
+        throw new Error("Training is currently restricted for this animal")
+      }
+    }
+
     const animalStage = await tx.animal.findUniqueOrThrow({
       where: { id: animalId },
       select: { lifeStage: { select: { energyCostMultiplier: true } } },

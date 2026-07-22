@@ -18,6 +18,7 @@ import { DailyCarePanel } from "../panels/DailyCarePanel"
 import { PersonalityPanel } from "../panels/PersonalityPanel"
 import { NotesPanel } from "../panels/NotesPanel"
 import { EquippedPanel } from "../panels/EquippedPanel"
+import { EquipModal } from "../panels/EquipModal"
 import { ConformationPanel } from "../panels/ConformationPanel"
 import { BirthDialog } from "../BirthDialog"
 
@@ -29,6 +30,7 @@ export function OwnerView({ animal, animalId, playerAccountId }: { animal: Anima
   const activeConditions = animal.healthRecords.filter((r) => r.isActive)
 
   const [birthPregnancyId, setBirthPregnancyId] = useState<string | null>(null)
+  const [equipOpen, setEquipOpen] = useState(false)
 
   // Auto-open if there's already a completed pregnancy with unborn offspring (e.g. navigated away mid-flow)
   useEffect(() => {
@@ -150,13 +152,13 @@ export function OwnerView({ animal, animalId, playerAccountId }: { animal: Anima
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">Owner Actions</h3>
               </header>
               <div className="min-h-0 flex-1 divide-y divide-border/50 overflow-y-auto">
-                <OwnerActionList animal={animal} playerAccountId={playerAccountId} />
+                <OwnerActionList animal={animal} playerAccountId={playerAccountId} onEquipOpen={() => setEquipOpen(true)} />
               </div>
             </div>
 
             {/* Equipped — pinned to col 2, directly under Owner Actions */}
             <div id="equipped-section" className="min-[1400px]:col-start-2">
-              <EquippedPanel animal={animal} playerAccountId={playerAccountId} />
+              <EquippedPanel animal={animal} />
             </div>
 
             <ConformationPanel animal={animal} />
@@ -172,6 +174,17 @@ export function OwnerView({ animal, animalId, playerAccountId }: { animal: Anima
 
         </div>
       </main>
+
+      {equipOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          onClick={() => setEquipOpen(false)}
+        >
+          <div className="w-full max-w-2xl mx-4" onClick={(e) => e.stopPropagation()}>
+            <EquipModal animal={animal} playerAccountId={playerAccountId} onClose={() => setEquipOpen(false)} />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

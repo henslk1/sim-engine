@@ -17,6 +17,7 @@ export async function enterCompetition(
     const competition = await tx.competition.findUniqueOrThrow({
       where: { id: competitionId },
       include: {
+        tierDef: true,
         disciplineDef: {
           include: {
             equipmentRequirements: true
@@ -44,6 +45,12 @@ export async function enterCompetition(
         data: { animalId, disciplineDefId: competition.disciplineDefId, tierDefId: lowestTierDef.id },
         include: { tierDef: true },
       })
+    }
+
+    // tier match check
+    if (competition.tierDefId && tier.tierDefId !== competition.tierDefId) {
+      const compTierName = competition.tierDef?.name ?? competition.tierDefId
+      throw new Error(`This competition is for ${compTierName} tier. Your animal competes at ${tier.tierDef.name} tier.`)
     }
 
     // equipment check
@@ -78,6 +85,13 @@ export async function enterCompetition(
       }
     }
 
+    if (competition.breedId) {
+      const animal = await tx.animal.findUniqueOrThrow({ where: { id: animalId }, select: { breedId: true } })
+      if (animal.breedId !== competition.breedId) {
+        throw new Error("This competition is restricted to a specific breed")
+      }
+    }
+
     if (competition.disciplineDef.isConformation) {
       const conformationScore = await tx.animalConformationScore.findFirst({ where: { animalId } })
       if (!conformationScore) throw new Error("Animal must have a conformation score to enter this competition")
@@ -85,6 +99,13 @@ export async function enterCompetition(
 
     const baseEnergyCost = tier.tierDef.energyCost
     const entryFee = tier.tierDef.entryFee
+
+    const competitionRestrictions = await tx.activityRestriction.count({
+      where: { animalId, isActive: true, restrictionType: { in: ["COMPETITION", "ALL"] } },
+    })
+    if (competitionRestrictions > 0) {
+      throw new Error("This animal is currently on a competition activity restriction")
+    }
 
     const [energy, animal] = await Promise.all([
       tx.animalEnergy.findUnique({ where: { animalId } }),
@@ -96,10 +117,34 @@ export async function enterCompetition(
     if (!energy) throw new Error(`No energy record for animal ${animalId}`)
 
     const energyUsed = baseEnergyCost * animal.lifeStage.energyCostMultiplier
+    if (energy.currentEnergy < energyUsed) {
+      throw new Error("Not enough energy to enter this competition")
+    }
+
+    const requiredCertDefs = await tx.healthCertificateDef.findMany({
+      where: { gameId: competition.gameId, requiredForCompetition: true },
+      select: { id: true, name: true },
+    })
+    if (requiredCertDefs.length > 0) {
+      const validCerts = await tx.healthCertificate.findMany({
+        where: {
+          animalId,
+          certDefId: { in: requiredCertDefs.map((c) => c.id) },
+          isValid: true,
+          expiresAtCycle: { gte: animal.ageInCycles },
+        },
+        select: { certDefId: true },
+      })
+      const validCertIds = new Set(validCerts.map((c) => c.certDefId))
+      const missing = requiredCertDefs.find((c) => !validCertIds.has(c.id))
+      if (missing) {
+        throw new Error(`Animal is missing required health certificate: ${missing.name}`)
+      }
+    }
 
     await tx.animalEnergy.update({
       where: { animalId },
-      data: { currentEnergy: Math.max(energy.currentEnergy - energyUsed, 0) },
+      data: { currentEnergy: energy.currentEnergy - energyUsed },
     })
 
     const gameConfig = await tx.gameConfig.findFirst({
@@ -116,25 +161,35 @@ export async function enterCompetition(
       }
     }
 
-    const baseCurrency = await tx.currencyDef.findFirstOrThrow({
-      where: { gameId: competition.gameId, currencyType: "BASE" },
-      select: { id: true },
-    })
+    if (entryFee > 0) {
+      const baseCurrency = await tx.currencyDef.findFirstOrThrow({
+        where: { gameId: competition.gameId, currencyType: "BASE" },
+        select: { id: true },
+      })
 
-    await tx.playerBalance.update({
-      where: { playerAccountId_currencyDefId: { playerAccountId, currencyDefId: baseCurrency.id } },
-      data: { balance: { decrement: entryFee } },
-    })
+      const playerBal = await tx.playerBalance.findUnique({
+        where: { playerAccountId_currencyDefId: { playerAccountId, currencyDefId: baseCurrency.id } },
+        select: { balance: true },
+      })
+      if (!playerBal || playerBal.balance < entryFee) {
+        throw new Error("Insufficient funds to enter this competition")
+      }
 
-    await tx.transaction.create({
-      data: {
-        gameId: competition.gameId,
-        fromPlayerAccountId: playerAccountId,
-        currencyDefId: baseCurrency.id,
-        amount: entryFee,
-        txnType: "COMPETITION_ENTRY",
-      },
-    })
+      await tx.playerBalance.update({
+        where: { playerAccountId_currencyDefId: { playerAccountId, currencyDefId: baseCurrency.id } },
+        data: { balance: { decrement: entryFee } },
+      })
+
+      await tx.transaction.create({
+        data: {
+          gameId: competition.gameId,
+          fromPlayerAccountId: playerAccountId,
+          currencyDefId: baseCurrency.id,
+          amount: entryFee,
+          txnType: "COMPETITION_ENTRY",
+        },
+      })
+    }
 
     const entry = await tx.competitionEntry.create({
       data: {
@@ -145,6 +200,28 @@ export async function enterCompetition(
         cycleNumber: animal.ageInCycles,
       },
     })
+
+    if (!competition.disciplineDef.isConformation) {
+      const statWeights = await tx.disciplineStatWeight.findMany({
+        where: { disciplineDefId: competition.disciplineDefId },
+        select: { statDefId: true },
+      })
+      if (statWeights.length > 0) {
+        const animalStats = await tx.animalStat.findMany({
+          where: { animalId, statDefId: { in: statWeights.map((s) => s.statDefId) } },
+          select: { statDefId: true, trainedValue: true },
+        })
+        if (animalStats.length > 0) {
+          await tx.competitionEntryStat.createMany({
+            data: animalStats.map((s) => ({
+              entryId: entry.id,
+              statDefId: s.statDefId,
+              trainedValue: s.trainedValue,
+            })),
+          })
+        }
+      }
+    }
 
     const entryCount = await tx.competitionEntry.count({ where: { competitionId } })
     const shouldRun = entryCount >= competition.maxEntries

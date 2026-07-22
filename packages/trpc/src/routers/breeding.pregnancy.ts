@@ -136,7 +136,15 @@ export const breedingPregnancyRouter = router({
           where: { id: input.pregnancyId },
           select: {
             isCompleted: true,
-            animal: { select: { id: true, gameId: true, ageInCycles: true } },
+            animal: {
+              select: {
+                id: true,
+                gameId: true,
+                ageInCycles: true,
+                careScore: { select: { score: true } },
+              },
+            },
+            breedingRecord: { select: { sireSnapshot: true, damSnapshot: true } },
             offspring: {
               select: { animal: { select: { id: true, status: true } } },
             },
@@ -146,20 +154,101 @@ export const breedingPregnancyRouter = router({
         if (!pregnancy.isCompleted) throw new Error("Pregnancy is not complete yet")
 
         const nameMap = new Map(input.names?.map((n) => [n.animalId, n.name]) ?? [])
+        const gameId = pregnancy.animal.gameId
 
-        const [ltcDefs, gameConfig] = await Promise.all([
+        const [ltcDefs, gameConfig, gameInnateMax] = await Promise.all([
           tx.longTermCareActionDef.findMany({
-            where: { gameId: pregnancy.animal.gameId },
+            where: { gameId },
             select: { id: true, intervalCycles: true },
           }),
           tx.gameConfig.findUnique({
-            where: { gameId: pregnancy.animal.gameId },
-            select: { breedingCooldownCycles: true },
+            where: { gameId },
+            select: {
+              breedingCooldownCycles: true,
+              breedingBaseGain: true,
+              breedingMinGain: true,
+              breedingVarianceFactor: true,
+              gestationCareFloor: true,
+              defaultInnateRatio: true,
+            },
+          }),
+          tx.gameInnateMax.findFirst({
+            where: { gameId },
+            select: { maxTotalInnate: true, averageTotalInnate: true },
           }),
         ])
 
         const unborn = pregnancy.offspring.filter((o) => o.animal.status === "EMBRYO_STORED")
+
+        // Detect IVF offspring (no AnimalStat records written at conception)
+        let needsStats = false
+        if (unborn.length > 0) {
+          const statCount = await tx.animalStat.count({ where: { animalId: unborn[0]!.animal.id } })
+          needsStats = statCount === 0
+        }
+
         for (const o of unborn) {
+          if (needsStats && gameConfig && gameInnateMax && pregnancy.breedingRecord) {
+            const sireSnap = pregnancy.breedingRecord.sireSnapshot as any
+            const damSnap = pregnancy.breedingRecord.damSnapshot as any
+            const sireStats: { statDefId: string; innateValue: number }[] = sireSnap?.stats ?? []
+            const damStats: { statDefId: string; innateValue: number }[] = damSnap?.stats ?? []
+
+            if (sireStats.length > 0 && damStats.length > 0) {
+              const sireTotal = sireStats.reduce((s, x) => s + x.innateValue, 0)
+              const damTotal = damStats.reduce((s, x) => s + x.innateValue, 0)
+              const parentAvgTotal = (sireTotal + damTotal) / 2
+
+              const statAvgs: Record<string, number> = {}
+              for (const s of sireStats) statAvgs[s.statDefId] = (statAvgs[s.statDefId] ?? 0) + s.innateValue * 0.5
+              for (const s of damStats) statAvgs[s.statDefId] = (statAvgs[s.statDefId] ?? 0) + s.innateValue * 0.5
+
+              const sireComp: { breedId: string; percentage: number }[] = sireSnap?.breedComposition ?? []
+              const damComp: { breedId: string; percentage: number }[] = damSnap?.breedComposition ?? []
+              const sireCompMap = new Map(sireComp.map((c) => [c.breedId, c.percentage]))
+              const isFirstGenCross = sireComp.length !== damComp.length ||
+                damComp.some((c) => {
+                  const v = sireCompMap.get(c.breedId)
+                  return v === undefined || Math.abs(v - c.percentage) > 0.001
+                })
+
+              const surrogateCarScore = pregnancy.animal.careScore?.score ?? 100
+              const careMultiplier = Math.max(gameConfig.gestationCareFloor ?? 0, surrogateCarScore / 100)
+              const pairQuality = ((sireSnap?.quality ?? 50) + (damSnap?.quality ?? 50)) / 200
+
+              let totalInnate: number
+              if (isFirstGenCross) {
+                totalInnate = (gameConfig.defaultInnateRatio ?? 0.5) * gameInnateMax.averageTotalInnate
+              } else {
+                const headroom = Math.max(0, (gameInnateMax.maxTotalInnate - parentAvgTotal) / gameInnateMax.maxTotalInnate)
+                const gain = Math.max(
+                  gameConfig.breedingMinGain ?? 0,
+                  (gameConfig.breedingBaseGain ?? 0) * Math.sqrt(headroom) * pairQuality,
+                )
+                const variance = gain * (Math.random() * 2 - 1) * (gameConfig.breedingVarianceFactor ?? 0.1)
+                totalInnate = Math.max(parentAvgTotal, parentAvgTotal + gain + variance)
+              }
+
+              const stats = parentAvgTotal > 0
+                ? Object.entries(statAvgs).map(([statDefId, avg]) => ({
+                    animalId: o.animal.id,
+                    statDefId,
+                    innateValue: totalInnate * (avg / parentAvgTotal) * careMultiplier,
+                    trainedValue: 0,
+                  }))
+                : Object.entries(statAvgs).map(([statDefId]) => ({
+                    animalId: o.animal.id,
+                    statDefId,
+                    innateValue: 0,
+                    trainedValue: 0,
+                  }))
+
+              if (stats.length > 0) {
+                await tx.animalStat.createMany({ data: stats })
+              }
+            }
+          }
+
           await tx.animal.update({
             where: { id: o.animal.id },
             data: {

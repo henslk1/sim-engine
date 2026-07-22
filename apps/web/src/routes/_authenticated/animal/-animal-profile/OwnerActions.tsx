@@ -14,9 +14,10 @@ type Props = {
     game: { gameConfig: { subContainerLabel: string | null } | null}
   }
   playerAccountId: string
+  onEquipOpen: () => void
 }
 
-export function OwnerActionList({ animal, playerAccountId }: Props) {
+export function OwnerActionList({ animal, playerAccountId, onEquipOpen }: Props) {
   const utils = trpc.useUtils()
   const [renaming, setRenaming] = useState(false)
   const [nameInput, setNameInput] = useState(animal.name)
@@ -114,7 +115,7 @@ export function OwnerActionList({ animal, playerAccountId }: Props) {
       {/* Equip / Unequip */}
       <button
         type="button"
-        onClick={() => document.getElementById("equipped-section")?.scrollIntoView({ behavior: "smooth", block: "center" })}
+        onClick={onEquipOpen}
         className="flex w-full items-center gap-3 px-3 py-3 text-left text-sm font-medium text-foreground transition-colors hover:bg-secondary/50"
       >
         <Package className="size-5 shrink-0 text-muted-foreground" />

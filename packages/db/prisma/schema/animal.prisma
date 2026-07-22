@@ -62,6 +62,7 @@ model StatDef {
   trainingActionDefs          TrainingActionDef[]
   breedingListingStatMinimums BreedingListingStatMinimum[]
   disciplineStatWeights       DisciplineStatWeight[]
+  competitionEntryStats       CompetitionEntryStat[]
   recordDefs                  RecordDef[]
   groupEntryRequirements      GroupEntryRequirement[]
   groupSaleConditions         GroupSaleProtectionRule[]

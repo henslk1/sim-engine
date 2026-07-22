@@ -97,7 +97,7 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
         if (eligible.length > 0) {
           const picked = eligible[Math.floor(Math.random() * eligible.length)]!
           await tx.animalHealthRecord.create({
-            data: { animalId, conditionDefId: picked.id, diagnosedCycle: newAge, isActive: true },
+            data: { animalId, conditionDefId: picked.id, isActive: true },
           })
         }
       }
@@ -129,7 +129,7 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
 
       if (Math.random() < (rule.penetrance ?? 1.0)) {
         await tx.animalHealthRecord.create({
-          data: { animalId, conditionDefId: condDef.id, diagnosedCycle: newAge, isActive: true },
+          data: { animalId, conditionDefId: condDef.id, isActive: true },
         })
       }
     }
@@ -213,7 +213,8 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
       Promise.all([
         tx.trainingLog.count({ where: { animalId, cycleNumber: currentCycle } }),
         tx.competitionEntry.count({ where: { animalId, cycleNumber: currentCycle } }),
-      ]).then(([t, c]) => t + c > 0),
+        tx.stageActivityLog.count({ where: { animalId, cycleNumber: currentCycle } }),
+      ]).then(([t, c, s]) => t + c + s > 0),
       Promise.all([
         tx.careActionDef.count({ where: { gameId: animal.gameId } }),
         tx.careLog.count({ where: { animalId, cycleNumber: currentCycle } }),
@@ -224,13 +225,22 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
       tx.animalCareScore.findUnique({ where: { animalId } }),
       tx.animalHealthRecord.findMany({
         where: { animalId, isActive: true },
-        include: { conditionDef: true },
+        include: {
+          conditionDef: true,
+          treatmentRecords: { where: { isActive: true }, select: { lastAdministeredCycle: true } },
+        },
       }),
     ])
 
     const conditionEnergyEffect = activeHealthRecords.reduce(
       (sum, r) => sum + (r.conditionDef.energyEffect ?? 0), 0
     )
+    const conditionMoodEffect = activeHealthRecords.reduce((sum, r) => {
+      const treatedThisCycle = r.treatmentRecords.some(
+        (t) => t.lastAdministeredCycle === currentCycle
+      )
+      return treatedThisCycle ? sum : sum + (r.conditionDef.moodEffect ?? 0)
+    }, 0)
     const neglected = careScore != null && careScore.score < gameConfig.energyLowCareThreshold
     const carePenalty = neglected ? gameConfig.energyLowCarePenalty : 0
 
@@ -257,7 +267,7 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
       }),
       mood && tx.animalMood.update({
         where: { animalId },
-        data: { value: Math.max(0, mood.value - gameConfig.moodDecayRate) },
+        data: { value: Math.max(0, Math.min(100, mood.value - gameConfig.moodDecayRate + conditionMoodEffect)) },
       }),
       condition && !workedThisCycle && tx.animalCondition.update({
         where: { animalId },

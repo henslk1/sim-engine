@@ -9,9 +9,10 @@ export type ParentData = {
   inbreedingCoefficient: number
   breedGeneration: number | null
   breedId: string
+  quality: number
   stats: Array<{ statDefId: string; innateValue: number }>
   mood: { value: number } | null
-  personality: Array<{ traitDef: { conceptionModifier: number }; value: number }>
+  personality: Array<{ traitDefId: string; traitDef: { conceptionModifier: number }; value: number }>
   genotypes: Array<{
     locusId: string
     alleleOneId: string
@@ -43,6 +44,7 @@ export type GenerateOffspringInput = {
   gameInnateMax: { maxTotalInnate: number; averageTotalInnate: number }
   gradeBreedId: string
   targetBreedId?: string
+  skipConceptionRoll?: boolean
 }
 
 export type OffspringData = {
@@ -55,6 +57,7 @@ export type OffspringData = {
   immunity: { innateMax: number; startingValue: number }
   genotypes: Array<{ locusId: string; alleleOneId: string; alleleTwoId: string }>
   breedComposition: Array<{ breedId: string; percentage: number }>
+  personality: Array<{ traitDefId: string; value: number }>
 }
 
 export type GenerateOffspringResult =
@@ -112,16 +115,18 @@ export function generateOffspring(input: GenerateOffspringInput): GenerateOffspr
   const { sire, dam, damCareScore, gameConfig, gameInnateMax, gradeBreedId, targetBreedId } = input
 
   // ── Conception roll ───────────────────────────────────────────────────────────
-  const base =
-    (sire.fertility * 100 + dam.fertility * 100 + (sire.mood?.value ?? 50) + (dam.mood?.value ?? 50)) / 4
+  if (!input.skipConceptionRoll) {
+    const base =
+      (sire.fertility * 100 + dam.fertility * 100 + (sire.mood?.value ?? 50) + (dam.mood?.value ?? 50)) / 4
 
-  const personalityOffset = [...sire.personality, ...dam.personality].reduce(
-    (acc, p) => acc + p.traitDef.conceptionModifier * p.value,
-    0,
-  )
+    const personalityOffset = [...sire.personality, ...dam.personality].reduce(
+      (acc, p) => acc + p.traitDef.conceptionModifier * p.value,
+      0,
+    )
 
-  const conceptionChance = Math.max(CONCEPTION_FLOOR, Math.min(100, base + personalityOffset))
-  if (Math.random() * 100 > conceptionChance) return { conceived: false }
+    const conceptionChance = Math.max(CONCEPTION_FLOOR, Math.min(100, base + personalityOffset))
+    if (Math.random() * 100 > conceptionChance) return { conceived: false }
+  }
 
   // ── Multiples ─────────────────────────────────────────────────────────────────
   let quantity = 1
@@ -169,20 +174,21 @@ export function generateOffspring(input: GenerateOffspringInput): GenerateOffspr
   const offspringInnateMax = ((sire.immunity?.innateMax ?? 100) + (dam.immunity?.innateMax ?? 100)) / 2
   const careMultiplier = Math.max(gameConfig.gestationCareFloor, damCareScore / 100)
 
-  // Fertility uses same headroom curve, scaled to 0–1 range.
+  // Fertility: parent average ± small variance. No systematic gain.
   const parentAvgFertility = (sire.fertility + dam.fertility) / 2
-  const fertilityHeadroom = Math.max(0, 1.0 - parentAvgFertility)
-  const fertScale = 0.01
-  const fertilityGain = Math.max(
-    gameConfig.breedingMinGain * fertScale,
-    gameConfig.breedingBaseGain * fertScale * Math.sqrt(fertilityHeadroom),
-  )
-  const fertilityVariance =
-    fertilityGain * (Math.random() * 2 - 1) * gameConfig.breedingVarianceFactor
-  const offspringFertility = Math.min(
-    1.0,
-    Math.max(parentAvgFertility, parentAvgFertility + fertilityGain + fertilityVariance),
-  )
+  const fertilityVariance = (Math.random() * 2 - 1) * 0.05
+  const offspringFertility = Math.min(1.0, Math.max(0, parentAvgFertility + fertilityVariance))
+
+  // Quality multiplier for stat gains — average of both parents, 0–1 scale.
+  const pairQuality = (sire.quality + dam.quality) / 200
+
+  // Personality: parent average per trait ± small variance.
+  const sirePersonalityMap = new Map(sire.personality.map((p) => [p.traitDefId, p.value]))
+  const offspringPersonality = dam.personality.map((dp) => {
+    const sireValue = sirePersonalityMap.get(dp.traitDefId) ?? dp.value
+    const raw = (sireValue + dp.value) / 2 + (Math.random() * 2 - 1) * 5
+    return { traitDefId: dp.traitDefId, value: Math.max(0, Math.min(100, raw)) }
+  })
 
   // ── Per-offspring genetics roll ───────────────────────────────────────────────
   function rollGenetics() {
@@ -197,7 +203,7 @@ export function generateOffspring(input: GenerateOffspringInput): GenerateOffspr
       )
       const gain = Math.max(
         gameConfig.breedingMinGain,
-        gameConfig.breedingBaseGain * Math.sqrt(headroom),
+        gameConfig.breedingBaseGain * Math.sqrt(headroom) * pairQuality,
       )
       const variance = gain * (Math.random() * 2 - 1) * gameConfig.breedingVarianceFactor
       totalInnate = Math.max(parentAvgTotal, parentAvgTotal + gain + variance)
@@ -248,6 +254,7 @@ export function generateOffspring(input: GenerateOffspringInput): GenerateOffspr
       },
       genotypes,
       breedComposition: offspringComposition,
+      personality: offspringPersonality,
     }
   })
 

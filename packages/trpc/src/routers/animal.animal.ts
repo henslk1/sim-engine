@@ -16,8 +16,20 @@ export const animalAnimalRouter = router({
         name: true,
         status: true,
         sex: true,
-        breed: { select: { name: true } },
+        image: true,
+        breed: { select: { id: true, name: true } },
         lifeStage: { select: { name: true } },
+        disciplineDef: { select: { name: true, isConformation: true } },
+        conformationScores: { select: { breedId: true } },
+        equipment: { select: { itemDef: { select: { id: true } } } },
+        subContainerId: true,
+        ageInCycles: true,
+        isCastrated: true,
+        breedingCooldownUntilCycle: true,
+        geneticCollectionCooldownUntilCycle: true,
+        pregnancies: { where: { isCompleted: false }, take: 1, select: { id: true } },
+        _count: { select: { healthRecords: { where: { isActive: true, diagnosedAt: null } } } },
+        healthCertificates: { select: { certDefId: true, isValid: true, expiresAtCycle: true } },
       },
     })
   ),
@@ -35,6 +47,11 @@ export const animalAnimalRouter = router({
   bury: publicProcedure
     .input(z.object({ animalId: z.string() }))
     .mutation(async ({ input }) => {
+      const animal = await db.animal.findUniqueOrThrow({
+        where: { id: input.animalId },
+        select: { status: true },
+      })
+      if (animal.status !== "DECEASED") throw new Error("Only deceased animals can be buried")
       const result = await db.animal.update({
         where: { id: input.animalId },
         data: { status: "BURIED" },
@@ -176,4 +193,32 @@ export const animalAnimalRouter = router({
     conformationInspect: publicProcedure
       .input(z.object({ animalId: z.string() }))
       .mutation(({ input }) => runConformationInspection(db, input.animalId)),
+
+    createSubContainer: publicProcedure
+      .input(z.object({ playerAccountId: z.string(), name: z.string().min(1).max(80).trim() }))
+      .mutation(async ({ input }) => {
+        const count = await db.subContainer.count({ where: { playerAccountId: input.playerAccountId } })
+        return db.subContainer.create({
+          data: { playerAccountId: input.playerAccountId, name: input.name, displayOrder: count },
+          select: { id: true, name: true, displayOrder: true },
+        })
+      }),
+
+    updateSubContainer: publicProcedure
+      .input(z.object({ id: z.string(), name: z.string().min(1).max(80).trim() }))
+      .mutation(({ input }) =>
+        db.subContainer.update({
+          where: { id: input.id },
+          data: { name: input.name },
+          select: { id: true, name: true },
+        })
+      ),
+
+    deleteSubContainer: publicProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async ({ input }) => {
+        await db.animal.updateMany({ where: { subContainerId: input.id }, data: { subContainerId: null } })
+        await db.subContainer.delete({ where: { id: input.id } })
+        return { deleted: true }
+      }),
 })

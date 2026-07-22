@@ -81,6 +81,7 @@ model VetServiceDef {
   currencyDefId         String
   hasSubscriberDiscount Boolean          @default(false)
   vetVisitLogs          VetVisitLog[]
+  conditions            VetServiceCondition[]
   panelDefId            String?
   panelDef              GeneticPanelDef? @relation(fields: [panelDefId], references: [id])
   currencyDef           CurrencyDef      @relation(fields: [currencyDefId], references: [id])

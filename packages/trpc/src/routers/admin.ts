@@ -32,6 +32,8 @@ import { storeListingAdminRouter } from "./admin.storelisting.js";
 import { gameShopAdminRouter } from "./admin.gameshop.js";
 import { groupPrestigeAdminRouter } from "./admin.groupprestige.js"
 import { playerAdminRouter } from "./admin.player.js";
+import { competitionAdminRouter } from "./admin.competition.js";
+import { opsAdminRouter } from "./admin.ops.js";
 
 export const adminRouter = router({
   game: gameAdminRouter,
@@ -67,4 +69,6 @@ export const adminRouter = router({
   gameShop: gameShopAdminRouter,
   groupPrestige: groupPrestigeAdminRouter,
   player: playerAdminRouter,
+  competition: competitionAdminRouter,
+  ops: opsAdminRouter,
 })

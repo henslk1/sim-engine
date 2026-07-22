@@ -406,49 +406,8 @@ function GameConfigPage() {
           </div>
         </section>
 
-        <PlayerCapacityInit gameId={data.id} />
         </>
       )}
     </div>
-  )
-}
-
-function PlayerCapacityInit({ gameId }: { gameId: string }) {
-  const initCapacity = trpc.admin.player.initCapacity.useMutation()
-  const initLtc = trpc.admin.care.initLtcRecords.useMutation()
-  return (
-    <section className="rounded-lg border border-border bg-card shadow-sm">
-      <header className="border-b border-border bg-secondary/40 px-4 py-2.5">
-        <h2 className="text-sm font-semibold text-foreground">Player Maintenance</h2>
-      </header>
-      <div className="p-4 space-y-4">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <p className="text-sm font-medium text-foreground">Initialize Player Capacity</p>
-            <p className="text-xs text-muted-foreground">Creates missing PlayerCapacity records for accounts created before onboarding was configured.</p>
-          </div>
-          <Button variant="outline" size="sm" onClick={() => initCapacity.mutate({ gameId })} disabled={initCapacity.isPending}>
-            {initCapacity.isPending ? "Running…" : "Run"}
-          </Button>
-        </div>
-        {initCapacity.data && (
-          <p className="text-xs text-muted-foreground">{initCapacity.data.initialized} initialized · {initCapacity.data.skipped} already had capacity</p>
-        )}
-        {initCapacity.error && <p className="text-xs text-destructive">{initCapacity.error.message}</p>}
-        <div className="flex items-center justify-between gap-4 border-t border-border pt-4">
-          <div>
-            <p className="text-sm font-medium text-foreground">Initialize LTC Records</p>
-            <p className="text-xs text-muted-foreground">Creates missing long-term care schedule records for all alive animals (shop animals, pre-existing animals).</p>
-          </div>
-          <Button variant="outline" size="sm" onClick={() => initLtc.mutate({ gameId })} disabled={initLtc.isPending}>
-            {initLtc.isPending ? "Running…" : "Run"}
-          </Button>
-        </div>
-        {initLtc.data && (
-          <p className="text-xs text-muted-foreground">{initLtc.data.initialized} initialized · {initLtc.data.skipped} already existed</p>
-        )}
-        {initLtc.error && <p className="text-xs text-destructive">{initLtc.error.message}</p>}
-      </div>
-    </section>
   )
 }

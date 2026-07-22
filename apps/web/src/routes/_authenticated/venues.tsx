@@ -1,8 +1,7 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
+import { createFileRoute, Link } from "@tanstack/react-router"
 import { trpc } from "@/lib/trpc"
-import { useState } from "react"
-import { Trophy, ChevronLeft, MapPin, Users, Clock, Ban, XCircle } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { ChevronLeft, Mountain, Waves, Wind, ArrowRight } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 export const Route = createFileRoute("/_authenticated/venues")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -14,248 +13,199 @@ export const Route = createFileRoute("/_authenticated/venues")({
   component: VenuesPage,
 })
 
-type Competition = {
-  id: string
-  disciplineDef: {
-    id: string
-    name: string
-    isConformation: boolean
-    equipmentRequirements: { id: string; quantity: number; itemDef: { id: string; name: string } }[]
-  }
-  venue: { id: string; name: string }
-  expiresAt: Date | string | null
-  _count: { entries: number }
+// ─── Lookup tables (full literal strings so Tailwind picks them up) ─────────────
+
+const CARD_HERO: Record<string, string> = {
+  HOT:       "bg-gradient-to-br from-chart-1/35 via-chart-1/10 to-transparent",
+  WARM:      "bg-gradient-to-br from-chart-3/35 via-chart-3/10 to-transparent",
+  COLD:      "bg-gradient-to-br from-chart-4/35 via-chart-4/10 to-transparent",
+  TEMPERATE: "bg-gradient-to-br from-chart-2/35 via-chart-2/10 to-transparent",
 }
 
-type EligibilityData = {
-  animal: {
-    ageInCycles: number
-    equipment: { itemDef: { id: string } }[]
-    healthCertificates: { isValid: boolean; expiresAtCycle: number; certDef: { id: string; name: string } }[]
-    healthRecords: {
-      treatmentRecords: {
-        treatmentDef: { restrictionDefs: { restrictionType: string }[] }
-        activityRestriction: { restrictionType: string }[]
-      }[]
-    }[]
-  }
-  requiredCertDefs: { id: string; name: string }[]
+const CLIMATE_BADGE: Record<string, string> = {
+  HOT:       "bg-chart-1/12 text-chart-1",
+  WARM:      "bg-chart-3/12 text-chart-3",
+  COLD:      "bg-chart-4/12 text-chart-4",
+  TEMPERATE: "bg-chart-2/12 text-chart-2",
 }
 
-function getBlockReasons(
-  eligibility: EligibilityData,
-  comp: Competition,
-  hasConformationScore: boolean,
-): string[] {
-  const reasons: string[] = []
-  const { animal, requiredCertDefs } = eligibility
-
-  const restrictionTypes = new Set<string>()
-  for (const record of animal.healthRecords) {
-    for (const t of record.treatmentRecords) {
-      for (const rd of t.treatmentDef.restrictionDefs) restrictionTypes.add(rd.restrictionType)
-      for (const r of t.activityRestriction) restrictionTypes.add(r.restrictionType)
-    }
-  }
-  if (restrictionTypes.has("COMPETITION") || restrictionTypes.has("ALL")) {
-    reasons.push("Activity restricted due to active treatment")
-  }
-
-  if (comp.disciplineDef.isConformation && !hasConformationScore) {
-    reasons.push("No conformation score — inspection required before entering")
-  }
-
-  for (const certDef of requiredCertDefs) {
-    const cert = animal.healthCertificates.find((c) => c.certDef.id === certDef.id)
-    if (!cert || !cert.isValid || cert.expiresAtCycle <= animal.ageInCycles) {
-      reasons.push(`Missing certificate: ${certDef.name}`)
-    }
-  }
-
-  for (const req of comp.disciplineDef.equipmentRequirements) {
-    const equipped = animal.equipment.filter((e) => e.itemDef.id === req.itemDef.id).length
-    if (equipped < req.quantity) {
-      reasons.push(`Missing equipment: ${req.itemDef.name}${req.quantity > 1 ? ` (${equipped}/${req.quantity})` : ""}`)
-    }
-  }
-
-  return reasons
+const CLIMATE_ICON_CLS: Record<string, string> = {
+  HOT:       "text-chart-1/60",
+  WARM:      "text-chart-3/60",
+  COLD:      "text-chart-4/60",
+  TEMPERATE: "text-chart-2/60",
 }
+
+const CONDITIONS: Record<string, Record<string, string>> = {
+  HOT:       { FLAT: "Hot & Hard Ground", COASTAL: "Hot & Coastal Shore", HILLY: "Hot & Rolling Hills", MOUNTAIN: "Hot & Rocky Peaks" },
+  WARM:      { FLAT: "Warm & Soft Turf",  COASTAL: "Warm & Sea Breeze",   HILLY: "Warm & Gentle Hills", MOUNTAIN: "Warm & Steep Slopes" },
+  COLD:      { FLAT: "Cold & Frozen Ground", COASTAL: "Cold & Icy Shoreline", HILLY: "Cold & Rugged Hills", MOUNTAIN: "Cold & Thin Air" },
+  TEMPERATE: { FLAT: "Temperate & Soft Turf", COASTAL: "Temperate & Open Coast", HILLY: "Temperate & Rolling Fields", MOUNTAIN: "Temperate & High Ground" },
+}
+
+function TerrainIcon({ terrain, size = 80 }: { terrain: string | null; size?: number }) {
+  if (terrain === "COASTAL") return <Waves size={size} strokeWidth={0.8} />
+  if (terrain === "MOUNTAIN" || terrain === "HILLY") return <Mountain size={size} strokeWidth={0.8} />
+  return <Wind size={size} strokeWidth={0.8} />
+}
+
+// ─── Page ───────────────────────────────────────────────────────────────────────
 
 function VenuesPage() {
-  const { animalId: initialAnimalId, disciplineDefId: initialDisciplineDefId, isConformation, from } = Route.useSearch()
-  const navigate = useNavigate()
+  const { animalId, disciplineDefId, isConformation, from } = Route.useSearch()
 
   const { data: gameData } = trpc.admin.game.get.useQuery()
   const gameId = gameData?.id
-  const { data: me } = trpc.player.me.useQuery({ gameId: gameId! }, { enabled: !!gameId })
-  const playerAccountId = me?.id
 
-  const { data: animals } = trpc.animal.list.useQuery()
-  const aliveAnimals = animals?.filter((a) => a.status === "ALIVE") ?? []
+  const { data: venues, isLoading: venuesLoading } = trpc.competition.listVenues.useQuery(
+    { gameId: gameId! },
+    { enabled: !!gameId },
+  )
 
-  const [selectedAnimalId, setSelectedAnimalId] = useState(initialAnimalId ?? "")
-  const [enteredId, setEnteredId] = useState<string | null>(null)
-  const [errorMsg, setErrorMsg] = useState<string | null>(null)
-
-  const { data: competitions, isLoading: compsLoading } = trpc.competition.listOpen.useQuery(
+  const { data: competitions } = trpc.competition.listOpen.useQuery(
     {
       gameId: gameId!,
-      disciplineDefId: isConformation ? undefined : initialDisciplineDefId,
+      disciplineDefId: isConformation ? undefined : disciplineDefId,
       isConformation: isConformation ?? undefined,
     },
     { enabled: !!gameId },
   )
 
-  const { data: eligibility } = trpc.competition.eligibility.useQuery(
-    { animalId: selectedAnimalId, gameId: gameId! },
-    { enabled: !!selectedAnimalId && !!gameId },
-  )
-
-  const { data: selectedAnimalProfile } = trpc.animalProfile.get.useQuery(
-    { animalId: selectedAnimalId },
-    { enabled: !!selectedAnimalId && !!isConformation },
-  )
-  const hasConformationScore = (selectedAnimalProfile?.conformationScores.length ?? 0) > 0
-
-  const utils = trpc.useUtils()
-
-  const enter = trpc.competition.enter.useMutation({
-    onSuccess: (_, variables) => {
-      setEnteredId(variables.competitionId)
-      setErrorMsg(null)
-      utils.competition.listOpen.invalidate({ gameId: gameId! })
-      if (from === "animal" && initialAnimalId) {
-        navigate({ to: "/animal/$animalId", params: { animalId: initialAnimalId } })
-      }
-    },
-    onError: (err) => {
-      setErrorMsg(err.message)
-    },
-  })
-
-  function handleEnter(competitionId: string) {
-    if (!selectedAnimalId || !playerAccountId) return
-    setEnteredId(null)
-    setErrorMsg(null)
-    enter.mutate({ animalId: selectedAnimalId, competitionId, playerAccountId })
-  }
-
-  const grouped = competitions?.reduce<Record<string, Competition[]>>((acc, comp) => {
-    const key = comp.venue.id
-    if (!acc[key]) acc[key] = []
-    acc[key].push(comp as Competition)
+  const infoByVenue = competitions?.reduce<Record<string, { count: number; disciplines: Set<string> }>>((acc, comp) => {
+    if (!acc[comp.venue.id]) acc[comp.venue.id] = { count: 0, disciplines: new Set() }
+    acc[comp.venue.id].count++
+    acc[comp.venue.id].disciplines.add(comp.disciplineDef.name)
     return acc
   }, {}) ?? {}
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 p-6">
+    <div className="min-h-screen bg-background">
+      <div className="mx-auto max-w-7xl px-8 py-10">
 
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        {from === "animal" && initialAnimalId && (
-          <Link to="/animal/$animalId" params={{ animalId: initialAnimalId }} className="text-muted-foreground hover:text-foreground">
-            <ChevronLeft className="size-5" />
-          </Link>
-        )}
-        <h1 className="font-serif text-2xl font-semibold text-foreground flex items-center gap-2">
-          <Trophy className="size-5" /> {isConformation ? "Conformation Shows" : "Competition Venues"}
-        </h1>
-      </div>
+        {/* Page header */}
+        <div className="mb-10">
+          {from === "animal" && animalId && (
+            <Link
+              to="/animal/$animalId"
+              params={{ animalId }}
+              className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <ChevronLeft size={15} />
+              Back to Animal
+            </Link>
+          )}
+          <h1 className="font-serif text-4xl font-semibold text-foreground">
+            {isConformation ? "Conformation Show Venues" : "World Venues"}
+          </h1>
+          <p className="mt-2 max-w-xl text-sm text-muted-foreground leading-relaxed">
+            Explore the competition grounds. Each region presents unique
+            environmental conditions that affect performance. Prepare your stable accordingly.
+          </p>
+        </div>
 
-      {/* Animal selector */}
-      <div className="space-y-1.5">
-        <label className="text-sm font-medium text-foreground">Competing Animal</label>
-        <select
-          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
-          value={selectedAnimalId}
-          onChange={(e) => { setSelectedAnimalId(e.target.value); setEnteredId(null); setErrorMsg(null) }}
-        >
-          <option value="">Select an animal…</option>
-          {aliveAnimals.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name} — {a.breed.name} · {a.lifeStage.name} · {a.sex === "MALE" ? "M" : "F"}
-            </option>
-          ))}
-        </select>
-      </div>
+        {/* Grid */}
+        {venuesLoading ? (
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="h-80 animate-pulse rounded-2xl border border-border bg-muted/20" />
+            ))}
+          </div>
+        ) : !venues?.length ? (
+          <p className="text-sm text-muted-foreground">No venues configured.</p>
+        ) : (
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {venues.map((venue) => {
+              const info = infoByVenue[venue.id]
+              const count = info?.count ?? 0
+              const disciplines = info ? Array.from(info.disciplines) : []
+              const heroGradient = venue.climate ? CARD_HERO[venue.climate] : "bg-muted/20"
+              const climateBadge = venue.climate ? CLIMATE_BADGE[venue.climate] : ""
+              const climateIconCls = venue.climate ? CLIMATE_ICON_CLS[venue.climate] : "text-foreground/10"
+              const conditions = venue.climate && venue.terrain ? CONDITIONS[venue.climate]?.[venue.terrain] : null
 
-      {errorMsg && (
-        <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {errorMsg}
-        </p>
-      )}
+              return (
+                <Link
+                  key={venue.id}
+                  to="/venue/$venueId"
+                  params={{ venueId: venue.id }}
+                  search={{ animalId, disciplineDefId, isConformation, from }}
+                  className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-all hover:shadow-md hover:border-primary/30"
+                >
+                  {/* Hero */}
+                  <div className={cn("relative h-36 overflow-hidden", heroGradient, count === 0 && "opacity-60")}>
+                    <div className={cn("absolute -bottom-3 -right-3 transition-transform group-hover:-translate-x-1 group-hover:translate-y-1", climateIconCls)}>
+                      <TerrainIcon terrain={venue.terrain} size={88} />
+                    </div>
+                    {venue.terrain && (
+                      <span className="absolute bottom-3 left-4 font-mono text-[10px] uppercase tracking-widest text-foreground/35">
+                        {venue.terrain === "MOUNTAIN" ? "Mountains" : venue.terrain === "COASTAL" ? "Coastal" : venue.terrain === "HILLY" ? "Hills" : "Flatlands"}
+                      </span>
+                    )}
+                  </div>
 
-      {/* Open competitions grouped by venue */}
-      {compsLoading ? (
-        <p className="text-sm text-muted-foreground">Loading competitions…</p>
-      ) : Object.keys(grouped).length === 0 ? (
-        <p className="text-sm text-muted-foreground">No open competitions right now.</p>
-      ) : (
-        Object.values(grouped).map((comps) => {
-          const venue = comps[0].venue
-          return (
-            <section key={venue.id} className="rounded-lg border border-border bg-card">
-              <div className="flex items-center gap-2 border-b border-border px-4 py-3">
-                <MapPin className="size-4 text-muted-foreground" />
-                <h2 className="text-sm font-semibold text-foreground">{venue.name}</h2>
-              </div>
-              <div className="divide-y divide-border/50">
-                {comps.map((comp) => {
-                  const blockReasons = eligibility ? getBlockReasons(eligibility as EligibilityData, comp, hasConformationScore) : []
-                  const isBlocked = blockReasons.length > 0
-                  const isEntering = enter.isPending && enter.variables?.competitionId === comp.id
-                  const justEntered = enteredId === comp.id
+                  {/* Body */}
+                  <div className="flex flex-1 flex-col p-5">
+                    <h2 className="font-serif text-xl font-semibold leading-snug text-foreground">
+                      {venue.name}
+                    </h2>
 
-                  return (
-                    <div key={comp.id} className="px-4 py-3">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-foreground">{comp.disciplineDef.name}</p>
-                          <div className="mt-0.5 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
-                            <span className="flex items-center gap-1">
-                              <Users className="size-3" />
-                              {comp._count.entries} entered
+                    {/* CONDITIONS */}
+                    {conditions && (
+                      <div className="mt-3">
+                        <p className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground/70">Conditions</p>
+                        <p className="mt-1 flex items-center gap-1.5 text-sm text-foreground/80">
+                          {venue.climate && (
+                            <span className={cn("rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide", climateBadge)}>
+                              {venue.climate.charAt(0) + venue.climate.slice(1).toLowerCase()}
                             </span>
-                            {comp.expiresAt && (
-                              <span className="flex items-center gap-1">
-                                <Clock className="size-3" />
-                                Closes {new Date(comp.expiresAt).toLocaleDateString()}
-                              </span>
-                            )}
-                          </div>
-                          {isBlocked && selectedAnimalId && (
-                            <div className="mt-1.5 space-y-0.5">
-                              {blockReasons.map((reason) => (
-                                <div key={reason} className="flex items-center gap-1 text-[11px] text-destructive">
-                                  {reason.startsWith("Activity") ? (
-                                    <Ban className="size-3 shrink-0" />
-                                  ) : (
-                                    <XCircle className="size-3 shrink-0" />
-                                  )}
-                                  {reason}
-                                </div>
-                              ))}
-                            </div>
+                          )}
+                          {conditions.split(" & ")[1]}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* SANCTIONED DISCIPLINES */}
+                    <div className="mt-4">
+                      <p className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground/70">
+                        Sanctioned Disciplines
+                      </p>
+                      {disciplines.length > 0 ? (
+                        <div className="mt-1.5 flex flex-wrap gap-1.5">
+                          {disciplines.slice(0, 4).map((d) => (
+                            <span key={d} className="rounded-full border border-border bg-secondary/50 px-2.5 py-0.5 text-xs text-muted-foreground">
+                              {d}
+                            </span>
+                          ))}
+                          {disciplines.length > 4 && (
+                            <span className="rounded-full border border-border bg-secondary/50 px-2.5 py-0.5 text-xs text-muted-foreground">
+                              +{disciplines.length - 4}
+                            </span>
                           )}
                         </div>
-                        <Button
-                          size="sm"
-                          variant={justEntered ? "outline" : "default"}
-                          disabled={!selectedAnimalId || isEntering || justEntered || isBlocked}
-                          onClick={() => handleEnter(comp.id)}
-                        >
-                          {isEntering ? "Entering…" : justEntered ? "Entered" : "Enter"}
-                        </Button>
+                      ) : (
+                        <p className="mt-1 text-xs text-muted-foreground/50">No open events</p>
+                      )}
+                    </div>
+
+                    {/* CTA */}
+                    <div className="mt-auto pt-5">
+                      <div className={cn(
+                        "flex w-full items-center justify-between rounded-lg px-4 py-2.5 text-sm font-medium transition-colors",
+                        count > 0
+                          ? "bg-primary text-primary-foreground group-hover:bg-primary/90"
+                          : "bg-muted text-muted-foreground cursor-default",
+                      )}>
+                        <span>{count > 0 ? `Visit Venue` : "No Open Events"}</span>
+                        {count > 0 && <ArrowRight size={15} className="transition-transform group-hover:translate-x-0.5" />}
                       </div>
                     </div>
-                  )
-                })}
-              </div>
-            </section>
-          )
-        })
-      )}
+                  </div>
+                </Link>
+              )
+            })}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

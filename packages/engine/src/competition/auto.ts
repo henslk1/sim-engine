@@ -21,33 +21,82 @@ export async function checkCompetitions(client: Client, gameId: string) {
 
   const venueDisciplines = await client.venueDiscipline.findMany({
     where: { venue: { gameId } },
-    include: { venue: true },
+    include: { venue: true, disciplineDef: { select: { isConformation: true } } },
+  })
+
+  const breeds = await client.breed.findMany({
+    where: { gameId },
+    select: { id: true, name: true },
   })
 
   for (const vd of venueDisciplines) {
-    const openCount = await client.competition.count({
-      where: {
-        gameId,
-        venueId: vd.venueId,
-        disciplineDefId: vd.disciplineDefId,
-        status: "OPEN",
-      },
+    const tiers = await client.competitionTierDef.findMany({
+      where: { disciplineDefId: vd.disciplineDefId },
+      orderBy: { tierIndex: "asc" },
     })
 
-    const toCreate = vd.maxOpenAtOnce - openCount
-    for (let i = 0; i < toCreate; i++) {
-      await client.competition.create({
-        data: {
-          gameId,
-          venueId: vd.venueId,
-          disciplineDefId: vd.disciplineDefId,
-          name: `${vd.venue.name}`,
-          maxEntries: vd.defaultMaxEntries,
-          maxWaitHours: vd.defaultMaxWaitHours,
-          status: "OPEN",
-          expiresAt: nextHour(),
-        },
-      })
+    if (vd.disciplineDef.isConformation) {
+      for (const tier of tiers) {
+        for (const breed of breeds) {
+          const openCount = await client.competition.count({
+            where: {
+              gameId,
+              venueId: vd.venueId,
+              disciplineDefId: vd.disciplineDefId,
+              tierDefId: tier.id,
+              breedId: breed.id,
+              status: "OPEN",
+            },
+          })
+
+          const toCreate = vd.maxOpenAtOnce - openCount
+          for (let i = 0; i < toCreate; i++) {
+            await client.competition.create({
+              data: {
+                gameId,
+                venueId: vd.venueId,
+                disciplineDefId: vd.disciplineDefId,
+                tierDefId: tier.id,
+                breedId: breed.id,
+                name: `${vd.venue.name} — ${breed.name} ${tier.name}`,
+                maxEntries: vd.defaultMaxEntries,
+                maxWaitHours: vd.defaultMaxWaitHours,
+                status: "OPEN",
+                expiresAt: nextHour(),
+              },
+            })
+          }
+        }
+      }
+    } else {
+      for (const tier of tiers) {
+        const openCount = await client.competition.count({
+          where: {
+            gameId,
+            venueId: vd.venueId,
+            disciplineDefId: vd.disciplineDefId,
+            tierDefId: tier.id,
+            status: "OPEN",
+          },
+        })
+
+        const toCreate = vd.maxOpenAtOnce - openCount
+        for (let i = 0; i < toCreate; i++) {
+          await client.competition.create({
+            data: {
+              gameId,
+              venueId: vd.venueId,
+              disciplineDefId: vd.disciplineDefId,
+              tierDefId: tier.id,
+              name: `${vd.venue.name} — ${tier.name}`,
+              maxEntries: vd.defaultMaxEntries,
+              maxWaitHours: vd.defaultMaxWaitHours,
+              status: "OPEN",
+              expiresAt: nextHour(),
+            },
+          })
+        }
+      }
     }
   }
 

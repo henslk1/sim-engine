@@ -108,7 +108,9 @@ export function ArchivedView({ animal, animalId }: { animal: AnimalProfile; anim
 
             <ConformationPanel animal={animal} />
             <div className="min-[1400px]:row-span-2 min-[1400px]:min-h-0">
-              <PersonalityPanel animal={animal} />
+              {(animal.lifeStage.canTrain || !animal.lifeStage.hasUniqueActionSet) && (
+                <PersonalityPanel animal={animal} />
+              )}
             </div>
 
             <NotesPanel animal={animal} animalId={animalId} readonly />

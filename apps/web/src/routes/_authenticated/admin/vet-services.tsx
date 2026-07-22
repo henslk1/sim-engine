@@ -14,6 +14,7 @@ type VetServiceForm = {
   currencyDefId: string
   hasSubscriberDiscount: boolean
   panelDefId: string
+  linkedConditionIds: string[]
 }
 const emptyForm = (): VetServiceForm => ({
   name: "",
@@ -22,6 +23,7 @@ const emptyForm = (): VetServiceForm => ({
   currencyDefId: "",
   hasSubscriberDiscount: false,
   panelDefId: "",
+  linkedConditionIds: [],
 })
 
 function VetServicesPage() {
@@ -40,12 +42,30 @@ function VetServicesPage() {
     { gameId: gameId! },
     { enabled: !!gameId }
   )
+  const { data: allConditions } = trpc.admin.health.list.useQuery(
+    { gameId: gameId! },
+    { enabled: !!gameId }
+  )
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editing, setEditing] = useState<VetServiceForm | null>(null)
   const utils = trpc.useUtils()
 
   const save = trpc.admin.vetService.save.useMutation({
+    onSuccess: (saved, vars) => {
+      if (vars.serviceType === "EXAM") {
+        setConditions.mutate({
+          vetServiceDefId: saved.id,
+          conditionDefIds: editing?.linkedConditionIds ?? [],
+        })
+      } else {
+        utils.admin.vetService.list.invalidate({ gameId: gameId! })
+        setEditingId(null)
+        setEditing(null)
+      }
+    },
+  })
+  const setConditions = trpc.admin.vetService.setConditions.useMutation({
     onSuccess: () => {
       utils.admin.vetService.list.invalidate({ gameId: gameId! })
       setEditingId(null)
@@ -57,6 +77,17 @@ function VetServicesPage() {
       utils.admin.vetService.list.invalidate({ gameId: gameId! })
     },
   })
+
+  function toggleCondition(conditionDefId: string) {
+    if (!editing) return
+    const ids = editing.linkedConditionIds
+    setEditing({
+      ...editing,
+      linkedConditionIds: ids.includes(conditionDefId)
+        ? ids.filter((id) => id !== conditionDefId)
+        : [...ids, conditionDefId],
+    })
+  }
 
   function submit() {
     if (!editing || !gameId || !editing.name.trim() || !editing.currencyDefId || editing.baseCost === "") return
@@ -81,7 +112,7 @@ function VetServicesPage() {
       <section className="rounded-lg border border-border bg-card shadow-sm">
         <header className="flex items-center justify-between border-b border-border bg-secondary/40 px-4 py-2.5">
           <h2 className="text-sm font-semibold text-foreground">Service Definitions</h2>
-          <Button size="sm" onClick={() => { setEditing(emptyForm()); setEditingId(null) }}>
+          <Button size="sm" onClick={() => { setEditing(emptyForm()); setEditingId(null); }}>
             + Add Service
           </Button>
         </header>
@@ -92,7 +123,7 @@ function VetServicesPage() {
               <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Type</th>
               <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cost</th>
               <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Currency</th>
-              <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Panel</th>
+              <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Panel / Conditions</th>
               <th className="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Actions</th>
             </tr>
           </thead>
@@ -106,7 +137,13 @@ function VetServicesPage() {
                 <td className="px-4 py-2 text-muted-foreground">{s.serviceType}</td>
                 <td className="px-4 py-2 text-muted-foreground">{s.baseCost}</td>
                 <td className="px-4 py-2 text-muted-foreground">{s.currencyDef.symbol ?? s.currencyDef.name}</td>
-                <td className="px-4 py-2 text-muted-foreground">{s.panelDef?.name ?? "—"}</td>
+                <td className="px-4 py-2 text-muted-foreground">
+                  {s.serviceType === "EXAM"
+                    ? s.conditions.length === 0
+                      ? <span className="text-xs italic">All conditions</span>
+                      : <span>{s.conditions.length} condition{s.conditions.length !== 1 ? "s" : ""}</span>
+                    : s.panelDef?.name ?? "—"}
+                </td>
                 <td className="px-4 py-2 text-right space-x-1">
                   <Button size="sm" variant="ghost" onClick={() => {
                     setEditingId(s.id)
@@ -117,6 +154,7 @@ function VetServicesPage() {
                       currencyDefId: s.currencyDef.id,
                       hasSubscriberDiscount: s.hasSubscriberDiscount,
                       panelDefId: s.panelDefId ?? "",
+                      linkedConditionIds: s.conditions.map((c) => c.conditionDefId),
                     })
                   }}>Edit</Button>
                   <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
@@ -203,6 +241,27 @@ function VetServicesPage() {
                 </select>
               </div>
             )}
+            {editing.serviceType === "EXAM" && allConditions && allConditions.length > 0 && (
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">
+                  Diagnosable conditions <span className="font-normal">(leave empty to diagnose all undiagnosed conditions)</span>
+                </label>
+                <div className="mt-1.5 max-h-40 overflow-y-auto rounded-md border border-input bg-background p-2 space-y-1">
+                  {allConditions.map((c) => (
+                    <label key={c.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-secondary/50">
+                      <input
+                        type="checkbox"
+                        checked={editing.linkedConditionIds.includes(c.id)}
+                        onChange={() => toggleCondition(c.id)}
+                        className="rounded border-input accent-primary"
+                      />
+                      <span className="text-sm text-foreground">{c.name}</span>
+                      <span className="ml-auto text-[10px] text-muted-foreground uppercase">{c.conditionType}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
             <div>
               <label className="flex items-center gap-2 text-sm">
                 <input
@@ -217,9 +276,9 @@ function VetServicesPage() {
             <div className="flex gap-2 pt-1">
               <Button
                 onClick={submit}
-                disabled={save.isPending || !editing.name.trim() || !editing.currencyDefId || editing.baseCost === ""}
+                disabled={save.isPending || setConditions.isPending || !editing.name.trim() || !editing.currencyDefId || editing.baseCost === ""}
               >
-                {editingId ? "Save" : "Add Service"}
+                {save.isPending || setConditions.isPending ? "Saving…" : editingId ? "Save" : "Add Service"}
               </Button>
               <Button variant="ghost" onClick={() => { setEditingId(null); setEditing(null) }}>
                 Cancel

@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { trpc } from "@/lib/trpc"
-import { useState, useMemo } from "react"
+import { useState, useMemo, useCallback } from "react"
 import {
   ShoppingBag, Package, CheckCircle, PawPrint,
-  Coins, Gem, Search, Sparkles, Plus, ArrowRight,
+  Coins, Gem, Search, Sparkles, Plus, ArrowRight, Minus,
+  ChevronLeft, ChevronRight,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -125,12 +126,56 @@ function Toolbar({
   )
 }
 
+function QuantityStepper({
+  value,
+  onChange,
+}: {
+  value: number
+  onChange: (n: number) => void
+}) {
+  return (
+    <div className="flex items-center overflow-hidden rounded-md border border-border">
+      <button
+        type="button"
+        onClick={() => onChange(Math.max(1, value - 1))}
+        disabled={value <= 1}
+        className="flex size-7 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:bg-muted disabled:opacity-30"
+      >
+        <Minus className="size-3" />
+      </button>
+      <input
+        type="number"
+        min={1}
+        value={value}
+        onChange={(e) => {
+          const n = parseInt(e.target.value)
+          if (!isNaN(n) && n >= 1) onChange(n)
+        }}
+        onBlur={(e) => {
+          const n = parseInt(e.target.value)
+          if (isNaN(n) || n < 1) onChange(1)
+        }}
+        className="w-12 border-x border-border bg-transparent py-1 text-center text-xs font-semibold tabular-nums text-foreground focus:outline-none focus:ring-1 focus:ring-inset focus:ring-ring [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+      />
+      <button
+        type="button"
+        onClick={() => onChange(value + 1)}
+        className="flex size-7 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:bg-muted"
+      >
+        <Plus className="size-3" />
+      </button>
+    </div>
+  )
+}
+
 function ItemCard({
   listing,
   inventory,
   canAfford,
   isBuying,
   isPremium,
+  quantity,
+  onQuantityChange,
   onBuy,
 }: {
   listing: ListingShape
@@ -138,9 +183,12 @@ function ItemCard({
   canAfford: boolean
   isBuying: boolean
   isPremium: boolean
+  quantity: number
+  onQuantityChange: (n: number) => void
   onBuy: () => void
 }) {
   const owned = inventory?.find((s) => s.itemDef.id === listing.itemDef.id)?.quantity
+  const total = listing.price * quantity
 
   return (
     <article className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm ring-1 ring-border transition-all hover:-translate-y-0.5 hover:shadow-md">
@@ -171,37 +219,159 @@ function ItemCard({
           </span>
         </div>
 
-        <div className="flex items-center justify-between gap-2 border-t border-border pt-2.5">
-          <div
-            className={cn(
-              "flex items-center gap-1 text-sm font-bold tabular-nums",
-              isPremium ? "text-accent-foreground" : "text-foreground",
+        <div className="mt-1 space-y-2 border-t border-border pt-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <div className={cn(
+              "flex items-center gap-1 text-xs text-muted-foreground",
+            )}>
+              {isPremium ? <Gem className="size-3 text-accent" /> : <Coins className="size-3 text-chart-1" />}
+              {listing.price === 0 ? "Free" : `${listing.price.toLocaleString()} each`}
+            </div>
+            {listing.price > 0 && (
+              <QuantityStepper value={quantity} onChange={onQuantityChange} />
             )}
-          >
-            {isPremium ? (
-              <Gem className="size-3.5 text-accent" />
-            ) : (
-              <Coins className="size-3.5 text-chart-1" />
-            )}
-            {listing.price === 0 ? "Free" : listing.price.toLocaleString()}
           </div>
           <button
             type="button"
             disabled={!canAfford || isBuying}
             onClick={onBuy}
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50",
+              "inline-flex w-full items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50",
               isPremium
                 ? "bg-accent text-accent-foreground hover:bg-accent/85"
                 : "bg-primary text-primary-foreground hover:bg-primary/90",
             )}
           >
             {isPremium ? <Gem className="size-3.5" /> : <Plus className="size-3.5" />}
-            {isBuying ? "Buying…" : isPremium ? "Get" : "Buy"}
+            {isBuying
+              ? "Buying…"
+              : listing.price === 0
+                ? "Get"
+                : `Buy · ${total.toLocaleString()}`}
           </button>
         </div>
       </div>
     </article>
+  )
+}
+
+type ShopAnimal = {
+  id: string
+  animal: {
+    id: string
+    name: string
+    sex: string
+    breed: { name: string }
+    lifeStage: { name: string }
+  }
+  shopBreedConfig: {
+    price: number
+    currencyDefId: string
+    currencyDef: { symbol: string | null; name: string }
+  }
+}
+
+const BREED_ROW_VISIBLE = 4
+
+function AnimalBreedRow({
+  breedName,
+  animals,
+  getBalance,
+  isBuyingId,
+  onBuyAnimal,
+}: {
+  breedName: string
+  animals: ShopAnimal[]
+  getBalance: (currencyDefId: string) => number
+  isBuyingId: string | undefined
+  onBuyAnimal: (id: string) => void
+}) {
+  const [offset, setOffset] = useState(0)
+  const needsArrows = animals.length > BREED_ROW_VISIBLE
+  const canGoLeft = offset > 0
+  const canGoRight = offset + BREED_ROW_VISIBLE < animals.length
+  const visible = animals.slice(offset, offset + BREED_ROW_VISIBLE)
+
+  return (
+    <div>
+      <div className="mb-3 flex items-center justify-between">
+        <div className="flex items-baseline gap-2.5">
+          <h3 className="font-serif text-base font-semibold text-foreground">{breedName}</h3>
+          <span className="text-xs text-muted-foreground">{animals.length} available</span>
+        </div>
+        {needsArrows && (
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              disabled={!canGoLeft}
+              onClick={() => setOffset((o) => Math.max(0, o - 1))}
+              className="grid size-7 place-items-center rounded border border-border text-muted-foreground transition-colors hover:bg-muted disabled:opacity-30"
+            >
+              <ChevronLeft size={14} />
+            </button>
+            <span className="min-w-[4rem] text-center font-mono text-xs text-muted-foreground tabular-nums">
+              {offset + 1}–{Math.min(offset + BREED_ROW_VISIBLE, animals.length)} / {animals.length}
+            </span>
+            <button
+              type="button"
+              disabled={!canGoRight}
+              onClick={() => setOffset((o) => Math.min(animals.length - BREED_ROW_VISIBLE, o + 1))}
+              className="grid size-7 place-items-center rounded border border-border text-muted-foreground transition-colors hover:bg-muted disabled:opacity-30"
+            >
+              <ChevronRight size={14} />
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-4 gap-3">
+        {visible.map((sa) => {
+          const { price, currencyDef, currencyDefId } = sa.shopBreedConfig
+          const canAfford = getBalance(currencyDefId) >= price
+          const isBuying = isBuyingId === sa.id
+          return (
+            <article
+              key={sa.id}
+              className="flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm ring-1 ring-border transition-all hover:-translate-y-0.5 hover:shadow-md"
+            >
+              <div className="flex aspect-[4/3] w-full items-center justify-center overflow-hidden bg-gradient-to-b from-secondary/50 to-card">
+                <PawPrint className="size-8 text-muted-foreground/20" />
+              </div>
+              <div className="flex flex-1 flex-col gap-1.5 p-3">
+                <div>
+                  <Link to="/animal/$animalId" params={{ animalId: sa.animal.id }}>
+                    <h4 className="font-serif text-sm font-semibold leading-tight text-foreground hover:text-primary">
+                      {sa.animal.name}
+                    </h4>
+                  </Link>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    {sa.animal.lifeStage.name} · {sa.animal.sex === "MALE" ? "Male" : "Female"}
+                  </p>
+                </div>
+                <div className="mt-auto flex items-center justify-between gap-2 border-t border-border pt-2">
+                  <div className="flex items-center gap-1 text-xs font-bold tabular-nums text-foreground">
+                    <Coins className="size-3 text-chart-1" />
+                    {price === 0 ? "Free" : `${price.toLocaleString()} ${currencyDef.symbol ?? currencyDef.name}`}
+                  </div>
+                  <button
+                    type="button"
+                    disabled={!canAfford || isBuying || !!isBuyingId}
+                    onClick={() => onBuyAnimal(sa.id)}
+                    className="inline-flex items-center gap-1 rounded-md bg-primary px-2.5 py-1 text-[11px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+                  >
+                    <Plus className="size-3" />
+                    {isBuying ? "Buying…" : "Buy"}
+                  </button>
+                </div>
+              </div>
+            </article>
+          )
+        })}
+        {Array.from({ length: BREED_ROW_VISIBLE - visible.length }).map((_, i) => (
+          <div key={`ghost-${i}`} />
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -256,14 +426,26 @@ function ShopPage() {
   const [tab, setTab] = useState<ShopTab>("BASE")
   const [filter, setFilter] = useState<string>("all")
   const [query, setQuery] = useState("")
-  const [justBought, setJustBought] = useState<string | null>(null)
+  const [quantities, setQuantities] = useState<Record<string, number>>({})
+  const [toasts, setToasts] = useState<{ id: number; message: string }[]>([])
+
+  const getQty = useCallback((listingId: string) => quantities[listingId] ?? 1, [quantities])
+  const setQty = useCallback((listingId: string, n: number) =>
+    setQuantities((prev) => ({ ...prev, [listingId]: Math.max(1, n) })), [])
+
+  function pushToast(message: string) {
+    const id = Date.now()
+    setToasts((prev) => [...prev.slice(-2), { id, message }])
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3000)
+  }
 
   function handleBuy(listingId: string) {
     if (!playerAccountId) return
-    buy.mutate({ listingId, playerAccountId, quantity: 1 }, {
+    const quantity = getQty(listingId)
+    buy.mutate({ listingId, playerAccountId, quantity }, {
       onSuccess: (data) => {
-        setJustBought(data.item)
-        setTimeout(() => setJustBought(null), 2500)
+        pushToast(`${data.item}${quantity > 1 ? ` ×${quantity}` : ""} added to inventory`)
+        setQty(listingId, 1)
       },
     })
   }
@@ -272,8 +454,7 @@ function ShopPage() {
     if (!playerAccountId) return
     buyAnimal.mutate({ gameShopAnimalId, playerAccountId }, {
       onSuccess: (data) => {
-        setJustBought(data.animalName)
-        setTimeout(() => setJustBought(null), 2500)
+        pushToast(`${data.animalName} added to your stable`)
       },
     })
   }
@@ -312,6 +493,30 @@ function ShopPage() {
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+
+      {/* Fixed toast stack — outside document flow, no layout shift */}
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2 pointer-events-none">
+        {toasts.map((t) => (
+          <div
+            key={t.id}
+            className="flex items-center gap-2 rounded-lg border border-primary/30 bg-card px-4 py-2.5 text-sm text-foreground shadow-lg"
+          >
+            <CheckCircle className="size-4 shrink-0 text-primary" />
+            <span>{t.message}</span>
+          </div>
+        ))}
+        {buy.error && (
+          <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-card px-4 py-2.5 text-sm text-destructive shadow-lg">
+            {buy.error.message}
+          </div>
+        )}
+        {buyAnimal.error && (
+          <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-card px-4 py-2.5 text-sm text-destructive shadow-lg">
+            {buyAnimal.error.message}
+          </div>
+        )}
+      </div>
+
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
@@ -386,21 +591,6 @@ function ShopPage() {
         })}
       </div>
 
-      {/* Notifications */}
-      {justBought && (
-        <div className="mt-4 flex items-center gap-2 rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-foreground">
-          <CheckCircle className="size-4 text-primary" />
-          <span>
-            <span className="font-semibold">{justBought}</span> added to your stable
-          </span>
-        </div>
-      )}
-      {(buy.error || buyAnimal.error) && (
-        <p className="mt-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {buy.error?.message ?? buyAnimal.error?.message}
-        </p>
-      )}
-
       {/* Store */}
       {tab === "BASE" && (
         <div className="mt-6 space-y-6">
@@ -429,9 +619,11 @@ function ShopPage() {
                   key={l.id}
                   listing={l}
                   inventory={inventory as InvSlot[] | undefined}
-                  canAfford={getBalance(l.currencyDef.id) >= l.price}
+                  canAfford={getBalance(l.currencyDef.id) >= l.price * getQty(l.id)}
                   isBuying={buy.isPending && buy.variables?.listingId === l.id}
                   isPremium={false}
+                  quantity={getQty(l.id)}
+                  onQuantityChange={(n) => setQty(l.id, n)}
                   onBuy={() => handleBuy(l.id)}
                 />
               ))}
@@ -463,9 +655,11 @@ function ShopPage() {
                   key={l.id}
                   listing={l}
                   inventory={inventory as InvSlot[] | undefined}
-                  canAfford={getBalance(l.currencyDef.id) >= l.price}
+                  canAfford={getBalance(l.currencyDef.id) >= l.price * getQty(l.id)}
                   isBuying={buy.isPending && buy.variables?.listingId === l.id}
                   isPremium={true}
+                  quantity={getQty(l.id)}
+                  onQuantityChange={(n) => setQty(l.id, n)}
                   onBuy={() => handleBuy(l.id)}
                 />
               ))}
@@ -483,53 +677,26 @@ function ShopPage() {
             body="Browse foals and adults listed by other stables. The marketplace opens next cycle."
           />
         ) : (
-          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {shopAnimals.map((sa) => {
-              const { price, currencyDef } = sa.shopBreedConfig
-              const canAfford = getBalance(sa.shopBreedConfig.currencyDefId) >= price
-              const isBuying =
-                buyAnimal.isPending && buyAnimal.variables?.gameShopAnimalId === sa.id
-              return (
-                <article
-                  key={sa.id}
-                  className="flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm ring-1 ring-border transition-all hover:-translate-y-0.5 hover:shadow-md"
-                >
-                  <div className="flex aspect-[4/3] w-full items-center justify-center overflow-hidden bg-gradient-to-b from-secondary/50 to-card">
-                    <PawPrint className="size-10 text-muted-foreground/20" />
-                  </div>
-                  <div className="flex flex-1 flex-col gap-2 p-3">
-                    <div>
-                      <Link to="/animal/$animalId" params={{ animalId: sa.animal.id }}>
-                        <h3 className="font-serif text-base font-semibold leading-tight text-foreground hover:text-primary">
-                          {sa.animal.name}
-                        </h3>
-                      </Link>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {sa.animal.breed.name} · {sa.animal.lifeStage.name} ·{" "}
-                        {sa.animal.sex === "MALE" ? "Male" : "Female"}
-                      </p>
-                    </div>
-                    <div className="mt-auto flex items-center justify-between gap-2 border-t border-border pt-2.5">
-                      <div className="flex items-center gap-1 text-sm font-bold tabular-nums text-foreground">
-                        <Coins className="size-3.5 text-chart-1" />
-                        {price === 0
-                          ? "Free"
-                          : `${price.toLocaleString()} ${currencyDef.symbol ?? currencyDef.name}`}
-                      </div>
-                      <button
-                        type="button"
-                        disabled={!canAfford || isBuying || buyAnimal.isPending}
-                        onClick={() => handleBuyAnimal(sa.id)}
-                        className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
-                      >
-                        <Plus className="size-3.5" />
-                        {isBuying ? "Buying…" : "Buy"}
-                      </button>
-                    </div>
-                  </div>
-                </article>
-              )
-            })}
+          <div className="mt-6 space-y-8">
+            {Object.entries(
+              (shopAnimals as ShopAnimal[]).reduce<Record<string, ShopAnimal[]>>((acc, sa) => {
+                const breed = sa.animal.breed.name
+                if (!acc[breed]) acc[breed] = []
+                acc[breed].push(sa)
+                return acc
+              }, {})
+            )
+              .sort(([a], [b]) => a.localeCompare(b))
+              .map(([breedName, breedAnimals]) => (
+                <AnimalBreedRow
+                  key={breedName}
+                  breedName={breedName}
+                  animals={breedAnimals}
+                  getBalance={getBalance}
+                  isBuyingId={buyAnimal.isPending ? buyAnimal.variables?.gameShopAnimalId : undefined}
+                  onBuyAnimal={handleBuyAnimal}
+                />
+              ))}
           </div>
         ))}
 
@@ -539,38 +706,42 @@ function ShopPage() {
           <EmptyState
             icon={Package}
             title="Your inventory"
-            body="Items you own will appear here, ready to equip or apply to your horses."
+            body="Items you own will appear here, ready to equip or apply to your animals."
           />
         ) : (
-          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {inventory.map((inv) => (
-              <article
-                key={inv.id}
-                className="flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm ring-1 ring-border"
-              >
-                <div className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden bg-gradient-to-b from-secondary/50 to-card">
-                  <Package className="size-10 text-muted-foreground/20" />
-                  <span className="absolute right-2 top-2 rounded-full bg-primary/90 px-2 py-0.5 text-[10px] font-bold text-primary-foreground shadow-sm">
-                    ×{inv.quantity}
-                  </span>
-                </div>
-                <div className="flex flex-1 flex-col gap-2 p-3">
-                  <h3 className="font-serif text-base font-semibold leading-tight text-foreground">
-                    {inv.itemDef.name}
-                  </h3>
-                  {inv.itemDef.description && (
-                    <p className="text-xs leading-relaxed text-muted-foreground text-pretty">
-                      {inv.itemDef.description}
-                    </p>
+          <div className="mt-4">
+            <p className="mb-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+              {inventory.reduce((s, i) => s + i.quantity, 0)} item{inventory.reduce((s, i) => s + i.quantity, 0) !== 1 ? "s" : ""} owned
+            </p>
+            <div className="overflow-hidden rounded-lg border border-border">
+              {inventory.map((inv, i) => (
+                <div
+                  key={inv.id}
+                  className={cn(
+                    "flex items-center gap-4 px-4 py-3",
+                    i < inventory.length - 1 && "border-b border-border/60",
                   )}
-                  <div className="mt-auto pt-1">
-                    <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                >
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded bg-secondary/60">
+                    <Package className="size-4 text-muted-foreground/60" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-sm text-foreground leading-tight">{inv.itemDef.name}</p>
+                    {inv.itemDef.description && (
+                      <p className="mt-0.5 text-[11px] text-muted-foreground leading-tight text-pretty">{inv.itemDef.description}</p>
+                    )}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2.5">
+                    <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                       {categoryLabel(inv.itemDef.category)}
+                    </span>
+                    <span className="min-w-[28px] rounded-md bg-primary/10 px-2 py-0.5 text-center font-mono text-sm font-semibold text-primary">
+                      ×{inv.quantity}
                     </span>
                   </div>
                 </div>
-              </article>
-            ))}
+              ))}
+            </div>
           </div>
         ))}
     </div>

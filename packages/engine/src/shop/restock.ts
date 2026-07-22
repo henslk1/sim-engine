@@ -52,18 +52,31 @@ export async function restockShop(gameId: string, shopBreedConfigId?: string): P
     if (needed <= 0) continue
 
     // Load allele frequencies for this breed, grouped by locus
-    const freqs = await db.breedAlleleFrequency.findMany({
-      where: { breedId: config.breedId },
-      include: { allele: { select: { id: true, symbol: true, locusId: true } } },
-    })
+    const [freqs, allLoci] = await Promise.all([
+      db.breedAlleleFrequency.findMany({
+        where: { breedId: config.breedId },
+        include: { allele: { select: { id: true, symbol: true, locusId: true } } },
+      }),
+      db.locus.findMany({
+        where: { gameId },
+        select: { id: true, alleles: { select: { id: true, symbol: true } } },
+      }),
+    ])
 
-    // Group by locusId → { locusId → [{id, symbol, frequency}] }
+    // Build weighted map from breed frequencies
     const byLocus = new Map<string, { id: string; symbol: string; frequency: number }[]>()
     for (const f of freqs) {
       const entry = { id: f.allele.id, symbol: f.allele.symbol, frequency: f.frequency }
       const list = byLocus.get(f.allele.locusId)
       if (list) list.push(entry)
       else byLocus.set(f.allele.locusId, [entry])
+    }
+
+    // Fall back to equal-weight sampling for loci with no breed frequencies
+    for (const locus of allLoci) {
+      if (!byLocus.has(locus.id) && locus.alleles.length > 0) {
+        byLocus.set(locus.id, locus.alleles.map((a) => ({ ...a, frequency: 1 })))
+      }
     }
 
     for (let i = 0; i < needed; i++) {

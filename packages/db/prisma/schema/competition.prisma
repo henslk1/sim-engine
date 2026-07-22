@@ -92,6 +92,7 @@ model CompetitionTierDef {
   animalTiers                    AnimalCompetitionTier[]
   tierPrizes                     CompetitionTierPrize[]
   competitionEntries             CompetitionEntry[]
+  competitions                   Competition[]
   disciplineDef                  DisciplineDef           @relation(fields: [disciplineDefId], references: [id])
   game                           Game                    @relation(fields: [gameId], references: [id])
 
@@ -211,44 +212,58 @@ model DirectoryFilterDef {
 }
 
 model Competition {
-  id                 String             @id @default(cuid())
+  id                 String              @id @default(cuid())
   gameId             String
   venueId            String
   disciplineDefId    String
+  tierDefId          String?
   seasonId           String?
   name               String
   maxEntries         Int
   maxWaitHours       Int
   breedId            String?
   status             CompetitionStatus
-  isInvitational     Boolean            @default(false)
+  isInvitational     Boolean             @default(false)
   entries            CompetitionEntry[]
   campaignPhaseDefId String?
-  breed              Breed?             @relation(fields: [breedId], references: [id])
-  campaignPhase      CampaignPhaseDef?  @relation(fields: [campaignPhaseDefId], references: [id])
-  season             Season?            @relation(fields: [seasonId], references: [id])
-  disciplineDef      DisciplineDef      @relation(fields: [disciplineDefId], references: [id])
-  venue              Venue              @relation(fields: [venueId], references: [id])
-  game               Game               @relation(fields: [gameId], references: [id])
-  createdAt          DateTime           @default(now())
+  breed              Breed?              @relation(fields: [breedId], references: [id])
+  campaignPhase      CampaignPhaseDef?   @relation(fields: [campaignPhaseDefId], references: [id])
+  season             Season?             @relation(fields: [seasonId], references: [id])
+  tierDef            CompetitionTierDef? @relation(fields: [tierDefId], references: [id])
+  disciplineDef      DisciplineDef       @relation(fields: [disciplineDefId], references: [id])
+  venue              Venue               @relation(fields: [venueId], references: [id])
+  game               Game                @relation(fields: [gameId], references: [id])
+  createdAt          DateTime            @default(now())
   expiresAt          DateTime
 }
 
 model CompetitionEntry {
-  id              String             @id @default(cuid())
+  id              String                   @id @default(cuid())
   competitionId   String
   animalId        String
   playerAccountId String
   tierDefId       String
-  enteredAt       DateTime           @default(now())
+  enteredAt       DateTime                 @default(now())
   cycleNumber     Int?
   result          CompetitionResult?
-  tierDef         CompetitionTierDef @relation(fields: [tierDefId], references: [id])
-  playerAccount   PlayerAccount      @relation(fields: [playerAccountId], references: [id])
-  animal          Animal             @relation(fields: [animalId], references: [id])
-  competition     Competition        @relation(fields: [competitionId], references: [id])
+  entryStats      CompetitionEntryStat[]
+  tierDef         CompetitionTierDef       @relation(fields: [tierDefId], references: [id])
+  playerAccount   PlayerAccount            @relation(fields: [playerAccountId], references: [id])
+  animal          Animal                   @relation(fields: [animalId], references: [id])
+  competition     Competition              @relation(fields: [competitionId], references: [id])
 
   @@unique([competitionId, animalId])
+}
+
+model CompetitionEntryStat {
+  id           String           @id @default(cuid())
+  entryId      String
+  statDefId    String
+  trainedValue Float
+  entry        CompetitionEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  statDef      StatDef          @relation(fields: [statDefId], references: [id])
+
+  @@unique([entryId, statDefId])
 }
 
 model CompetitionResult {

@@ -3,8 +3,12 @@ import { db } from "@sim-engine/db";
 import { z } from "zod";
 
 export const gameAdminRouter = router({
-  get: publicProcedure.query(() => 
+  get: publicProcedure.query(() =>
     db.game.findFirst({ include: { gameConfig: true } })
+  ),
+
+  list: publicProcedure.query(() =>
+    db.game.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, slug: true, isActive: true } })
   ),
 
   saveGame: publicProcedure
@@ -83,4 +87,59 @@ export const gameAdminRouter = router({
           update: { ...rest, ...labels, ...nullable },
         })
       }),
+
+  setupCounts: publicProcedure
+    .input(z.object({ gameId: z.string() }))
+    .query(async ({ input }) => {
+      const { gameId } = input
+      const [
+        gameConfigRow,
+        currencies, species, lifeStages, stats, personalityTraits,
+        breeds, loci, alleles, expressionRules, geneticPanels, conformationSections,
+        items, careActions, healthConditions, treatments, healthCerts,
+        trainingActions, intensityTiers, stageActivities, titles,
+        disciplines, competitionTiers, venues, seasonCategories, records,
+        vetServices, storeListings, gameShopBreedConfigs, groupPrestigeTiers,
+      ] = await Promise.all([
+        db.gameConfig.findUnique({ where: { gameId }, select: { gameId: true } }),
+        db.currencyDef.count({ where: { gameId } }),
+        db.species.count({ where: { gameId } }),
+        db.lifeStageDef.count({ where: { gameId } }),
+        db.statDef.count({ where: { gameId } }),
+        db.personalityTraitDef.count({ where: { gameId } }),
+        db.breed.count({ where: { gameId } }),
+        db.locus.count({ where: { gameId } }),
+        db.allele.count({ where: { locus: { gameId } } }),
+        db.expressionRule.count({ where: { locus: { gameId } } }),
+        db.geneticPanelDef.count({ where: { gameId } }),
+        db.conformationSection.count({ where: { gameId } }),
+        db.itemDef.count({ where: { gameId } }),
+        db.careActionDef.count({ where: { gameId } }),
+        db.healthConditionDef.count({ where: { gameId } }),
+        db.treatmentDef.count({ where: { conditionDef: { gameId } } }),
+        db.healthCertificateDef.count({ where: { gameId } }),
+        db.trainingActionDef.count({ where: { gameId } }),
+        db.intensityTierDef.count({ where: { gameId } }),
+        db.stageActivityDef.count({ where: { gameId } }),
+        db.titleDef.count({ where: { gameId } }),
+        db.disciplineDef.count({ where: { gameId } }),
+        db.competitionTierDef.count({ where: { gameId } }),
+        db.venue.count({ where: { gameId } }),
+        db.season.count({ where: { gameId } }),
+        db.recordDef.count({ where: { gameId } }),
+        db.vetServiceDef.count({ where: { gameId } }),
+        db.storeListing.count({ where: { gameId } }),
+        db.gameShopBreedConfig.count({ where: { gameId } }),
+        db.groupPrestigeTierDef.count({ where: { gameId } }),
+      ])
+      return {
+        gameConfig: !!gameConfigRow,
+        currencies, species, lifeStages, stats, personalityTraits,
+        breeds, loci, alleles, expressionRules, geneticPanels, conformationSections,
+        items, careActions, healthConditions, treatments, healthCerts,
+        trainingActions, intensityTiers, stageActivities, titles,
+        disciplines, competitionTiers, venues, seasonCategories, records,
+        vetServices, storeListings, gameShopBreedConfigs, groupPrestigeTiers,
+      }
+    }),
 })

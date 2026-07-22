@@ -27,7 +27,10 @@ export function DailyCarePanel({ animal, playerAccountId }: { animal: AnimalProf
   const [pendingId, setPendingId] = useState<string | null>(null)
   const [ltcPendingId, setLtcPendingId] = useState<string | null>(null)
   const utils = trpc.useUtils()
-  const invalidate = () => utils.animalProfile.get.invalidate({ animalId: animal.id })
+  const invalidate = () => {
+    utils.animalProfile.get.invalidate({ animalId: animal.id })
+    utils.inventory.mine.invalidate({ playerAccountId })
+  }
   const { mutate: performCare } = trpc.care.perform.useMutation({
     onMutate: ({ careActionDefId }) => setPendingId(careActionDefId),
     onSettled: () => {

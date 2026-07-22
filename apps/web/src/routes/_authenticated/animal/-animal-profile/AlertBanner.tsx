@@ -37,14 +37,13 @@ function Banner({
 export function AlertBanner({ animal }: { animal: AnimalProfile }) {
   const banners: ReactNode[] = []
 
-  // Priority 1: Active health conditions
-  const activeConditions = animal.healthRecords.filter((r) => r.isActive)
-  if (activeConditions.length > 0) {
-    const first = activeConditions[0]
+  // Priority 1: Undiagnosed conditions only — once diagnosed, treatment is known and scheduled
+  const undiagnosedConditions = animal.healthRecords.filter((r) => r.isActive && !r.diagnosedAt)
+  if (undiagnosedConditions.length > 0) {
     banners.push(
       <Banner key="health" tone="danger" icon={<Stethoscope className="size-3.5 shrink-0" />}>
-        {first.conditionDef.name}
-        {activeConditions.length > 1 && ` +${activeConditions.length - 1} more`}
+        Unknown illness
+        {undiagnosedConditions.length > 1 && ` +${undiagnosedConditions.length - 1} more`}
         {" — "}Visit the vet
       </Banner>
     )

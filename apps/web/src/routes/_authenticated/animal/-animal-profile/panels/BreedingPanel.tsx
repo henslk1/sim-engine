@@ -228,7 +228,7 @@ export function BreedingPanel({
                         <Sparkles className="size-3 shrink-0 text-accent-foreground" />
                         <span className="font-medium capitalize text-foreground">{o.animal.sex.toLowerCase()}</span>
                         {o.animal.phenotypeDescription && (
-                          <span className="text-muted-foreground">· {o.animal.phenotypeDescription}</span>
+                          <span className="text-muted-foreground">· </span>
                         )}
                       </div>
                     ))}
@@ -647,7 +647,7 @@ export function BreedingPanel({
                           {(() => {
                             const onCooldown = (animal.breedingCooldownUntilCycle ?? 0) > animal.ageInCycles
                             return (
-                              <span className="flex-1" title={onCooldown ? `Breeding cooldown active until cycle ${animal.breedingCooldownUntilCycle}` : undefined}>
+                              <span className="flex-1" title={onCooldown ? (() => { const cpy = animal.game.gameConfig?.cyclesPerYear ?? 12; const c = animal.breedingCooldownUntilCycle ?? 0; return `Breeding cooldown active until ${Math.floor(c / cpy)}y ${c % cpy}m` })() : undefined}>
                                 <ActionButton
                                   variant="soft"
                                   className="w-full justify-center"

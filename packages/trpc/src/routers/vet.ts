@@ -52,6 +52,7 @@ export const vetRouter = router({
             },
           },
         },
+        // diagnosedAt is included automatically (not in a nested select)
       })
     ),
 
@@ -63,22 +64,29 @@ export const vetRouter = router({
     }))
     .mutation(({ input }) =>
       db.$transaction(async (tx) => {
-        const [service, animal, healthRecords] = await Promise.all([
+        const animalStatus = await tx.animal.findUnique({
+          where: { id: input.animalId },
+          select: { status: true },
+        })
+        if (!animalStatus || animalStatus.status !== "ALIVE") throw new Error("Animal is not alive")
+
+        const [service, animal, undiagnosedRecords] = await Promise.all([
           tx.vetServiceDef.findUniqueOrThrow({
             where: { id: input.vetServiceDefId },
-            include: { currencyDef: { select: { id: true, name: true } } },
+            include: {
+              currencyDef: { select: { id: true, name: true } },
+              conditions: { select: { conditionDefId: true } },
+            },
           }),
           tx.animal.findUniqueOrThrow({
             where: { id: input.animalId },
             select: { ageInCycles: true, gameId: true },
           }),
           tx.animalHealthRecord.findMany({
-            where: { animalId: input.animalId, isActive: true },
+            where: { animalId: input.animalId, isActive: true, diagnosedAt: null },
             include: {
               conditionDef: {
-                include: {
-                  treatments: { include: { restrictionDefs: true } },
-                },
+                include: { treatments: { include: { restrictionDefs: true } } },
               },
               treatmentRecords: { where: { isActive: true } },
             },
@@ -119,36 +127,43 @@ export const vetRouter = router({
           })
         }
 
-        const untreated = healthRecords.filter((r) => r.treatmentRecords.length === 0)
-        let treatedCount = 0
+        // Scope to linked conditions if any are configured for this exam
+        const linkedIds = service.conditions.map((c) => c.conditionDefId)
+        const undiagnosed = linkedIds.length > 0
+          ? undiagnosedRecords.filter((r) => linkedIds.includes(r.conditionDefId))
+          : undiagnosedRecords
+        let diagnosedCount = 0
 
-        for (const record of untreated) {
-          const treatment = record.conditionDef.treatments[0]
-          if (!treatment) continue
-
-          const treatmentRecord = await tx.animalTreatmentRecord.create({
-            data: {
-              animalId: input.animalId,
-              treatmentDefId: treatment.id,
-              healthRecordId: record.id,
-              startedCycle: animal.ageInCycles,
-              isActive: true,
-            },
+        for (const record of undiagnosed) {
+          await tx.animalHealthRecord.update({
+            where: { id: record.id },
+            data: { diagnosedAt: new Date(), diagnosedCycle: animal.ageInCycles },
           })
-
-          for (const rd of treatment.restrictionDefs) {
-            await tx.activityRestriction.create({
+          const treatment = record.conditionDef.treatments[0]
+          if (treatment) {
+            const treatmentRecord = await tx.animalTreatmentRecord.create({
               data: {
                 animalId: input.animalId,
-                treatmentRecordId: treatmentRecord.id,
-                restrictionType: rd.restrictionType,
-                maxIntensityTier: rd.maxIntensityTier ?? null,
-                remainingCycles: rd.durationCycles ?? 1,
+                treatmentDefId: treatment.id,
+                healthRecordId: record.id,
+                startedCycle: animal.ageInCycles,
                 isActive: true,
               },
             })
+            for (const rd of treatment.restrictionDefs) {
+              await tx.activityRestriction.create({
+                data: {
+                  animalId: input.animalId,
+                  treatmentRecordId: treatmentRecord.id,
+                  restrictionType: rd.restrictionType,
+                  maxIntensityTier: rd.maxIntensityTier ?? null,
+                  remainingCycles: rd.durationCycles ?? 1,
+                  isActive: true,
+                },
+              })
+            }
           }
-          treatedCount++
+          diagnosedCount++
         }
 
         const visitLog = await tx.vetVisitLog.create({
@@ -157,13 +172,13 @@ export const vetRouter = router({
             playerAccountId: input.playerAccountId,
             vetServiceDefId: input.vetServiceDefId,
             visitCycle: animal.ageInCycles,
-            notes: treatedCount > 0
-              ? `Exam: ${treatedCount} condition${treatedCount !== 1 ? "s" : ""} diagnosed.`
-              : "Exam: no untreated conditions found.",
+            notes: diagnosedCount > 0
+              ? `Exam: ${diagnosedCount} condition${diagnosedCount !== 1 ? "s" : ""} diagnosed.`
+              : "Exam: no undiagnosed conditions found.",
           },
         })
 
-        return { visitLog, treatedCount, totalConditions: healthRecords.length }
+        return { visitLog, diagnosedCount, totalConditions: undiagnosedRecords.length }
       })
     ),
 
@@ -171,6 +186,14 @@ export const vetRouter = router({
     .input(z.object({ treatmentRecordId: z.string(), playerAccountId: z.string() }))
     .mutation(({ input }) =>
       db.$transaction(async (tx) => {
+        const treatmentAnimal = await tx.animalTreatmentRecord.findUnique({
+          where: { id: input.treatmentRecordId },
+          select: { animal: { select: { status: true } } },
+        })
+        if (!treatmentAnimal?.animal || treatmentAnimal.animal.status !== "ALIVE") {
+          throw new Error("Animal is not alive")
+        }
+
         const record = await tx.animalTreatmentRecord.findUniqueOrThrow({
           where: { id: input.treatmentRecordId },
           include: {
@@ -292,13 +315,14 @@ export const vetRouter = router({
         const [animal, certDef] = await Promise.all([
           tx.animal.findUniqueOrThrow({
             where: { id: input.animalId },
-            select: { ageInCycles: true },
+            select: { ageInCycles: true, status: true },
           }),
           tx.healthCertificateDef.findUniqueOrThrow({
             where: { id: input.certDefId },
             select: { validForCycles: true },
           }),
         ])
+        if (animal.status !== "ALIVE") throw new Error("Animal is not alive")
         return tx.healthCertificate.upsert({
           where: { animalId_certDefId: { animalId: input.animalId, certDefId: input.certDefId } },
           create: {

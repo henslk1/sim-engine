@@ -44,6 +44,7 @@ model HealthConditionDef {
   groupEntryRequirements GroupEntryRequirement[]
   expressionRules        ExpressionRule[]
   vetVisitLogs           VetVisitLog[]
+  vetServices            VetServiceCondition[]
   game                   Game                      @relation(fields: [gameId], references: [id])
 
   @@unique([gameId, name])
@@ -94,8 +95,8 @@ model AnimalHealthRecord {
   id               String                  @id @default(cuid())
   animalId         String
   conditionDefId   String
-  diagnosedCycle   Int
-  diagnosedAt      DateTime                @default(now())
+  diagnosedCycle   Int?
+  diagnosedAt      DateTime?
   resolvedCycle    Int?
   resolvedAt       DateTime?
   isActive         Boolean                 @default(true)
@@ -192,4 +193,13 @@ model AnimalImmunity {
   innateMax Float
   animal    Animal   @relation(fields: [animalId], references: [id])
   updatedAt DateTime @updatedAt
+}
+
+model VetServiceCondition {
+  vetServiceDefId String
+  conditionDefId  String
+  vetServiceDef   VetServiceDef      @relation(fields: [vetServiceDefId], references: [id])
+  conditionDef    HealthConditionDef @relation(fields: [conditionDefId], references: [id])
+
+  @@id([vetServiceDefId, conditionDefId])
 }

@@ -12,6 +12,7 @@ export const vetServiceAdminRouter = router({
         include: {
           currencyDef: { select: { id: true, name: true, symbol: true } },
           panelDef: { select: { id: true, name: true } },
+          conditions: { select: { conditionDefId: true } },
         },
       })
     ),
@@ -20,7 +21,7 @@ export const vetServiceAdminRouter = router({
       id: z.string().optional(),
       gameId: z.string(),
       name: z.string().min(1),
-      serviceType: z.enum(["EXAM", "PANEL_TEST", "GENETIC_COLLECTION", "GENETIC_STORAGE", "CASTRATION", "ULTRASOUND", "NATURAL_COVER"]),
+      serviceType: z.enum(["EXAM", "PANEL_TEST", "GENETIC_COLLECTION", "GENETIC_STORAGE", "CASTRATION", "ULTRASOUND", "NATURAL_COVER", "PREGNANCY_ABORT"]),
       baseCost: z.number().int().min(0),
       currencyDefId: z.string().min(1),
       hasSubscriberDiscount: z.boolean().default(false),
@@ -32,6 +33,25 @@ export const vetServiceAdminRouter = router({
       if (id) return db.vetServiceDef.update({ where: { id }, data })
       return db.vetServiceDef.create({ data: { gameId, ...data } })
     }),
+  setConditions: publicProcedure
+    .input(z.object({
+      vetServiceDefId: z.string(),
+      conditionDefIds: z.array(z.string()),
+    }))
+    .mutation(({ input }) =>
+      db.$transaction(async (tx) => {
+        await tx.vetServiceCondition.deleteMany({ where: { vetServiceDefId: input.vetServiceDefId } })
+        if (input.conditionDefIds.length > 0) {
+          await tx.vetServiceCondition.createMany({
+            data: input.conditionDefIds.map((conditionDefId) => ({
+              vetServiceDefId: input.vetServiceDefId,
+              conditionDefId,
+            })),
+          })
+        }
+        return { vetServiceDefId: input.vetServiceDefId, count: input.conditionDefIds.length }
+      })
+    ),
   remove: publicProcedure
     .input(z.object({ id: z.string() }))
     .mutation(({ input }) =>

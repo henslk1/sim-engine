@@ -1,6 +1,7 @@
 import type { AnimalProfile } from "../types"
+import { cn } from "@/lib/utils"
 import { Panel, Badge, ActionButton } from "@/components/game/ui"
-import { Stethoscope, ShieldCheck, ShieldAlert, CalendarClock, Pill, FlaskConical, Footprints, CheckCircle2 } from "lucide-react"
+import { Stethoscope, ShieldCheck, ShieldAlert, CalendarClock, Pill, FlaskConical, Footprints, CheckCircle2, HelpCircle } from "lucide-react"
 import { Link } from "@tanstack/react-router"
 import { trpc } from "@/lib/trpc"
 
@@ -75,33 +76,56 @@ export function HealthPanel({
           {activeConditions.map((record: HealthRecord) => {
             const activeTreatments = record.treatmentRecords.filter((t: TreatmentRecord) => t.isActive)
             const isUntreated = activeTreatments.length === 0
+            const administeredToday = activeTreatments.some((t) => {
+              const isTimeBased = t.treatmentDef.treatmentType === "OTC" || t.treatmentDef.treatmentType === "PRESCRIPTION" || t.treatmentDef.treatmentType === "PLAYER_ACTION"
+              return isTimeBased && (t as TreatmentRecord & { lastAdministeredCycle?: number | null }).lastAdministeredCycle === animal.ageInCycles
+            })
+            const showRed = !administeredToday
             return (
-              <div key={record.id} className="overflow-hidden rounded-md border border-destructive/25">
-                <div className="flex items-center justify-between gap-2 bg-destructive/10 px-3 py-2">
+              <div key={record.id} className={cn("overflow-hidden rounded-md border", showRed ? "border-destructive/25" : "border-border")}>
+                <div className={cn("flex items-center justify-between gap-2 px-3 py-2", showRed ? "bg-destructive/10" : "bg-secondary/40")}>
                   <div className="flex items-center gap-2">
-                    <Badge tone="danger">{record.conditionDef.conditionType}</Badge>
-                    <span className="text-sm font-semibold text-foreground">{record.conditionDef.name}</span>
+                    {record.diagnosedAt ? (
+                      <>
+                        <Badge tone="danger">{record.conditionDef.conditionType}</Badge>
+                        <span className="text-sm font-semibold text-foreground">{record.conditionDef.name}</span>
+                      </>
+                    ) : (
+                      <>
+                        <HelpCircle className="size-3.5 shrink-0 text-muted-foreground" />
+                        <span className="text-sm font-semibold text-muted-foreground">Unknown illness</span>
+                      </>
+                    )}
                   </div>
-                  {isUntreated && <Badge tone="muted">Untreated</Badge>}
+                  {isUntreated && <Badge tone="muted">{record.diagnosedAt ? "Untreated" : "Undiagnosed"}</Badge>}
                 </div>
 
-                {activeTreatments.map((t: TreatmentRecord) => {
+                {!record.diagnosedAt ? (
+                  <div className="border-t border-destructive/15 bg-destructive/5 px-3 py-2">
+                    <p className="text-[11px] text-muted-foreground">Visit the vet to diagnose this condition.</p>
+                  </div>
+                ) : null}
+
+                {record.diagnosedAt && activeTreatments.map((t: TreatmentRecord) => {
                   const { treatmentType, items } = t.treatmentDef
                   const isPending = administer.isPending && administer.variables?.treatmentRecordId === t.id
                   const canAdminister = hasItems(items)
                   const missing = missingItems(items)
 
                   return (
-                    <div key={t.id} className="border-t border-destructive/15 bg-destructive/5 px-3 py-2">
+                    <div key={t.id} className={cn("border-t px-3 py-2", isUntreated ? "border-destructive/15 bg-destructive/5" : "border-border/50 bg-transparent")}>
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-[11px] font-medium text-foreground">{t.treatmentDef.name}</span>
                         <Badge tone="muted">{TREATMENT_LABEL[treatmentType]}</Badge>
                       </div>
-                      {t.treatmentDef.durationCycles != null && (
-                        <p className="mt-0.5 text-[11px] text-muted-foreground">
-                          Duration: {t.treatmentDef.durationCycles} cycle{t.treatmentDef.durationCycles !== 1 ? "s" : ""}
-                        </p>
-                      )}
+                      {t.treatmentDef.durationCycles != null && (() => {
+                        const remaining = (t.startedCycle + t.treatmentDef.durationCycles) - animal.ageInCycles
+                        return (
+                          <p className="mt-0.5 text-[11px] text-muted-foreground">
+                            {remaining} cycle{remaining !== 1 ? "s" : ""} remaining
+                          </p>
+                        )
+                      })()}
                       {t.treatmentDef.restrictionDefs.map((rd) => {
                         const live = t.activityRestriction.find(
                           (r) => r.isActive && r.restrictionType === rd.restrictionType
@@ -227,7 +251,7 @@ export function HealthPanel({
                       </span>
                     )}
                     {!readonly && (
-                      <Link to="/vet" search={{ animalId: animal.id }}>
+                      <Link to="/vet" search={{ animalId: animal.id, service: "certificates" }}>
                         <ActionButton variant="soft" className="h-6 px-2 text-[11px]">
                           Book Testing
                         </ActionButton>

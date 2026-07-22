@@ -33,9 +33,9 @@ export async function runCompetition(
         entries: {
           include: {
             tierDef: { include: { tierPrizes: true } },
+            entryStats: true,
             animal: {
               include: {
-                stats: true,
                 personality: true,
                 conformationScores: true,
               }
@@ -65,7 +65,7 @@ export async function runCompetition(
         score = conformationScore?.score ?? 0
       } else {
         for (const weight of competition.disciplineDef.statWeights) {
-          const stat = entry.animal.stats.find(s => s.statDefId === weight.statDefId)
+          const stat = entry.entryStats.find(s => s.statDefId === weight.statDefId)
           score += weight.weight * (stat?.trainedValue ?? 0)
         }
         for (const weight of competition.disciplineDef.personalityWeights) {

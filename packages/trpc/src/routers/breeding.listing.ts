@@ -11,6 +11,9 @@ export const breedingListingRouter = router({
   create: publicProcedure
     .input(z.object({
       animalId: z.string(),
+      title: z.string().optional(),
+      pureBredOnly: z.boolean().default(false),
+      requiredTitleDefId: z.string().optional(),
       pricePerSlot: z.number().int().min(0).default(0),
       currencyDefId: z.string().optional(),
       description: z.any().optional(),
@@ -35,6 +38,9 @@ export const breedingListingRouter = router({
           gameId: animal.gameId,
           ownerPlayerId: animal.playerAccountId,
           animalId: input.animalId,
+          title: input.title ?? null,
+          pureBredOnly: input.pureBredOnly,
+          requiredTitleDefId: input.requiredTitleDefId ?? null,
           pricePerSlot: input.pricePerSlot,
           currencyDefId: input.pricePerSlot > 0 ? (input.currencyDefId ?? null) : null,
           description: input.description ?? null,
@@ -49,6 +55,9 @@ export const breedingListingRouter = router({
   update: publicProcedure
     .input(z.object({
       listingId: z.string(),
+      title: z.string().optional(),
+      pureBredOnly: z.boolean().default(false),
+      requiredTitleDefId: z.string().optional(),
       pricePerSlot: z.number().int().min(0).default(0),
       currencyDefId: z.string().optional(),
       description: z.any().optional(),
@@ -61,6 +70,9 @@ export const breedingListingRouter = router({
         return tx.breedingListing.update({
           where: { id: input.listingId },
           data: {
+            title: input.title ?? null,
+            pureBredOnly: input.pureBredOnly,
+            requiredTitleDefId: input.requiredTitleDefId ?? null,
             pricePerSlot: input.pricePerSlot,
             currencyDefId: input.pricePerSlot > 0 ? (input.currencyDefId ?? null) : null,
             description: input.description ?? null,

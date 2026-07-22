@@ -89,7 +89,7 @@ export const animalProfileRouter = router({
 
           // health
           healthRecords: {
-            orderBy: { diagnosedCycle: "desc" },
+            orderBy: [{ isActive: "desc" }, { diagnosedAt: { sort: "desc", nulls: "last" } }],
             include: {
               conditionDef: true,
               treatmentRecords: {
@@ -169,14 +169,19 @@ export const animalProfileRouter = router({
           },
           weeklyPoints: {
             orderBy: { weekStart: "desc" },
-            take: 4,
+            take: 20,
           },
           competitionEntries: {
             orderBy: { enteredAt: "desc" },
-            take: 5,
             include: {
-              competition: { include: { venue: true } },
-              tierDef: true,
+              competition: {
+                include: {
+                  venue: { select: { name: true } },
+                  disciplineDef: { select: { name: true } },
+                  _count: { select: { entries: true } },
+                },
+              },
+              tierDef: { select: { name: true } },
               result: true,
             },
           },
@@ -230,11 +235,18 @@ export const animalProfileRouter = router({
 
           // breeding listing (male)
           breedingListings: {
+            where: { isActive: true },
             take: 1,
+            orderBy: { createdAt: "desc" },
             select: {
               id: true,
               isActive: true,
               pricePerSlot: true,
+              title: true,
+              pureBredOnly: true,
+              description: true,
+              requiredTitleDefId: true,
+              requiredTitleDef: { select: { id: true, name: true } },
               currencyDef: { select: { id: true, name: true, symbol: true } },
               slots: { select: { id: true, status: true } },
               breedRestrictions: { select: { id: true, breedId: true, breed: { select: { id: true, name: true } } } },
@@ -275,6 +287,19 @@ export const animalProfileRouter = router({
                   name: true,
                   breed: { select: { id: true, name: true } },
                   playerAccount: { select: { id: true, username: true } },
+                },
+              },
+            },
+          },
+
+          gameShopAnimal: {
+            select: {
+              id: true,
+              isAvailable: true,
+              shopBreedConfig: {
+                select: {
+                  price: true,
+                  currencyDef: { select: { id: true, name: true, symbol: true } },
                 },
               },
             },

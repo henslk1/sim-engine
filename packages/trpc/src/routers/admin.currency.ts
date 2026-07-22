@@ -8,7 +8,7 @@ export const currencyAdminRouter = router({
     .query(({ input }) =>
       db.currencyDef.findMany({
         where: { gameId: input.gameId },
-        orderBy: { name: "asc" },
+        orderBy: [{ currencyType: "asc" }, { name: "asc" }],
       })
     ),
   save: publicProcedure

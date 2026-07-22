@@ -118,22 +118,15 @@ export function DailyLogPanel({ animal }: { animal: AnimalProfile }) {
       })),
     ...animal.competitionEntries
       .filter((e) => e.cycleNumber === cycle)
-      .map((e: AnimalProfile["competitionEntries"][number]) => {
-        const placement = e.result?.placement
-        const score = e.result?.score
-        const vitals: VitalChange[] = []
-        return {
-          key: `comp-${e.id}`,
-          cycleNumber: e.cycleNumber,
-          createdAt: new Date(e.enteredAt),
-          type: "competition" as const,
-          label: `${e.competition.venue.name}`,
-          subLabel: placement != null
-            ? `${e.tierDef.name} · #${placement}${score != null ? ` · ${Math.round(score)} pts` : ""}`
-            : e.tierDef.name,
-          vitals,
-        }
-      }),
+      .map((e: AnimalProfile["competitionEntries"][number]) => ({
+        key: `comp-${e.id}`,
+        cycleNumber: e.cycleNumber,
+        createdAt: new Date(e.enteredAt),
+        type: "competition" as const,
+        label: `${e.competition.disciplineDef.name} — ${e.tierDef.name}`,
+        subLabel: e.competition.venue.name,
+        vitals: [] as VitalChange[],
+      })),
     ...animal.dailyLogs
       .filter((l) => l.cycleNumber === cycle && l.eventType === "TIER_ADVANCED")
       .map((l: AnimalProfile["dailyLogs"][number]) => {

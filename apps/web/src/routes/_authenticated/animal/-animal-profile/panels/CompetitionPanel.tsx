@@ -1,6 +1,6 @@
 import type { AnimalProfile } from "../types"
 import { Panel, ActionButton, Meter } from "@/components/game/ui"
-import { Trophy, CheckCircle, XCircle, Ban, MapPin, Ruler } from "lucide-react"
+import { Trophy, CheckCircle, XCircle, Ban, MapPin } from "lucide-react"
 import { Link } from "@tanstack/react-router"
 import { useState } from "react"
 import { trpc } from "@/lib/trpc"
@@ -19,7 +19,8 @@ function InfoCard({ label, value }: { label: string; value: string }) {
 
 export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalProfile; readonly?: boolean }) {
   const canCompete = animal.lifeStage.canCompete
-  const currentTier = animal.compTiers[0]
+  const currentTier = animal.compTiers.find((t) => !t.disciplineDef.isConformation) ?? animal.compTiers[0]
+  const conformationTiers = animal.compTiers.filter((t) => t.disciplineDef.isConformation)
   const [selectedDisciplineId, setSelectedDisciplineId] = useState("")
 
   const { data: allDisciplines } = trpc.admin.discipline.list.useQuery(
@@ -32,7 +33,9 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
   const setDiscipline = trpc.animal.setDiscipline.useMutation({
     onSuccess: () => utils.animalProfile.get.invalidate({ animalId: animal.id }),
   })
-  const latestWeeklyPoints = animal.weeklyPoints[0]?.points
+  const latestWeeklyPoints = animal.weeklyPoints.find(
+    (p) => p.disciplineDefId === currentTier?.disciplineDefId
+  )?.points
   const restrictions = getActiveRestrictions(animal)
   const isRestricted = restrictions.has("COMPETITION") || restrictions.has("ALL")
 
@@ -61,54 +64,8 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
       )}
       {animal.disciplineDef ? (
         <>
-          <div className="mb-3 space-y-2">
-            <div className="grid grid-cols-3 gap-2">
-              <InfoCard label="Discipline" value={animal.disciplineDef.name} />
-              <InfoCard label="Current Tier" value={currentTier?.tierDef.name ?? "—"} />
-              <InfoCard label="Weekly Points" value={latestWeeklyPoints !== undefined ? `${Math.round(latestWeeklyPoints)} pts` : "—"} />
-            </div>
-            {currentTier?.tierDef.advancementThreshold != null && (
-              <div className="rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2">
-                <div className="mb-1.5 flex items-center justify-between">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    Progress to Next Tier
-                  </p>
-                  <span className="text-[11px] tabular-nums text-muted-foreground">
-                    {latestWeeklyPoints !== undefined ? Math.round(latestWeeklyPoints) : 0} /{" "}
-                    {Math.round(currentTier.tierDef.advancementThreshold)}
-                  </span>
-                </div>
-                <Meter
-                  value={latestWeeklyPoints ?? 0}
-                  max={currentTier.tierDef.advancementThreshold}
-                  tone="condition"
-                  className="h-1.5"
-                />
-              </div>
-            )}
-          </div>
-
-          {!readonly && (
-            canBrowseVenues ? (
-              <Link
-                to="/venues"
-                search={{ animalId: animal.id, disciplineDefId: animal.disciplineDef?.id, from: "animal" as const }}
-              >
-                <ActionButton variant="soft" className="w-full justify-center">
-                  <MapPin className="size-3.5" />
-                  Browse Venues
-                </ActionButton>
-              </Link>
-            ) : (
-              <ActionButton variant="soft" className="w-full justify-center" disabled>
-                <MapPin className="size-3.5" />
-                Browse Venues
-              </ActionButton>
-            )
-          )}
-
-          {(currentTier?.disciplineDef.equipmentRequirements.length ?? 0) > 0 || requiredCertDefs.length > 0 ? (
-            <div className="mt-3 grid grid-cols-2 gap-3">
+          {!allEquipmentMet || !allCertsMet ? (
+            <div className="space-y-3">
               {(currentTier?.disciplineDef.equipmentRequirements.length ?? 0) > 0 && (
                 <div>
                   <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Equipment</h4>
@@ -160,9 +117,44 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
                   </div>
                 </div>
               )}
+              {!readonly && (
+                <ActionButton variant="soft" className="w-full justify-center" disabled>
+                  <MapPin className="size-3.5" />
+                  Browse Venues
+                </ActionButton>
+              )}
             </div>
-          ) : null}
+          ) : (
+            <>
+              <div className="mb-3 space-y-2">
+                <div className="grid grid-cols-3 gap-2">
+                  <InfoCard label="Discipline" value={animal.disciplineDef.name} />
+                  <InfoCard label="Current Tier" value={currentTier?.tierDef.name ?? "—"} />
+                  <InfoCard label="Weekly Points" value={latestWeeklyPoints !== undefined ? `${Math.round(latestWeeklyPoints)} pts` : "—"} />
+                </div>
+                {currentTier?.tierDef.advancementThreshold != null && (
+                  <div className="rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2">
+                    <div className="mb-1.5 flex items-center justify-between">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        Progress to Next Tier
+                      </p>
+                      <span className="text-[11px] tabular-nums text-muted-foreground">
+                        {latestWeeklyPoints !== undefined ? Math.round(latestWeeklyPoints) : 0} /{" "}
+                        {Math.round(currentTier.tierDef.advancementThreshold)}
+                      </span>
+                    </div>
+                    <Meter
+                      value={latestWeeklyPoints ?? 0}
+                      max={currentTier.tierDef.advancementThreshold}
+                      tone="condition"
+                      className="h-1.5"
+                    />
+                  </div>
+                )}
+              </div>
 
+            </>
+          )}
         </>
       ) : readonly ? (
         <p className="text-[11px] text-muted-foreground">No discipline assigned</p>
@@ -193,43 +185,42 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
           )}
         </div>
       )}
-      {/* Conformation shows — available to any animal with a conformation score */}
-      {canCompete && animal.conformationScores.length > 0 && (
-        <div className="mt-3 border-t border-border/50 pt-3">
-          <div className="mb-1.5 flex items-center gap-1.5">
-            <Ruler className="size-3 text-muted-foreground" />
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Conformation Shows</span>
-          </div>
-          {(() => {
-            const conformationTier = animal.compTiers.find((t) => t.disciplineDef.isConformation)
-            if (!conformationTier) return null
-            const conformationPoints = animal.weeklyPoints.find(
-              (p) => p.disciplineDefId === conformationTier.disciplineDefId
-            )
-            return (
-              <div className="mb-2 grid grid-cols-2 gap-2">
-                <InfoCard label="Current Tier" value={conformationTier.tierDef.name} />
-                <InfoCard
-                  label="Weekly Points"
-                  value={conformationPoints !== undefined ? `${Math.round(conformationPoints.points)} pts` : "—"}
-                />
+      {conformationTiers.map((tier) => {
+        const confPoints = animal.weeklyPoints.find((p) => p.disciplineDefId === tier.disciplineDefId)?.points
+        return (
+          <div key={tier.disciplineDefId} className="mt-3 border-t border-border/50 pt-3 space-y-2">
+            <div className="grid grid-cols-3 gap-2">
+              <InfoCard label="Discipline" value={tier.disciplineDef.name} />
+              <InfoCard label="Current Tier" value={tier.tierDef.name} />
+              <InfoCard label="Weekly Points" value={confPoints !== undefined ? `${Math.round(confPoints)} pts` : "—"} />
+            </div>
+            {tier.tierDef.advancementThreshold != null && (
+              <div className="rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2">
+                <div className="mb-1.5 flex items-center justify-between">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Progress to Next Tier</p>
+                  <span className="text-[11px] tabular-nums text-muted-foreground">
+                    {confPoints !== undefined ? Math.round(confPoints) : 0} / {Math.round(tier.tierDef.advancementThreshold)}
+                  </span>
+                </div>
+                <Meter value={confPoints ?? 0} max={tier.tierDef.advancementThreshold} tone="condition" className="h-1.5" />
               </div>
-            )
-          })()}
-          {!readonly && !isRestricted ? (
-            <Link
-              to="/venues"
-              search={{ animalId: animal.id, isConformation: true, from: "animal" as const }}
-            >
+            )}
+          </div>
+        )
+      })}
+      {canCompete && !readonly && (
+        <div className="mt-3 border-t border-border/50 pt-3">
+          {canBrowseVenues ? (
+            <Link to="/venues" search={{ animalId: animal.id, from: "animal" as const }}>
               <ActionButton variant="soft" className="w-full justify-center">
                 <MapPin className="size-3.5" />
-                Browse Conformation Shows
+                View Venues
               </ActionButton>
             </Link>
           ) : (
             <ActionButton variant="soft" className="w-full justify-center" disabled>
               <MapPin className="size-3.5" />
-              Browse Conformation Shows
+              View Venues
             </ActionButton>
           )}
         </div>

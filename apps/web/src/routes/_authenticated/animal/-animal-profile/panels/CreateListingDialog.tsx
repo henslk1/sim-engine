@@ -23,6 +23,11 @@ export function CreateListingDialog({
   const gameBreeds = animal.game.breeds ?? []
   const statDefs = animal.stats.map((s) => s.statDef)
 
+  const { data: titleDefs } = trpc.admin.title.list.useQuery({ gameId: animal.gameId })
+
+  const [title, setTitle] = useState(listing?.title ?? "")
+  const [pureBredOnly, setPureBredOnly] = useState(listing?.pureBredOnly ?? false)
+  const [requiredTitleDefId, setRequiredTitleDefId] = useState(listing?.requiredTitleDefId ?? "")
   const [pricePerSlot, setPricePerSlot] = useState(listing?.pricePerSlot ?? 0)
   const [currencyDefId, setCurrencyDefId] = useState(listing?.currencyDef?.id ?? currencies[0]?.id ?? "")
   const [description, setDescription] = useState<object | null>(
@@ -68,30 +73,69 @@ export function CreateListingDialog({
       .filter(([, v]) => v > 0)
       .map(([statDefId, minValue]) => ({ statDefId, minValue }))
 
+    const shared = {
+      title: title.trim() || undefined,
+      pureBredOnly,
+      requiredTitleDefId: requiredTitleDefId || undefined,
+      pricePerSlot,
+      currencyDefId: pricePerSlot > 0 && currencyDefId ? currencyDefId : undefined,
+      description: description ?? undefined,
+      breedRestrictions: restrictions,
+      statMinimums: minimums,
+    }
+
     if (isEditing) {
-      updateListing({
-        listingId: listing.id,
-        pricePerSlot,
-        currencyDefId: pricePerSlot > 0 && currencyDefId ? currencyDefId : undefined,
-        description: description ?? undefined,
-        breedRestrictions: restrictions,
-        statMinimums: minimums,
-      })
+      updateListing({ listingId: listing.id, ...shared })
     } else {
-      createListing({
-        animalId: animal.id,
-        pricePerSlot,
-        currencyDefId: pricePerSlot > 0 && currencyDefId ? currencyDefId : undefined,
-        description: description ?? undefined,
-        breedRestrictions: restrictions,
-        statMinimums: minimums,
-      })
+      createListing({ animalId: animal.id, ...shared })
     }
   }
 
   return (
     <Dialog open onClose={onClose} title={isEditing ? "Edit Breeding Listing" : "Create Breeding Listing"}>
       <div className="max-h-[80vh] overflow-y-auto space-y-4 p-4">
+
+        {/* Ad title */}
+        <div>
+          <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Ad title
+          </label>
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="e.g. Champion bloodline — open for bookings"
+            className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+        </div>
+
+        {/* Purebred only + required title */}
+        <div className="flex flex-wrap items-start gap-4">
+          <label className="flex cursor-pointer items-center gap-2">
+            <input
+              type="checkbox"
+              checked={pureBredOnly}
+              onChange={(e) => setPureBredOnly(e.target.checked)}
+              className="rounded border-input accent-primary"
+            />
+            <span className="text-sm">Purebred mares only</span>
+          </label>
+          {titleDefs && titleDefs.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Required title</span>
+              <select
+                value={requiredTitleDefId}
+                onChange={(e) => setRequiredTitleDefId(e.target.value)}
+                className="rounded-md border border-input bg-background px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+              >
+                <option value="">None</option>
+                {titleDefs.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
 
         {/* Price per slot */}
         <div>

@@ -3,7 +3,8 @@ import { authClient } from "@/lib/auth-client";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem, 
+  DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
@@ -34,6 +35,7 @@ export function Header({ session }: { session: Session}) {
       <div className="flex h-14 items-center justify-between px-4">
         <div className="flex items-center gap-4">
           <span className="font-serif text-lg font-semibold text-foreground"><Link to="/">Sim Engine</Link></span>
+          <Link to="/stable" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Stable</Link>
           <Link to="/town" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Town</Link>
           <Link to="/shop" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Shop</Link>
         </div>
@@ -49,6 +51,10 @@ export function Header({ session }: { session: Session}) {
             <span>{user.name}</span>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            <DropdownMenuItem asChild>
+              <Link to="/admin" className="cursor-pointer">Admin Console</Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={handleSignOut} className="cursor-pointer">
               Sign out
             </DropdownMenuItem>

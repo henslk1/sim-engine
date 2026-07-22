@@ -96,64 +96,37 @@ export function computeBreedingGrade(
   animal: AnimalProfile,
   config: AnimalProfile["game"]["gameConfig"]
 ): string {
-  const components: number[] = []
-
-  components.push((animal.careScore?.score ?? 0) / 100)
-
+  const parts: number[] = []
+  parts.push((animal.careScore?.score ?? 0) / 100)
   const topTier = [...animal.compTiers].sort((a, b) => b.tierDef.tierIndex - a.tierDef.tierIndex)[0]
   if (topTier) {
     const maxTierIndex = topTier.disciplineDef.compTierDefs[0]?.tierIndex ?? topTier.tierDef.tierIndex
-    components.push((topTier.tierDef.tierIndex + 1) / (maxTierIndex + 1))
+    parts.push((topTier.tierDef.tierIndex + 1) / (maxTierIndex + 1))
   } else {
-    components.push(0)
+    parts.push(0)
   }
-
-  components.push(Math.max(0, 1 - animal.inbreedingCoefficient / 0.25))
-
+  parts.push(Math.max(0, 1 - animal.inbreedingCoefficient / 0.25))
   if (animal.stats.length > 0 && config) {
-    const avg =
-      animal.stats.reduce((sum: number, s: AnimalProfile["stats"][number]) => {
+    parts.push(
+      animal.stats.reduce((sum, s) => {
         const cap = s.innateValue * config.trainingCeilingMultiplier
         return sum + Math.min(s.trainedValue / cap, 1)
       }, 0) / animal.stats.length
-    components.push(avg)
+    )
   } else {
-    components.push(0)
+    parts.push(0)
   }
-
   const isCross = animal.breedComposition.length > 1
-  if (!isCross) {
-    if (animal.conformationScores.length > 0) {
-      const avg =
-        animal.conformationScores.reduce(
-          (sum: number, s: AnimalProfile["conformationScores"][number]) => sum + s.score,
-          0
-        ) / animal.conformationScores.length
-      components.push(avg / 100)
-    } else {
-      components.push(0)
-    }
+  if (!isCross && animal.conformationScores.length > 0) {
+    parts.push(animal.conformationScores.reduce((sum, s) => sum + s.score, 0) / animal.conformationScores.length / 100)
   }
-
   const healthLoci = animal.genotypes.filter((g) =>
     g.locus.panelEntries.some((e) => e.panelDef.panelType === "HEALTH")
-)
+  )
   if (healthLoci.length > 0) {
-    const tested = healthLoci.filter((g) => g.isTestedByOwner).length
-    components.push(tested / healthLoci.length)
+    parts.push(healthLoci.filter((g) => g.isTestedByOwner).length / healthLoci.length)
   }
-
-  const activeConditions = animal.healthRecords.filter((r) => r.isActive).length
-  components.push(Math.max(0, 1 - activeConditions * 0.15))
-
-  const pct = (components.reduce((a, b) => a + b, 0) / components.length) * 100
-
-  switch (true) {
-    case pct >= 100: return "S"
-    case pct >= 85: return "A"
-    case pct >= 70: return "B"
-    case pct >= 55: return "C"
-    case pct >= 40: return "D"
-    default: return "F"
-  }
+  parts.push(Math.max(0, 1 - animal.healthRecords.filter((r) => r.isActive).length * 0.15))
+  const pct = (parts.reduce((a, b) => a + b, 0) / parts.length) * 100
+  return pct >= 100 ? "S" : pct >= 85 ? "A" : pct >= 70 ? "B" : pct >= 55 ? "C" : pct >= 40 ? "D" : "F"
 }
