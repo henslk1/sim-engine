@@ -36,7 +36,22 @@ const overviewRouter = router({
           where: { ...gf, createdAt: { gte: sevenDaysAgo } },
           orderBy: { createdAt: "desc" },
           take: 10,
-          select: { id: true, username: true, createdAt: true, user: { select: { email: true } } },
+          select: {
+            id: true,
+            username: true,
+            createdAt: true,
+            user: {
+              select: {
+                email: true,
+                emailVerified: true,
+                staffRoles: { select: { role: true, gameId: true } },
+                banRecords: { orderBy: { bannedAt: "desc" }, take: 1, select: { expiresAt: true, reason: true } },
+                userIpLogs: { orderBy: { seenAt: "desc" }, take: 1, select: { ipAddress: true } },
+                playerAccounts: { select: { game: { select: { id: true, name: true } } } },
+              },
+            },
+            _count: { select: { warnings: true } },
+          },
         }),
         db.adminActionLog.findMany({
           where: gf,

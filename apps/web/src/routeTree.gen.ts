@@ -25,17 +25,18 @@ import { Route as AuthenticatedVenueVenueIdRouteImport } from './routes/_authent
 import { Route as AuthenticatedCompetitionCompetitionIdRouteImport } from './routes/_authenticated/competition.$competitionId'
 import { Route as AuthenticatedBreedingOfferIdRouteImport } from './routes/_authenticated/breeding/$offerId'
 import { Route as AuthenticatedAnimalAnimalIdRouteImport } from './routes/_authenticated/animal/$animalId'
+import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin/users'
 import { Route as AuthenticatedAdminSystemRouteImport } from './routes/_authenticated/admin/system'
 import { Route as AuthenticatedAdminSupportRouteImport } from './routes/_authenticated/admin/support'
-import { Route as AuthenticatedAdminPlayersRouteImport } from './routes/_authenticated/admin/players'
 import { Route as AuthenticatedAdminModerationRouteImport } from './routes/_authenticated/admin/moderation'
 import { Route as AuthenticatedAdminIntegrityRouteImport } from './routes/_authenticated/admin/integrity'
 import { Route as AuthenticatedAdminBugsRouteImport } from './routes/_authenticated/admin/bugs'
 import { Route as AuthenticatedAdminBroadcastRouteImport } from './routes/_authenticated/admin/broadcast'
 import { Route as AuthenticatedAdminAuditRouteImport } from './routes/_authenticated/admin/audit'
+import { Route as AuthenticatedAdminUsersIndexRouteImport } from './routes/_authenticated/admin/users.index'
 import { Route as AuthenticatedAdminSupportIndexRouteImport } from './routes/_authenticated/admin/support.index'
-import { Route as AuthenticatedAdminPlayersIndexRouteImport } from './routes/_authenticated/admin/players.index'
 import { Route as AuthenticatedAdminBugsIndexRouteImport } from './routes/_authenticated/admin/bugs.index'
+import { Route as AuthenticatedAdminUsersPlayerIdRouteImport } from './routes/_authenticated/admin/users.$playerId'
 import { Route as AuthenticatedAdminSupportTicketIdRouteImport } from './routes/_authenticated/admin/support.$ticketId'
 import { Route as AuthenticatedAdminPlayersPlayerIdRouteImport } from './routes/_authenticated/admin/players.$playerId'
 import { Route as AuthenticatedAdminGamesGameIdRouteImport } from './routes/_authenticated/admin/games.$gameId'
@@ -160,6 +161,11 @@ const AuthenticatedAnimalAnimalIdRoute =
     path: '/animal/$animalId',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedAdminUsersRoute = AuthenticatedAdminUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => AuthenticatedAdminRoute,
+} as any)
 const AuthenticatedAdminSystemRoute =
   AuthenticatedAdminSystemRouteImport.update({
     id: '/system',
@@ -170,12 +176,6 @@ const AuthenticatedAdminSupportRoute =
   AuthenticatedAdminSupportRouteImport.update({
     id: '/support',
     path: '/support',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
-const AuthenticatedAdminPlayersRoute =
-  AuthenticatedAdminPlayersRouteImport.update({
-    id: '/players',
-    path: '/players',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
 const AuthenticatedAdminModerationRoute =
@@ -206,23 +206,29 @@ const AuthenticatedAdminAuditRoute = AuthenticatedAdminAuditRouteImport.update({
   path: '/audit',
   getParentRoute: () => AuthenticatedAdminRoute,
 } as any)
+const AuthenticatedAdminUsersIndexRoute =
+  AuthenticatedAdminUsersIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedAdminUsersRoute,
+  } as any)
 const AuthenticatedAdminSupportIndexRoute =
   AuthenticatedAdminSupportIndexRouteImport.update({
     id: '/',
     path: '/',
     getParentRoute: () => AuthenticatedAdminSupportRoute,
   } as any)
-const AuthenticatedAdminPlayersIndexRoute =
-  AuthenticatedAdminPlayersIndexRouteImport.update({
-    id: '/',
-    path: '/',
-    getParentRoute: () => AuthenticatedAdminPlayersRoute,
-  } as any)
 const AuthenticatedAdminBugsIndexRoute =
   AuthenticatedAdminBugsIndexRouteImport.update({
     id: '/',
     path: '/',
     getParentRoute: () => AuthenticatedAdminBugsRoute,
+  } as any)
+const AuthenticatedAdminUsersPlayerIdRoute =
+  AuthenticatedAdminUsersPlayerIdRouteImport.update({
+    id: '/$playerId',
+    path: '/$playerId',
+    getParentRoute: () => AuthenticatedAdminUsersRoute,
   } as any)
 const AuthenticatedAdminSupportTicketIdRoute =
   AuthenticatedAdminSupportTicketIdRouteImport.update({
@@ -232,9 +238,9 @@ const AuthenticatedAdminSupportTicketIdRoute =
   } as any)
 const AuthenticatedAdminPlayersPlayerIdRoute =
   AuthenticatedAdminPlayersPlayerIdRouteImport.update({
-    id: '/$playerId',
-    path: '/$playerId',
-    getParentRoute: () => AuthenticatedAdminPlayersRoute,
+    id: '/players/$playerId',
+    path: '/players/$playerId',
+    getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
 const AuthenticatedAdminGamesGameIdRoute =
   AuthenticatedAdminGamesGameIdRouteImport.update({
@@ -481,9 +487,9 @@ export interface FileRoutesByFullPath {
   '/admin/bugs': typeof AuthenticatedAdminBugsRouteWithChildren
   '/admin/integrity': typeof AuthenticatedAdminIntegrityRoute
   '/admin/moderation': typeof AuthenticatedAdminModerationRoute
-  '/admin/players': typeof AuthenticatedAdminPlayersRouteWithChildren
   '/admin/support': typeof AuthenticatedAdminSupportRouteWithChildren
   '/admin/system': typeof AuthenticatedAdminSystemRoute
+  '/admin/users': typeof AuthenticatedAdminUsersRouteWithChildren
   '/animal/$animalId': typeof AuthenticatedAnimalAnimalIdRoute
   '/breeding/$offerId': typeof AuthenticatedBreedingOfferIdRoute
   '/competition/$competitionId': typeof AuthenticatedCompetitionCompetitionIdRoute
@@ -493,9 +499,10 @@ export interface FileRoutesByFullPath {
   '/admin/games/$gameId': typeof AuthenticatedAdminGamesGameIdRouteWithChildren
   '/admin/players/$playerId': typeof AuthenticatedAdminPlayersPlayerIdRoute
   '/admin/support/$ticketId': typeof AuthenticatedAdminSupportTicketIdRoute
+  '/admin/users/$playerId': typeof AuthenticatedAdminUsersPlayerIdRoute
   '/admin/bugs/': typeof AuthenticatedAdminBugsIndexRoute
-  '/admin/players/': typeof AuthenticatedAdminPlayersIndexRoute
   '/admin/support/': typeof AuthenticatedAdminSupportIndexRoute
+  '/admin/users/': typeof AuthenticatedAdminUsersIndexRoute
   '/admin/games/$gameId/breeds': typeof AuthenticatedAdminGamesGameIdBreedsRoute
   '/admin/games/$gameId/care-actions': typeof AuthenticatedAdminGamesGameIdCareActionsRoute
   '/admin/games/$gameId/competition-tiers': typeof AuthenticatedAdminGamesGameIdCompetitionTiersRoute
@@ -556,9 +563,10 @@ export interface FileRoutesByTo {
   '/admin/bugs/$bugId': typeof AuthenticatedAdminBugsBugIdRoute
   '/admin/players/$playerId': typeof AuthenticatedAdminPlayersPlayerIdRoute
   '/admin/support/$ticketId': typeof AuthenticatedAdminSupportTicketIdRoute
+  '/admin/users/$playerId': typeof AuthenticatedAdminUsersPlayerIdRoute
   '/admin/bugs': typeof AuthenticatedAdminBugsIndexRoute
-  '/admin/players': typeof AuthenticatedAdminPlayersIndexRoute
   '/admin/support': typeof AuthenticatedAdminSupportIndexRoute
+  '/admin/users': typeof AuthenticatedAdminUsersIndexRoute
   '/admin/games/$gameId/breeds': typeof AuthenticatedAdminGamesGameIdBreedsRoute
   '/admin/games/$gameId/care-actions': typeof AuthenticatedAdminGamesGameIdCareActionsRoute
   '/admin/games/$gameId/competition-tiers': typeof AuthenticatedAdminGamesGameIdCompetitionTiersRoute
@@ -614,9 +622,9 @@ export interface FileRoutesById {
   '/_authenticated/admin/bugs': typeof AuthenticatedAdminBugsRouteWithChildren
   '/_authenticated/admin/integrity': typeof AuthenticatedAdminIntegrityRoute
   '/_authenticated/admin/moderation': typeof AuthenticatedAdminModerationRoute
-  '/_authenticated/admin/players': typeof AuthenticatedAdminPlayersRouteWithChildren
   '/_authenticated/admin/support': typeof AuthenticatedAdminSupportRouteWithChildren
   '/_authenticated/admin/system': typeof AuthenticatedAdminSystemRoute
+  '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRouteWithChildren
   '/_authenticated/animal/$animalId': typeof AuthenticatedAnimalAnimalIdRoute
   '/_authenticated/breeding/$offerId': typeof AuthenticatedBreedingOfferIdRoute
   '/_authenticated/competition/$competitionId': typeof AuthenticatedCompetitionCompetitionIdRoute
@@ -626,9 +634,10 @@ export interface FileRoutesById {
   '/_authenticated/admin/games/$gameId': typeof AuthenticatedAdminGamesGameIdRouteWithChildren
   '/_authenticated/admin/players/$playerId': typeof AuthenticatedAdminPlayersPlayerIdRoute
   '/_authenticated/admin/support/$ticketId': typeof AuthenticatedAdminSupportTicketIdRoute
+  '/_authenticated/admin/users/$playerId': typeof AuthenticatedAdminUsersPlayerIdRoute
   '/_authenticated/admin/bugs/': typeof AuthenticatedAdminBugsIndexRoute
-  '/_authenticated/admin/players/': typeof AuthenticatedAdminPlayersIndexRoute
   '/_authenticated/admin/support/': typeof AuthenticatedAdminSupportIndexRoute
+  '/_authenticated/admin/users/': typeof AuthenticatedAdminUsersIndexRoute
   '/_authenticated/admin/games/$gameId/breeds': typeof AuthenticatedAdminGamesGameIdBreedsRoute
   '/_authenticated/admin/games/$gameId/care-actions': typeof AuthenticatedAdminGamesGameIdCareActionsRoute
   '/_authenticated/admin/games/$gameId/competition-tiers': typeof AuthenticatedAdminGamesGameIdCompetitionTiersRoute
@@ -684,9 +693,9 @@ export interface FileRouteTypes {
     | '/admin/bugs'
     | '/admin/integrity'
     | '/admin/moderation'
-    | '/admin/players'
     | '/admin/support'
     | '/admin/system'
+    | '/admin/users'
     | '/animal/$animalId'
     | '/breeding/$offerId'
     | '/competition/$competitionId'
@@ -696,9 +705,10 @@ export interface FileRouteTypes {
     | '/admin/games/$gameId'
     | '/admin/players/$playerId'
     | '/admin/support/$ticketId'
+    | '/admin/users/$playerId'
     | '/admin/bugs/'
-    | '/admin/players/'
     | '/admin/support/'
+    | '/admin/users/'
     | '/admin/games/$gameId/breeds'
     | '/admin/games/$gameId/care-actions'
     | '/admin/games/$gameId/competition-tiers'
@@ -759,9 +769,10 @@ export interface FileRouteTypes {
     | '/admin/bugs/$bugId'
     | '/admin/players/$playerId'
     | '/admin/support/$ticketId'
+    | '/admin/users/$playerId'
     | '/admin/bugs'
-    | '/admin/players'
     | '/admin/support'
+    | '/admin/users'
     | '/admin/games/$gameId/breeds'
     | '/admin/games/$gameId/care-actions'
     | '/admin/games/$gameId/competition-tiers'
@@ -816,9 +827,9 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/bugs'
     | '/_authenticated/admin/integrity'
     | '/_authenticated/admin/moderation'
-    | '/_authenticated/admin/players'
     | '/_authenticated/admin/support'
     | '/_authenticated/admin/system'
+    | '/_authenticated/admin/users'
     | '/_authenticated/animal/$animalId'
     | '/_authenticated/breeding/$offerId'
     | '/_authenticated/competition/$competitionId'
@@ -828,9 +839,10 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/games/$gameId'
     | '/_authenticated/admin/players/$playerId'
     | '/_authenticated/admin/support/$ticketId'
+    | '/_authenticated/admin/users/$playerId'
     | '/_authenticated/admin/bugs/'
-    | '/_authenticated/admin/players/'
     | '/_authenticated/admin/support/'
+    | '/_authenticated/admin/users/'
     | '/_authenticated/admin/games/$gameId/breeds'
     | '/_authenticated/admin/games/$gameId/care-actions'
     | '/_authenticated/admin/games/$gameId/competition-tiers'
@@ -989,6 +1001,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAnimalAnimalIdRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/admin/users': {
+      id: '/_authenticated/admin/users'
+      path: '/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AuthenticatedAdminUsersRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/system': {
       id: '/_authenticated/admin/system'
       path: '/system'
@@ -1001,13 +1020,6 @@ declare module '@tanstack/react-router' {
       path: '/support'
       fullPath: '/admin/support'
       preLoaderRoute: typeof AuthenticatedAdminSupportRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/players': {
-      id: '/_authenticated/admin/players'
-      path: '/players'
-      fullPath: '/admin/players'
-      preLoaderRoute: typeof AuthenticatedAdminPlayersRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
     '/_authenticated/admin/moderation': {
@@ -1045,6 +1057,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminAuditRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/users/': {
+      id: '/_authenticated/admin/users/'
+      path: '/'
+      fullPath: '/admin/users/'
+      preLoaderRoute: typeof AuthenticatedAdminUsersIndexRouteImport
+      parentRoute: typeof AuthenticatedAdminUsersRoute
+    }
     '/_authenticated/admin/support/': {
       id: '/_authenticated/admin/support/'
       path: '/'
@@ -1052,19 +1071,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminSupportIndexRouteImport
       parentRoute: typeof AuthenticatedAdminSupportRoute
     }
-    '/_authenticated/admin/players/': {
-      id: '/_authenticated/admin/players/'
-      path: '/'
-      fullPath: '/admin/players/'
-      preLoaderRoute: typeof AuthenticatedAdminPlayersIndexRouteImport
-      parentRoute: typeof AuthenticatedAdminPlayersRoute
-    }
     '/_authenticated/admin/bugs/': {
       id: '/_authenticated/admin/bugs/'
       path: '/'
       fullPath: '/admin/bugs/'
       preLoaderRoute: typeof AuthenticatedAdminBugsIndexRouteImport
       parentRoute: typeof AuthenticatedAdminBugsRoute
+    }
+    '/_authenticated/admin/users/$playerId': {
+      id: '/_authenticated/admin/users/$playerId'
+      path: '/$playerId'
+      fullPath: '/admin/users/$playerId'
+      preLoaderRoute: typeof AuthenticatedAdminUsersPlayerIdRouteImport
+      parentRoute: typeof AuthenticatedAdminUsersRoute
     }
     '/_authenticated/admin/support/$ticketId': {
       id: '/_authenticated/admin/support/$ticketId'
@@ -1075,10 +1094,10 @@ declare module '@tanstack/react-router' {
     }
     '/_authenticated/admin/players/$playerId': {
       id: '/_authenticated/admin/players/$playerId'
-      path: '/$playerId'
+      path: '/players/$playerId'
       fullPath: '/admin/players/$playerId'
       preLoaderRoute: typeof AuthenticatedAdminPlayersPlayerIdRouteImport
-      parentRoute: typeof AuthenticatedAdminPlayersRoute
+      parentRoute: typeof AuthenticatedAdminRoute
     }
     '/_authenticated/admin/games/$gameId': {
       id: '/_authenticated/admin/games/$gameId'
@@ -1365,23 +1384,6 @@ const AuthenticatedAdminBugsRouteWithChildren =
     AuthenticatedAdminBugsRouteChildren,
   )
 
-interface AuthenticatedAdminPlayersRouteChildren {
-  AuthenticatedAdminPlayersPlayerIdRoute: typeof AuthenticatedAdminPlayersPlayerIdRoute
-  AuthenticatedAdminPlayersIndexRoute: typeof AuthenticatedAdminPlayersIndexRoute
-}
-
-const AuthenticatedAdminPlayersRouteChildren: AuthenticatedAdminPlayersRouteChildren =
-  {
-    AuthenticatedAdminPlayersPlayerIdRoute:
-      AuthenticatedAdminPlayersPlayerIdRoute,
-    AuthenticatedAdminPlayersIndexRoute: AuthenticatedAdminPlayersIndexRoute,
-  }
-
-const AuthenticatedAdminPlayersRouteWithChildren =
-  AuthenticatedAdminPlayersRoute._addFileChildren(
-    AuthenticatedAdminPlayersRouteChildren,
-  )
-
 interface AuthenticatedAdminSupportRouteChildren {
   AuthenticatedAdminSupportTicketIdRoute: typeof AuthenticatedAdminSupportTicketIdRoute
   AuthenticatedAdminSupportIndexRoute: typeof AuthenticatedAdminSupportIndexRoute
@@ -1397,6 +1399,22 @@ const AuthenticatedAdminSupportRouteChildren: AuthenticatedAdminSupportRouteChil
 const AuthenticatedAdminSupportRouteWithChildren =
   AuthenticatedAdminSupportRoute._addFileChildren(
     AuthenticatedAdminSupportRouteChildren,
+  )
+
+interface AuthenticatedAdminUsersRouteChildren {
+  AuthenticatedAdminUsersPlayerIdRoute: typeof AuthenticatedAdminUsersPlayerIdRoute
+  AuthenticatedAdminUsersIndexRoute: typeof AuthenticatedAdminUsersIndexRoute
+}
+
+const AuthenticatedAdminUsersRouteChildren: AuthenticatedAdminUsersRouteChildren =
+  {
+    AuthenticatedAdminUsersPlayerIdRoute: AuthenticatedAdminUsersPlayerIdRoute,
+    AuthenticatedAdminUsersIndexRoute: AuthenticatedAdminUsersIndexRoute,
+  }
+
+const AuthenticatedAdminUsersRouteWithChildren =
+  AuthenticatedAdminUsersRoute._addFileChildren(
+    AuthenticatedAdminUsersRouteChildren,
   )
 
 interface AuthenticatedAdminGamesGameIdRouteChildren {
@@ -1525,11 +1543,12 @@ interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminBugsRoute: typeof AuthenticatedAdminBugsRouteWithChildren
   AuthenticatedAdminIntegrityRoute: typeof AuthenticatedAdminIntegrityRoute
   AuthenticatedAdminModerationRoute: typeof AuthenticatedAdminModerationRoute
-  AuthenticatedAdminPlayersRoute: typeof AuthenticatedAdminPlayersRouteWithChildren
   AuthenticatedAdminSupportRoute: typeof AuthenticatedAdminSupportRouteWithChildren
   AuthenticatedAdminSystemRoute: typeof AuthenticatedAdminSystemRoute
+  AuthenticatedAdminUsersRoute: typeof AuthenticatedAdminUsersRouteWithChildren
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
   AuthenticatedAdminGamesGameIdRoute: typeof AuthenticatedAdminGamesGameIdRouteWithChildren
+  AuthenticatedAdminPlayersPlayerIdRoute: typeof AuthenticatedAdminPlayersPlayerIdRoute
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
@@ -1538,12 +1557,14 @@ const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminBugsRoute: AuthenticatedAdminBugsRouteWithChildren,
   AuthenticatedAdminIntegrityRoute: AuthenticatedAdminIntegrityRoute,
   AuthenticatedAdminModerationRoute: AuthenticatedAdminModerationRoute,
-  AuthenticatedAdminPlayersRoute: AuthenticatedAdminPlayersRouteWithChildren,
   AuthenticatedAdminSupportRoute: AuthenticatedAdminSupportRouteWithChildren,
   AuthenticatedAdminSystemRoute: AuthenticatedAdminSystemRoute,
+  AuthenticatedAdminUsersRoute: AuthenticatedAdminUsersRouteWithChildren,
   AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
   AuthenticatedAdminGamesGameIdRoute:
     AuthenticatedAdminGamesGameIdRouteWithChildren,
+  AuthenticatedAdminPlayersPlayerIdRoute:
+    AuthenticatedAdminPlayersPlayerIdRoute,
 }
 
 const AuthenticatedAdminRouteWithChildren =

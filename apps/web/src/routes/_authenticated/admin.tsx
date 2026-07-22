@@ -18,7 +18,7 @@ type NavGroupDef = { label: string; links: NavLink[] }
 
 const platformLinks: NavLink[] = [
   { to: "/admin", label: "Overview", icon: LayoutDashboard },
-  { to: "/admin/players", label: "Players", icon: Users },
+  { to: "/admin/users", label: "Users", icon: Users },
   { to: "/admin/support", label: "Support Tickets", icon: MessageSquare },
   { to: "/admin/bugs", label: "Bug Reports", icon: Bug },
   { to: "/admin/moderation", label: "Moderation", icon: ShieldAlert },

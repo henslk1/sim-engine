@@ -85,7 +85,7 @@ function OpsModeration() {
                 <p className="text-sm font-medium">
                   {r.reporterPlayer?.username ?? "Unknown"} reported{" "}
                   {r.reportedPlayer
-                    ? <Link to="/admin/players/$playerId" params={{ playerId: r.reportedPlayer.id }} className="text-primary hover:underline">{r.reportedPlayer.username}</Link>
+                    ? <Link to="/admin/users/$playerId" params={{ playerId: r.reportedPlayer.id }} className="text-primary hover:underline">{r.reportedPlayer.username}</Link>
                     : "content"}
                 </p>
                 <p className="text-sm text-muted-foreground">{r.reason}</p>
@@ -134,7 +134,7 @@ function OpsModeration() {
                 {r.reportedPlayer && (
                   <p className="text-xs text-muted-foreground">
                     To take action against this player, visit{" "}
-                    <Link to="/admin/players/$playerId" params={{ playerId: r.reportedPlayer.id }} className="text-primary hover:underline">
+                    <Link to="/admin/users/$playerId" params={{ playerId: r.reportedPlayer.id }} className="text-primary hover:underline">
                       {r.reportedPlayer.username}'s profile
                     </Link>
                   </p>

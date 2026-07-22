@@ -4,8 +4,8 @@ import { useState } from "react"
 import { Search, CheckCircle2, Circle, ShieldAlert, ShieldBan, AlertTriangle } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-export const Route = createFileRoute("/_authenticated/admin/players/")({
-  component: OpsPlayers,
+export const Route = createFileRoute("/_authenticated/admin/users/")({
+  component: OpsUsers,
 })
 
 const STAFF_BADGE: Record<string, { label: string; className: string }> = {
@@ -26,7 +26,7 @@ function relativeDate(date: Date | string | null | undefined): string {
   return `${Math.floor(days / 365)}y ago`
 }
 
-function OpsPlayers() {
+function OpsUsers() {
   const [search, setSearch] = useState("")
   const [debouncedSearch, setDebouncedSearch] = useState("")
   const [isBannedFilter, setIsBannedFilter] = useState<boolean | undefined>(undefined)
@@ -47,7 +47,7 @@ function OpsPlayers() {
   return (
     <div className="space-y-4 p-6">
       <div className="flex items-center justify-between">
-        <h1 className="font-serif text-xl font-semibold text-foreground">Players</h1>
+        <h1 className="font-serif text-xl font-semibold text-foreground">Users</h1>
         <span className="text-sm text-muted-foreground">{players.length} loaded</span>
       </div>
 
@@ -66,7 +66,7 @@ function OpsPlayers() {
           onChange={e => setIsBannedFilter(e.target.value === "" ? undefined : e.target.value === "true")}
           className="rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
         >
-          <option value="">All players</option>
+          <option value="">All users</option>
           <option value="true">Banned</option>
           <option value="false">Not banned</option>
         </select>
@@ -128,7 +128,7 @@ function OpsPlayers() {
                   {/* Last IP */}
                   <td className="px-3 py-2">
                     {lastIp ? (
-                      <span className="font-mono text-xs text-muted-foreground" title={`Seen ${new Date(lastIp.seenAt).toLocaleString()}`}>
+                      <span className="font-mono text-xs text-muted-foreground">
                         {lastIp.ipAddress}
                       </span>
                     ) : (
@@ -183,7 +183,7 @@ function OpsPlayers() {
 
                   <td className="px-3 py-2 text-right">
                     <Link
-                      to="/admin/players/$playerId"
+                      to="/admin/users/$playerId"
                       params={{ playerId: p.id }}
                       className="text-xs text-primary hover:underline"
                     >
@@ -194,7 +194,7 @@ function OpsPlayers() {
               )
             })}
             {players.length === 0 && (
-              <tr><td colSpan={8} className="px-3 py-6 text-center text-muted-foreground">No players found.</td></tr>
+              <tr><td colSpan={8} className="px-3 py-6 text-center text-muted-foreground">No users found.</td></tr>
             )}
           </tbody>
         </table>

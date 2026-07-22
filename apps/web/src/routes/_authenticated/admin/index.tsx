@@ -3,7 +3,7 @@ import { trpc } from "@/lib/trpc"
 import { useState, useEffect } from "react"
 import {
   Bug, MessageSquare, Flag, ShieldBan,
-  CheckCircle2, XCircle, ChevronRight,
+  CheckCircle2, XCircle, ChevronRight, Circle, AlertTriangle,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -39,35 +39,77 @@ function OpsOverview() {
       {/* Main grid */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_260px_240px]">
 
-        {/* Players this week */}
+        {/* Users this week */}
         <Panel
-          title="New Players This Week"
+          title="New Users This Week"
           count={recentPlayers.length}
-          action={{ label: "All players", href: "/admin/players" }}
+          action={{ label: "All users", href: "/admin/users" }}
         >
           {recentPlayers.length === 0 ? (
-            <p className="px-4 py-6 text-center text-sm text-muted-foreground">No new players this week.</p>
+            <p className="px-4 py-6 text-center text-sm text-muted-foreground">No new users this week.</p>
           ) : (
             <div>
-              {recentPlayers.map((p) => (
-                <Link
-                  key={p.id}
-                  to="/admin/players/$playerId"
-                  params={{ playerId: p.id }}
-                  className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-muted/50 border-t border-border first:border-t-0"
-                >
-                  <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] font-semibold text-primary">
-                    {p.username.slice(0, 2).toUpperCase()}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-foreground">{p.username}</p>
-                    <p className="truncate text-xs text-muted-foreground">{p.user.email}</p>
-                  </div>
-                  <span className="shrink-0 text-xs text-muted-foreground">
-                    {new Date(p.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-                  </span>
-                </Link>
-              ))}
+              {recentPlayers.map((p) => {
+                const ban = p.user.banRecords?.[0]
+                const isBanned = ban && (!ban.expiresAt || new Date(ban.expiresAt) > new Date())
+                const lastIp = p.user.userIpLogs?.[0]
+                const staffRoles = p.user.staffRoles ?? []
+                const games = p.user.playerAccounts?.map((pa: { game: { id: string; name: string } }) => pa.game) ?? []
+                const warningCount = p._count?.warnings ?? 0
+                return (
+                  <Link
+                    key={p.id}
+                    to="/admin/users/$playerId"
+                    params={{ playerId: p.id }}
+                    className="flex items-start gap-3 px-4 py-2.5 transition-colors hover:bg-muted/50 border-t border-border first:border-t-0"
+                  >
+                    <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] font-semibold text-primary mt-0.5">
+                      {p.username.slice(0, 2).toUpperCase()}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      {/* Row 1: username + staff badges */}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-sm font-medium text-foreground">{p.username}</span>
+                        {staffRoles.map((r: { role: string }) => (
+                          <span key={r.role} className="rounded bg-primary/10 px-1 py-0.5 text-[9px] font-bold text-primary">
+                            {r.role.slice(0, 3)}
+                          </span>
+                        ))}
+                      </div>
+                      {/* Row 2: email + verified */}
+                      <div className="flex items-center gap-1">
+                        <span className="truncate text-xs text-muted-foreground">{p.user.email}</span>
+                        {p.user.emailVerified
+                          ? <CheckCircle2 className="size-3 shrink-0 text-chart-2" />
+                          : <Circle className="size-3 shrink-0 text-muted-foreground/30" />
+                        }
+                      </div>
+                      {/* Row 3: IP + games + flags */}
+                      <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                        {lastIp && (
+                          <span className="font-mono text-[10px] text-muted-foreground/60">{lastIp.ipAddress}</span>
+                        )}
+                        {games.map((g: { id: string; name: string }) => (
+                          <span key={g.id} className="rounded bg-muted px-1 py-0.5 text-[9px] text-muted-foreground">{g.name}</span>
+                        ))}
+                        {isBanned && (
+                          <span className="flex items-center gap-0.5 text-[9px] font-semibold text-destructive">
+                            <ShieldBan className="size-2.5" />BAN
+                          </span>
+                        )}
+                        {warningCount > 0 && (
+                          <span className="flex items-center gap-0.5 text-[9px] font-semibold text-orange-500">
+                            <AlertTriangle className="size-2.5" />{warningCount}W
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <span className="shrink-0 text-xs text-muted-foreground pt-0.5">
+                      {new Date(p.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                    </span>
+                  </Link>
+                )
+              })}
             </div>
           )}
         </Panel>

@@ -108,7 +108,7 @@ function OpsIntegrity() {
                   u.user.playerAccounts[0] ? (
                     <Link
                       key={u.userId}
-                      to="/admin/players/$playerId"
+                      to="/admin/users/$playerId"
                       params={{ playerId: u.user.playerAccounts[0].id }}
                       className="rounded-md border border-border bg-background px-2 py-1 text-xs hover:border-primary hover:text-primary"
                     >
@@ -139,7 +139,7 @@ function OpsIntegrity() {
                   u.user.playerAccounts[0] ? (
                     <Link
                       key={u.userId}
-                      to="/admin/players/$playerId"
+                      to="/admin/users/$playerId"
                       params={{ playerId: u.user.playerAccounts[0].id }}
                       className="rounded-md border border-border bg-background px-2 py-1 text-xs hover:border-primary hover:text-primary"
                     >
@@ -177,7 +177,7 @@ function OpsIntegrity() {
                   <td className="px-3 py-2 text-right">
                     {row.player && (
                       <Link
-                        to="/admin/players/$playerId"
+                        to="/admin/users/$playerId"
                         params={{ playerId: row.player.id }}
                         className="text-xs text-primary hover:underline"
                       >
