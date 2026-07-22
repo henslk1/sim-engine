@@ -564,14 +564,14 @@ function DashboardPage() {
   const { data: gameData, isLoading: gameLoading } = trpc.admin.game.get.useQuery()
   const gameId = gameData?.id
 
-  const { data: me, isLoading: meLoading } = trpc.player.me.useQuery(
+  const { data: me, isLoading: meLoading, isFetching: meFetching } = trpc.player.me.useQuery(
     { gameId: gameId! },
     { enabled: !!gameId },
   )
 
   useEffect(() => {
-    if (!meLoading && gameId && me === null) navigate({ to: "/setup" })
-  }, [me, meLoading, gameId, navigate])
+    if (!meLoading && !meFetching && gameId && me === null) navigate({ to: "/setup" })
+  }, [me, meLoading, meFetching, gameId, navigate])
 
   const playerAccountId = me?.id
 
