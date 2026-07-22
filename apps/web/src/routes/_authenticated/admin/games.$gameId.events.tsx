@@ -4,17 +4,16 @@ import { useState } from "react"
 import { cn } from "@/lib/utils"
 import { Plus, Pencil, Trash2 } from "lucide-react"
 
-export const Route = createFileRoute("/_authenticated/admin/ops/events")({
+export const Route = createFileRoute("/_authenticated/admin/games/$gameId/events")({
   component: OpsEvents,
 })
 
 function OpsEvents() {
-  const { data: gameData } = trpc.admin.game.get.useQuery()
-  const gameId = gameData?.id
+  const { gameId } = Route.useParams()
 
   const { data: events, refetch } = trpc.admin.ops.events.list.useQuery(
     { gameId: gameId! },
-    { enabled: !!gameId },
+    {},
   )
 
   const createMutation = trpc.admin.ops.events.create.useMutation({ onSuccess: () => { refetch(); setShowForm(false); resetForm() } })
@@ -39,13 +38,10 @@ function OpsEvents() {
     let parsed: Record<string, unknown>
     try { parsed = JSON.parse(configJson) } catch { setJsonError("Invalid JSON"); return }
     setJsonError("")
-    if (!gameId) return
-    createMutation.mutate({ gameId, eventType, configOverrides: parsed, startsAt: new Date(startsAt).toISOString(), endsAt: new Date(endsAt).toISOString(), isTemplate, staffUserId: "CURRENT_USER" })
+    createMutation.mutate({ gameId: gameId!, eventType, configOverrides: parsed, startsAt: new Date(startsAt).toISOString(), endsAt: new Date(endsAt).toISOString(), isTemplate, staffUserId: "CURRENT_USER" })
   }
 
   const now = new Date()
-
-  if (!gameId) return <div className="p-6 text-sm text-muted-foreground">No game found.</div>
 
   return (
     <div className="space-y-4 p-6">

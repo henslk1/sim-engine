@@ -19,16 +19,15 @@ const CLIMATES = ["HOT", "WARM", "COLD", "TEMPERATE"] as const
 const TERRAINS = ["FLAT", "COASTAL", "HILLY", "MOUNTAIN"] as const
 
 function ExpressionRulesPage() {
-  const { data: gameData } = trpc.admin.game.get.useQuery()
-  const gameId = gameData?.id
+  const { gameId } = Route.useParams()
 
   const { data: loci } = trpc.admin.locus.list.useQuery(
     { gameId: gameId! },
-    { enabled: !!gameId }
+    {}
   )
   const { data: healthConditions } = trpc.admin.health.list.useQuery(
     { gameId: gameId! },
-    { enabled: !!gameId }
+    {}
   )
 
   const [selectedLocusId, setSelectedLocusId] = useState<string | null>(null)
@@ -121,8 +120,6 @@ function ExpressionRulesPage() {
       modifier: parseFloat(newTerrain.modifier),
     })
   }
-
-  if (!gameId) return <p className="p-6 text-sm text-muted-foreground">No game configured yet. Set up Game Config first.</p>
 
   return (
     <div className="p-6 max-w-4xl space-y-6">
@@ -554,6 +551,6 @@ function ExpressionRulesPage() {
   )
 }
 
-export const Route = createFileRoute("/_authenticated/admin/expression-rules")({
+export const Route = createFileRoute("/_authenticated/admin/games/$gameId/expression-rules")({
   component: ExpressionRulesPage,
 })

@@ -4,11 +4,12 @@ import { trpc } from "@/lib/trpc"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 
-export const Route = createFileRoute("/_authenticated/admin/game-config")({
+export const Route = createFileRoute("/_authenticated/admin/games/$gameId/config")({
   component: GameConfigPage,
 })
 
 function GameConfigPage() {
+  const { gameId } = Route.useParams()
   const { data, isLoading } = trpc.admin.game.get.useQuery()
   const utils = trpc.useUtils()
 
@@ -137,7 +138,7 @@ function GameConfigPage() {
             <label htmlFor="isActive" className="text-sm text-foreground">Active</label>
           </div>
           {saveGame.error && <p className="text-sm text-destructive">{saveGame.error.message}</p>}
-          <Button onClick={() => saveGame.mutate({ id: data?.id, ...gameForm })} disabled={saveGame.isPending}>
+          <Button onClick={() => saveGame.mutate({ id: gameId, ...gameForm })} disabled={saveGame.isPending}>
             {saveGame.isPending ? "Saving…" : "Save Game"}
           </Button>
         </div>
@@ -392,7 +393,7 @@ function GameConfigPage() {
             {saveConfig.error && <p className="text-sm text-destructive">{saveConfig.error.message}</p>}
             <Button
               onClick={() => saveConfig.mutate({
-                gameId: data.id,
+                gameId: gameId!,
                 ...configForm,
                 containerLabel: configForm.containerLabel || undefined,
                 subContainerLabel: configForm.subContainerLabel || undefined,

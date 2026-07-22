@@ -23,16 +23,15 @@ type BehaviorRow = { symptomText: string; careActionDefId: string }
 const emptyBehavior = (): BehaviorRow => ({ symptomText: "", careActionDefId: "" })
 
 function HealthConditionsPage() {
-  const { data: gameData } = trpc.admin.game.get.useQuery()
-  const gameId = gameData?.id
+  const { gameId } = Route.useParams()
 
   const { data: conditions } = trpc.admin.health.list.useQuery(
     { gameId: gameId! },
-    { enabled: !!gameId }
+    {}
   )
   const { data: careActions } = trpc.admin.care.list.useQuery(
     { gameId: gameId! },
-    { enabled: !!gameId }
+    {}
   )
 
   const utils = trpc.useUtils()
@@ -128,8 +127,6 @@ function HealthConditionsPage() {
       careActionDefId: form.careActionDefId || null,
     })
   }
-
-  if (!gameId) return <p className="p-6 text-sm text-muted-foreground">No game configured yet. Set up Game Config first.</p>
 
   if (editing !== null) {
     return (
@@ -421,6 +418,6 @@ function HealthConditionsPage() {
   )
 }
 
-export const Route = createFileRoute("/_authenticated/admin/health-conditions")({
+export const Route = createFileRoute("/_authenticated/admin/games/$gameId/health-conditions")({
   component: HealthConditionsPage,
 })

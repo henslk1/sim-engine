@@ -18,12 +18,11 @@ type LabelRangeRow = { label: string; minValue: string; maxValue: string }
 const emptyRange = (): LabelRangeRow => ({ label: "", minValue: "", maxValue: "" })
 
 function PersonalityTraitsPage() {
-  const { data: gameData } = trpc.admin.game.get.useQuery()
-  const gameId = gameData?.id
+  const { gameId } = Route.useParams()
 
   const { data: traits } = trpc.admin.personality.list.useQuery(
     { gameId: gameId! },
-    { enabled: !!gameId }
+    {}
   )
 
   const utils = trpc.useUtils()
@@ -127,8 +126,6 @@ function PersonalityTraitsPage() {
       }
     )
   }
-
-  if (!gameId) return <p className="p-6 text-sm text-muted-foreground">No game configured yet. Set up Game Config first.</p>
 
   if (editing !== null) {
     return (
@@ -474,6 +471,6 @@ function PersonalityTraitsPage() {
   )
 }
 
-export const Route = createFileRoute("/_authenticated/admin/personality-traits")({
+export const Route = createFileRoute("/_authenticated/admin/games/$gameId/personality-traits")({
   component: PersonalityTraitsPage,
 })

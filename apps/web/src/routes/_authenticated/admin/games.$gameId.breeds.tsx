@@ -80,8 +80,7 @@ type AlleleFreqForm = { alleleId: string; frequency: string }
 const emptyAlleleFreq = (): AlleleFreqForm => ({ alleleId: "", frequency: "" })
 
 function BreedsPage() {
-  const { data: gameData } = trpc.admin.game.get.useQuery()
-  const gameId = gameData?.id
+  const { gameId } = Route.useParams()
 
   const [editing, setEditing] = useState<BreedForm | null>(null)
   const [formExpanded, setFormExpanded] = useState(true)
@@ -99,19 +98,19 @@ function BreedsPage() {
   const [newAlleleFreq, setNewAlleleFreq] = useState<AlleleFreqForm>(emptyAlleleFreq())
 
   const { data: breeds } = trpc.admin.breed.list.useQuery(
-    { gameId: gameId! }, { enabled: !!gameId }
+    { gameId: gameId! }, {}
   )
   const { data: species } = trpc.admin.species.list.useQuery(
-    { gameId: gameId! }, { enabled: !!gameId }
+    { gameId: gameId! }, {}
   )
   const { data: stats } = trpc.admin.stat.list.useQuery(
-    { gameId: gameId! }, { enabled: !!gameId }
+    { gameId: gameId! }, {}
   )
   const { data: loci } = trpc.admin.breed.listLoci.useQuery(
-    { gameId: gameId! }, { enabled: !!gameId }
+    { gameId: gameId! }, {}
   )
   const { data: personalityTraits } = trpc.admin.personality.list.useQuery(
-    { gameId: gameId! }, { enabled: !!gameId }
+    { gameId: gameId! }, {}
   )
   const { data: statProfiles } = trpc.admin.breed.listStatProfiles.useQuery(
     { breedId: editing?.id! }, { enabled: !!editing?.id }
@@ -123,7 +122,7 @@ function BreedsPage() {
     { breedId: editing?.id! }, { enabled: !!editing?.id }
   )
   const { data: alleles } = trpc.admin.breed.listAlleles.useQuery(
-    { gameId: gameId! }, { enabled: !!gameId }
+    { gameId: gameId! }, {}
   )
   const { data: alleleFrequencies } = trpc.admin.breed.listAlleleFrequencies.useQuery(
     { breedId: editing?.id! }, { enabled: !!editing?.id }
@@ -282,8 +281,6 @@ function BreedsPage() {
     }
     return Array.from(map.values())
   })()
-
-  if (!gameId) return <p className="p-6 text-sm text-muted-foreground">No game configured yet. Set up Game Config first.</p>
 
   if (!editing) {
     return (
@@ -868,6 +865,6 @@ function BreedsPage() {
   )
 }
 
-export const Route = createFileRoute("/_authenticated/admin/breeds")({
+export const Route = createFileRoute("/_authenticated/admin/games/$gameId/breeds")({
   component: BreedsPage,
 })

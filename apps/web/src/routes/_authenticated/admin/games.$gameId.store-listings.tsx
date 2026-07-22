@@ -26,12 +26,11 @@ const emptyForm = (): ListingForm => ({
 })
 
 function StoreListingsPage() {
-  const { data: gameData } = trpc.admin.game.get.useQuery()
-  const gameId = gameData?.id
+  const { gameId } = Route.useParams()
 
-  const { data: listings } = trpc.admin.storeListing.list.useQuery({ gameId: gameId! }, { enabled: !!gameId })
-  const { data: items } = trpc.admin.item.list.useQuery({ gameId: gameId! }, { enabled: !!gameId })
-  const { data: currencies } = trpc.admin.currency.list.useQuery({ gameId: gameId! }, { enabled: !!gameId })
+  const { data: listings } = trpc.admin.storeListing.list.useQuery({ gameId: gameId! }, {})
+  const { data: items } = trpc.admin.item.list.useQuery({ gameId: gameId! }, {})
+  const { data: currencies } = trpc.admin.currency.list.useQuery({ gameId: gameId! }, {})
 
   const utils = trpc.useUtils()
   const invalidate = () => utils.admin.storeListing.list.invalidate({ gameId: gameId! })
@@ -55,8 +54,6 @@ function StoreListingsPage() {
       isRotating: form.isRotating,
     })
   }
-
-  if (!gameId) return <p className="p-6 text-sm text-muted-foreground">No game configured yet.</p>
 
   return (
     <div className="p-6 max-w-3xl space-y-6">
@@ -184,6 +181,6 @@ function StoreListingsPage() {
   )
 }
 
-export const Route = createFileRoute("/_authenticated/admin/store-listings")({
+export const Route = createFileRoute("/_authenticated/admin/games/$gameId/store-listings")({
   component: StoreListingsPage,
 })

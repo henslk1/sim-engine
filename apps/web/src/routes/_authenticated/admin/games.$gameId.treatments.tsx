@@ -45,16 +45,15 @@ type RestrictionRow = {
 const emptyRestriction = (): RestrictionRow => ({ restrictionType: "TRAINING", maxIntensityTier: "", durationCycles: "" })
 
 function TreatmentsPage() {
-  const { data: gameData } = trpc.admin.game.get.useQuery()
-  const gameId = gameData?.id
+  const { gameId } = Route.useParams()
 
   const { data: conditions } = trpc.admin.health.list.useQuery(
     { gameId: gameId! },
-    { enabled: !!gameId }
+    {}
   )
   const { data: itemDefs } = trpc.admin.item.list.useQuery(
     { gameId: gameId! },
-    { enabled: !!gameId }
+    {}
   )
 
   const [selectedConditionId, setSelectedConditionId] = useState("")
@@ -198,8 +197,6 @@ function TreatmentsPage() {
       durationCycles: form.durationCycles ? parseInt(form.durationCycles) : null,
     })
   }
-
-  if (!gameId) return <p className="p-6 text-sm text-muted-foreground">No game configured yet. Set up Game Config first.</p>
 
   return (
     <div className="p-6 max-w-3xl space-y-6">
@@ -494,6 +491,6 @@ function TreatmentsPage() {
   )
 }
 
-export const Route = createFileRoute("/_authenticated/admin/treatments")({
+export const Route = createFileRoute("/_authenticated/admin/games/$gameId/treatments")({
   component: TreatmentsPage,
 })

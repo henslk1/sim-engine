@@ -16,12 +16,11 @@ type TierForm = {
 const emptyForm = (): TierForm => ({ name: "", tierIndex: "", minScore: "", advancementThreshold: "", energyCost: "0", entryFee: "0", minWeeklyPoints: "" })
 
 function CompetitionTiersPage() {
-  const { data: gameData } = trpc.admin.game.get.useQuery()
-  const gameId = gameData?.id
+  const { gameId } = Route.useParams()
 
   const { data: disciplines } = trpc.admin.discipline.list.useQuery(
     { gameId: gameId! },
-    { enabled: !!gameId }
+    {}
   )
 
   const [selectedDisciplineId, setSelectedDisciplineId] = useState("")
@@ -32,7 +31,7 @@ function CompetitionTiersPage() {
 
   const { data: currencies } = trpc.admin.currency.list.useQuery(
     { gameId: gameId! },
-    { enabled: !!gameId }
+    {}
   )
   const { data: prizes } = trpc.admin.competitionTier.listPrizes.useQuery(
     { tierDefId: prizeTierId! },
@@ -90,8 +89,6 @@ function CompetitionTiersPage() {
       minWeeklyPointsForInvitational: editing.minWeeklyPoints !== "" ? parseFloat(editing.minWeeklyPoints) : null,
     })
   }
-
-  if (!gameId) return <p className="p-6 text-sm text-muted-foreground">No game configured yet.</p>
 
   return (
     <div className="p-6 max-w-3xl space-y-6">
@@ -368,6 +365,6 @@ function CompetitionTiersPage() {
   )
 }
 
-export const Route = createFileRoute("/_authenticated/admin/competition-tiers")({
+export const Route = createFileRoute("/_authenticated/admin/games/$gameId/competition-tiers")({
   component: CompetitionTiersPage,
 })

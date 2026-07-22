@@ -16,16 +16,15 @@ type WeightRow = { weight: string }
 const emptyWeight = (): WeightRow => ({ weight: "" })
 
 function DisciplinesPage() {
-  const { data: gameData } = trpc.admin.game.get.useQuery()
-  const gameId = gameData?.id
+  const { gameId } = Route.useParams()
 
   const { data: disciplines } = trpc.admin.discipline.list.useQuery(
     { gameId: gameId! },
-    { enabled: !!gameId }
+    {}
   )
-  const { data: stats } = trpc.admin.stat.list.useQuery({ gameId: gameId! }, { enabled: !!gameId })
-  const { data: traits } = trpc.admin.personality.list.useQuery({ gameId: gameId! }, { enabled: !!gameId })
-  const { data: items } = trpc.admin.item.list.useQuery({ gameId: gameId! }, { enabled: !!gameId })
+  const { data: stats } = trpc.admin.stat.list.useQuery({ gameId: gameId! }, {})
+  const { data: traits } = trpc.admin.personality.list.useQuery({ gameId: gameId! }, {})
+  const { data: items } = trpc.admin.item.list.useQuery({ gameId: gameId! }, {})
 
   const utils = trpc.useUtils()
 
@@ -173,8 +172,6 @@ function DisciplinesPage() {
   const availableStats = stats?.filter((s) => !usedStatIds.has(s.id)) ?? []
   const usedTraitIds = new Set(personalityWeights?.map((w) => w.traitDefId) ?? [])
   const availableTraits = traits?.filter((t) => !usedTraitIds.has(t.id)) ?? []
-
-  if (!gameId) return <p className="p-6 text-sm text-muted-foreground">No game configured yet.</p>
 
   if (editing !== null) {
     return (
@@ -573,6 +570,6 @@ function DisciplinesPage() {
   )
 }
 
-export const Route = createFileRoute("/_authenticated/admin/disciplines")({
+export const Route = createFileRoute("/_authenticated/admin/games/$gameId/disciplines")({
   component: DisciplinesPage,
 })

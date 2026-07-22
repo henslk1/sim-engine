@@ -27,24 +27,23 @@ const emptyForm = (): VetServiceForm => ({
 })
 
 function VetServicesPage() {
-  const { data: gameData } = trpc.admin.game.get.useQuery()
-  const gameId = gameData?.id
+  const { gameId } = Route.useParams()
 
   const { data: services } = trpc.admin.vetService.list.useQuery(
     { gameId: gameId! },
-    { enabled: !!gameId }
+    {}
   )
   const { data: currencies } = trpc.admin.currency.list.useQuery(
     { gameId: gameId! },
-    { enabled: !!gameId }
+    {}
   )
   const { data: panels } = trpc.admin.panel.list.useQuery(
     { gameId: gameId! },
-    { enabled: !!gameId }
+    {}
   )
   const { data: allConditions } = trpc.admin.health.list.useQuery(
     { gameId: gameId! },
-    { enabled: !!gameId }
+    {}
   )
 
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -102,8 +101,6 @@ function VetServicesPage() {
       panelDefId: editing.panelDefId || null,
     })
   }
-
-  if (!gameId) return <p className="p-6 text-sm text-muted-foreground">No game configured yet.</p>
 
   return (
     <div className="p-6 max-w-3xl space-y-6">
@@ -292,6 +289,6 @@ function VetServicesPage() {
   )
 }
 
-export const Route = createFileRoute("/_authenticated/admin/vet-services")({
+export const Route = createFileRoute("/_authenticated/admin/games/$gameId/vet-services")({
   component: VetServicesPage,
 })

@@ -2,25 +2,22 @@ import { createFileRoute } from "@tanstack/react-router"
 import { trpc } from "@/lib/trpc"
 import { cn } from "@/lib/utils"
 
-export const Route = createFileRoute("/_authenticated/admin/ops/seasons")({
+export const Route = createFileRoute("/_authenticated/admin/games/$gameId/seasons")({
   component: OpsSeasons,
 })
 
 function OpsSeasons() {
-  const { data: gameData } = trpc.admin.game.get.useQuery()
-  const gameId = gameData?.id
+  const { gameId } = Route.useParams()
 
   const { data: seasons } = trpc.admin.ops.seasons.list.useQuery(
     { gameId: gameId! },
-    { enabled: !!gameId },
+    {},
   )
 
   const { data: competitions } = trpc.admin.ops.seasons.getCompetitions.useQuery(
     { gameId: gameId!, status: "OPEN" },
-    { enabled: !!gameId },
+    {},
   )
-
-  if (!gameId) return <div className="p-6 text-sm text-muted-foreground">No game found.</div>
 
   const now = new Date()
 

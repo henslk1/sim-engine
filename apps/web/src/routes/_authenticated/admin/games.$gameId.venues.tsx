@@ -44,11 +44,10 @@ const emptyDisciplineForm = (): DisciplineForm => ({
 })
 
 function VenuesPage() {
-  const { data: gameData } = trpc.admin.game.get.useQuery()
-  const gameId = gameData?.id
+  const { gameId } = Route.useParams()
 
-  const { data: venues } = trpc.admin.venue.list.useQuery({ gameId: gameId! }, { enabled: !!gameId })
-  const { data: disciplines } = trpc.admin.discipline.list.useQuery({ gameId: gameId! }, { enabled: !!gameId })
+  const { data: venues } = trpc.admin.venue.list.useQuery({ gameId: gameId! }, {})
+  const { data: disciplines } = trpc.admin.discipline.list.useQuery({ gameId: gameId! }, {})
 
   const utils = trpc.useUtils()
   const invalidate = () => utils.admin.venue.list.invalidate({ gameId: gameId! })
@@ -116,8 +115,6 @@ function VenuesPage() {
     setDiscForm(null)
     setEditingDiscId(null)
   }
-
-  if (!gameId) return <p className="p-6 text-sm text-muted-foreground">No game configured yet.</p>
 
   const currentVenue = editing?.venueId ? venues?.find((v) => v.id === editing.venueId) : undefined
 
@@ -320,6 +317,6 @@ function VenuesPage() {
   )
 }
 
-export const Route = createFileRoute("/_authenticated/admin/venues")({
+export const Route = createFileRoute("/_authenticated/admin/games/$gameId/venues")({
   component: VenuesPage,
 })

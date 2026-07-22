@@ -51,12 +51,11 @@ const checkboxFields: [keyof StageForm, string][] = [
 ]
 
 function LifeStagePage() {
-  const { data: gameData } = trpc.admin.game.get.useQuery()
-  const gameId = gameData?.id
+  const { gameId } = Route.useParams()
 
   const { data: stages } = trpc.admin.lifestage.list.useQuery(
     { gameId: gameId! },
-    { enabled: !!gameId }
+    {}
   )
 
   const utils = trpc.useUtils()
@@ -117,8 +116,6 @@ function LifeStagePage() {
   function update(field: keyof StageForm, value: string | number | boolean) {
     setEditing((prev) => prev ? { ...prev, [field]: value } : prev)
   }
-
-  if (!gameId) return <p className="p-6 text-sm text-muted-foreground">No game configured yet. Set up Game Config first.</p>
 
   if (editing) {
     return (
@@ -263,6 +260,6 @@ function LifeStagePage() {
   )
 }
 
-export const Route = createFileRoute("/_authenticated/admin/life-stages")({
+export const Route = createFileRoute("/_authenticated/admin/games/$gameId/life-stages")({
   component: LifeStagePage,
 })

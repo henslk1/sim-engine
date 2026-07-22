@@ -3,7 +3,7 @@ import { trpc } from "@/lib/trpc"
 import { useState } from "react"
 import { cn } from "@/lib/utils"
 
-export const Route = createFileRoute("/_authenticated/admin/ops/economy")({
+export const Route = createFileRoute("/_authenticated/admin/games/$gameId/economy")({
   component: OpsEconomy,
 })
 
@@ -34,24 +34,21 @@ const TXN_TYPE_LABELS: Record<string, string> = {
 }
 
 function OpsEconomy() {
-  const { data: gameData } = trpc.admin.game.get.useQuery()
-  const gameId = gameData?.id
+  const { gameId } = Route.useParams()
   const [txnPlayerSearch, setTxnPlayerSearch] = useState("")
   const [txnTypeFilter, setTxnTypeFilter] = useState("")
 
   const { data: stats } = trpc.admin.ops.economy.stats.useQuery(
     { gameId: gameId! },
-    { enabled: !!gameId },
+    {},
   )
 
   const { data: txnData, fetchNextPage, hasNextPage, isFetchingNextPage } = trpc.admin.ops.economy.transactions.useInfiniteQuery(
     { gameId: gameId!, txnType: txnTypeFilter || undefined, limit: 50 },
-    { enabled: !!gameId, getNextPageParam: (last) => last.nextCursor },
+    { getNextPageParam: (last) => last.nextCursor },
   )
 
   const transactions = txnData?.pages.flatMap(p => p.txns) ?? []
-
-  if (!gameId) return <div className="p-6 text-sm text-muted-foreground">No game found.</div>
 
   return (
     <div className="space-y-6 p-6">

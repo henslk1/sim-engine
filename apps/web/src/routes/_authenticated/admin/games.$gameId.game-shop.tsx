@@ -25,12 +25,11 @@ const emptyForm = (): ShopBreedForm => ({
 })
 
 function GameShopPage() {
-  const { data: gameData } = trpc.admin.game.get.useQuery()
-  const gameId = gameData?.id
+  const { gameId } = Route.useParams()
 
-  const { data: configs } = trpc.admin.gameShop.list.useQuery({ gameId: gameId! }, { enabled: !!gameId })
-  const { data: breeds } = trpc.admin.breed.list.useQuery({ gameId: gameId! }, { enabled: !!gameId })
-  const { data: currencies } = trpc.admin.currency.list.useQuery({ gameId: gameId! }, { enabled: !!gameId })
+  const { data: configs } = trpc.admin.gameShop.list.useQuery({ gameId: gameId! }, {})
+  const { data: breeds } = trpc.admin.breed.list.useQuery({ gameId: gameId! }, {})
+  const { data: currencies } = trpc.admin.currency.list.useQuery({ gameId: gameId! }, {})
 
   const utils = trpc.useUtils()
   const invalidate = () => utils.admin.gameShop.list.invalidate({ gameId: gameId! })
@@ -57,8 +56,6 @@ function GameShopPage() {
       isActive: form.isActive,
     })
   }
-
-  if (!gameId) return <p className="p-6 text-sm text-muted-foreground">No game configured yet.</p>
 
   return (
     <div className="p-6 max-w-3xl space-y-6">
@@ -214,6 +211,6 @@ function GameShopPage() {
   )
 }
 
-export const Route = createFileRoute("/_authenticated/admin/game-shop")({
+export const Route = createFileRoute("/_authenticated/admin/games/$gameId/game-shop")({
   component: GameShopPage,
 })

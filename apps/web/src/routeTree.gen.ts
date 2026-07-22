@@ -25,73 +25,57 @@ import { Route as AuthenticatedVenueVenueIdRouteImport } from './routes/_authent
 import { Route as AuthenticatedCompetitionCompetitionIdRouteImport } from './routes/_authenticated/competition.$competitionId'
 import { Route as AuthenticatedBreedingOfferIdRouteImport } from './routes/_authenticated/breeding/$offerId'
 import { Route as AuthenticatedAnimalAnimalIdRouteImport } from './routes/_authenticated/animal/$animalId'
-import { Route as AuthenticatedAdminVetServicesRouteImport } from './routes/_authenticated/admin/vet-services'
-import { Route as AuthenticatedAdminVenuesRouteImport } from './routes/_authenticated/admin/venues'
-import { Route as AuthenticatedAdminTutorialStepsRouteImport } from './routes/_authenticated/admin/tutorial-steps'
-import { Route as AuthenticatedAdminTreatmentsRouteImport } from './routes/_authenticated/admin/treatments'
-import { Route as AuthenticatedAdminTrainingActionsRouteImport } from './routes/_authenticated/admin/training-actions'
-import { Route as AuthenticatedAdminTitlesRouteImport } from './routes/_authenticated/admin/titles'
 import { Route as AuthenticatedAdminSystemRouteImport } from './routes/_authenticated/admin/system'
 import { Route as AuthenticatedAdminSupportRouteImport } from './routes/_authenticated/admin/support'
-import { Route as AuthenticatedAdminStoreListingsRouteImport } from './routes/_authenticated/admin/store-listings'
-import { Route as AuthenticatedAdminStatsRouteImport } from './routes/_authenticated/admin/stats'
-import { Route as AuthenticatedAdminStageActivitiesRouteImport } from './routes/_authenticated/admin/stage-activities'
-import { Route as AuthenticatedAdminSpeciesRouteImport } from './routes/_authenticated/admin/species'
-import { Route as AuthenticatedAdminSeasonCategoriesRouteImport } from './routes/_authenticated/admin/season-categories'
-import { Route as AuthenticatedAdminRecordsRouteImport } from './routes/_authenticated/admin/records'
 import { Route as AuthenticatedAdminPlayersRouteImport } from './routes/_authenticated/admin/players'
-import { Route as AuthenticatedAdminPersonalityTraitsRouteImport } from './routes/_authenticated/admin/personality-traits'
-import { Route as AuthenticatedAdminNotificationTopicsRouteImport } from './routes/_authenticated/admin/notification-topics'
 import { Route as AuthenticatedAdminModerationRouteImport } from './routes/_authenticated/admin/moderation'
-import { Route as AuthenticatedAdminLociRouteImport } from './routes/_authenticated/admin/loci'
-import { Route as AuthenticatedAdminLifeStagesRouteImport } from './routes/_authenticated/admin/life-stages'
-import { Route as AuthenticatedAdminItemsRouteImport } from './routes/_authenticated/admin/items'
-import { Route as AuthenticatedAdminIntensityTiersRouteImport } from './routes/_authenticated/admin/intensity-tiers'
 import { Route as AuthenticatedAdminIntegrityRouteImport } from './routes/_authenticated/admin/integrity'
-import { Route as AuthenticatedAdminHealthConditionsRouteImport } from './routes/_authenticated/admin/health-conditions'
-import { Route as AuthenticatedAdminHealthCertificatesRouteImport } from './routes/_authenticated/admin/health-certificates'
-import { Route as AuthenticatedAdminGroupPrestigeTiersRouteImport } from './routes/_authenticated/admin/group-prestige-tiers'
-import { Route as AuthenticatedAdminGeneticPanelsRouteImport } from './routes/_authenticated/admin/genetic-panels'
-import { Route as AuthenticatedAdminGameShopRouteImport } from './routes/_authenticated/admin/game-shop'
-import { Route as AuthenticatedAdminGameConfigRouteImport } from './routes/_authenticated/admin/game-config'
-import { Route as AuthenticatedAdminExpressionRulesRouteImport } from './routes/_authenticated/admin/expression-rules'
-import { Route as AuthenticatedAdminDisciplinesRouteImport } from './routes/_authenticated/admin/disciplines'
-import { Route as AuthenticatedAdminDirectoryFiltersRouteImport } from './routes/_authenticated/admin/directory-filters'
-import { Route as AuthenticatedAdminCurrenciesRouteImport } from './routes/_authenticated/admin/currencies'
-import { Route as AuthenticatedAdminConformationSectionsRouteImport } from './routes/_authenticated/admin/conformation-sections'
-import { Route as AuthenticatedAdminCompetitionTiersRouteImport } from './routes/_authenticated/admin/competition-tiers'
-import { Route as AuthenticatedAdminCareActionsRouteImport } from './routes/_authenticated/admin/care-actions'
 import { Route as AuthenticatedAdminBugsRouteImport } from './routes/_authenticated/admin/bugs'
 import { Route as AuthenticatedAdminBroadcastRouteImport } from './routes/_authenticated/admin/broadcast'
-import { Route as AuthenticatedAdminBreedsRouteImport } from './routes/_authenticated/admin/breeds'
 import { Route as AuthenticatedAdminAuditRouteImport } from './routes/_authenticated/admin/audit'
 import { Route as AuthenticatedAdminSupportIndexRouteImport } from './routes/_authenticated/admin/support.index'
 import { Route as AuthenticatedAdminPlayersIndexRouteImport } from './routes/_authenticated/admin/players.index'
 import { Route as AuthenticatedAdminBugsIndexRouteImport } from './routes/_authenticated/admin/bugs.index'
 import { Route as AuthenticatedAdminSupportTicketIdRouteImport } from './routes/_authenticated/admin/support.$ticketId'
 import { Route as AuthenticatedAdminPlayersPlayerIdRouteImport } from './routes/_authenticated/admin/players.$playerId'
-import { Route as AuthenticatedAdminOpsSeasonsRouteImport } from './routes/_authenticated/admin/ops/seasons'
-import { Route as AuthenticatedAdminOpsEventsRouteImport } from './routes/_authenticated/admin/ops/events'
-import { Route as AuthenticatedAdminOpsEconomyRouteImport } from './routes/_authenticated/admin/ops/economy'
 import { Route as AuthenticatedAdminGamesGameIdRouteImport } from './routes/_authenticated/admin/games.$gameId'
 import { Route as AuthenticatedAdminBugsBugIdRouteImport } from './routes/_authenticated/admin/bugs.$bugId'
 import { Route as AuthenticatedAdminGamesGameIdIndexRouteImport } from './routes/_authenticated/admin/games.$gameId.index'
+import { Route as AuthenticatedAdminGamesGameIdVetServicesRouteImport } from './routes/_authenticated/admin/games.$gameId.vet-services'
+import { Route as AuthenticatedAdminGamesGameIdVenuesRouteImport } from './routes/_authenticated/admin/games.$gameId.venues'
 import { Route as AuthenticatedAdminGamesGameIdTutorialStepsRouteImport } from './routes/_authenticated/admin/games.$gameId.tutorial-steps'
+import { Route as AuthenticatedAdminGamesGameIdTreatmentsRouteImport } from './routes/_authenticated/admin/games.$gameId.treatments'
 import { Route as AuthenticatedAdminGamesGameIdTrainingActionsRouteImport } from './routes/_authenticated/admin/games.$gameId.training-actions'
 import { Route as AuthenticatedAdminGamesGameIdTitlesRouteImport } from './routes/_authenticated/admin/games.$gameId.titles'
+import { Route as AuthenticatedAdminGamesGameIdStoreListingsRouteImport } from './routes/_authenticated/admin/games.$gameId.store-listings'
 import { Route as AuthenticatedAdminGamesGameIdStatsRouteImport } from './routes/_authenticated/admin/games.$gameId.stats'
 import { Route as AuthenticatedAdminGamesGameIdStageActivitiesRouteImport } from './routes/_authenticated/admin/games.$gameId.stage-activities'
 import { Route as AuthenticatedAdminGamesGameIdSpeciesRouteImport } from './routes/_authenticated/admin/games.$gameId.species'
+import { Route as AuthenticatedAdminGamesGameIdSeasonsRouteImport } from './routes/_authenticated/admin/games.$gameId.seasons'
 import { Route as AuthenticatedAdminGamesGameIdSeasonCategoriesRouteImport } from './routes/_authenticated/admin/games.$gameId.season-categories'
 import { Route as AuthenticatedAdminGamesGameIdRecordsRouteImport } from './routes/_authenticated/admin/games.$gameId.records'
+import { Route as AuthenticatedAdminGamesGameIdPersonalityTraitsRouteImport } from './routes/_authenticated/admin/games.$gameId.personality-traits'
 import { Route as AuthenticatedAdminGamesGameIdNotificationTopicsRouteImport } from './routes/_authenticated/admin/games.$gameId.notification-topics'
+import { Route as AuthenticatedAdminGamesGameIdLociRouteImport } from './routes/_authenticated/admin/games.$gameId.loci'
+import { Route as AuthenticatedAdminGamesGameIdLifeStagesRouteImport } from './routes/_authenticated/admin/games.$gameId.life-stages'
 import { Route as AuthenticatedAdminGamesGameIdItemsRouteImport } from './routes/_authenticated/admin/games.$gameId.items'
 import { Route as AuthenticatedAdminGamesGameIdIntensityTiersRouteImport } from './routes/_authenticated/admin/games.$gameId.intensity-tiers'
+import { Route as AuthenticatedAdminGamesGameIdHealthConditionsRouteImport } from './routes/_authenticated/admin/games.$gameId.health-conditions'
 import { Route as AuthenticatedAdminGamesGameIdHealthCertificatesRouteImport } from './routes/_authenticated/admin/games.$gameId.health-certificates'
 import { Route as AuthenticatedAdminGamesGameIdGroupPrestigeTiersRouteImport } from './routes/_authenticated/admin/games.$gameId.group-prestige-tiers'
+import { Route as AuthenticatedAdminGamesGameIdGeneticPanelsRouteImport } from './routes/_authenticated/admin/games.$gameId.genetic-panels'
+import { Route as AuthenticatedAdminGamesGameIdGameShopRouteImport } from './routes/_authenticated/admin/games.$gameId.game-shop'
+import { Route as AuthenticatedAdminGamesGameIdExpressionRulesRouteImport } from './routes/_authenticated/admin/games.$gameId.expression-rules'
+import { Route as AuthenticatedAdminGamesGameIdEventsRouteImport } from './routes/_authenticated/admin/games.$gameId.events'
+import { Route as AuthenticatedAdminGamesGameIdEconomyRouteImport } from './routes/_authenticated/admin/games.$gameId.economy'
+import { Route as AuthenticatedAdminGamesGameIdDisciplinesRouteImport } from './routes/_authenticated/admin/games.$gameId.disciplines'
 import { Route as AuthenticatedAdminGamesGameIdDirectoryFiltersRouteImport } from './routes/_authenticated/admin/games.$gameId.directory-filters'
 import { Route as AuthenticatedAdminGamesGameIdCurrenciesRouteImport } from './routes/_authenticated/admin/games.$gameId.currencies'
 import { Route as AuthenticatedAdminGamesGameIdConformationSectionsRouteImport } from './routes/_authenticated/admin/games.$gameId.conformation-sections'
+import { Route as AuthenticatedAdminGamesGameIdConfigRouteImport } from './routes/_authenticated/admin/games.$gameId.config'
+import { Route as AuthenticatedAdminGamesGameIdCompetitionTiersRouteImport } from './routes/_authenticated/admin/games.$gameId.competition-tiers'
+import { Route as AuthenticatedAdminGamesGameIdCareActionsRouteImport } from './routes/_authenticated/admin/games.$gameId.care-actions'
+import { Route as AuthenticatedAdminGamesGameIdBreedsRouteImport } from './routes/_authenticated/admin/games.$gameId.breeds'
 
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
@@ -176,42 +160,6 @@ const AuthenticatedAnimalAnimalIdRoute =
     path: '/animal/$animalId',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedAdminVetServicesRoute =
-  AuthenticatedAdminVetServicesRouteImport.update({
-    id: '/vet-services',
-    path: '/vet-services',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
-const AuthenticatedAdminVenuesRoute =
-  AuthenticatedAdminVenuesRouteImport.update({
-    id: '/venues',
-    path: '/venues',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
-const AuthenticatedAdminTutorialStepsRoute =
-  AuthenticatedAdminTutorialStepsRouteImport.update({
-    id: '/tutorial-steps',
-    path: '/tutorial-steps',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
-const AuthenticatedAdminTreatmentsRoute =
-  AuthenticatedAdminTreatmentsRouteImport.update({
-    id: '/treatments',
-    path: '/treatments',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
-const AuthenticatedAdminTrainingActionsRoute =
-  AuthenticatedAdminTrainingActionsRouteImport.update({
-    id: '/training-actions',
-    path: '/training-actions',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
-const AuthenticatedAdminTitlesRoute =
-  AuthenticatedAdminTitlesRouteImport.update({
-    id: '/titles',
-    path: '/titles',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
 const AuthenticatedAdminSystemRoute =
   AuthenticatedAdminSystemRouteImport.update({
     id: '/system',
@@ -224,57 +172,10 @@ const AuthenticatedAdminSupportRoute =
     path: '/support',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
-const AuthenticatedAdminStoreListingsRoute =
-  AuthenticatedAdminStoreListingsRouteImport.update({
-    id: '/store-listings',
-    path: '/store-listings',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
-const AuthenticatedAdminStatsRoute = AuthenticatedAdminStatsRouteImport.update({
-  id: '/stats',
-  path: '/stats',
-  getParentRoute: () => AuthenticatedAdminRoute,
-} as any)
-const AuthenticatedAdminStageActivitiesRoute =
-  AuthenticatedAdminStageActivitiesRouteImport.update({
-    id: '/stage-activities',
-    path: '/stage-activities',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
-const AuthenticatedAdminSpeciesRoute =
-  AuthenticatedAdminSpeciesRouteImport.update({
-    id: '/species',
-    path: '/species',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
-const AuthenticatedAdminSeasonCategoriesRoute =
-  AuthenticatedAdminSeasonCategoriesRouteImport.update({
-    id: '/season-categories',
-    path: '/season-categories',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
-const AuthenticatedAdminRecordsRoute =
-  AuthenticatedAdminRecordsRouteImport.update({
-    id: '/records',
-    path: '/records',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
 const AuthenticatedAdminPlayersRoute =
   AuthenticatedAdminPlayersRouteImport.update({
     id: '/players',
     path: '/players',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
-const AuthenticatedAdminPersonalityTraitsRoute =
-  AuthenticatedAdminPersonalityTraitsRouteImport.update({
-    id: '/personality-traits',
-    path: '/personality-traits',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
-const AuthenticatedAdminNotificationTopicsRoute =
-  AuthenticatedAdminNotificationTopicsRouteImport.update({
-    id: '/notification-topics',
-    path: '/notification-topics',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
 const AuthenticatedAdminModerationRoute =
@@ -283,110 +184,10 @@ const AuthenticatedAdminModerationRoute =
     path: '/moderation',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
-const AuthenticatedAdminLociRoute = AuthenticatedAdminLociRouteImport.update({
-  id: '/loci',
-  path: '/loci',
-  getParentRoute: () => AuthenticatedAdminRoute,
-} as any)
-const AuthenticatedAdminLifeStagesRoute =
-  AuthenticatedAdminLifeStagesRouteImport.update({
-    id: '/life-stages',
-    path: '/life-stages',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
-const AuthenticatedAdminItemsRoute = AuthenticatedAdminItemsRouteImport.update({
-  id: '/items',
-  path: '/items',
-  getParentRoute: () => AuthenticatedAdminRoute,
-} as any)
-const AuthenticatedAdminIntensityTiersRoute =
-  AuthenticatedAdminIntensityTiersRouteImport.update({
-    id: '/intensity-tiers',
-    path: '/intensity-tiers',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
 const AuthenticatedAdminIntegrityRoute =
   AuthenticatedAdminIntegrityRouteImport.update({
     id: '/integrity',
     path: '/integrity',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
-const AuthenticatedAdminHealthConditionsRoute =
-  AuthenticatedAdminHealthConditionsRouteImport.update({
-    id: '/health-conditions',
-    path: '/health-conditions',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
-const AuthenticatedAdminHealthCertificatesRoute =
-  AuthenticatedAdminHealthCertificatesRouteImport.update({
-    id: '/health-certificates',
-    path: '/health-certificates',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
-const AuthenticatedAdminGroupPrestigeTiersRoute =
-  AuthenticatedAdminGroupPrestigeTiersRouteImport.update({
-    id: '/group-prestige-tiers',
-    path: '/group-prestige-tiers',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
-const AuthenticatedAdminGeneticPanelsRoute =
-  AuthenticatedAdminGeneticPanelsRouteImport.update({
-    id: '/genetic-panels',
-    path: '/genetic-panels',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
-const AuthenticatedAdminGameShopRoute =
-  AuthenticatedAdminGameShopRouteImport.update({
-    id: '/game-shop',
-    path: '/game-shop',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
-const AuthenticatedAdminGameConfigRoute =
-  AuthenticatedAdminGameConfigRouteImport.update({
-    id: '/game-config',
-    path: '/game-config',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
-const AuthenticatedAdminExpressionRulesRoute =
-  AuthenticatedAdminExpressionRulesRouteImport.update({
-    id: '/expression-rules',
-    path: '/expression-rules',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
-const AuthenticatedAdminDisciplinesRoute =
-  AuthenticatedAdminDisciplinesRouteImport.update({
-    id: '/disciplines',
-    path: '/disciplines',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
-const AuthenticatedAdminDirectoryFiltersRoute =
-  AuthenticatedAdminDirectoryFiltersRouteImport.update({
-    id: '/directory-filters',
-    path: '/directory-filters',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
-const AuthenticatedAdminCurrenciesRoute =
-  AuthenticatedAdminCurrenciesRouteImport.update({
-    id: '/currencies',
-    path: '/currencies',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
-const AuthenticatedAdminConformationSectionsRoute =
-  AuthenticatedAdminConformationSectionsRouteImport.update({
-    id: '/conformation-sections',
-    path: '/conformation-sections',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
-const AuthenticatedAdminCompetitionTiersRoute =
-  AuthenticatedAdminCompetitionTiersRouteImport.update({
-    id: '/competition-tiers',
-    path: '/competition-tiers',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
-const AuthenticatedAdminCareActionsRoute =
-  AuthenticatedAdminCareActionsRouteImport.update({
-    id: '/care-actions',
-    path: '/care-actions',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
 const AuthenticatedAdminBugsRoute = AuthenticatedAdminBugsRouteImport.update({
@@ -398,12 +199,6 @@ const AuthenticatedAdminBroadcastRoute =
   AuthenticatedAdminBroadcastRouteImport.update({
     id: '/broadcast',
     path: '/broadcast',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
-const AuthenticatedAdminBreedsRoute =
-  AuthenticatedAdminBreedsRouteImport.update({
-    id: '/breeds',
-    path: '/breeds',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
 const AuthenticatedAdminAuditRoute = AuthenticatedAdminAuditRouteImport.update({
@@ -441,24 +236,6 @@ const AuthenticatedAdminPlayersPlayerIdRoute =
     path: '/$playerId',
     getParentRoute: () => AuthenticatedAdminPlayersRoute,
   } as any)
-const AuthenticatedAdminOpsSeasonsRoute =
-  AuthenticatedAdminOpsSeasonsRouteImport.update({
-    id: '/ops/seasons',
-    path: '/ops/seasons',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
-const AuthenticatedAdminOpsEventsRoute =
-  AuthenticatedAdminOpsEventsRouteImport.update({
-    id: '/ops/events',
-    path: '/ops/events',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
-const AuthenticatedAdminOpsEconomyRoute =
-  AuthenticatedAdminOpsEconomyRouteImport.update({
-    id: '/ops/economy',
-    path: '/ops/economy',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
 const AuthenticatedAdminGamesGameIdRoute =
   AuthenticatedAdminGamesGameIdRouteImport.update({
     id: '/games/$gameId',
@@ -477,10 +254,28 @@ const AuthenticatedAdminGamesGameIdIndexRoute =
     path: '/',
     getParentRoute: () => AuthenticatedAdminGamesGameIdRoute,
   } as any)
+const AuthenticatedAdminGamesGameIdVetServicesRoute =
+  AuthenticatedAdminGamesGameIdVetServicesRouteImport.update({
+    id: '/vet-services',
+    path: '/vet-services',
+    getParentRoute: () => AuthenticatedAdminGamesGameIdRoute,
+  } as any)
+const AuthenticatedAdminGamesGameIdVenuesRoute =
+  AuthenticatedAdminGamesGameIdVenuesRouteImport.update({
+    id: '/venues',
+    path: '/venues',
+    getParentRoute: () => AuthenticatedAdminGamesGameIdRoute,
+  } as any)
 const AuthenticatedAdminGamesGameIdTutorialStepsRoute =
   AuthenticatedAdminGamesGameIdTutorialStepsRouteImport.update({
     id: '/tutorial-steps',
     path: '/tutorial-steps',
+    getParentRoute: () => AuthenticatedAdminGamesGameIdRoute,
+  } as any)
+const AuthenticatedAdminGamesGameIdTreatmentsRoute =
+  AuthenticatedAdminGamesGameIdTreatmentsRouteImport.update({
+    id: '/treatments',
+    path: '/treatments',
     getParentRoute: () => AuthenticatedAdminGamesGameIdRoute,
   } as any)
 const AuthenticatedAdminGamesGameIdTrainingActionsRoute =
@@ -493,6 +288,12 @@ const AuthenticatedAdminGamesGameIdTitlesRoute =
   AuthenticatedAdminGamesGameIdTitlesRouteImport.update({
     id: '/titles',
     path: '/titles',
+    getParentRoute: () => AuthenticatedAdminGamesGameIdRoute,
+  } as any)
+const AuthenticatedAdminGamesGameIdStoreListingsRoute =
+  AuthenticatedAdminGamesGameIdStoreListingsRouteImport.update({
+    id: '/store-listings',
+    path: '/store-listings',
     getParentRoute: () => AuthenticatedAdminGamesGameIdRoute,
   } as any)
 const AuthenticatedAdminGamesGameIdStatsRoute =
@@ -513,6 +314,12 @@ const AuthenticatedAdminGamesGameIdSpeciesRoute =
     path: '/species',
     getParentRoute: () => AuthenticatedAdminGamesGameIdRoute,
   } as any)
+const AuthenticatedAdminGamesGameIdSeasonsRoute =
+  AuthenticatedAdminGamesGameIdSeasonsRouteImport.update({
+    id: '/seasons',
+    path: '/seasons',
+    getParentRoute: () => AuthenticatedAdminGamesGameIdRoute,
+  } as any)
 const AuthenticatedAdminGamesGameIdSeasonCategoriesRoute =
   AuthenticatedAdminGamesGameIdSeasonCategoriesRouteImport.update({
     id: '/season-categories',
@@ -525,10 +332,28 @@ const AuthenticatedAdminGamesGameIdRecordsRoute =
     path: '/records',
     getParentRoute: () => AuthenticatedAdminGamesGameIdRoute,
   } as any)
+const AuthenticatedAdminGamesGameIdPersonalityTraitsRoute =
+  AuthenticatedAdminGamesGameIdPersonalityTraitsRouteImport.update({
+    id: '/personality-traits',
+    path: '/personality-traits',
+    getParentRoute: () => AuthenticatedAdminGamesGameIdRoute,
+  } as any)
 const AuthenticatedAdminGamesGameIdNotificationTopicsRoute =
   AuthenticatedAdminGamesGameIdNotificationTopicsRouteImport.update({
     id: '/notification-topics',
     path: '/notification-topics',
+    getParentRoute: () => AuthenticatedAdminGamesGameIdRoute,
+  } as any)
+const AuthenticatedAdminGamesGameIdLociRoute =
+  AuthenticatedAdminGamesGameIdLociRouteImport.update({
+    id: '/loci',
+    path: '/loci',
+    getParentRoute: () => AuthenticatedAdminGamesGameIdRoute,
+  } as any)
+const AuthenticatedAdminGamesGameIdLifeStagesRoute =
+  AuthenticatedAdminGamesGameIdLifeStagesRouteImport.update({
+    id: '/life-stages',
+    path: '/life-stages',
     getParentRoute: () => AuthenticatedAdminGamesGameIdRoute,
   } as any)
 const AuthenticatedAdminGamesGameIdItemsRoute =
@@ -543,6 +368,12 @@ const AuthenticatedAdminGamesGameIdIntensityTiersRoute =
     path: '/intensity-tiers',
     getParentRoute: () => AuthenticatedAdminGamesGameIdRoute,
   } as any)
+const AuthenticatedAdminGamesGameIdHealthConditionsRoute =
+  AuthenticatedAdminGamesGameIdHealthConditionsRouteImport.update({
+    id: '/health-conditions',
+    path: '/health-conditions',
+    getParentRoute: () => AuthenticatedAdminGamesGameIdRoute,
+  } as any)
 const AuthenticatedAdminGamesGameIdHealthCertificatesRoute =
   AuthenticatedAdminGamesGameIdHealthCertificatesRouteImport.update({
     id: '/health-certificates',
@@ -553,6 +384,42 @@ const AuthenticatedAdminGamesGameIdGroupPrestigeTiersRoute =
   AuthenticatedAdminGamesGameIdGroupPrestigeTiersRouteImport.update({
     id: '/group-prestige-tiers',
     path: '/group-prestige-tiers',
+    getParentRoute: () => AuthenticatedAdminGamesGameIdRoute,
+  } as any)
+const AuthenticatedAdminGamesGameIdGeneticPanelsRoute =
+  AuthenticatedAdminGamesGameIdGeneticPanelsRouteImport.update({
+    id: '/genetic-panels',
+    path: '/genetic-panels',
+    getParentRoute: () => AuthenticatedAdminGamesGameIdRoute,
+  } as any)
+const AuthenticatedAdminGamesGameIdGameShopRoute =
+  AuthenticatedAdminGamesGameIdGameShopRouteImport.update({
+    id: '/game-shop',
+    path: '/game-shop',
+    getParentRoute: () => AuthenticatedAdminGamesGameIdRoute,
+  } as any)
+const AuthenticatedAdminGamesGameIdExpressionRulesRoute =
+  AuthenticatedAdminGamesGameIdExpressionRulesRouteImport.update({
+    id: '/expression-rules',
+    path: '/expression-rules',
+    getParentRoute: () => AuthenticatedAdminGamesGameIdRoute,
+  } as any)
+const AuthenticatedAdminGamesGameIdEventsRoute =
+  AuthenticatedAdminGamesGameIdEventsRouteImport.update({
+    id: '/events',
+    path: '/events',
+    getParentRoute: () => AuthenticatedAdminGamesGameIdRoute,
+  } as any)
+const AuthenticatedAdminGamesGameIdEconomyRoute =
+  AuthenticatedAdminGamesGameIdEconomyRouteImport.update({
+    id: '/economy',
+    path: '/economy',
+    getParentRoute: () => AuthenticatedAdminGamesGameIdRoute,
+  } as any)
+const AuthenticatedAdminGamesGameIdDisciplinesRoute =
+  AuthenticatedAdminGamesGameIdDisciplinesRouteImport.update({
+    id: '/disciplines',
+    path: '/disciplines',
     getParentRoute: () => AuthenticatedAdminGamesGameIdRoute,
   } as any)
 const AuthenticatedAdminGamesGameIdDirectoryFiltersRoute =
@@ -573,6 +440,30 @@ const AuthenticatedAdminGamesGameIdConformationSectionsRoute =
     path: '/conformation-sections',
     getParentRoute: () => AuthenticatedAdminGamesGameIdRoute,
   } as any)
+const AuthenticatedAdminGamesGameIdConfigRoute =
+  AuthenticatedAdminGamesGameIdConfigRouteImport.update({
+    id: '/config',
+    path: '/config',
+    getParentRoute: () => AuthenticatedAdminGamesGameIdRoute,
+  } as any)
+const AuthenticatedAdminGamesGameIdCompetitionTiersRoute =
+  AuthenticatedAdminGamesGameIdCompetitionTiersRouteImport.update({
+    id: '/competition-tiers',
+    path: '/competition-tiers',
+    getParentRoute: () => AuthenticatedAdminGamesGameIdRoute,
+  } as any)
+const AuthenticatedAdminGamesGameIdCareActionsRoute =
+  AuthenticatedAdminGamesGameIdCareActionsRouteImport.update({
+    id: '/care-actions',
+    path: '/care-actions',
+    getParentRoute: () => AuthenticatedAdminGamesGameIdRoute,
+  } as any)
+const AuthenticatedAdminGamesGameIdBreedsRoute =
+  AuthenticatedAdminGamesGameIdBreedsRouteImport.update({
+    id: '/breeds',
+    path: '/breeds',
+    getParentRoute: () => AuthenticatedAdminGamesGameIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
@@ -586,45 +477,13 @@ export interface FileRoutesByFullPath {
   '/venues': typeof AuthenticatedVenuesRoute
   '/vet': typeof AuthenticatedVetRoute
   '/admin/audit': typeof AuthenticatedAdminAuditRoute
-  '/admin/breeds': typeof AuthenticatedAdminBreedsRoute
   '/admin/broadcast': typeof AuthenticatedAdminBroadcastRoute
   '/admin/bugs': typeof AuthenticatedAdminBugsRouteWithChildren
-  '/admin/care-actions': typeof AuthenticatedAdminCareActionsRoute
-  '/admin/competition-tiers': typeof AuthenticatedAdminCompetitionTiersRoute
-  '/admin/conformation-sections': typeof AuthenticatedAdminConformationSectionsRoute
-  '/admin/currencies': typeof AuthenticatedAdminCurrenciesRoute
-  '/admin/directory-filters': typeof AuthenticatedAdminDirectoryFiltersRoute
-  '/admin/disciplines': typeof AuthenticatedAdminDisciplinesRoute
-  '/admin/expression-rules': typeof AuthenticatedAdminExpressionRulesRoute
-  '/admin/game-config': typeof AuthenticatedAdminGameConfigRoute
-  '/admin/game-shop': typeof AuthenticatedAdminGameShopRoute
-  '/admin/genetic-panels': typeof AuthenticatedAdminGeneticPanelsRoute
-  '/admin/group-prestige-tiers': typeof AuthenticatedAdminGroupPrestigeTiersRoute
-  '/admin/health-certificates': typeof AuthenticatedAdminHealthCertificatesRoute
-  '/admin/health-conditions': typeof AuthenticatedAdminHealthConditionsRoute
   '/admin/integrity': typeof AuthenticatedAdminIntegrityRoute
-  '/admin/intensity-tiers': typeof AuthenticatedAdminIntensityTiersRoute
-  '/admin/items': typeof AuthenticatedAdminItemsRoute
-  '/admin/life-stages': typeof AuthenticatedAdminLifeStagesRoute
-  '/admin/loci': typeof AuthenticatedAdminLociRoute
   '/admin/moderation': typeof AuthenticatedAdminModerationRoute
-  '/admin/notification-topics': typeof AuthenticatedAdminNotificationTopicsRoute
-  '/admin/personality-traits': typeof AuthenticatedAdminPersonalityTraitsRoute
   '/admin/players': typeof AuthenticatedAdminPlayersRouteWithChildren
-  '/admin/records': typeof AuthenticatedAdminRecordsRoute
-  '/admin/season-categories': typeof AuthenticatedAdminSeasonCategoriesRoute
-  '/admin/species': typeof AuthenticatedAdminSpeciesRoute
-  '/admin/stage-activities': typeof AuthenticatedAdminStageActivitiesRoute
-  '/admin/stats': typeof AuthenticatedAdminStatsRoute
-  '/admin/store-listings': typeof AuthenticatedAdminStoreListingsRoute
   '/admin/support': typeof AuthenticatedAdminSupportRouteWithChildren
   '/admin/system': typeof AuthenticatedAdminSystemRoute
-  '/admin/titles': typeof AuthenticatedAdminTitlesRoute
-  '/admin/training-actions': typeof AuthenticatedAdminTrainingActionsRoute
-  '/admin/treatments': typeof AuthenticatedAdminTreatmentsRoute
-  '/admin/tutorial-steps': typeof AuthenticatedAdminTutorialStepsRoute
-  '/admin/venues': typeof AuthenticatedAdminVenuesRoute
-  '/admin/vet-services': typeof AuthenticatedAdminVetServicesRoute
   '/animal/$animalId': typeof AuthenticatedAnimalAnimalIdRoute
   '/breeding/$offerId': typeof AuthenticatedBreedingOfferIdRoute
   '/competition/$competitionId': typeof AuthenticatedCompetitionCompetitionIdRoute
@@ -632,30 +491,46 @@ export interface FileRoutesByFullPath {
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/admin/bugs/$bugId': typeof AuthenticatedAdminBugsBugIdRoute
   '/admin/games/$gameId': typeof AuthenticatedAdminGamesGameIdRouteWithChildren
-  '/admin/ops/economy': typeof AuthenticatedAdminOpsEconomyRoute
-  '/admin/ops/events': typeof AuthenticatedAdminOpsEventsRoute
-  '/admin/ops/seasons': typeof AuthenticatedAdminOpsSeasonsRoute
   '/admin/players/$playerId': typeof AuthenticatedAdminPlayersPlayerIdRoute
   '/admin/support/$ticketId': typeof AuthenticatedAdminSupportTicketIdRoute
   '/admin/bugs/': typeof AuthenticatedAdminBugsIndexRoute
   '/admin/players/': typeof AuthenticatedAdminPlayersIndexRoute
   '/admin/support/': typeof AuthenticatedAdminSupportIndexRoute
+  '/admin/games/$gameId/breeds': typeof AuthenticatedAdminGamesGameIdBreedsRoute
+  '/admin/games/$gameId/care-actions': typeof AuthenticatedAdminGamesGameIdCareActionsRoute
+  '/admin/games/$gameId/competition-tiers': typeof AuthenticatedAdminGamesGameIdCompetitionTiersRoute
+  '/admin/games/$gameId/config': typeof AuthenticatedAdminGamesGameIdConfigRoute
   '/admin/games/$gameId/conformation-sections': typeof AuthenticatedAdminGamesGameIdConformationSectionsRoute
   '/admin/games/$gameId/currencies': typeof AuthenticatedAdminGamesGameIdCurrenciesRoute
   '/admin/games/$gameId/directory-filters': typeof AuthenticatedAdminGamesGameIdDirectoryFiltersRoute
+  '/admin/games/$gameId/disciplines': typeof AuthenticatedAdminGamesGameIdDisciplinesRoute
+  '/admin/games/$gameId/economy': typeof AuthenticatedAdminGamesGameIdEconomyRoute
+  '/admin/games/$gameId/events': typeof AuthenticatedAdminGamesGameIdEventsRoute
+  '/admin/games/$gameId/expression-rules': typeof AuthenticatedAdminGamesGameIdExpressionRulesRoute
+  '/admin/games/$gameId/game-shop': typeof AuthenticatedAdminGamesGameIdGameShopRoute
+  '/admin/games/$gameId/genetic-panels': typeof AuthenticatedAdminGamesGameIdGeneticPanelsRoute
   '/admin/games/$gameId/group-prestige-tiers': typeof AuthenticatedAdminGamesGameIdGroupPrestigeTiersRoute
   '/admin/games/$gameId/health-certificates': typeof AuthenticatedAdminGamesGameIdHealthCertificatesRoute
+  '/admin/games/$gameId/health-conditions': typeof AuthenticatedAdminGamesGameIdHealthConditionsRoute
   '/admin/games/$gameId/intensity-tiers': typeof AuthenticatedAdminGamesGameIdIntensityTiersRoute
   '/admin/games/$gameId/items': typeof AuthenticatedAdminGamesGameIdItemsRoute
+  '/admin/games/$gameId/life-stages': typeof AuthenticatedAdminGamesGameIdLifeStagesRoute
+  '/admin/games/$gameId/loci': typeof AuthenticatedAdminGamesGameIdLociRoute
   '/admin/games/$gameId/notification-topics': typeof AuthenticatedAdminGamesGameIdNotificationTopicsRoute
+  '/admin/games/$gameId/personality-traits': typeof AuthenticatedAdminGamesGameIdPersonalityTraitsRoute
   '/admin/games/$gameId/records': typeof AuthenticatedAdminGamesGameIdRecordsRoute
   '/admin/games/$gameId/season-categories': typeof AuthenticatedAdminGamesGameIdSeasonCategoriesRoute
+  '/admin/games/$gameId/seasons': typeof AuthenticatedAdminGamesGameIdSeasonsRoute
   '/admin/games/$gameId/species': typeof AuthenticatedAdminGamesGameIdSpeciesRoute
   '/admin/games/$gameId/stage-activities': typeof AuthenticatedAdminGamesGameIdStageActivitiesRoute
   '/admin/games/$gameId/stats': typeof AuthenticatedAdminGamesGameIdStatsRoute
+  '/admin/games/$gameId/store-listings': typeof AuthenticatedAdminGamesGameIdStoreListingsRoute
   '/admin/games/$gameId/titles': typeof AuthenticatedAdminGamesGameIdTitlesRoute
   '/admin/games/$gameId/training-actions': typeof AuthenticatedAdminGamesGameIdTrainingActionsRoute
+  '/admin/games/$gameId/treatments': typeof AuthenticatedAdminGamesGameIdTreatmentsRoute
   '/admin/games/$gameId/tutorial-steps': typeof AuthenticatedAdminGamesGameIdTutorialStepsRoute
+  '/admin/games/$gameId/venues': typeof AuthenticatedAdminGamesGameIdVenuesRoute
+  '/admin/games/$gameId/vet-services': typeof AuthenticatedAdminGamesGameIdVetServicesRoute
   '/admin/games/$gameId/': typeof AuthenticatedAdminGamesGameIdIndexRoute
 }
 export interface FileRoutesByTo {
@@ -669,72 +544,56 @@ export interface FileRoutesByTo {
   '/vet': typeof AuthenticatedVetRoute
   '/': typeof AuthenticatedIndexRoute
   '/admin/audit': typeof AuthenticatedAdminAuditRoute
-  '/admin/breeds': typeof AuthenticatedAdminBreedsRoute
   '/admin/broadcast': typeof AuthenticatedAdminBroadcastRoute
-  '/admin/care-actions': typeof AuthenticatedAdminCareActionsRoute
-  '/admin/competition-tiers': typeof AuthenticatedAdminCompetitionTiersRoute
-  '/admin/conformation-sections': typeof AuthenticatedAdminConformationSectionsRoute
-  '/admin/currencies': typeof AuthenticatedAdminCurrenciesRoute
-  '/admin/directory-filters': typeof AuthenticatedAdminDirectoryFiltersRoute
-  '/admin/disciplines': typeof AuthenticatedAdminDisciplinesRoute
-  '/admin/expression-rules': typeof AuthenticatedAdminExpressionRulesRoute
-  '/admin/game-config': typeof AuthenticatedAdminGameConfigRoute
-  '/admin/game-shop': typeof AuthenticatedAdminGameShopRoute
-  '/admin/genetic-panels': typeof AuthenticatedAdminGeneticPanelsRoute
-  '/admin/group-prestige-tiers': typeof AuthenticatedAdminGroupPrestigeTiersRoute
-  '/admin/health-certificates': typeof AuthenticatedAdminHealthCertificatesRoute
-  '/admin/health-conditions': typeof AuthenticatedAdminHealthConditionsRoute
   '/admin/integrity': typeof AuthenticatedAdminIntegrityRoute
-  '/admin/intensity-tiers': typeof AuthenticatedAdminIntensityTiersRoute
-  '/admin/items': typeof AuthenticatedAdminItemsRoute
-  '/admin/life-stages': typeof AuthenticatedAdminLifeStagesRoute
-  '/admin/loci': typeof AuthenticatedAdminLociRoute
   '/admin/moderation': typeof AuthenticatedAdminModerationRoute
-  '/admin/notification-topics': typeof AuthenticatedAdminNotificationTopicsRoute
-  '/admin/personality-traits': typeof AuthenticatedAdminPersonalityTraitsRoute
-  '/admin/records': typeof AuthenticatedAdminRecordsRoute
-  '/admin/season-categories': typeof AuthenticatedAdminSeasonCategoriesRoute
-  '/admin/species': typeof AuthenticatedAdminSpeciesRoute
-  '/admin/stage-activities': typeof AuthenticatedAdminStageActivitiesRoute
-  '/admin/stats': typeof AuthenticatedAdminStatsRoute
-  '/admin/store-listings': typeof AuthenticatedAdminStoreListingsRoute
   '/admin/system': typeof AuthenticatedAdminSystemRoute
-  '/admin/titles': typeof AuthenticatedAdminTitlesRoute
-  '/admin/training-actions': typeof AuthenticatedAdminTrainingActionsRoute
-  '/admin/treatments': typeof AuthenticatedAdminTreatmentsRoute
-  '/admin/tutorial-steps': typeof AuthenticatedAdminTutorialStepsRoute
-  '/admin/venues': typeof AuthenticatedAdminVenuesRoute
-  '/admin/vet-services': typeof AuthenticatedAdminVetServicesRoute
   '/animal/$animalId': typeof AuthenticatedAnimalAnimalIdRoute
   '/breeding/$offerId': typeof AuthenticatedBreedingOfferIdRoute
   '/competition/$competitionId': typeof AuthenticatedCompetitionCompetitionIdRoute
   '/venue/$venueId': typeof AuthenticatedVenueVenueIdRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/admin/bugs/$bugId': typeof AuthenticatedAdminBugsBugIdRoute
-  '/admin/ops/economy': typeof AuthenticatedAdminOpsEconomyRoute
-  '/admin/ops/events': typeof AuthenticatedAdminOpsEventsRoute
-  '/admin/ops/seasons': typeof AuthenticatedAdminOpsSeasonsRoute
   '/admin/players/$playerId': typeof AuthenticatedAdminPlayersPlayerIdRoute
   '/admin/support/$ticketId': typeof AuthenticatedAdminSupportTicketIdRoute
   '/admin/bugs': typeof AuthenticatedAdminBugsIndexRoute
   '/admin/players': typeof AuthenticatedAdminPlayersIndexRoute
   '/admin/support': typeof AuthenticatedAdminSupportIndexRoute
+  '/admin/games/$gameId/breeds': typeof AuthenticatedAdminGamesGameIdBreedsRoute
+  '/admin/games/$gameId/care-actions': typeof AuthenticatedAdminGamesGameIdCareActionsRoute
+  '/admin/games/$gameId/competition-tiers': typeof AuthenticatedAdminGamesGameIdCompetitionTiersRoute
+  '/admin/games/$gameId/config': typeof AuthenticatedAdminGamesGameIdConfigRoute
   '/admin/games/$gameId/conformation-sections': typeof AuthenticatedAdminGamesGameIdConformationSectionsRoute
   '/admin/games/$gameId/currencies': typeof AuthenticatedAdminGamesGameIdCurrenciesRoute
   '/admin/games/$gameId/directory-filters': typeof AuthenticatedAdminGamesGameIdDirectoryFiltersRoute
+  '/admin/games/$gameId/disciplines': typeof AuthenticatedAdminGamesGameIdDisciplinesRoute
+  '/admin/games/$gameId/economy': typeof AuthenticatedAdminGamesGameIdEconomyRoute
+  '/admin/games/$gameId/events': typeof AuthenticatedAdminGamesGameIdEventsRoute
+  '/admin/games/$gameId/expression-rules': typeof AuthenticatedAdminGamesGameIdExpressionRulesRoute
+  '/admin/games/$gameId/game-shop': typeof AuthenticatedAdminGamesGameIdGameShopRoute
+  '/admin/games/$gameId/genetic-panels': typeof AuthenticatedAdminGamesGameIdGeneticPanelsRoute
   '/admin/games/$gameId/group-prestige-tiers': typeof AuthenticatedAdminGamesGameIdGroupPrestigeTiersRoute
   '/admin/games/$gameId/health-certificates': typeof AuthenticatedAdminGamesGameIdHealthCertificatesRoute
+  '/admin/games/$gameId/health-conditions': typeof AuthenticatedAdminGamesGameIdHealthConditionsRoute
   '/admin/games/$gameId/intensity-tiers': typeof AuthenticatedAdminGamesGameIdIntensityTiersRoute
   '/admin/games/$gameId/items': typeof AuthenticatedAdminGamesGameIdItemsRoute
+  '/admin/games/$gameId/life-stages': typeof AuthenticatedAdminGamesGameIdLifeStagesRoute
+  '/admin/games/$gameId/loci': typeof AuthenticatedAdminGamesGameIdLociRoute
   '/admin/games/$gameId/notification-topics': typeof AuthenticatedAdminGamesGameIdNotificationTopicsRoute
+  '/admin/games/$gameId/personality-traits': typeof AuthenticatedAdminGamesGameIdPersonalityTraitsRoute
   '/admin/games/$gameId/records': typeof AuthenticatedAdminGamesGameIdRecordsRoute
   '/admin/games/$gameId/season-categories': typeof AuthenticatedAdminGamesGameIdSeasonCategoriesRoute
+  '/admin/games/$gameId/seasons': typeof AuthenticatedAdminGamesGameIdSeasonsRoute
   '/admin/games/$gameId/species': typeof AuthenticatedAdminGamesGameIdSpeciesRoute
   '/admin/games/$gameId/stage-activities': typeof AuthenticatedAdminGamesGameIdStageActivitiesRoute
   '/admin/games/$gameId/stats': typeof AuthenticatedAdminGamesGameIdStatsRoute
+  '/admin/games/$gameId/store-listings': typeof AuthenticatedAdminGamesGameIdStoreListingsRoute
   '/admin/games/$gameId/titles': typeof AuthenticatedAdminGamesGameIdTitlesRoute
   '/admin/games/$gameId/training-actions': typeof AuthenticatedAdminGamesGameIdTrainingActionsRoute
+  '/admin/games/$gameId/treatments': typeof AuthenticatedAdminGamesGameIdTreatmentsRoute
   '/admin/games/$gameId/tutorial-steps': typeof AuthenticatedAdminGamesGameIdTutorialStepsRoute
+  '/admin/games/$gameId/venues': typeof AuthenticatedAdminGamesGameIdVenuesRoute
+  '/admin/games/$gameId/vet-services': typeof AuthenticatedAdminGamesGameIdVetServicesRoute
   '/admin/games/$gameId': typeof AuthenticatedAdminGamesGameIdIndexRoute
 }
 export interface FileRoutesById {
@@ -751,45 +610,13 @@ export interface FileRoutesById {
   '/_authenticated/vet': typeof AuthenticatedVetRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/admin/audit': typeof AuthenticatedAdminAuditRoute
-  '/_authenticated/admin/breeds': typeof AuthenticatedAdminBreedsRoute
   '/_authenticated/admin/broadcast': typeof AuthenticatedAdminBroadcastRoute
   '/_authenticated/admin/bugs': typeof AuthenticatedAdminBugsRouteWithChildren
-  '/_authenticated/admin/care-actions': typeof AuthenticatedAdminCareActionsRoute
-  '/_authenticated/admin/competition-tiers': typeof AuthenticatedAdminCompetitionTiersRoute
-  '/_authenticated/admin/conformation-sections': typeof AuthenticatedAdminConformationSectionsRoute
-  '/_authenticated/admin/currencies': typeof AuthenticatedAdminCurrenciesRoute
-  '/_authenticated/admin/directory-filters': typeof AuthenticatedAdminDirectoryFiltersRoute
-  '/_authenticated/admin/disciplines': typeof AuthenticatedAdminDisciplinesRoute
-  '/_authenticated/admin/expression-rules': typeof AuthenticatedAdminExpressionRulesRoute
-  '/_authenticated/admin/game-config': typeof AuthenticatedAdminGameConfigRoute
-  '/_authenticated/admin/game-shop': typeof AuthenticatedAdminGameShopRoute
-  '/_authenticated/admin/genetic-panels': typeof AuthenticatedAdminGeneticPanelsRoute
-  '/_authenticated/admin/group-prestige-tiers': typeof AuthenticatedAdminGroupPrestigeTiersRoute
-  '/_authenticated/admin/health-certificates': typeof AuthenticatedAdminHealthCertificatesRoute
-  '/_authenticated/admin/health-conditions': typeof AuthenticatedAdminHealthConditionsRoute
   '/_authenticated/admin/integrity': typeof AuthenticatedAdminIntegrityRoute
-  '/_authenticated/admin/intensity-tiers': typeof AuthenticatedAdminIntensityTiersRoute
-  '/_authenticated/admin/items': typeof AuthenticatedAdminItemsRoute
-  '/_authenticated/admin/life-stages': typeof AuthenticatedAdminLifeStagesRoute
-  '/_authenticated/admin/loci': typeof AuthenticatedAdminLociRoute
   '/_authenticated/admin/moderation': typeof AuthenticatedAdminModerationRoute
-  '/_authenticated/admin/notification-topics': typeof AuthenticatedAdminNotificationTopicsRoute
-  '/_authenticated/admin/personality-traits': typeof AuthenticatedAdminPersonalityTraitsRoute
   '/_authenticated/admin/players': typeof AuthenticatedAdminPlayersRouteWithChildren
-  '/_authenticated/admin/records': typeof AuthenticatedAdminRecordsRoute
-  '/_authenticated/admin/season-categories': typeof AuthenticatedAdminSeasonCategoriesRoute
-  '/_authenticated/admin/species': typeof AuthenticatedAdminSpeciesRoute
-  '/_authenticated/admin/stage-activities': typeof AuthenticatedAdminStageActivitiesRoute
-  '/_authenticated/admin/stats': typeof AuthenticatedAdminStatsRoute
-  '/_authenticated/admin/store-listings': typeof AuthenticatedAdminStoreListingsRoute
   '/_authenticated/admin/support': typeof AuthenticatedAdminSupportRouteWithChildren
   '/_authenticated/admin/system': typeof AuthenticatedAdminSystemRoute
-  '/_authenticated/admin/titles': typeof AuthenticatedAdminTitlesRoute
-  '/_authenticated/admin/training-actions': typeof AuthenticatedAdminTrainingActionsRoute
-  '/_authenticated/admin/treatments': typeof AuthenticatedAdminTreatmentsRoute
-  '/_authenticated/admin/tutorial-steps': typeof AuthenticatedAdminTutorialStepsRoute
-  '/_authenticated/admin/venues': typeof AuthenticatedAdminVenuesRoute
-  '/_authenticated/admin/vet-services': typeof AuthenticatedAdminVetServicesRoute
   '/_authenticated/animal/$animalId': typeof AuthenticatedAnimalAnimalIdRoute
   '/_authenticated/breeding/$offerId': typeof AuthenticatedBreedingOfferIdRoute
   '/_authenticated/competition/$competitionId': typeof AuthenticatedCompetitionCompetitionIdRoute
@@ -797,30 +624,46 @@ export interface FileRoutesById {
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/admin/bugs/$bugId': typeof AuthenticatedAdminBugsBugIdRoute
   '/_authenticated/admin/games/$gameId': typeof AuthenticatedAdminGamesGameIdRouteWithChildren
-  '/_authenticated/admin/ops/economy': typeof AuthenticatedAdminOpsEconomyRoute
-  '/_authenticated/admin/ops/events': typeof AuthenticatedAdminOpsEventsRoute
-  '/_authenticated/admin/ops/seasons': typeof AuthenticatedAdminOpsSeasonsRoute
   '/_authenticated/admin/players/$playerId': typeof AuthenticatedAdminPlayersPlayerIdRoute
   '/_authenticated/admin/support/$ticketId': typeof AuthenticatedAdminSupportTicketIdRoute
   '/_authenticated/admin/bugs/': typeof AuthenticatedAdminBugsIndexRoute
   '/_authenticated/admin/players/': typeof AuthenticatedAdminPlayersIndexRoute
   '/_authenticated/admin/support/': typeof AuthenticatedAdminSupportIndexRoute
+  '/_authenticated/admin/games/$gameId/breeds': typeof AuthenticatedAdminGamesGameIdBreedsRoute
+  '/_authenticated/admin/games/$gameId/care-actions': typeof AuthenticatedAdminGamesGameIdCareActionsRoute
+  '/_authenticated/admin/games/$gameId/competition-tiers': typeof AuthenticatedAdminGamesGameIdCompetitionTiersRoute
+  '/_authenticated/admin/games/$gameId/config': typeof AuthenticatedAdminGamesGameIdConfigRoute
   '/_authenticated/admin/games/$gameId/conformation-sections': typeof AuthenticatedAdminGamesGameIdConformationSectionsRoute
   '/_authenticated/admin/games/$gameId/currencies': typeof AuthenticatedAdminGamesGameIdCurrenciesRoute
   '/_authenticated/admin/games/$gameId/directory-filters': typeof AuthenticatedAdminGamesGameIdDirectoryFiltersRoute
+  '/_authenticated/admin/games/$gameId/disciplines': typeof AuthenticatedAdminGamesGameIdDisciplinesRoute
+  '/_authenticated/admin/games/$gameId/economy': typeof AuthenticatedAdminGamesGameIdEconomyRoute
+  '/_authenticated/admin/games/$gameId/events': typeof AuthenticatedAdminGamesGameIdEventsRoute
+  '/_authenticated/admin/games/$gameId/expression-rules': typeof AuthenticatedAdminGamesGameIdExpressionRulesRoute
+  '/_authenticated/admin/games/$gameId/game-shop': typeof AuthenticatedAdminGamesGameIdGameShopRoute
+  '/_authenticated/admin/games/$gameId/genetic-panels': typeof AuthenticatedAdminGamesGameIdGeneticPanelsRoute
   '/_authenticated/admin/games/$gameId/group-prestige-tiers': typeof AuthenticatedAdminGamesGameIdGroupPrestigeTiersRoute
   '/_authenticated/admin/games/$gameId/health-certificates': typeof AuthenticatedAdminGamesGameIdHealthCertificatesRoute
+  '/_authenticated/admin/games/$gameId/health-conditions': typeof AuthenticatedAdminGamesGameIdHealthConditionsRoute
   '/_authenticated/admin/games/$gameId/intensity-tiers': typeof AuthenticatedAdminGamesGameIdIntensityTiersRoute
   '/_authenticated/admin/games/$gameId/items': typeof AuthenticatedAdminGamesGameIdItemsRoute
+  '/_authenticated/admin/games/$gameId/life-stages': typeof AuthenticatedAdminGamesGameIdLifeStagesRoute
+  '/_authenticated/admin/games/$gameId/loci': typeof AuthenticatedAdminGamesGameIdLociRoute
   '/_authenticated/admin/games/$gameId/notification-topics': typeof AuthenticatedAdminGamesGameIdNotificationTopicsRoute
+  '/_authenticated/admin/games/$gameId/personality-traits': typeof AuthenticatedAdminGamesGameIdPersonalityTraitsRoute
   '/_authenticated/admin/games/$gameId/records': typeof AuthenticatedAdminGamesGameIdRecordsRoute
   '/_authenticated/admin/games/$gameId/season-categories': typeof AuthenticatedAdminGamesGameIdSeasonCategoriesRoute
+  '/_authenticated/admin/games/$gameId/seasons': typeof AuthenticatedAdminGamesGameIdSeasonsRoute
   '/_authenticated/admin/games/$gameId/species': typeof AuthenticatedAdminGamesGameIdSpeciesRoute
   '/_authenticated/admin/games/$gameId/stage-activities': typeof AuthenticatedAdminGamesGameIdStageActivitiesRoute
   '/_authenticated/admin/games/$gameId/stats': typeof AuthenticatedAdminGamesGameIdStatsRoute
+  '/_authenticated/admin/games/$gameId/store-listings': typeof AuthenticatedAdminGamesGameIdStoreListingsRoute
   '/_authenticated/admin/games/$gameId/titles': typeof AuthenticatedAdminGamesGameIdTitlesRoute
   '/_authenticated/admin/games/$gameId/training-actions': typeof AuthenticatedAdminGamesGameIdTrainingActionsRoute
+  '/_authenticated/admin/games/$gameId/treatments': typeof AuthenticatedAdminGamesGameIdTreatmentsRoute
   '/_authenticated/admin/games/$gameId/tutorial-steps': typeof AuthenticatedAdminGamesGameIdTutorialStepsRoute
+  '/_authenticated/admin/games/$gameId/venues': typeof AuthenticatedAdminGamesGameIdVenuesRoute
+  '/_authenticated/admin/games/$gameId/vet-services': typeof AuthenticatedAdminGamesGameIdVetServicesRoute
   '/_authenticated/admin/games/$gameId/': typeof AuthenticatedAdminGamesGameIdIndexRoute
 }
 export interface FileRouteTypes {
@@ -837,45 +680,13 @@ export interface FileRouteTypes {
     | '/venues'
     | '/vet'
     | '/admin/audit'
-    | '/admin/breeds'
     | '/admin/broadcast'
     | '/admin/bugs'
-    | '/admin/care-actions'
-    | '/admin/competition-tiers'
-    | '/admin/conformation-sections'
-    | '/admin/currencies'
-    | '/admin/directory-filters'
-    | '/admin/disciplines'
-    | '/admin/expression-rules'
-    | '/admin/game-config'
-    | '/admin/game-shop'
-    | '/admin/genetic-panels'
-    | '/admin/group-prestige-tiers'
-    | '/admin/health-certificates'
-    | '/admin/health-conditions'
     | '/admin/integrity'
-    | '/admin/intensity-tiers'
-    | '/admin/items'
-    | '/admin/life-stages'
-    | '/admin/loci'
     | '/admin/moderation'
-    | '/admin/notification-topics'
-    | '/admin/personality-traits'
     | '/admin/players'
-    | '/admin/records'
-    | '/admin/season-categories'
-    | '/admin/species'
-    | '/admin/stage-activities'
-    | '/admin/stats'
-    | '/admin/store-listings'
     | '/admin/support'
     | '/admin/system'
-    | '/admin/titles'
-    | '/admin/training-actions'
-    | '/admin/treatments'
-    | '/admin/tutorial-steps'
-    | '/admin/venues'
-    | '/admin/vet-services'
     | '/animal/$animalId'
     | '/breeding/$offerId'
     | '/competition/$competitionId'
@@ -883,30 +694,46 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/admin/bugs/$bugId'
     | '/admin/games/$gameId'
-    | '/admin/ops/economy'
-    | '/admin/ops/events'
-    | '/admin/ops/seasons'
     | '/admin/players/$playerId'
     | '/admin/support/$ticketId'
     | '/admin/bugs/'
     | '/admin/players/'
     | '/admin/support/'
+    | '/admin/games/$gameId/breeds'
+    | '/admin/games/$gameId/care-actions'
+    | '/admin/games/$gameId/competition-tiers'
+    | '/admin/games/$gameId/config'
     | '/admin/games/$gameId/conformation-sections'
     | '/admin/games/$gameId/currencies'
     | '/admin/games/$gameId/directory-filters'
+    | '/admin/games/$gameId/disciplines'
+    | '/admin/games/$gameId/economy'
+    | '/admin/games/$gameId/events'
+    | '/admin/games/$gameId/expression-rules'
+    | '/admin/games/$gameId/game-shop'
+    | '/admin/games/$gameId/genetic-panels'
     | '/admin/games/$gameId/group-prestige-tiers'
     | '/admin/games/$gameId/health-certificates'
+    | '/admin/games/$gameId/health-conditions'
     | '/admin/games/$gameId/intensity-tiers'
     | '/admin/games/$gameId/items'
+    | '/admin/games/$gameId/life-stages'
+    | '/admin/games/$gameId/loci'
     | '/admin/games/$gameId/notification-topics'
+    | '/admin/games/$gameId/personality-traits'
     | '/admin/games/$gameId/records'
     | '/admin/games/$gameId/season-categories'
+    | '/admin/games/$gameId/seasons'
     | '/admin/games/$gameId/species'
     | '/admin/games/$gameId/stage-activities'
     | '/admin/games/$gameId/stats'
+    | '/admin/games/$gameId/store-listings'
     | '/admin/games/$gameId/titles'
     | '/admin/games/$gameId/training-actions'
+    | '/admin/games/$gameId/treatments'
     | '/admin/games/$gameId/tutorial-steps'
+    | '/admin/games/$gameId/venues'
+    | '/admin/games/$gameId/vet-services'
     | '/admin/games/$gameId/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -920,72 +747,56 @@ export interface FileRouteTypes {
     | '/vet'
     | '/'
     | '/admin/audit'
-    | '/admin/breeds'
     | '/admin/broadcast'
-    | '/admin/care-actions'
-    | '/admin/competition-tiers'
-    | '/admin/conformation-sections'
-    | '/admin/currencies'
-    | '/admin/directory-filters'
-    | '/admin/disciplines'
-    | '/admin/expression-rules'
-    | '/admin/game-config'
-    | '/admin/game-shop'
-    | '/admin/genetic-panels'
-    | '/admin/group-prestige-tiers'
-    | '/admin/health-certificates'
-    | '/admin/health-conditions'
     | '/admin/integrity'
-    | '/admin/intensity-tiers'
-    | '/admin/items'
-    | '/admin/life-stages'
-    | '/admin/loci'
     | '/admin/moderation'
-    | '/admin/notification-topics'
-    | '/admin/personality-traits'
-    | '/admin/records'
-    | '/admin/season-categories'
-    | '/admin/species'
-    | '/admin/stage-activities'
-    | '/admin/stats'
-    | '/admin/store-listings'
     | '/admin/system'
-    | '/admin/titles'
-    | '/admin/training-actions'
-    | '/admin/treatments'
-    | '/admin/tutorial-steps'
-    | '/admin/venues'
-    | '/admin/vet-services'
     | '/animal/$animalId'
     | '/breeding/$offerId'
     | '/competition/$competitionId'
     | '/venue/$venueId'
     | '/admin'
     | '/admin/bugs/$bugId'
-    | '/admin/ops/economy'
-    | '/admin/ops/events'
-    | '/admin/ops/seasons'
     | '/admin/players/$playerId'
     | '/admin/support/$ticketId'
     | '/admin/bugs'
     | '/admin/players'
     | '/admin/support'
+    | '/admin/games/$gameId/breeds'
+    | '/admin/games/$gameId/care-actions'
+    | '/admin/games/$gameId/competition-tiers'
+    | '/admin/games/$gameId/config'
     | '/admin/games/$gameId/conformation-sections'
     | '/admin/games/$gameId/currencies'
     | '/admin/games/$gameId/directory-filters'
+    | '/admin/games/$gameId/disciplines'
+    | '/admin/games/$gameId/economy'
+    | '/admin/games/$gameId/events'
+    | '/admin/games/$gameId/expression-rules'
+    | '/admin/games/$gameId/game-shop'
+    | '/admin/games/$gameId/genetic-panels'
     | '/admin/games/$gameId/group-prestige-tiers'
     | '/admin/games/$gameId/health-certificates'
+    | '/admin/games/$gameId/health-conditions'
     | '/admin/games/$gameId/intensity-tiers'
     | '/admin/games/$gameId/items'
+    | '/admin/games/$gameId/life-stages'
+    | '/admin/games/$gameId/loci'
     | '/admin/games/$gameId/notification-topics'
+    | '/admin/games/$gameId/personality-traits'
     | '/admin/games/$gameId/records'
     | '/admin/games/$gameId/season-categories'
+    | '/admin/games/$gameId/seasons'
     | '/admin/games/$gameId/species'
     | '/admin/games/$gameId/stage-activities'
     | '/admin/games/$gameId/stats'
+    | '/admin/games/$gameId/store-listings'
     | '/admin/games/$gameId/titles'
     | '/admin/games/$gameId/training-actions'
+    | '/admin/games/$gameId/treatments'
     | '/admin/games/$gameId/tutorial-steps'
+    | '/admin/games/$gameId/venues'
+    | '/admin/games/$gameId/vet-services'
     | '/admin/games/$gameId'
   id:
     | '__root__'
@@ -1001,45 +812,13 @@ export interface FileRouteTypes {
     | '/_authenticated/vet'
     | '/_authenticated/'
     | '/_authenticated/admin/audit'
-    | '/_authenticated/admin/breeds'
     | '/_authenticated/admin/broadcast'
     | '/_authenticated/admin/bugs'
-    | '/_authenticated/admin/care-actions'
-    | '/_authenticated/admin/competition-tiers'
-    | '/_authenticated/admin/conformation-sections'
-    | '/_authenticated/admin/currencies'
-    | '/_authenticated/admin/directory-filters'
-    | '/_authenticated/admin/disciplines'
-    | '/_authenticated/admin/expression-rules'
-    | '/_authenticated/admin/game-config'
-    | '/_authenticated/admin/game-shop'
-    | '/_authenticated/admin/genetic-panels'
-    | '/_authenticated/admin/group-prestige-tiers'
-    | '/_authenticated/admin/health-certificates'
-    | '/_authenticated/admin/health-conditions'
     | '/_authenticated/admin/integrity'
-    | '/_authenticated/admin/intensity-tiers'
-    | '/_authenticated/admin/items'
-    | '/_authenticated/admin/life-stages'
-    | '/_authenticated/admin/loci'
     | '/_authenticated/admin/moderation'
-    | '/_authenticated/admin/notification-topics'
-    | '/_authenticated/admin/personality-traits'
     | '/_authenticated/admin/players'
-    | '/_authenticated/admin/records'
-    | '/_authenticated/admin/season-categories'
-    | '/_authenticated/admin/species'
-    | '/_authenticated/admin/stage-activities'
-    | '/_authenticated/admin/stats'
-    | '/_authenticated/admin/store-listings'
     | '/_authenticated/admin/support'
     | '/_authenticated/admin/system'
-    | '/_authenticated/admin/titles'
-    | '/_authenticated/admin/training-actions'
-    | '/_authenticated/admin/treatments'
-    | '/_authenticated/admin/tutorial-steps'
-    | '/_authenticated/admin/venues'
-    | '/_authenticated/admin/vet-services'
     | '/_authenticated/animal/$animalId'
     | '/_authenticated/breeding/$offerId'
     | '/_authenticated/competition/$competitionId'
@@ -1047,30 +826,46 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/'
     | '/_authenticated/admin/bugs/$bugId'
     | '/_authenticated/admin/games/$gameId'
-    | '/_authenticated/admin/ops/economy'
-    | '/_authenticated/admin/ops/events'
-    | '/_authenticated/admin/ops/seasons'
     | '/_authenticated/admin/players/$playerId'
     | '/_authenticated/admin/support/$ticketId'
     | '/_authenticated/admin/bugs/'
     | '/_authenticated/admin/players/'
     | '/_authenticated/admin/support/'
+    | '/_authenticated/admin/games/$gameId/breeds'
+    | '/_authenticated/admin/games/$gameId/care-actions'
+    | '/_authenticated/admin/games/$gameId/competition-tiers'
+    | '/_authenticated/admin/games/$gameId/config'
     | '/_authenticated/admin/games/$gameId/conformation-sections'
     | '/_authenticated/admin/games/$gameId/currencies'
     | '/_authenticated/admin/games/$gameId/directory-filters'
+    | '/_authenticated/admin/games/$gameId/disciplines'
+    | '/_authenticated/admin/games/$gameId/economy'
+    | '/_authenticated/admin/games/$gameId/events'
+    | '/_authenticated/admin/games/$gameId/expression-rules'
+    | '/_authenticated/admin/games/$gameId/game-shop'
+    | '/_authenticated/admin/games/$gameId/genetic-panels'
     | '/_authenticated/admin/games/$gameId/group-prestige-tiers'
     | '/_authenticated/admin/games/$gameId/health-certificates'
+    | '/_authenticated/admin/games/$gameId/health-conditions'
     | '/_authenticated/admin/games/$gameId/intensity-tiers'
     | '/_authenticated/admin/games/$gameId/items'
+    | '/_authenticated/admin/games/$gameId/life-stages'
+    | '/_authenticated/admin/games/$gameId/loci'
     | '/_authenticated/admin/games/$gameId/notification-topics'
+    | '/_authenticated/admin/games/$gameId/personality-traits'
     | '/_authenticated/admin/games/$gameId/records'
     | '/_authenticated/admin/games/$gameId/season-categories'
+    | '/_authenticated/admin/games/$gameId/seasons'
     | '/_authenticated/admin/games/$gameId/species'
     | '/_authenticated/admin/games/$gameId/stage-activities'
     | '/_authenticated/admin/games/$gameId/stats'
+    | '/_authenticated/admin/games/$gameId/store-listings'
     | '/_authenticated/admin/games/$gameId/titles'
     | '/_authenticated/admin/games/$gameId/training-actions'
+    | '/_authenticated/admin/games/$gameId/treatments'
     | '/_authenticated/admin/games/$gameId/tutorial-steps'
+    | '/_authenticated/admin/games/$gameId/venues'
+    | '/_authenticated/admin/games/$gameId/vet-services'
     | '/_authenticated/admin/games/$gameId/'
   fileRoutesById: FileRoutesById
 }
@@ -1194,48 +989,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAnimalAnimalIdRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/admin/vet-services': {
-      id: '/_authenticated/admin/vet-services'
-      path: '/vet-services'
-      fullPath: '/admin/vet-services'
-      preLoaderRoute: typeof AuthenticatedAdminVetServicesRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/venues': {
-      id: '/_authenticated/admin/venues'
-      path: '/venues'
-      fullPath: '/admin/venues'
-      preLoaderRoute: typeof AuthenticatedAdminVenuesRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/tutorial-steps': {
-      id: '/_authenticated/admin/tutorial-steps'
-      path: '/tutorial-steps'
-      fullPath: '/admin/tutorial-steps'
-      preLoaderRoute: typeof AuthenticatedAdminTutorialStepsRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/treatments': {
-      id: '/_authenticated/admin/treatments'
-      path: '/treatments'
-      fullPath: '/admin/treatments'
-      preLoaderRoute: typeof AuthenticatedAdminTreatmentsRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/training-actions': {
-      id: '/_authenticated/admin/training-actions'
-      path: '/training-actions'
-      fullPath: '/admin/training-actions'
-      preLoaderRoute: typeof AuthenticatedAdminTrainingActionsRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/titles': {
-      id: '/_authenticated/admin/titles'
-      path: '/titles'
-      fullPath: '/admin/titles'
-      preLoaderRoute: typeof AuthenticatedAdminTitlesRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
     '/_authenticated/admin/system': {
       id: '/_authenticated/admin/system'
       path: '/system'
@@ -1250,67 +1003,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminSupportRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
-    '/_authenticated/admin/store-listings': {
-      id: '/_authenticated/admin/store-listings'
-      path: '/store-listings'
-      fullPath: '/admin/store-listings'
-      preLoaderRoute: typeof AuthenticatedAdminStoreListingsRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/stats': {
-      id: '/_authenticated/admin/stats'
-      path: '/stats'
-      fullPath: '/admin/stats'
-      preLoaderRoute: typeof AuthenticatedAdminStatsRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/stage-activities': {
-      id: '/_authenticated/admin/stage-activities'
-      path: '/stage-activities'
-      fullPath: '/admin/stage-activities'
-      preLoaderRoute: typeof AuthenticatedAdminStageActivitiesRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/species': {
-      id: '/_authenticated/admin/species'
-      path: '/species'
-      fullPath: '/admin/species'
-      preLoaderRoute: typeof AuthenticatedAdminSpeciesRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/season-categories': {
-      id: '/_authenticated/admin/season-categories'
-      path: '/season-categories'
-      fullPath: '/admin/season-categories'
-      preLoaderRoute: typeof AuthenticatedAdminSeasonCategoriesRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/records': {
-      id: '/_authenticated/admin/records'
-      path: '/records'
-      fullPath: '/admin/records'
-      preLoaderRoute: typeof AuthenticatedAdminRecordsRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
     '/_authenticated/admin/players': {
       id: '/_authenticated/admin/players'
       path: '/players'
       fullPath: '/admin/players'
       preLoaderRoute: typeof AuthenticatedAdminPlayersRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/personality-traits': {
-      id: '/_authenticated/admin/personality-traits'
-      path: '/personality-traits'
-      fullPath: '/admin/personality-traits'
-      preLoaderRoute: typeof AuthenticatedAdminPersonalityTraitsRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/notification-topics': {
-      id: '/_authenticated/admin/notification-topics'
-      path: '/notification-topics'
-      fullPath: '/admin/notification-topics'
-      preLoaderRoute: typeof AuthenticatedAdminNotificationTopicsRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
     '/_authenticated/admin/moderation': {
@@ -1320,130 +1017,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminModerationRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
-    '/_authenticated/admin/loci': {
-      id: '/_authenticated/admin/loci'
-      path: '/loci'
-      fullPath: '/admin/loci'
-      preLoaderRoute: typeof AuthenticatedAdminLociRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/life-stages': {
-      id: '/_authenticated/admin/life-stages'
-      path: '/life-stages'
-      fullPath: '/admin/life-stages'
-      preLoaderRoute: typeof AuthenticatedAdminLifeStagesRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/items': {
-      id: '/_authenticated/admin/items'
-      path: '/items'
-      fullPath: '/admin/items'
-      preLoaderRoute: typeof AuthenticatedAdminItemsRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/intensity-tiers': {
-      id: '/_authenticated/admin/intensity-tiers'
-      path: '/intensity-tiers'
-      fullPath: '/admin/intensity-tiers'
-      preLoaderRoute: typeof AuthenticatedAdminIntensityTiersRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
     '/_authenticated/admin/integrity': {
       id: '/_authenticated/admin/integrity'
       path: '/integrity'
       fullPath: '/admin/integrity'
       preLoaderRoute: typeof AuthenticatedAdminIntegrityRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/health-conditions': {
-      id: '/_authenticated/admin/health-conditions'
-      path: '/health-conditions'
-      fullPath: '/admin/health-conditions'
-      preLoaderRoute: typeof AuthenticatedAdminHealthConditionsRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/health-certificates': {
-      id: '/_authenticated/admin/health-certificates'
-      path: '/health-certificates'
-      fullPath: '/admin/health-certificates'
-      preLoaderRoute: typeof AuthenticatedAdminHealthCertificatesRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/group-prestige-tiers': {
-      id: '/_authenticated/admin/group-prestige-tiers'
-      path: '/group-prestige-tiers'
-      fullPath: '/admin/group-prestige-tiers'
-      preLoaderRoute: typeof AuthenticatedAdminGroupPrestigeTiersRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/genetic-panels': {
-      id: '/_authenticated/admin/genetic-panels'
-      path: '/genetic-panels'
-      fullPath: '/admin/genetic-panels'
-      preLoaderRoute: typeof AuthenticatedAdminGeneticPanelsRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/game-shop': {
-      id: '/_authenticated/admin/game-shop'
-      path: '/game-shop'
-      fullPath: '/admin/game-shop'
-      preLoaderRoute: typeof AuthenticatedAdminGameShopRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/game-config': {
-      id: '/_authenticated/admin/game-config'
-      path: '/game-config'
-      fullPath: '/admin/game-config'
-      preLoaderRoute: typeof AuthenticatedAdminGameConfigRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/expression-rules': {
-      id: '/_authenticated/admin/expression-rules'
-      path: '/expression-rules'
-      fullPath: '/admin/expression-rules'
-      preLoaderRoute: typeof AuthenticatedAdminExpressionRulesRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/disciplines': {
-      id: '/_authenticated/admin/disciplines'
-      path: '/disciplines'
-      fullPath: '/admin/disciplines'
-      preLoaderRoute: typeof AuthenticatedAdminDisciplinesRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/directory-filters': {
-      id: '/_authenticated/admin/directory-filters'
-      path: '/directory-filters'
-      fullPath: '/admin/directory-filters'
-      preLoaderRoute: typeof AuthenticatedAdminDirectoryFiltersRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/currencies': {
-      id: '/_authenticated/admin/currencies'
-      path: '/currencies'
-      fullPath: '/admin/currencies'
-      preLoaderRoute: typeof AuthenticatedAdminCurrenciesRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/conformation-sections': {
-      id: '/_authenticated/admin/conformation-sections'
-      path: '/conformation-sections'
-      fullPath: '/admin/conformation-sections'
-      preLoaderRoute: typeof AuthenticatedAdminConformationSectionsRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/competition-tiers': {
-      id: '/_authenticated/admin/competition-tiers'
-      path: '/competition-tiers'
-      fullPath: '/admin/competition-tiers'
-      preLoaderRoute: typeof AuthenticatedAdminCompetitionTiersRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/care-actions': {
-      id: '/_authenticated/admin/care-actions'
-      path: '/care-actions'
-      fullPath: '/admin/care-actions'
-      preLoaderRoute: typeof AuthenticatedAdminCareActionsRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
     '/_authenticated/admin/bugs': {
@@ -1458,13 +1036,6 @@ declare module '@tanstack/react-router' {
       path: '/broadcast'
       fullPath: '/admin/broadcast'
       preLoaderRoute: typeof AuthenticatedAdminBroadcastRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/breeds': {
-      id: '/_authenticated/admin/breeds'
-      path: '/breeds'
-      fullPath: '/admin/breeds'
-      preLoaderRoute: typeof AuthenticatedAdminBreedsRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
     '/_authenticated/admin/audit': {
@@ -1509,27 +1080,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminPlayersPlayerIdRouteImport
       parentRoute: typeof AuthenticatedAdminPlayersRoute
     }
-    '/_authenticated/admin/ops/seasons': {
-      id: '/_authenticated/admin/ops/seasons'
-      path: '/ops/seasons'
-      fullPath: '/admin/ops/seasons'
-      preLoaderRoute: typeof AuthenticatedAdminOpsSeasonsRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/ops/events': {
-      id: '/_authenticated/admin/ops/events'
-      path: '/ops/events'
-      fullPath: '/admin/ops/events'
-      preLoaderRoute: typeof AuthenticatedAdminOpsEventsRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/ops/economy': {
-      id: '/_authenticated/admin/ops/economy'
-      path: '/ops/economy'
-      fullPath: '/admin/ops/economy'
-      preLoaderRoute: typeof AuthenticatedAdminOpsEconomyRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
     '/_authenticated/admin/games/$gameId': {
       id: '/_authenticated/admin/games/$gameId'
       path: '/games/$gameId'
@@ -1551,11 +1101,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminGamesGameIdIndexRouteImport
       parentRoute: typeof AuthenticatedAdminGamesGameIdRoute
     }
+    '/_authenticated/admin/games/$gameId/vet-services': {
+      id: '/_authenticated/admin/games/$gameId/vet-services'
+      path: '/vet-services'
+      fullPath: '/admin/games/$gameId/vet-services'
+      preLoaderRoute: typeof AuthenticatedAdminGamesGameIdVetServicesRouteImport
+      parentRoute: typeof AuthenticatedAdminGamesGameIdRoute
+    }
+    '/_authenticated/admin/games/$gameId/venues': {
+      id: '/_authenticated/admin/games/$gameId/venues'
+      path: '/venues'
+      fullPath: '/admin/games/$gameId/venues'
+      preLoaderRoute: typeof AuthenticatedAdminGamesGameIdVenuesRouteImport
+      parentRoute: typeof AuthenticatedAdminGamesGameIdRoute
+    }
     '/_authenticated/admin/games/$gameId/tutorial-steps': {
       id: '/_authenticated/admin/games/$gameId/tutorial-steps'
       path: '/tutorial-steps'
       fullPath: '/admin/games/$gameId/tutorial-steps'
       preLoaderRoute: typeof AuthenticatedAdminGamesGameIdTutorialStepsRouteImport
+      parentRoute: typeof AuthenticatedAdminGamesGameIdRoute
+    }
+    '/_authenticated/admin/games/$gameId/treatments': {
+      id: '/_authenticated/admin/games/$gameId/treatments'
+      path: '/treatments'
+      fullPath: '/admin/games/$gameId/treatments'
+      preLoaderRoute: typeof AuthenticatedAdminGamesGameIdTreatmentsRouteImport
       parentRoute: typeof AuthenticatedAdminGamesGameIdRoute
     }
     '/_authenticated/admin/games/$gameId/training-actions': {
@@ -1570,6 +1141,13 @@ declare module '@tanstack/react-router' {
       path: '/titles'
       fullPath: '/admin/games/$gameId/titles'
       preLoaderRoute: typeof AuthenticatedAdminGamesGameIdTitlesRouteImport
+      parentRoute: typeof AuthenticatedAdminGamesGameIdRoute
+    }
+    '/_authenticated/admin/games/$gameId/store-listings': {
+      id: '/_authenticated/admin/games/$gameId/store-listings'
+      path: '/store-listings'
+      fullPath: '/admin/games/$gameId/store-listings'
+      preLoaderRoute: typeof AuthenticatedAdminGamesGameIdStoreListingsRouteImport
       parentRoute: typeof AuthenticatedAdminGamesGameIdRoute
     }
     '/_authenticated/admin/games/$gameId/stats': {
@@ -1593,6 +1171,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminGamesGameIdSpeciesRouteImport
       parentRoute: typeof AuthenticatedAdminGamesGameIdRoute
     }
+    '/_authenticated/admin/games/$gameId/seasons': {
+      id: '/_authenticated/admin/games/$gameId/seasons'
+      path: '/seasons'
+      fullPath: '/admin/games/$gameId/seasons'
+      preLoaderRoute: typeof AuthenticatedAdminGamesGameIdSeasonsRouteImport
+      parentRoute: typeof AuthenticatedAdminGamesGameIdRoute
+    }
     '/_authenticated/admin/games/$gameId/season-categories': {
       id: '/_authenticated/admin/games/$gameId/season-categories'
       path: '/season-categories'
@@ -1607,11 +1192,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminGamesGameIdRecordsRouteImport
       parentRoute: typeof AuthenticatedAdminGamesGameIdRoute
     }
+    '/_authenticated/admin/games/$gameId/personality-traits': {
+      id: '/_authenticated/admin/games/$gameId/personality-traits'
+      path: '/personality-traits'
+      fullPath: '/admin/games/$gameId/personality-traits'
+      preLoaderRoute: typeof AuthenticatedAdminGamesGameIdPersonalityTraitsRouteImport
+      parentRoute: typeof AuthenticatedAdminGamesGameIdRoute
+    }
     '/_authenticated/admin/games/$gameId/notification-topics': {
       id: '/_authenticated/admin/games/$gameId/notification-topics'
       path: '/notification-topics'
       fullPath: '/admin/games/$gameId/notification-topics'
       preLoaderRoute: typeof AuthenticatedAdminGamesGameIdNotificationTopicsRouteImport
+      parentRoute: typeof AuthenticatedAdminGamesGameIdRoute
+    }
+    '/_authenticated/admin/games/$gameId/loci': {
+      id: '/_authenticated/admin/games/$gameId/loci'
+      path: '/loci'
+      fullPath: '/admin/games/$gameId/loci'
+      preLoaderRoute: typeof AuthenticatedAdminGamesGameIdLociRouteImport
+      parentRoute: typeof AuthenticatedAdminGamesGameIdRoute
+    }
+    '/_authenticated/admin/games/$gameId/life-stages': {
+      id: '/_authenticated/admin/games/$gameId/life-stages'
+      path: '/life-stages'
+      fullPath: '/admin/games/$gameId/life-stages'
+      preLoaderRoute: typeof AuthenticatedAdminGamesGameIdLifeStagesRouteImport
       parentRoute: typeof AuthenticatedAdminGamesGameIdRoute
     }
     '/_authenticated/admin/games/$gameId/items': {
@@ -1628,6 +1234,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminGamesGameIdIntensityTiersRouteImport
       parentRoute: typeof AuthenticatedAdminGamesGameIdRoute
     }
+    '/_authenticated/admin/games/$gameId/health-conditions': {
+      id: '/_authenticated/admin/games/$gameId/health-conditions'
+      path: '/health-conditions'
+      fullPath: '/admin/games/$gameId/health-conditions'
+      preLoaderRoute: typeof AuthenticatedAdminGamesGameIdHealthConditionsRouteImport
+      parentRoute: typeof AuthenticatedAdminGamesGameIdRoute
+    }
     '/_authenticated/admin/games/$gameId/health-certificates': {
       id: '/_authenticated/admin/games/$gameId/health-certificates'
       path: '/health-certificates'
@@ -1640,6 +1253,48 @@ declare module '@tanstack/react-router' {
       path: '/group-prestige-tiers'
       fullPath: '/admin/games/$gameId/group-prestige-tiers'
       preLoaderRoute: typeof AuthenticatedAdminGamesGameIdGroupPrestigeTiersRouteImport
+      parentRoute: typeof AuthenticatedAdminGamesGameIdRoute
+    }
+    '/_authenticated/admin/games/$gameId/genetic-panels': {
+      id: '/_authenticated/admin/games/$gameId/genetic-panels'
+      path: '/genetic-panels'
+      fullPath: '/admin/games/$gameId/genetic-panels'
+      preLoaderRoute: typeof AuthenticatedAdminGamesGameIdGeneticPanelsRouteImport
+      parentRoute: typeof AuthenticatedAdminGamesGameIdRoute
+    }
+    '/_authenticated/admin/games/$gameId/game-shop': {
+      id: '/_authenticated/admin/games/$gameId/game-shop'
+      path: '/game-shop'
+      fullPath: '/admin/games/$gameId/game-shop'
+      preLoaderRoute: typeof AuthenticatedAdminGamesGameIdGameShopRouteImport
+      parentRoute: typeof AuthenticatedAdminGamesGameIdRoute
+    }
+    '/_authenticated/admin/games/$gameId/expression-rules': {
+      id: '/_authenticated/admin/games/$gameId/expression-rules'
+      path: '/expression-rules'
+      fullPath: '/admin/games/$gameId/expression-rules'
+      preLoaderRoute: typeof AuthenticatedAdminGamesGameIdExpressionRulesRouteImport
+      parentRoute: typeof AuthenticatedAdminGamesGameIdRoute
+    }
+    '/_authenticated/admin/games/$gameId/events': {
+      id: '/_authenticated/admin/games/$gameId/events'
+      path: '/events'
+      fullPath: '/admin/games/$gameId/events'
+      preLoaderRoute: typeof AuthenticatedAdminGamesGameIdEventsRouteImport
+      parentRoute: typeof AuthenticatedAdminGamesGameIdRoute
+    }
+    '/_authenticated/admin/games/$gameId/economy': {
+      id: '/_authenticated/admin/games/$gameId/economy'
+      path: '/economy'
+      fullPath: '/admin/games/$gameId/economy'
+      preLoaderRoute: typeof AuthenticatedAdminGamesGameIdEconomyRouteImport
+      parentRoute: typeof AuthenticatedAdminGamesGameIdRoute
+    }
+    '/_authenticated/admin/games/$gameId/disciplines': {
+      id: '/_authenticated/admin/games/$gameId/disciplines'
+      path: '/disciplines'
+      fullPath: '/admin/games/$gameId/disciplines'
+      preLoaderRoute: typeof AuthenticatedAdminGamesGameIdDisciplinesRouteImport
       parentRoute: typeof AuthenticatedAdminGamesGameIdRoute
     }
     '/_authenticated/admin/games/$gameId/directory-filters': {
@@ -1661,6 +1316,34 @@ declare module '@tanstack/react-router' {
       path: '/conformation-sections'
       fullPath: '/admin/games/$gameId/conformation-sections'
       preLoaderRoute: typeof AuthenticatedAdminGamesGameIdConformationSectionsRouteImport
+      parentRoute: typeof AuthenticatedAdminGamesGameIdRoute
+    }
+    '/_authenticated/admin/games/$gameId/config': {
+      id: '/_authenticated/admin/games/$gameId/config'
+      path: '/config'
+      fullPath: '/admin/games/$gameId/config'
+      preLoaderRoute: typeof AuthenticatedAdminGamesGameIdConfigRouteImport
+      parentRoute: typeof AuthenticatedAdminGamesGameIdRoute
+    }
+    '/_authenticated/admin/games/$gameId/competition-tiers': {
+      id: '/_authenticated/admin/games/$gameId/competition-tiers'
+      path: '/competition-tiers'
+      fullPath: '/admin/games/$gameId/competition-tiers'
+      preLoaderRoute: typeof AuthenticatedAdminGamesGameIdCompetitionTiersRouteImport
+      parentRoute: typeof AuthenticatedAdminGamesGameIdRoute
+    }
+    '/_authenticated/admin/games/$gameId/care-actions': {
+      id: '/_authenticated/admin/games/$gameId/care-actions'
+      path: '/care-actions'
+      fullPath: '/admin/games/$gameId/care-actions'
+      preLoaderRoute: typeof AuthenticatedAdminGamesGameIdCareActionsRouteImport
+      parentRoute: typeof AuthenticatedAdminGamesGameIdRoute
+    }
+    '/_authenticated/admin/games/$gameId/breeds': {
+      id: '/_authenticated/admin/games/$gameId/breeds'
+      path: '/breeds'
+      fullPath: '/admin/games/$gameId/breeds'
+      preLoaderRoute: typeof AuthenticatedAdminGamesGameIdBreedsRouteImport
       parentRoute: typeof AuthenticatedAdminGamesGameIdRoute
     }
   }
@@ -1717,59 +1400,116 @@ const AuthenticatedAdminSupportRouteWithChildren =
   )
 
 interface AuthenticatedAdminGamesGameIdRouteChildren {
+  AuthenticatedAdminGamesGameIdBreedsRoute: typeof AuthenticatedAdminGamesGameIdBreedsRoute
+  AuthenticatedAdminGamesGameIdCareActionsRoute: typeof AuthenticatedAdminGamesGameIdCareActionsRoute
+  AuthenticatedAdminGamesGameIdCompetitionTiersRoute: typeof AuthenticatedAdminGamesGameIdCompetitionTiersRoute
+  AuthenticatedAdminGamesGameIdConfigRoute: typeof AuthenticatedAdminGamesGameIdConfigRoute
   AuthenticatedAdminGamesGameIdConformationSectionsRoute: typeof AuthenticatedAdminGamesGameIdConformationSectionsRoute
   AuthenticatedAdminGamesGameIdCurrenciesRoute: typeof AuthenticatedAdminGamesGameIdCurrenciesRoute
   AuthenticatedAdminGamesGameIdDirectoryFiltersRoute: typeof AuthenticatedAdminGamesGameIdDirectoryFiltersRoute
+  AuthenticatedAdminGamesGameIdDisciplinesRoute: typeof AuthenticatedAdminGamesGameIdDisciplinesRoute
+  AuthenticatedAdminGamesGameIdEconomyRoute: typeof AuthenticatedAdminGamesGameIdEconomyRoute
+  AuthenticatedAdminGamesGameIdEventsRoute: typeof AuthenticatedAdminGamesGameIdEventsRoute
+  AuthenticatedAdminGamesGameIdExpressionRulesRoute: typeof AuthenticatedAdminGamesGameIdExpressionRulesRoute
+  AuthenticatedAdminGamesGameIdGameShopRoute: typeof AuthenticatedAdminGamesGameIdGameShopRoute
+  AuthenticatedAdminGamesGameIdGeneticPanelsRoute: typeof AuthenticatedAdminGamesGameIdGeneticPanelsRoute
   AuthenticatedAdminGamesGameIdGroupPrestigeTiersRoute: typeof AuthenticatedAdminGamesGameIdGroupPrestigeTiersRoute
   AuthenticatedAdminGamesGameIdHealthCertificatesRoute: typeof AuthenticatedAdminGamesGameIdHealthCertificatesRoute
+  AuthenticatedAdminGamesGameIdHealthConditionsRoute: typeof AuthenticatedAdminGamesGameIdHealthConditionsRoute
   AuthenticatedAdminGamesGameIdIntensityTiersRoute: typeof AuthenticatedAdminGamesGameIdIntensityTiersRoute
   AuthenticatedAdminGamesGameIdItemsRoute: typeof AuthenticatedAdminGamesGameIdItemsRoute
+  AuthenticatedAdminGamesGameIdLifeStagesRoute: typeof AuthenticatedAdminGamesGameIdLifeStagesRoute
+  AuthenticatedAdminGamesGameIdLociRoute: typeof AuthenticatedAdminGamesGameIdLociRoute
   AuthenticatedAdminGamesGameIdNotificationTopicsRoute: typeof AuthenticatedAdminGamesGameIdNotificationTopicsRoute
+  AuthenticatedAdminGamesGameIdPersonalityTraitsRoute: typeof AuthenticatedAdminGamesGameIdPersonalityTraitsRoute
   AuthenticatedAdminGamesGameIdRecordsRoute: typeof AuthenticatedAdminGamesGameIdRecordsRoute
   AuthenticatedAdminGamesGameIdSeasonCategoriesRoute: typeof AuthenticatedAdminGamesGameIdSeasonCategoriesRoute
+  AuthenticatedAdminGamesGameIdSeasonsRoute: typeof AuthenticatedAdminGamesGameIdSeasonsRoute
   AuthenticatedAdminGamesGameIdSpeciesRoute: typeof AuthenticatedAdminGamesGameIdSpeciesRoute
   AuthenticatedAdminGamesGameIdStageActivitiesRoute: typeof AuthenticatedAdminGamesGameIdStageActivitiesRoute
   AuthenticatedAdminGamesGameIdStatsRoute: typeof AuthenticatedAdminGamesGameIdStatsRoute
+  AuthenticatedAdminGamesGameIdStoreListingsRoute: typeof AuthenticatedAdminGamesGameIdStoreListingsRoute
   AuthenticatedAdminGamesGameIdTitlesRoute: typeof AuthenticatedAdminGamesGameIdTitlesRoute
   AuthenticatedAdminGamesGameIdTrainingActionsRoute: typeof AuthenticatedAdminGamesGameIdTrainingActionsRoute
+  AuthenticatedAdminGamesGameIdTreatmentsRoute: typeof AuthenticatedAdminGamesGameIdTreatmentsRoute
   AuthenticatedAdminGamesGameIdTutorialStepsRoute: typeof AuthenticatedAdminGamesGameIdTutorialStepsRoute
+  AuthenticatedAdminGamesGameIdVenuesRoute: typeof AuthenticatedAdminGamesGameIdVenuesRoute
+  AuthenticatedAdminGamesGameIdVetServicesRoute: typeof AuthenticatedAdminGamesGameIdVetServicesRoute
   AuthenticatedAdminGamesGameIdIndexRoute: typeof AuthenticatedAdminGamesGameIdIndexRoute
 }
 
 const AuthenticatedAdminGamesGameIdRouteChildren: AuthenticatedAdminGamesGameIdRouteChildren =
   {
+    AuthenticatedAdminGamesGameIdBreedsRoute:
+      AuthenticatedAdminGamesGameIdBreedsRoute,
+    AuthenticatedAdminGamesGameIdCareActionsRoute:
+      AuthenticatedAdminGamesGameIdCareActionsRoute,
+    AuthenticatedAdminGamesGameIdCompetitionTiersRoute:
+      AuthenticatedAdminGamesGameIdCompetitionTiersRoute,
+    AuthenticatedAdminGamesGameIdConfigRoute:
+      AuthenticatedAdminGamesGameIdConfigRoute,
     AuthenticatedAdminGamesGameIdConformationSectionsRoute:
       AuthenticatedAdminGamesGameIdConformationSectionsRoute,
     AuthenticatedAdminGamesGameIdCurrenciesRoute:
       AuthenticatedAdminGamesGameIdCurrenciesRoute,
     AuthenticatedAdminGamesGameIdDirectoryFiltersRoute:
       AuthenticatedAdminGamesGameIdDirectoryFiltersRoute,
+    AuthenticatedAdminGamesGameIdDisciplinesRoute:
+      AuthenticatedAdminGamesGameIdDisciplinesRoute,
+    AuthenticatedAdminGamesGameIdEconomyRoute:
+      AuthenticatedAdminGamesGameIdEconomyRoute,
+    AuthenticatedAdminGamesGameIdEventsRoute:
+      AuthenticatedAdminGamesGameIdEventsRoute,
+    AuthenticatedAdminGamesGameIdExpressionRulesRoute:
+      AuthenticatedAdminGamesGameIdExpressionRulesRoute,
+    AuthenticatedAdminGamesGameIdGameShopRoute:
+      AuthenticatedAdminGamesGameIdGameShopRoute,
+    AuthenticatedAdminGamesGameIdGeneticPanelsRoute:
+      AuthenticatedAdminGamesGameIdGeneticPanelsRoute,
     AuthenticatedAdminGamesGameIdGroupPrestigeTiersRoute:
       AuthenticatedAdminGamesGameIdGroupPrestigeTiersRoute,
     AuthenticatedAdminGamesGameIdHealthCertificatesRoute:
       AuthenticatedAdminGamesGameIdHealthCertificatesRoute,
+    AuthenticatedAdminGamesGameIdHealthConditionsRoute:
+      AuthenticatedAdminGamesGameIdHealthConditionsRoute,
     AuthenticatedAdminGamesGameIdIntensityTiersRoute:
       AuthenticatedAdminGamesGameIdIntensityTiersRoute,
     AuthenticatedAdminGamesGameIdItemsRoute:
       AuthenticatedAdminGamesGameIdItemsRoute,
+    AuthenticatedAdminGamesGameIdLifeStagesRoute:
+      AuthenticatedAdminGamesGameIdLifeStagesRoute,
+    AuthenticatedAdminGamesGameIdLociRoute:
+      AuthenticatedAdminGamesGameIdLociRoute,
     AuthenticatedAdminGamesGameIdNotificationTopicsRoute:
       AuthenticatedAdminGamesGameIdNotificationTopicsRoute,
+    AuthenticatedAdminGamesGameIdPersonalityTraitsRoute:
+      AuthenticatedAdminGamesGameIdPersonalityTraitsRoute,
     AuthenticatedAdminGamesGameIdRecordsRoute:
       AuthenticatedAdminGamesGameIdRecordsRoute,
     AuthenticatedAdminGamesGameIdSeasonCategoriesRoute:
       AuthenticatedAdminGamesGameIdSeasonCategoriesRoute,
+    AuthenticatedAdminGamesGameIdSeasonsRoute:
+      AuthenticatedAdminGamesGameIdSeasonsRoute,
     AuthenticatedAdminGamesGameIdSpeciesRoute:
       AuthenticatedAdminGamesGameIdSpeciesRoute,
     AuthenticatedAdminGamesGameIdStageActivitiesRoute:
       AuthenticatedAdminGamesGameIdStageActivitiesRoute,
     AuthenticatedAdminGamesGameIdStatsRoute:
       AuthenticatedAdminGamesGameIdStatsRoute,
+    AuthenticatedAdminGamesGameIdStoreListingsRoute:
+      AuthenticatedAdminGamesGameIdStoreListingsRoute,
     AuthenticatedAdminGamesGameIdTitlesRoute:
       AuthenticatedAdminGamesGameIdTitlesRoute,
     AuthenticatedAdminGamesGameIdTrainingActionsRoute:
       AuthenticatedAdminGamesGameIdTrainingActionsRoute,
+    AuthenticatedAdminGamesGameIdTreatmentsRoute:
+      AuthenticatedAdminGamesGameIdTreatmentsRoute,
     AuthenticatedAdminGamesGameIdTutorialStepsRoute:
       AuthenticatedAdminGamesGameIdTutorialStepsRoute,
+    AuthenticatedAdminGamesGameIdVenuesRoute:
+      AuthenticatedAdminGamesGameIdVenuesRoute,
+    AuthenticatedAdminGamesGameIdVetServicesRoute:
+      AuthenticatedAdminGamesGameIdVetServicesRoute,
     AuthenticatedAdminGamesGameIdIndexRoute:
       AuthenticatedAdminGamesGameIdIndexRoute,
   }
@@ -1781,111 +1521,29 @@ const AuthenticatedAdminGamesGameIdRouteWithChildren =
 
 interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminAuditRoute: typeof AuthenticatedAdminAuditRoute
-  AuthenticatedAdminBreedsRoute: typeof AuthenticatedAdminBreedsRoute
   AuthenticatedAdminBroadcastRoute: typeof AuthenticatedAdminBroadcastRoute
   AuthenticatedAdminBugsRoute: typeof AuthenticatedAdminBugsRouteWithChildren
-  AuthenticatedAdminCareActionsRoute: typeof AuthenticatedAdminCareActionsRoute
-  AuthenticatedAdminCompetitionTiersRoute: typeof AuthenticatedAdminCompetitionTiersRoute
-  AuthenticatedAdminConformationSectionsRoute: typeof AuthenticatedAdminConformationSectionsRoute
-  AuthenticatedAdminCurrenciesRoute: typeof AuthenticatedAdminCurrenciesRoute
-  AuthenticatedAdminDirectoryFiltersRoute: typeof AuthenticatedAdminDirectoryFiltersRoute
-  AuthenticatedAdminDisciplinesRoute: typeof AuthenticatedAdminDisciplinesRoute
-  AuthenticatedAdminExpressionRulesRoute: typeof AuthenticatedAdminExpressionRulesRoute
-  AuthenticatedAdminGameConfigRoute: typeof AuthenticatedAdminGameConfigRoute
-  AuthenticatedAdminGameShopRoute: typeof AuthenticatedAdminGameShopRoute
-  AuthenticatedAdminGeneticPanelsRoute: typeof AuthenticatedAdminGeneticPanelsRoute
-  AuthenticatedAdminGroupPrestigeTiersRoute: typeof AuthenticatedAdminGroupPrestigeTiersRoute
-  AuthenticatedAdminHealthCertificatesRoute: typeof AuthenticatedAdminHealthCertificatesRoute
-  AuthenticatedAdminHealthConditionsRoute: typeof AuthenticatedAdminHealthConditionsRoute
   AuthenticatedAdminIntegrityRoute: typeof AuthenticatedAdminIntegrityRoute
-  AuthenticatedAdminIntensityTiersRoute: typeof AuthenticatedAdminIntensityTiersRoute
-  AuthenticatedAdminItemsRoute: typeof AuthenticatedAdminItemsRoute
-  AuthenticatedAdminLifeStagesRoute: typeof AuthenticatedAdminLifeStagesRoute
-  AuthenticatedAdminLociRoute: typeof AuthenticatedAdminLociRoute
   AuthenticatedAdminModerationRoute: typeof AuthenticatedAdminModerationRoute
-  AuthenticatedAdminNotificationTopicsRoute: typeof AuthenticatedAdminNotificationTopicsRoute
-  AuthenticatedAdminPersonalityTraitsRoute: typeof AuthenticatedAdminPersonalityTraitsRoute
   AuthenticatedAdminPlayersRoute: typeof AuthenticatedAdminPlayersRouteWithChildren
-  AuthenticatedAdminRecordsRoute: typeof AuthenticatedAdminRecordsRoute
-  AuthenticatedAdminSeasonCategoriesRoute: typeof AuthenticatedAdminSeasonCategoriesRoute
-  AuthenticatedAdminSpeciesRoute: typeof AuthenticatedAdminSpeciesRoute
-  AuthenticatedAdminStageActivitiesRoute: typeof AuthenticatedAdminStageActivitiesRoute
-  AuthenticatedAdminStatsRoute: typeof AuthenticatedAdminStatsRoute
-  AuthenticatedAdminStoreListingsRoute: typeof AuthenticatedAdminStoreListingsRoute
   AuthenticatedAdminSupportRoute: typeof AuthenticatedAdminSupportRouteWithChildren
   AuthenticatedAdminSystemRoute: typeof AuthenticatedAdminSystemRoute
-  AuthenticatedAdminTitlesRoute: typeof AuthenticatedAdminTitlesRoute
-  AuthenticatedAdminTrainingActionsRoute: typeof AuthenticatedAdminTrainingActionsRoute
-  AuthenticatedAdminTreatmentsRoute: typeof AuthenticatedAdminTreatmentsRoute
-  AuthenticatedAdminTutorialStepsRoute: typeof AuthenticatedAdminTutorialStepsRoute
-  AuthenticatedAdminVenuesRoute: typeof AuthenticatedAdminVenuesRoute
-  AuthenticatedAdminVetServicesRoute: typeof AuthenticatedAdminVetServicesRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
   AuthenticatedAdminGamesGameIdRoute: typeof AuthenticatedAdminGamesGameIdRouteWithChildren
-  AuthenticatedAdminOpsEconomyRoute: typeof AuthenticatedAdminOpsEconomyRoute
-  AuthenticatedAdminOpsEventsRoute: typeof AuthenticatedAdminOpsEventsRoute
-  AuthenticatedAdminOpsSeasonsRoute: typeof AuthenticatedAdminOpsSeasonsRoute
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminAuditRoute: AuthenticatedAdminAuditRoute,
-  AuthenticatedAdminBreedsRoute: AuthenticatedAdminBreedsRoute,
   AuthenticatedAdminBroadcastRoute: AuthenticatedAdminBroadcastRoute,
   AuthenticatedAdminBugsRoute: AuthenticatedAdminBugsRouteWithChildren,
-  AuthenticatedAdminCareActionsRoute: AuthenticatedAdminCareActionsRoute,
-  AuthenticatedAdminCompetitionTiersRoute:
-    AuthenticatedAdminCompetitionTiersRoute,
-  AuthenticatedAdminConformationSectionsRoute:
-    AuthenticatedAdminConformationSectionsRoute,
-  AuthenticatedAdminCurrenciesRoute: AuthenticatedAdminCurrenciesRoute,
-  AuthenticatedAdminDirectoryFiltersRoute:
-    AuthenticatedAdminDirectoryFiltersRoute,
-  AuthenticatedAdminDisciplinesRoute: AuthenticatedAdminDisciplinesRoute,
-  AuthenticatedAdminExpressionRulesRoute:
-    AuthenticatedAdminExpressionRulesRoute,
-  AuthenticatedAdminGameConfigRoute: AuthenticatedAdminGameConfigRoute,
-  AuthenticatedAdminGameShopRoute: AuthenticatedAdminGameShopRoute,
-  AuthenticatedAdminGeneticPanelsRoute: AuthenticatedAdminGeneticPanelsRoute,
-  AuthenticatedAdminGroupPrestigeTiersRoute:
-    AuthenticatedAdminGroupPrestigeTiersRoute,
-  AuthenticatedAdminHealthCertificatesRoute:
-    AuthenticatedAdminHealthCertificatesRoute,
-  AuthenticatedAdminHealthConditionsRoute:
-    AuthenticatedAdminHealthConditionsRoute,
   AuthenticatedAdminIntegrityRoute: AuthenticatedAdminIntegrityRoute,
-  AuthenticatedAdminIntensityTiersRoute: AuthenticatedAdminIntensityTiersRoute,
-  AuthenticatedAdminItemsRoute: AuthenticatedAdminItemsRoute,
-  AuthenticatedAdminLifeStagesRoute: AuthenticatedAdminLifeStagesRoute,
-  AuthenticatedAdminLociRoute: AuthenticatedAdminLociRoute,
   AuthenticatedAdminModerationRoute: AuthenticatedAdminModerationRoute,
-  AuthenticatedAdminNotificationTopicsRoute:
-    AuthenticatedAdminNotificationTopicsRoute,
-  AuthenticatedAdminPersonalityTraitsRoute:
-    AuthenticatedAdminPersonalityTraitsRoute,
   AuthenticatedAdminPlayersRoute: AuthenticatedAdminPlayersRouteWithChildren,
-  AuthenticatedAdminRecordsRoute: AuthenticatedAdminRecordsRoute,
-  AuthenticatedAdminSeasonCategoriesRoute:
-    AuthenticatedAdminSeasonCategoriesRoute,
-  AuthenticatedAdminSpeciesRoute: AuthenticatedAdminSpeciesRoute,
-  AuthenticatedAdminStageActivitiesRoute:
-    AuthenticatedAdminStageActivitiesRoute,
-  AuthenticatedAdminStatsRoute: AuthenticatedAdminStatsRoute,
-  AuthenticatedAdminStoreListingsRoute: AuthenticatedAdminStoreListingsRoute,
   AuthenticatedAdminSupportRoute: AuthenticatedAdminSupportRouteWithChildren,
   AuthenticatedAdminSystemRoute: AuthenticatedAdminSystemRoute,
-  AuthenticatedAdminTitlesRoute: AuthenticatedAdminTitlesRoute,
-  AuthenticatedAdminTrainingActionsRoute:
-    AuthenticatedAdminTrainingActionsRoute,
-  AuthenticatedAdminTreatmentsRoute: AuthenticatedAdminTreatmentsRoute,
-  AuthenticatedAdminTutorialStepsRoute: AuthenticatedAdminTutorialStepsRoute,
-  AuthenticatedAdminVenuesRoute: AuthenticatedAdminVenuesRoute,
-  AuthenticatedAdminVetServicesRoute: AuthenticatedAdminVetServicesRoute,
   AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
   AuthenticatedAdminGamesGameIdRoute:
     AuthenticatedAdminGamesGameIdRouteWithChildren,
-  AuthenticatedAdminOpsEconomyRoute: AuthenticatedAdminOpsEconomyRoute,
-  AuthenticatedAdminOpsEventsRoute: AuthenticatedAdminOpsEventsRoute,
-  AuthenticatedAdminOpsSeasonsRoute: AuthenticatedAdminOpsSeasonsRoute,
 }
 
 const AuthenticatedAdminRouteWithChildren =

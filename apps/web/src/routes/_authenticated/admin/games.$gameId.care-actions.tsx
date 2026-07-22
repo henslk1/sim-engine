@@ -33,20 +33,19 @@ type LongTermRow = { name: string; intervalCycles: string; gracePeriodCycles: st
 const emptyLongTerm = (): LongTermRow => ({ name: "", intervalCycles: "", gracePeriodCycles: "0" })
 
 function CareActionsPage() {
-  const { data: gameData } = trpc.admin.game.get.useQuery()
-  const gameId = gameData?.id
+  const { gameId } = Route.useParams()
 
   const { data: actions } = trpc.admin.care.list.useQuery(
     { gameId: gameId! },
-    { enabled: !!gameId }
+    {}
   )
   const { data: longTermDefs } = trpc.admin.care.listLongTerm.useQuery(
     { gameId: gameId! },
-    { enabled: !!gameId }
+    {}
   )
   const { data: itemDefs } = trpc.admin.item.list.useQuery(
     { gameId: gameId! },
-    { enabled: !!gameId }
+    {}
   )
 
   const itemOptions = (itemDefs ?? []) as Array<{ id: string; name: string }>
@@ -161,8 +160,6 @@ function CareActionsPage() {
       gracePeriodCycles: parseInt(editingLongTerm.gracePeriodCycles) || 0,
     })
   }
-
-  if (!gameId) return <p className="p-6 text-sm text-muted-foreground">No game configured yet. Set up Game Config first.</p>
 
   if (editing !== null) {
     return (
@@ -528,6 +525,6 @@ function CareActionsPage() {
   )
 }
 
-export const Route = createFileRoute("/_authenticated/admin/care-actions")({
+export const Route = createFileRoute("/_authenticated/admin/games/$gameId/care-actions")({
   component: CareActionsPage,
 })

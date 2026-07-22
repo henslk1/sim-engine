@@ -12,16 +12,15 @@ type PanelForm = {
 const emptyPanel = (): PanelForm => ({ name: "", panelType: "HEALTH" })
 
 function GeneticPanelsPage() {
-  const { data: gameData } = trpc.admin.game.get.useQuery()
-  const gameId = gameData?.id
+  const { gameId } = Route.useParams()
 
   const { data: panels } = trpc.admin.panel.list.useQuery(
     { gameId: gameId! },
-    { enabled: !!gameId }
+    {}
   )
   const { data: allLoci } = trpc.admin.locus.list.useQuery(
     { gameId: gameId! },
-    { enabled: !!gameId }
+    {}
   )
 
   const utils = trpc.useUtils()
@@ -88,8 +87,6 @@ function GeneticPanelsPage() {
     utils.admin.panel.list.invalidate()
     setStagedLocusIds(null)
   }
-
-  if (!gameId) return <p className="p-6 text-sm text-muted-foreground">No game configured yet. Set up Game Config first.</p>
 
   if (editing !== null) {
     return (
@@ -294,6 +291,6 @@ function GeneticPanelsPage() {
   )
 }
 
-export const Route = createFileRoute("/_authenticated/admin/genetic-panels")({
+export const Route = createFileRoute("/_authenticated/admin/games/$gameId/genetic-panels")({
   component: GeneticPanelsPage,
 })

@@ -17,12 +17,11 @@ type AlleleRow = { symbol: string; isAvailable: boolean }
 const emptyAllele = (): AlleleRow => ({ symbol: "", isAvailable: false })
 
 function LociPage() {
-  const { data: gameData } = trpc.admin.game.get.useQuery()
-  const gameId = gameData?.id
+  const { gameId } = Route.useParams()
 
   const { data: loci } = trpc.admin.locus.list.useQuery(
     { gameId: gameId! },
-    { enabled: !!gameId }
+    {}
   )
 
   const utils = trpc.useUtils()
@@ -101,8 +100,6 @@ function LociPage() {
       }
     )
   }
-
-  if (!gameId) return <p className="p-6 text-sm text-muted-foreground">No game configured yet. Set up Game Config first.</p>
 
   if (editing !== null) {
     return (
@@ -452,6 +449,6 @@ function LociPage() {
   )
 }
 
-export const Route = createFileRoute("/_authenticated/admin/loci")({
+export const Route = createFileRoute("/_authenticated/admin/games/$gameId/loci")({
   component: LociPage,
 })
