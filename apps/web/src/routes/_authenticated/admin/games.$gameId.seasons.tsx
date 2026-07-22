@@ -22,20 +22,20 @@ function OpsSeasons() {
   const now = new Date()
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-3 p-4 max-w-4xl mx-auto">
       <h1 className="font-serif text-xl font-semibold text-foreground">Seasons & Competition</h1>
 
       <section>
-        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Seasons</h2>
+        <h2 className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Seasons</h2>
         <div className="rounded-lg border border-border overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-muted/50">
-              <tr>
-                <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Name</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Status</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Starts</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Ends</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Players</th>
+            <thead>
+              <tr className="border-b border-border bg-secondary/40">
+                <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Name</th>
+                <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Status</th>
+                <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Starts</th>
+                <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Ends</th>
+                <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Players</th>
               </tr>
             </thead>
             <tbody>
@@ -70,15 +70,15 @@ function OpsSeasons() {
       </section>
 
       <section>
-        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Open Competitions</h2>
+        <h2 className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Open Competitions</h2>
         <div className="rounded-lg border border-border overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-muted/50">
-              <tr>
-                <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Venue</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Status</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Entries</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Started</th>
+            <thead>
+              <tr className="border-b border-border bg-secondary/40">
+                <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Venue</th>
+                <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Status</th>
+                <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Entries</th>
+                <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Started</th>
               </tr>
             </thead>
             <tbody>

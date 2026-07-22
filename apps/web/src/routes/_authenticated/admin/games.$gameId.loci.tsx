@@ -36,7 +36,6 @@ function LociPage() {
   })
 
   const [editing, setEditing] = useState<LocusForm | null>(null)
-  const [formExpanded, setFormExpanded] = useState(false)
 
   const { data: alleles } = trpc.admin.locus.listAlleles.useQuery(
     { locusId: editing?.id! },
@@ -61,7 +60,6 @@ function LociPage() {
 
   function openEdit(locus: NonNullable<typeof loci>[number]) {
     setEditing({ id: locus.id, name: locus.name, displayGroup: locus.displayGroup ?? "", biasTarget: locus.biasTarget, minTestCycle: locus.minTestCycle ?? null })
-    setFormExpanded(false)
     setEditingAlleleId(null)
     setEditingAllele(emptyAllele())
     setNewAllele(emptyAllele())
@@ -74,7 +72,6 @@ function LociPage() {
       {
         onSuccess: (saved) => {
           setEditing((prev) => (prev ? { ...prev, id: saved.id } : null))
-          setFormExpanded(false)
         },
       }
     )
@@ -103,67 +100,61 @@ function LociPage() {
 
   if (editing !== null) {
     return (
-      <div className="p-6 max-w-2xl space-y-6">
-        <div className="flex items-center gap-3">
+      <div className="p-4 space-y-3 max-w-4xl mx-auto">
+        <div className="flex items-center gap-1.5 text-sm">
           <button
             onClick={() => setEditing(null)}
-            className="text-sm text-muted-foreground hover:text-foreground"
+            className="text-muted-foreground hover:text-foreground"
           >
-            ← Back to list
+            ← Loci & Alleles
           </button>
-          <h1 className="font-serif text-2xl font-semibold text-foreground">
-            {editing.id ? editing.name : "New Locus"}
-          </h1>
+          <span className="text-muted-foreground">/</span>
+          <span className="text-foreground">{editing.name || "New Locus"}</span>
         </div>
 
-        <section className="rounded-lg border border-border bg-card shadow-sm">
-          <header className="flex items-center justify-between border-b border-border bg-secondary/40 px-4 py-2.5">
-            <h2 className="text-sm font-semibold text-foreground">Locus Details</h2>
-            {!formExpanded && editing.id && (
-              <Button size="sm" variant="ghost" onClick={() => setFormExpanded(true)}>
-                Edit Details
-              </Button>
-            )}
-          </header>
-          {formExpanded || !editing.id ? (
-            <div className="p-4 space-y-3">
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Name</label>
+        <div className="rounded-xl border border-border bg-card shadow-md p-2">
+        <div className="grid grid-cols-[300px_1fr] gap-2 items-start">
+          <div className="rounded-lg border border-border bg-card shadow-sm">
+            <div className="border-b border-border bg-secondary/40 px-3 py-2">
+              <h2 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Locus Details</h2>
+            </div>
+            <div className="p-3 space-y-2.5">
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Name</label>
                 <Input
                   value={editing.name}
                   onChange={(e) => setEditing({ ...editing, name: e.target.value })}
-                  className="mt-1"
+                  className="h-8 text-sm"
                 />
               </div>
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">
-                  Display Group{" "}
-                  <span className="font-normal">(optional — e.g. "Bird Half")</span>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Display Group <span className="font-normal normal-case">(optional)</span>
                 </label>
                 <Input
                   value={editing.displayGroup}
                   onChange={(e) => setEditing({ ...editing, displayGroup: e.target.value })}
-                  className="mt-1"
+                  placeholder='e.g. "Bird Half"'
+                  className="h-8 text-sm"
                 />
               </div>
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Bias Target</label>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Bias Target</label>
                 <select
                   value={editing.biasTarget}
                   onChange={(e) =>
                     setEditing({ ...editing, biasTarget: e.target.value as LocusForm["biasTarget"] })
                   }
-                  className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  className="h-8 rounded-md border border-input bg-background px-3 text-sm"
                 >
                   <option value="NONE">None</option>
                   <option value="FAVORABILITY">Favorability</option>
                   <option value="RARITY">Rarity</option>
                 </select>
               </div>
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">
-                  Min Test Cycle{" "}
-                  <span className="font-normal">(optional — leave blank for no age gate)</span>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Min Test Cycle <span className="font-normal normal-case">(optional)</span>
                 </label>
                 <Input
                   type="number"
@@ -177,243 +168,220 @@ function LociPage() {
                     })
                   }
                   placeholder="e.g. 6"
-                  className="mt-1"
+                  className="h-8 text-sm"
                 />
-              </div>
-              <div className="flex gap-2 pt-1">
-                <Button onClick={submitLocus} disabled={saveLocus.isPending || !editing.name.trim()}>
-                  Save
-                </Button>
-                {editing.id && (
-                  <Button variant="ghost" onClick={() => setFormExpanded(false)}>
-                    Cancel
-                  </Button>
-                )}
               </div>
               {saveLocus.error && (
                 <p className="text-sm text-destructive">{saveLocus.error.message}</p>
               )}
-            </div>
-          ) : (
-            <div className="p-4 text-sm space-y-1 text-foreground">
-              <p>
-                <span className="text-muted-foreground">Name:</span> {editing.name}
-              </p>
-              {editing.displayGroup && (
-                <p>
-                  <span className="text-muted-foreground">Display Group:</span> {editing.displayGroup}
-                </p>
+              <Button
+                className="w-full h-8 text-sm"
+                onClick={submitLocus}
+                disabled={saveLocus.isPending || !editing.name.trim()}
+              >
+                Save
+              </Button>
+              {editing.id && (
+                <>
+                  {removeLocus.error && (
+                    <p className="text-sm text-destructive">{removeLocus.error.message}</p>
+                  )}
+                  <Button
+                    variant="ghost"
+                    className="w-full h-8 text-sm text-destructive hover:text-destructive"
+                    onClick={() => {
+                      if (
+                        !confirm(
+                          "Delete this locus? This will also delete all alleles and expression rules."
+                        )
+                      )
+                        return
+                      removeLocus.mutate({ id: editing.id! })
+                    }}
+                    disabled={removeLocus.isPending}
+                  >
+                    Delete Locus
+                  </Button>
+                </>
               )}
-              <p>
-                <span className="text-muted-foreground">Bias Target:</span> {editing.biasTarget}
-              </p>
-              <p>
-                <span className="text-muted-foreground">Min Test Cycle:</span>{" "}
-                {editing.minTestCycle != null ? `Cycle ${editing.minTestCycle}` : "None"}
-              </p>
             </div>
-          )}
-        </section>
+          </div>
 
-        {editing.id && (
-          <section className="rounded-lg border border-border bg-card shadow-sm">
-            <header className="border-b border-border bg-secondary/40 px-4 py-2.5">
-              <h2 className="text-sm font-semibold text-foreground">Alleles</h2>
-            </header>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Symbol
-                  </th>
-                  <th className="px-4 py-2 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Available
-                  </th>
-                  <th className="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {alleles?.map((a) =>
-                  editingAlleleId === a.id ? (
-                    <tr key={a.id} className="border-b border-border last:border-0">
-                      <td className="px-4 py-2">
+          <div className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
+            <div className="border-b border-border bg-secondary/40 px-3 py-2">
+              <h2 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Alleles</h2>
+            </div>
+            {editing.id ? (
+              <>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        Symbol
+                      </th>
+                      <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        Available
+                      </th>
+                      <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {alleles?.map((a) =>
+                      editingAlleleId === a.id ? (
+                        <tr key={a.id} className="border-b border-border last:border-0">
+                          <td className="px-3 py-2">
+                            <Input
+                              value={editingAllele.symbol}
+                              onChange={(e) => setEditingAllele({ ...editingAllele, symbol: e.target.value })}
+                              className="h-7 text-sm font-mono"
+                            />
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            <input
+                              type="checkbox"
+                              checked={editingAllele.isAvailable}
+                              onChange={(e) =>
+                                setEditingAllele({ ...editingAllele, isAvailable: e.target.checked })
+                              }
+                            />
+                          </td>
+                          <td className="px-3 py-2 text-right space-x-2">
+                            <Button
+                              size="sm"
+                              onClick={() => submitEditAllele(a.id)}
+                              disabled={saveAllele.isPending}
+                            >
+                              Save
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                setEditingAlleleId(null)
+                                setEditingAllele(emptyAllele())
+                              }}
+                            >
+                              Cancel
+                            </Button>
+                          </td>
+                        </tr>
+                      ) : (
+                        <tr key={a.id} className="border-b border-border last:border-0">
+                          <td className="px-3 py-2 font-mono text-foreground">{a.symbol}</td>
+                          <td className="px-3 py-2 text-center">
+                            {a.availabilityState?.isAvailable ? (
+                              <span className="text-primary font-semibold">✓</span>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-right space-x-2">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                setEditingAlleleId(a.id)
+                                setEditingAllele({
+                                  symbol: a.symbol,
+                                  isAvailable: a.availabilityState?.isAvailable ?? false,
+                                })
+                              }}
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => {
+                                if (
+                                  !confirm(
+                                    `Delete allele "${a.symbol}"? Expression rules referencing it must be removed first.`
+                                  )
+                                )
+                                  return
+                                removeAllele.mutate({ id: a.id })
+                              }}
+                            >
+                              Delete
+                            </Button>
+                          </td>
+                        </tr>
+                      )
+                    )}
+                    <tr>
+                      <td className="px-3 py-2">
                         <Input
-                          value={editingAllele.symbol}
-                          onChange={(e) => setEditingAllele({ ...editingAllele, symbol: e.target.value })}
+                          value={newAllele.symbol}
+                          onChange={(e) => setNewAllele({ ...newAllele, symbol: e.target.value })}
+                          placeholder="Symbol (e.g. E, e, Ccr)"
+                          onKeyDown={(e) => e.key === "Enter" && submitNewAllele()}
                           className="h-7 text-sm font-mono"
                         />
                       </td>
-                      <td className="px-4 py-2 text-center">
+                      <td className="px-3 py-2 text-center">
                         <input
                           type="checkbox"
-                          checked={editingAllele.isAvailable}
-                          onChange={(e) =>
-                            setEditingAllele({ ...editingAllele, isAvailable: e.target.checked })
-                          }
+                          checked={newAllele.isAvailable}
+                          onChange={(e) => setNewAllele({ ...newAllele, isAvailable: e.target.checked })}
                         />
                       </td>
-                      <td className="px-4 py-2 text-right space-x-2">
+                      <td className="px-3 py-2 text-right">
                         <Button
                           size="sm"
-                          onClick={() => submitEditAllele(a.id)}
-                          disabled={saveAllele.isPending}
+                          onClick={submitNewAllele}
+                          disabled={saveAllele.isPending || !newAllele.symbol.trim()}
                         >
-                          Save
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            setEditingAlleleId(null)
-                            setEditingAllele(emptyAllele())
-                          }}
-                        >
-                          Cancel
+                          Add
                         </Button>
                       </td>
                     </tr>
-                  ) : (
-                    <tr key={a.id} className="border-b border-border last:border-0">
-                      <td className="px-4 py-2 font-mono text-foreground">{a.symbol}</td>
-                      <td className="px-4 py-2 text-center">
-                        {a.availabilityState?.isAvailable ? (
-                          <span className="text-primary font-semibold">✓</span>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-2 text-right space-x-2">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            setEditingAlleleId(a.id)
-                            setEditingAllele({
-                              symbol: a.symbol,
-                              isAvailable: a.availabilityState?.isAvailable ?? false,
-                            })
-                          }}
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => {
-                            if (
-                              !confirm(
-                                `Delete allele "${a.symbol}"? Expression rules referencing it must be removed first.`
-                              )
-                            )
-                              return
-                            removeAllele.mutate({ id: a.id })
-                          }}
-                        >
-                          Delete
-                        </Button>
-                      </td>
-                    </tr>
-                  )
+                  </tbody>
+                </table>
+                {removeAllele.error && (
+                  <p className="px-3 pb-3 text-sm text-destructive">{removeAllele.error.message}</p>
                 )}
-                <tr>
-                  <td className="px-4 py-3">
-                    <Input
-                      value={newAllele.symbol}
-                      onChange={(e) => setNewAllele({ ...newAllele, symbol: e.target.value })}
-                      placeholder="Symbol (e.g. E, e, Ccr)"
-                      onKeyDown={(e) => e.key === "Enter" && submitNewAllele()}
-                      className="h-7 text-sm font-mono"
-                    />
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <input
-                      type="checkbox"
-                      checked={newAllele.isAvailable}
-                      onChange={(e) => setNewAllele({ ...newAllele, isAvailable: e.target.checked })}
-                    />
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <Button
-                      size="sm"
-                      onClick={submitNewAllele}
-                      disabled={saveAllele.isPending || !newAllele.symbol.trim()}
-                    >
-                      Add
-                    </Button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-            {removeAllele.error && (
-              <p className="px-4 pb-3 text-sm text-destructive">{removeAllele.error.message}</p>
+              </>
+            ) : (
+              <p className="px-3 py-4 text-sm text-muted-foreground">Save the locus first to add alleles.</p>
             )}
-          </section>
-        )}
-
-        {editing.id && (
-          <div className="flex items-center justify-end gap-3">
-            {removeLocus.error && (
-              <p className="text-sm text-destructive">{removeLocus.error.message}</p>
-            )}
-            <Button
-              variant="ghost"
-              className="text-destructive hover:text-destructive"
-              onClick={() => {
-                if (
-                  !confirm(
-                    "Delete this locus? This will also delete all alleles and expression rules."
-                  )
-                )
-                  return
-                removeLocus.mutate({ id: editing.id! })
-              }}
-              disabled={removeLocus.isPending}
-            >
-              Delete Locus
-            </Button>
           </div>
-        )}
+        </div>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="p-6 max-w-3xl space-y-6">
+    <div className="p-4 space-y-3 max-w-4xl mx-auto">
       <div className="flex items-center justify-between">
-        <h1 className="font-serif text-2xl font-semibold text-foreground">Loci & Alleles</h1>
-        <Button
-          onClick={() => {
-            setEditing(emptyLocus())
-            setFormExpanded(true)
-          }}
-        >
-          + New Locus
-        </Button>
+        <h1 className="font-serif text-xl font-semibold text-foreground">Loci & Alleles</h1>
+        <Button onClick={() => setEditing(emptyLocus())}>+ New Locus</Button>
       </div>
 
-      <section className="rounded-lg border border-border bg-card shadow-sm">
+      <div className="rounded-xl border border-border bg-card shadow-md p-2">
+      <section className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border">
-              <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Name
               </th>
-              <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Display Group
               </th>
-              <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Bias Target
               </th>
-              <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Min Test Cycle
               </th>
-              <th className="px-4 py-2 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Alleles
               </th>
-              <th className="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Actions
               </th>
             </tr>
@@ -421,14 +389,14 @@ function LociPage() {
           <tbody>
             {loci?.map((l) => (
               <tr key={l.id} className="border-b border-border last:border-0">
-                <td className="px-4 py-2 font-medium text-foreground">{l.name}</td>
-                <td className="px-4 py-2 text-muted-foreground">{l.displayGroup ?? "—"}</td>
-                <td className="px-4 py-2 text-muted-foreground">{l.biasTarget}</td>
-                <td className="px-4 py-2 text-muted-foreground">
+                <td className="px-3 py-2 font-medium text-foreground">{l.name}</td>
+                <td className="px-3 py-2 text-muted-foreground">{l.displayGroup ?? "—"}</td>
+                <td className="px-3 py-2 text-muted-foreground">{l.biasTarget}</td>
+                <td className="px-3 py-2 text-muted-foreground">
                   {l.minTestCycle != null ? `Cycle ${l.minTestCycle}` : "—"}
                 </td>
-                <td className="px-4 py-2 text-center text-muted-foreground">{l._count.alleles}</td>
-                <td className="px-4 py-2 text-right">
+                <td className="px-3 py-2 text-center text-muted-foreground">{l._count.alleles}</td>
+                <td className="px-3 py-2 text-right">
                   <Button size="sm" variant="ghost" onClick={() => openEdit(l)}>
                     Edit
                   </Button>
@@ -437,7 +405,7 @@ function LociPage() {
             ))}
             {loci?.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-sm text-muted-foreground">
+                <td colSpan={6} className="px-3 py-6 text-center text-sm text-muted-foreground">
                   No loci yet. Add your first locus to get started.
                 </td>
               </tr>
@@ -445,6 +413,7 @@ function LociPage() {
           </tbody>
         </table>
       </section>
+      </div>
     </div>
   )
 }

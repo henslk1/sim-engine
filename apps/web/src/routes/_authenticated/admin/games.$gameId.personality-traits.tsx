@@ -37,7 +37,6 @@ function PersonalityTraitsPage() {
   })
 
   const [editing, setEditing] = useState<TraitForm | null>(null)
-  const [formExpanded, setFormExpanded] = useState(false)
 
   const { data: labelRanges } = trpc.admin.personality.listLabelRanges.useQuery(
     { traitDefId: editing?.id! },
@@ -69,7 +68,6 @@ function PersonalityTraitsPage() {
       moodModifier: trait.moodModifier.toString(),
       conceptionModifier: trait.conceptionModifier.toString(),
     })
-    setFormExpanded(false)
     setEditingRangeId(null)
     setEditingRange(emptyRange())
     setNewRange(emptyRange())
@@ -89,7 +87,6 @@ function PersonalityTraitsPage() {
       {
         onSuccess: (saved) => {
           setEditing((prev) => (prev ? { ...prev, id: saved.id } : null))
-          setFormExpanded(false)
         },
       }
     )
@@ -129,317 +126,287 @@ function PersonalityTraitsPage() {
 
   if (editing !== null) {
     return (
-      <div className="p-6 max-w-2xl space-y-6">
-        <div className="flex items-center gap-3">
+      <div className="p-4 space-y-3 max-w-4xl mx-auto">
+        <div className="flex items-center gap-1.5 text-sm">
           <button
             onClick={() => setEditing(null)}
-            className="text-sm text-muted-foreground hover:text-foreground"
+            className="text-muted-foreground hover:text-foreground"
           >
-            ← Back to list
+            ← Personality Traits
           </button>
-          <h1 className="font-serif text-2xl font-semibold text-foreground">
-            {editing.id ? editing.name : "New Personality Trait"}
-          </h1>
+          <span className="text-muted-foreground">/</span>
+          <span className="text-foreground">{editing.name || "New Personality Trait"}</span>
         </div>
 
-        <section className="rounded-lg border border-border bg-card shadow-sm">
-          <header className="flex items-center justify-between border-b border-border bg-secondary/40 px-4 py-2.5">
-            <h2 className="text-sm font-semibold text-foreground">Trait Details</h2>
-            {!formExpanded && editing.id && (
-              <Button size="sm" variant="ghost" onClick={() => setFormExpanded(true)}>
-                Edit Details
-              </Button>
-            )}
-          </header>
-          {formExpanded || !editing.id ? (
-            <div className="p-4 space-y-3">
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Name</label>
+        <div className="rounded-xl border border-border bg-card shadow-md p-2">
+        <div className="grid grid-cols-[300px_1fr] gap-2 items-start">
+          <div className="rounded-lg border border-border bg-card shadow-sm">
+            <div className="border-b border-border bg-secondary/40 px-3 py-2">
+              <h2 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Trait Details</h2>
+            </div>
+            <div className="p-3 space-y-2.5">
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Name</label>
                 <Input
                   value={editing.name}
                   onChange={(e) => setEditing({ ...editing, name: e.target.value })}
                   placeholder="e.g. Boldness, Sociability"
-                  className="mt-1"
+                  className="h-8 text-sm"
                 />
               </div>
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">
-                  Description <span className="font-normal">(optional)</span>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Description <span className="font-normal normal-case">(optional)</span>
                 </label>
                 <Input
                   value={editing.description}
                   onChange={(e) => setEditing({ ...editing, description: e.target.value })}
-                  className="mt-1"
+                  className="h-8 text-sm"
                 />
               </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground">Training Modifier</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={editing.trainingModifier}
-                    onChange={(e) => setEditing({ ...editing, trainingModifier: e.target.value })}
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground">Mood Modifier</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={editing.moodModifier}
-                    onChange={(e) => setEditing({ ...editing, moodModifier: e.target.value })}
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground">Conception Modifier</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={editing.conceptionModifier}
-                    onChange={(e) => setEditing({ ...editing, conceptionModifier: e.target.value })}
-                    className="mt-1"
-                  />
-                </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Training Modifier</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={editing.trainingModifier}
+                  onChange={(e) => setEditing({ ...editing, trainingModifier: e.target.value })}
+                  className="h-8 text-sm"
+                />
               </div>
-              <div className="flex gap-2 pt-1">
-                <Button onClick={submitTrait} disabled={saveTrait.isPending || !editing.name.trim()}>
-                  Save
-                </Button>
-                {editing.id && (
-                  <Button variant="ghost" onClick={() => setFormExpanded(false)}>
-                    Cancel
-                  </Button>
-                )}
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Mood Modifier</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={editing.moodModifier}
+                  onChange={(e) => setEditing({ ...editing, moodModifier: e.target.value })}
+                  className="h-8 text-sm"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Conception Modifier</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={editing.conceptionModifier}
+                  onChange={(e) => setEditing({ ...editing, conceptionModifier: e.target.value })}
+                  className="h-8 text-sm"
+                />
               </div>
               {saveTrait.error && (
                 <p className="text-sm text-destructive">{saveTrait.error.message}</p>
               )}
-            </div>
-          ) : (
-            <div className="p-4 text-sm space-y-1 text-foreground">
-              <p>
-                <span className="text-muted-foreground">Name:</span> {editing.name}
-              </p>
-              {editing.description && (
-                <p>
-                  <span className="text-muted-foreground">Description:</span> {editing.description}
-                </p>
+              <Button
+                className="w-full h-8 text-sm"
+                onClick={submitTrait}
+                disabled={saveTrait.isPending || !editing.name.trim()}
+              >
+                Save
+              </Button>
+              {editing.id && (
+                <>
+                  {removeTrait.error && (
+                    <p className="text-sm text-destructive">{removeTrait.error.message}</p>
+                  )}
+                  <Button
+                    variant="ghost"
+                    className="w-full h-8 text-sm text-destructive hover:text-destructive"
+                    onClick={() => {
+                      if (!confirm("Delete this personality trait? This will remove it from all breed profiles.")) return
+                      removeTrait.mutate({ id: editing.id! })
+                    }}
+                    disabled={removeTrait.isPending}
+                  >
+                    Delete Trait
+                  </Button>
+                </>
               )}
-              <p>
-                <span className="text-muted-foreground">Training Modifier:</span> {editing.trainingModifier}
-                <span className="ml-4 text-muted-foreground">Mood Modifier:</span> {editing.moodModifier}
-                <span className="ml-4 text-muted-foreground">Conception Modifier:</span> {editing.conceptionModifier}
-              </p>
             </div>
-          )}
-        </section>
-
-        {editing.id && (
-          <section className="rounded-lg border border-border bg-card shadow-sm">
-            <header className="border-b border-border bg-secondary/40 px-4 py-2.5">
-              <h2 className="text-sm font-semibold text-foreground">Label Ranges</h2>
-            </header>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Label
-                  </th>
-                  <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Min
-                  </th>
-                  <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Max
-                  </th>
-                  <th className="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {labelRanges?.map((r: NonNullable<typeof labelRanges>[number]) =>
-                  editingRangeId === r.id ? (
-                    <tr key={r.id} className="border-b border-border last:border-0">
-                      <td className="px-4 py-2">
-                        <Input
-                          value={editingRange.label}
-                          onChange={(e) => setEditingRange({ ...editingRange, label: e.target.value })}
-                          className="h-7 text-sm"
-                        />
-                      </td>
-                      <td className="px-4 py-2">
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={editingRange.minValue}
-                          onChange={(e) => setEditingRange({ ...editingRange, minValue: e.target.value })}
-                          className="h-7 text-sm"
-                        />
-                      </td>
-                      <td className="px-4 py-2">
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={editingRange.maxValue}
-                          onChange={(e) => setEditingRange({ ...editingRange, maxValue: e.target.value })}
-                          className="h-7 text-sm"
-                        />
-                      </td>
-                      <td className="px-4 py-2 text-right space-x-2">
-                        <Button
-                          size="sm"
-                          onClick={() => submitEditRange(r.id)}
-                          disabled={saveLabelRange.isPending}
-                        >
-                          Save
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            setEditingRangeId(null)
-                            setEditingRange(emptyRange())
-                          }}
-                        >
-                          Cancel
-                        </Button>
-                      </td>
-                    </tr>
-                  ) : (
-                    <tr key={r.id} className="border-b border-border last:border-0">
-                      <td className="px-4 py-2 font-medium text-foreground">{r.label}</td>
-                      <td className="px-4 py-2 text-muted-foreground">{r.minValue}</td>
-                      <td className="px-4 py-2 text-muted-foreground">{r.maxValue}</td>
-                      <td className="px-4 py-2 text-right space-x-2">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            setEditingRangeId(r.id)
-                            setEditingRange({
-                              label: r.label,
-                              minValue: r.minValue.toString(),
-                              maxValue: r.maxValue.toString(),
-                            })
-                          }}
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => removeLabelRange.mutate({ id: r.id })}
-                        >
-                          Delete
-                        </Button>
-                      </td>
-                    </tr>
-                  )
-                )}
-                <tr>
-                  <td className="px-4 py-3">
-                    <Input
-                      value={newRange.label}
-                      onChange={(e) => setNewRange({ ...newRange, label: e.target.value })}
-                      placeholder="e.g. Timid"
-                      onKeyDown={(e) => e.key === "Enter" && submitNewRange()}
-                      className="h-7 text-sm"
-                    />
-                  </td>
-                  <td className="px-4 py-3">
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={newRange.minValue}
-                      onChange={(e) => setNewRange({ ...newRange, minValue: e.target.value })}
-                      placeholder="0"
-                      className="h-7 text-sm"
-                    />
-                  </td>
-                  <td className="px-4 py-3">
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={newRange.maxValue}
-                      onChange={(e) => setNewRange({ ...newRange, maxValue: e.target.value })}
-                      placeholder="0"
-                      className="h-7 text-sm"
-                    />
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <Button
-                      size="sm"
-                      onClick={submitNewRange}
-                      disabled={
-                        saveLabelRange.isPending ||
-                        !newRange.label.trim() ||
-                        !newRange.minValue ||
-                        !newRange.maxValue
-                      }
-                    >
-                      Add
-                    </Button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </section>
-        )}
-
-        {editing.id && (
-          <div className="flex items-center justify-end gap-3">
-            {removeTrait.error && (
-              <p className="text-sm text-destructive">{removeTrait.error.message}</p>
-            )}
-            <Button
-              variant="ghost"
-              className="text-destructive hover:text-destructive"
-              onClick={() => {
-                if (!confirm("Delete this personality trait? This will remove it from all breed profiles.")) return
-                removeTrait.mutate({ id: editing.id! })
-              }}
-              disabled={removeTrait.isPending}
-            >
-              Delete Trait
-            </Button>
           </div>
-        )}
+
+          <div className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
+            <div className="border-b border-border bg-secondary/40 px-3 py-2">
+              <h2 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Label Ranges</h2>
+            </div>
+            {editing.id ? (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Label
+                    </th>
+                    <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Min
+                    </th>
+                    <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Max
+                    </th>
+                    <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {labelRanges?.map((r: NonNullable<typeof labelRanges>[number]) =>
+                    editingRangeId === r.id ? (
+                      <tr key={r.id} className="border-b border-border last:border-0">
+                        <td className="px-3 py-2">
+                          <Input
+                            value={editingRange.label}
+                            onChange={(e) => setEditingRange({ ...editingRange, label: e.target.value })}
+                            className="h-7 text-sm"
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={editingRange.minValue}
+                            onChange={(e) => setEditingRange({ ...editingRange, minValue: e.target.value })}
+                            className="h-7 text-sm"
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={editingRange.maxValue}
+                            onChange={(e) => setEditingRange({ ...editingRange, maxValue: e.target.value })}
+                            className="h-7 text-sm"
+                          />
+                        </td>
+                        <td className="px-3 py-2 text-right space-x-2">
+                          <Button
+                            size="sm"
+                            onClick={() => submitEditRange(r.id)}
+                            disabled={saveLabelRange.isPending}
+                          >
+                            Save
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setEditingRangeId(null)
+                              setEditingRange(emptyRange())
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                        </td>
+                      </tr>
+                    ) : (
+                      <tr key={r.id} className="border-b border-border last:border-0">
+                        <td className="px-3 py-2 font-medium text-foreground">{r.label}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{r.minValue}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{r.maxValue}</td>
+                        <td className="px-3 py-2 text-right space-x-2">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setEditingRangeId(r.id)
+                              setEditingRange({
+                                label: r.label,
+                                minValue: r.minValue.toString(),
+                                maxValue: r.maxValue.toString(),
+                              })
+                            }}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => removeLabelRange.mutate({ id: r.id })}
+                          >
+                            Delete
+                          </Button>
+                        </td>
+                      </tr>
+                    )
+                  )}
+                  <tr>
+                    <td className="px-3 py-2">
+                      <Input
+                        value={newRange.label}
+                        onChange={(e) => setNewRange({ ...newRange, label: e.target.value })}
+                        placeholder="e.g. Timid"
+                        onKeyDown={(e) => e.key === "Enter" && submitNewRange()}
+                        className="h-7 text-sm"
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={newRange.minValue}
+                        onChange={(e) => setNewRange({ ...newRange, minValue: e.target.value })}
+                        placeholder="0"
+                        className="h-7 text-sm"
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={newRange.maxValue}
+                        onChange={(e) => setNewRange({ ...newRange, maxValue: e.target.value })}
+                        placeholder="0"
+                        className="h-7 text-sm"
+                      />
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <Button
+                        size="sm"
+                        onClick={submitNewRange}
+                        disabled={
+                          saveLabelRange.isPending ||
+                          !newRange.label.trim() ||
+                          !newRange.minValue ||
+                          !newRange.maxValue
+                        }
+                      >
+                        Add
+                      </Button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            ) : (
+              <p className="px-3 py-4 text-sm text-muted-foreground">Save the trait first to add label ranges.</p>
+            )}
+          </div>
+        </div>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="p-6 max-w-2xl space-y-6">
+    <div className="p-4 space-y-3 max-w-4xl mx-auto">
       <div className="flex items-center justify-between">
-        <h1 className="font-serif text-2xl font-semibold text-foreground">Personality Traits</h1>
-        <Button
-          onClick={() => {
-            setEditing(emptyTrait())
-            setFormExpanded(true)
-          }}
-        >
-          + New Trait
-        </Button>
+        <h1 className="font-serif text-xl font-semibold text-foreground">Personality Traits</h1>
+        <Button onClick={() => setEditing(emptyTrait())}>+ New Trait</Button>
       </div>
 
-      <section className="rounded-lg border border-border bg-card shadow-sm">
+      <div className="rounded-xl border border-border bg-card shadow-md p-2">
+      <section className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border">
-              <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Name
               </th>
-              <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Description
               </th>
-              <th className="px-4 py-2 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Label Ranges
               </th>
-              <th className="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Actions
               </th>
             </tr>
@@ -447,10 +414,10 @@ function PersonalityTraitsPage() {
           <tbody>
             {traits?.map((t) => (
               <tr key={t.id} className="border-b border-border last:border-0">
-                <td className="px-4 py-2 font-medium text-foreground">{t.name}</td>
-                <td className="px-4 py-2 text-muted-foreground">{t.description ?? "—"}</td>
-                <td className="px-4 py-2 text-center text-muted-foreground">{t._count.labelRanges}</td>
-                <td className="px-4 py-2 text-right">
+                <td className="px-3 py-2 font-medium text-foreground">{t.name}</td>
+                <td className="px-3 py-2 text-muted-foreground">{t.description ?? "—"}</td>
+                <td className="px-3 py-2 text-center text-muted-foreground">{t._count.labelRanges}</td>
+                <td className="px-3 py-2 text-right">
                   <Button size="sm" variant="ghost" onClick={() => openEdit(t)}>
                     Edit
                   </Button>
@@ -459,7 +426,7 @@ function PersonalityTraitsPage() {
             ))}
             {traits?.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-sm text-muted-foreground">
+                <td colSpan={4} className="px-3 py-6 text-center text-sm text-muted-foreground">
                   No personality traits yet.
                 </td>
               </tr>
@@ -467,6 +434,7 @@ function PersonalityTraitsPage() {
           </tbody>
         </table>
       </section>
+      </div>
     </div>
   )
 }

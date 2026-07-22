@@ -54,18 +54,19 @@ function SpeciesPage() {
   }
 
   return (
-    <div className="p-6 max-w-2xl space-y-6">
-      <h1 className="font-serif text-2xl font-semibold text-foreground">Species</h1>
+    <div className="p-4 max-w-4xl mx-auto">
+      <h1 className="font-serif text-xl font-semibold text-foreground mb-4">Species</h1>
 
-      <section className="rounded-lg border border-border bg-card shadow-sm">
-        <header className="border-b border-border bg-secondary/40 px-4 py-2.5">
-          <h2 className="text-sm font-semibold text-foreground">Species List</h2>
-        </header>
+      <div className="rounded-xl border border-border bg-card shadow-md p-2">
+        <div className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
+        <div className="border-b border-border bg-secondary/40 px-3 py-2">
+          <h2 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Species List</h2>
+        </div>
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border">
-              <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Name</th>
-              <th className="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Actions</th>
+              <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Name</th>
+              <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -73,7 +74,7 @@ function SpeciesPage() {
               <tr key={s.id} className="border-b border-border last:border-0">
                 {editingId === s.id ? (
                   <>
-                    <td className="px-4 py-2">
+                    <td className="px-3 py-2">
                       <Input
                         value={editName}
                         onChange={(e) => setEditName(e.target.value)}
@@ -81,15 +82,15 @@ function SpeciesPage() {
                         className="h-7 text-sm"
                       />
                     </td>
-                    <td className="px-4 py-2 text-right space-x-2">
+                    <td className="px-3 py-2 text-right space-x-2">
                       <Button size="sm" onClick={() => submitEdit(s.id)} disabled={save.isPending}>Save</Button>
                       <Button size="sm" variant="ghost" onClick={cancelEdit}>Cancel</Button>
                     </td>
                   </>
                 ) : (
                   <>
-                    <td className="px-4 py-2 text-foreground">{s.name}</td>
-                    <td className="px-4 py-2 text-right space-x-2">
+                    <td className="px-3 py-2 text-foreground">{s.name}</td>
+                    <td className="px-3 py-2 text-right space-x-2">
                       <Button size="sm" variant="ghost" onClick={() => startEdit(s.id, s.name)}>Edit</Button>
                       <Button size="sm" variant="ghost" onClick={() => handleRemove(s.id)} className="text-destructive hover:text-destructive">Delete</Button>
                     </td>
@@ -98,7 +99,7 @@ function SpeciesPage() {
               </tr>
             ))}
             <tr>
-              <td className="px-4 py-3">
+              <td className="px-3 py-2">
                 <Input
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
@@ -107,13 +108,14 @@ function SpeciesPage() {
                   className="h-7 text-sm"
                 />
               </td>
-              <td className="px-4 py-3 text-right">
+              <td className="px-3 py-2 text-right">
                 <Button size="sm" onClick={submitAdd} disabled={save.isPending || !newName.trim()}>Add</Button>
               </td>
             </tr>
           </tbody>
         </table>
-      </section>
+        </div>
+      </div>
     </div>
   )
 }

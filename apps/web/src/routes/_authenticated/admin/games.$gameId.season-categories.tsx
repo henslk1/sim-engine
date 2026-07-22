@@ -49,7 +49,6 @@ function SeasonCategoriesPage() {
     onSuccess: (saved) => {
       utils.admin.season.list.invalidate()
       setSeasonForm((prev) => (prev ? { ...prev, id: saved.id } : null))
-      setSeasonFormExpanded(false)
     },
   })
   const removeSeason = trpc.admin.season.remove.useMutation({
@@ -60,7 +59,6 @@ function SeasonCategoriesPage() {
   })
 
   const [seasonForm, setSeasonForm] = useState<SeasonForm | null>(null)
-  const [seasonFormExpanded, setSeasonFormExpanded] = useState(false)
 
   const { data: categories } = trpc.admin.season.listCategories.useQuery(
     { seasonId: seasonForm?.id! },
@@ -71,7 +69,7 @@ function SeasonCategoriesPage() {
     onSuccess: () => {
       utils.admin.season.listCategories.invalidate({ seasonId: seasonForm?.id })
       setCategoryEditingId(null)
-      setCategoryForm(null)
+      setCategoryForm(emptyCategoryForm())
     },
   })
   const removeCategory = trpc.admin.season.removeCategory.useMutation({
@@ -81,7 +79,7 @@ function SeasonCategoriesPage() {
   })
 
   const [categoryEditingId, setCategoryEditingId] = useState<string | null>(null)
-  const [categoryForm, setCategoryForm] = useState<CategoryForm | null>(null)
+  const [categoryForm, setCategoryForm] = useState<CategoryForm>(emptyCategoryForm())
 
   function openSeason(s: NonNullable<typeof seasons>[number]) {
     setSeasonForm({
@@ -91,9 +89,8 @@ function SeasonCategoriesPage() {
       endsAt: String(s.endsAt).slice(0, 10),
       isActive: s.isActive,
     })
-    setSeasonFormExpanded(false)
     setCategoryEditingId(null)
-    setCategoryForm(null)
+    setCategoryForm(emptyCategoryForm())
   }
 
   function submitSeason() {
@@ -120,282 +117,250 @@ function SeasonCategoriesPage() {
     })
   }
 
-  if (seasonForm !== null) {
-    return (
-      <div className="p-6 max-w-2xl space-y-6">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setSeasonForm(null)}
-            className="text-sm text-muted-foreground hover:text-foreground"
-          >
-            ← Back to list
-          </button>
-          <h1 className="font-serif text-2xl font-semibold text-foreground">
-            {seasonForm.id ? seasonForm.name : "New Season"}
-          </h1>
-        </div>
+  return (
+    <div className="p-4 space-y-3 max-w-4xl mx-auto">
+      <h1 className="font-serif text-xl font-semibold text-foreground">Season Categories</h1>
 
+      <div className="rounded-xl border border-border bg-card shadow-md p-2">
+        <div className="grid grid-cols-[300px_1fr] gap-2 items-start">
         <section className="rounded-lg border border-border bg-card shadow-sm">
-          <header className="flex items-center justify-between border-b border-border bg-secondary/40 px-4 py-2.5">
-            <h2 className="text-sm font-semibold text-foreground">Season Details</h2>
-            {!seasonFormExpanded && seasonForm.id && (
-              <Button size="sm" variant="ghost" onClick={() => setSeasonFormExpanded(true)}>
-                Edit Details
-              </Button>
-            )}
-          </header>
-          {seasonFormExpanded || !seasonForm.id ? (
-            <div className="p-4 space-y-3">
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Name</label>
-                <Input
-                  value={seasonForm.name}
-                  onChange={(e) => setSeasonForm({ ...seasonForm, name: e.target.value })}
-                  placeholder="e.g. Spring 2026"
-                  className="mt-1"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground">Starts</label>
-                  <Input
-                    type="date"
-                    value={seasonForm.startsAt}
-                    onChange={(e) => setSeasonForm({ ...seasonForm, startsAt: e.target.value })}
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground">Ends</label>
-                  <Input
-                    type="date"
-                    value={seasonForm.endsAt}
-                    onChange={(e) => setSeasonForm({ ...seasonForm, endsAt: e.target.value })}
-                    className="mt-1"
-                  />
-                </div>
-              </div>
-              <div className="flex items-center gap-2 pt-1">
-                <input
-                  type="checkbox"
-                  id="isActive"
-                  checked={seasonForm.isActive}
-                  onChange={(e) => setSeasonForm({ ...seasonForm, isActive: e.target.checked })}
-                  className="h-4 w-4 rounded border border-input accent-primary"
-                />
-                <label htmlFor="isActive" className="text-sm text-foreground">Active</label>
-              </div>
-              <div className="flex gap-2 pt-1">
-                <Button
-                  onClick={submitSeason}
-                  disabled={saveSeason.isPending || !seasonForm.name.trim() || !seasonForm.startsAt || !seasonForm.endsAt}
-                >
-                  Save
-                </Button>
-                {seasonForm.id && (
-                  <Button variant="ghost" onClick={() => setSeasonFormExpanded(false)}>Cancel</Button>
-                )}
-              </div>
-              {saveSeason.error && <p className="text-sm text-destructive">{saveSeason.error.message}</p>}
-            </div>
-          ) : (
-            <div className="p-4 text-sm space-y-1 text-foreground">
-              <p><span className="text-muted-foreground">Name:</span> {seasonForm.name}</p>
-              <p><span className="text-muted-foreground">Dates:</span> {seasonForm.startsAt} — {seasonForm.endsAt}</p>
-              <p><span className="text-muted-foreground">Status:</span> {seasonForm.isActive ? "Active" : "Inactive"}</p>
-            </div>
+          <div className="flex items-center justify-between border-b border-border bg-secondary/40 px-3 py-2">
+            <h2 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Seasons</h2>
+            <Button size="sm" variant="ghost" onClick={() => { setSeasonForm(emptySeasonForm()); setCategoryEditingId(null); setCategoryForm(emptyCategoryForm()) }}>
+              + New
+            </Button>
+          </div>
+          {seasons?.length === 0 && (
+            <p className="px-3 py-4 text-sm text-muted-foreground">No seasons yet.</p>
           )}
+          <ul className="divide-y divide-border">
+            {seasons?.map((s) => (
+              <li
+                key={s.id}
+                onClick={() => openSeason(s)}
+                className={`flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-muted/50 ${seasonForm?.id === s.id ? "bg-muted/50" : ""}`}
+              >
+                <span className="text-sm font-medium text-foreground">{s.name}</span>
+                <span className="text-[10px] text-muted-foreground">
+                  {s.isActive ? "Active" : String(s.startsAt).slice(0, 4)}
+                </span>
+              </li>
+            ))}
+          </ul>
         </section>
 
-        {seasonForm.id && (
-          <>
+        {seasonForm !== null ? (
+          <div className="space-y-4">
             <section className="rounded-lg border border-border bg-card shadow-sm">
-              <header className="flex items-center justify-between border-b border-border bg-secondary/40 px-4 py-2.5">
-                <h2 className="text-sm font-semibold text-foreground">Categories</h2>
-                <Button size="sm" onClick={() => { setCategoryForm(emptyCategoryForm()); setCategoryEditingId(null) }}>
-                  + Add Category
-                </Button>
-              </header>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Name</th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Type</th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Scoped To</th>
-                    <th className="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {categories?.map((c) => (
-                    <tr key={c.id} className="border-b border-border last:border-0">
-                      <td className="px-4 py-2 font-medium text-foreground">{c.name}</td>
-                      <td className="px-4 py-2 text-muted-foreground">{CATEGORY_TYPE_LABELS[c.categoryType] ?? c.categoryType}</td>
-                      <td className="px-4 py-2 text-muted-foreground">{c.breed?.name ?? c.disciplineDef?.name ?? "—"}</td>
-                      <td className="px-4 py-2 text-right space-x-1">
-                        <Button size="sm" variant="ghost" onClick={() => {
-                          setCategoryEditingId(c.id)
-                          setCategoryForm({
-                            name: c.name,
-                            categoryType: c.categoryType,
-                            breedId: c.breedId ?? "",
-                            disciplineDefId: c.disciplineDefId ?? "",
-                          })
-                        }}>Edit</Button>
-                        <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
-                          onClick={() => {
-                            if (!confirm("Delete this category? This will remove its rankings.")) return
-                            removeCategory.mutate({ id: c.id })
-                          }}>
-                          Delete
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                  {categories?.length === 0 && (
-                    <tr>
-                      <td colSpan={4} className="px-4 py-6 text-center text-sm text-muted-foreground">No categories yet.</td>
-                    </tr>
+              <div className="border-b border-border bg-secondary/40 px-3 py-2">
+                <h2 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  {seasonForm.id ? "Season Details" : "New Season"}
+                </h2>
+              </div>
+              <div className="p-3 space-y-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Name</label>
+                  <Input
+                    value={seasonForm.name}
+                    onChange={(e) => setSeasonForm({ ...seasonForm, name: e.target.value })}
+                    placeholder="e.g. Spring 2026"
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Starts</label>
+                    <Input
+                      type="date"
+                      value={seasonForm.startsAt}
+                      onChange={(e) => setSeasonForm({ ...seasonForm, startsAt: e.target.value })}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Ends</label>
+                    <Input
+                      type="date"
+                      value={seasonForm.endsAt}
+                      onChange={(e) => setSeasonForm({ ...seasonForm, endsAt: e.target.value })}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="isActive"
+                    checked={seasonForm.isActive}
+                    onChange={(e) => setSeasonForm({ ...seasonForm, isActive: e.target.checked })}
+                    className="h-4 w-4 rounded border border-input accent-primary"
+                  />
+                  <label htmlFor="isActive" className="text-sm text-foreground">Active</label>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    onClick={submitSeason}
+                    disabled={saveSeason.isPending || !seasonForm.name.trim() || !seasonForm.startsAt || !seasonForm.endsAt}
+                  >
+                    Save
+                  </Button>
+                  {seasonForm.id && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => {
+                        if (!confirm("Delete this season? This will remove all its categories and rankings.")) return
+                        removeSeason.mutate({ id: seasonForm.id! })
+                      }}
+                      disabled={removeSeason.isPending}
+                    >
+                      Delete
+                    </Button>
                   )}
-                </tbody>
-              </table>
-              {removeCategory.error && <p className="px-4 pb-3 text-sm text-destructive">{removeCategory.error.message}</p>}
+                  <Button size="sm" variant="ghost" onClick={() => setSeasonForm(null)}>
+                    Cancel
+                  </Button>
+                </div>
+                {saveSeason.error && <p className="text-sm text-destructive">{saveSeason.error.message}</p>}
+                {removeSeason.error && <p className="text-sm text-destructive">{removeSeason.error.message}</p>}
+              </div>
             </section>
 
-            {categoryForm !== null && (
-              <section className="rounded-lg border border-border bg-card shadow-sm">
-                <header className="border-b border-border bg-secondary/40 px-4 py-2.5">
-                  <h2 className="text-sm font-semibold text-foreground">
-                    {categoryEditingId ? "Edit Category" : "Add Category"}
-                  </h2>
-                </header>
-                <div className="p-4 space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs font-medium text-muted-foreground">Name</label>
+            {seasonForm.id && (
+              <div className="grid grid-cols-[1fr_300px] gap-4 items-start">
+                <section className="rounded-lg border border-border bg-card shadow-sm">
+                  <div className="flex items-center justify-between border-b border-border bg-secondary/40 px-3 py-2">
+                    <h2 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Categories</h2>
+                    <Button size="sm" variant="ghost" onClick={() => { setCategoryForm(emptyCategoryForm()); setCategoryEditingId(null) }}>
+                      + Add
+                    </Button>
+                  </div>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Name</th>
+                        <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Type</th>
+                        <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Scoped To</th>
+                        <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {categories?.map((c) => (
+                        <tr key={c.id} className="border-b border-border last:border-0">
+                          <td className="px-3 py-2 font-medium text-foreground">{c.name}</td>
+                          <td className="px-3 py-2 text-muted-foreground">{CATEGORY_TYPE_LABELS[c.categoryType] ?? c.categoryType}</td>
+                          <td className="px-3 py-2 text-muted-foreground">{c.breed?.name ?? c.disciplineDef?.name ?? "—"}</td>
+                          <td className="px-3 py-2 text-right space-x-1">
+                            <Button size="sm" variant="ghost" onClick={() => {
+                              setCategoryEditingId(c.id)
+                              setCategoryForm({
+                                name: c.name,
+                                categoryType: c.categoryType,
+                                breedId: c.breedId ?? "",
+                                disciplineDefId: c.disciplineDefId ?? "",
+                              })
+                            }}>Edit</Button>
+                            <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
+                              onClick={() => {
+                                if (!confirm("Delete this category? This will remove its rankings.")) return
+                                removeCategory.mutate({ id: c.id })
+                              }}>
+                              Delete
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                      {categories?.length === 0 && (
+                        <tr>
+                          <td colSpan={4} className="px-3 py-6 text-center text-sm text-muted-foreground">No categories yet.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                  {removeCategory.error && <p className="px-3 pb-3 text-sm text-destructive">{removeCategory.error.message}</p>}
+                </section>
+
+                <section className="rounded-lg border border-border bg-card shadow-sm">
+                  <div className="border-b border-border bg-secondary/40 px-3 py-2">
+                    <h2 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                      {categoryEditingId ? "Edit Category" : "Add Category"}
+                    </h2>
+                  </div>
+                  <div className="p-3 space-y-3">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Name</label>
                       <Input
                         value={categoryForm.name}
                         onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
-                        placeholder="e.g. Overall, Dressage Rankings"
-                        className="mt-1"
+                        placeholder="e.g. Overall"
+                        className="h-8 text-sm"
                       />
                     </div>
-                    <div>
-                      <label className="text-xs font-medium text-muted-foreground">Type</label>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Type</label>
                       <select
                         value={categoryForm.categoryType}
                         onChange={(e) => setCategoryForm({ ...categoryForm, categoryType: e.target.value, breedId: "", disciplineDefId: "" })}
-                        className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                        className="h-8 w-full rounded-md border border-input bg-background px-3 text-sm"
                       >
                         <option value="OVERALL">Overall</option>
                         <option value="PER_BREED">Per Breed</option>
                         <option value="PER_DISCIPLINE">Per Discipline</option>
                       </select>
                     </div>
-                  </div>
-                  {categoryForm.categoryType === "PER_BREED" && (
-                    <div>
-                      <label className="text-xs font-medium text-muted-foreground">Breed</label>
-                      <select
-                        value={categoryForm.breedId}
-                        onChange={(e) => setCategoryForm({ ...categoryForm, breedId: e.target.value })}
-                        className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                    {categoryForm.categoryType === "PER_BREED" && (
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Breed</label>
+                        <select
+                          value={categoryForm.breedId}
+                          onChange={(e) => setCategoryForm({ ...categoryForm, breedId: e.target.value })}
+                          className="h-8 w-full rounded-md border border-input bg-background px-3 text-sm"
+                        >
+                          <option value="">— Select breed —</option>
+                          {breeds?.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                        </select>
+                      </div>
+                    )}
+                    {categoryForm.categoryType === "PER_DISCIPLINE" && (
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Discipline</label>
+                        <select
+                          value={categoryForm.disciplineDefId}
+                          onChange={(e) => setCategoryForm({ ...categoryForm, disciplineDefId: e.target.value })}
+                          className="h-8 w-full rounded-md border border-input bg-background px-3 text-sm"
+                        >
+                          <option value="">— Select discipline —</option>
+                          {disciplines?.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                        </select>
+                      </div>
+                    )}
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={submitCategory}
+                        disabled={saveCategory.isPending || !categoryForm.name.trim()}
                       >
-                        <option value="">— Select breed —</option>
-                        {breeds?.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-                      </select>
+                        {categoryEditingId ? "Save" : "Add Category"}
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => { setCategoryEditingId(null); setCategoryForm(emptyCategoryForm()) }}>
+                        Cancel
+                      </Button>
                     </div>
-                  )}
-                  {categoryForm.categoryType === "PER_DISCIPLINE" && (
-                    <div>
-                      <label className="text-xs font-medium text-muted-foreground">Discipline</label>
-                      <select
-                        value={categoryForm.disciplineDefId}
-                        onChange={(e) => setCategoryForm({ ...categoryForm, disciplineDefId: e.target.value })}
-                        className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                      >
-                        <option value="">— Select discipline —</option>
-                        {disciplines?.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-                      </select>
-                    </div>
-                  )}
-                  <div className="flex gap-2 pt-1">
-                    <Button
-                      onClick={submitCategory}
-                      disabled={saveCategory.isPending || !categoryForm.name.trim()}
-                    >
-                      {categoryEditingId ? "Save" : "Add Category"}
-                    </Button>
-                    <Button variant="ghost" onClick={() => { setCategoryEditingId(null); setCategoryForm(null) }}>
-                      Cancel
-                    </Button>
+                    {saveCategory.error && <p className="text-sm text-destructive">{saveCategory.error.message}</p>}
                   </div>
-                  {saveCategory.error && <p className="text-sm text-destructive">{saveCategory.error.message}</p>}
-                </div>
-              </section>
+                </section>
+              </div>
             )}
-
-            <div className="flex items-center justify-end gap-3">
-              {removeSeason.error && <p className="text-sm text-destructive">{removeSeason.error.message}</p>}
-              <Button
-                variant="ghost"
-                className="text-destructive hover:text-destructive"
-                onClick={() => {
-                  if (!confirm("Delete this season? This will remove all its categories and rankings.")) return
-                  removeSeason.mutate({ id: seasonForm.id! })
-                }}
-                disabled={removeSeason.isPending}
-              >
-                Delete Season
-              </Button>
-            </div>
-          </>
+          </div>
+        ) : (
+          <div className="rounded-lg border border-dashed border-border px-3 py-12 text-center text-sm text-muted-foreground">
+            Select a season or create a new one
+          </div>
         )}
+        </div>
       </div>
-    )
-  }
-
-  return (
-    <div className="p-6 max-w-2xl space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="font-serif text-2xl font-semibold text-foreground">Season Categories</h1>
-        <Button onClick={() => { setSeasonForm(emptySeasonForm()); setSeasonFormExpanded(true) }}>
-          + New Season
-        </Button>
-      </div>
-
-      <section className="rounded-lg border border-border bg-card shadow-sm">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border">
-              <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Name</th>
-              <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dates</th>
-              <th className="px-4 py-2 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">Active</th>
-              <th className="px-4 py-2 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">Categories</th>
-              <th className="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {seasons?.map((s) => (
-              <tr key={s.id} className="border-b border-border last:border-0">
-                <td className="px-4 py-2 font-medium text-foreground">{s.name}</td>
-                <td className="px-4 py-2 text-xs text-muted-foreground">
-                  {String(s.startsAt).slice(0, 10)} — {String(s.endsAt).slice(0, 10)}
-                </td>
-                <td className="px-4 py-2 text-center text-muted-foreground">{s.isActive ? "✓" : "—"}</td>
-                <td className="px-4 py-2 text-center text-muted-foreground">{s._count.categories}</td>
-                <td className="px-4 py-2 text-right">
-                  <Button size="sm" variant="ghost" onClick={() => openSeason(s)}>Edit</Button>
-                </td>
-              </tr>
-            ))}
-            {seasons?.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-sm text-muted-foreground">No seasons yet.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </section>
     </div>
   )
 }

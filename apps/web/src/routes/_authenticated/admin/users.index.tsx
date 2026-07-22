@@ -81,7 +81,6 @@ function OpsUsers() {
               <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Last IP</th>
               <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Games</th>
               <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Last Active</th>
-              <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Animals</th>
               <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Flags</th>
               <th className="px-3 py-2" />
             </tr>
@@ -94,8 +93,6 @@ function OpsUsers() {
               const staffRoles = p.user.staffRoles
               const games = p.user.playerAccounts.map(pa => pa.game)
               const warningCount = p._count.warnings
-              const animalCount = p._count.animalsOwned
-
               return (
                 <tr key={p.id} className="border-t border-border hover:bg-muted/30">
                   {/* Username + staff badge */}
@@ -153,11 +150,6 @@ function OpsUsers() {
                   {/* Last active */}
                   <td className="px-3 py-2 text-xs text-muted-foreground">
                     {relativeDate(p.seniority?.lastActiveDateAt)}
-                  </td>
-
-                  {/* Animals */}
-                  <td className="px-3 py-2 tabular-nums text-muted-foreground">
-                    {animalCount}
                   </td>
 
                   {/* Flags */}

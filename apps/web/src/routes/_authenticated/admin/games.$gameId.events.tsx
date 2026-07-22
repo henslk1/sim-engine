@@ -2,7 +2,9 @@ import { createFileRoute } from "@tanstack/react-router"
 import { trpc } from "@/lib/trpc"
 import { useState } from "react"
 import { cn } from "@/lib/utils"
-import { Plus, Pencil, Trash2 } from "lucide-react"
+import { Trash2 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 
 export const Route = createFileRoute("/_authenticated/admin/games/$gameId/events")({
   component: OpsEvents,
@@ -17,11 +19,10 @@ function OpsEvents() {
   )
 
   const createMutation = trpc.admin.ops.events.create.useMutation({ onSuccess: () => { refetch(); setShowForm(false); resetForm() } })
-  const updateMutation = trpc.admin.ops.events.update.useMutation({ onSuccess: () => { refetch(); setEditingId(null) } })
+  const updateMutation = trpc.admin.ops.events.update.useMutation({ onSuccess: () => { refetch() } })
   const deleteMutation = trpc.admin.ops.events.delete.useMutation({ onSuccess: () => refetch() })
 
   const [showForm, setShowForm] = useState(false)
-  const [editingId, setEditingId] = useState<string | null>(null)
 
   const [eventType, setEventType] = useState("breeding_bonus")
   const [configJson, setConfigJson] = useState("{}")
@@ -44,71 +45,71 @@ function OpsEvents() {
   const now = new Date()
 
   return (
-    <div className="space-y-4 p-6">
+    <div className="space-y-3 p-4 max-w-4xl mx-auto">
       <div className="flex items-center justify-between">
         <h1 className="font-serif text-xl font-semibold text-foreground">Event Scheduler</h1>
-        <button
-          onClick={() => setShowForm(v => !v)}
-          className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground"
-        >
-          <Plus className="size-4" />
-          New Event
-        </button>
+        <Button size="sm" onClick={() => setShowForm(v => !v)}>
+          + New Event
+        </Button>
       </div>
 
       {showForm && (
-        <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-          <h2 className="text-sm font-semibold">Create Live Ops Event</h2>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-xs text-muted-foreground">Event Type</label>
-              <input
-                value={eventType}
-                onChange={e => setEventType(e.target.value)}
-                placeholder="e.g. breeding_bonus"
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+        <section className="rounded-lg border border-border bg-card shadow-sm">
+          <div className="border-b border-border bg-secondary/40 px-3 py-2">
+            <h2 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Create Live Ops Event</h2>
+          </div>
+          <div className="p-3 space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Event Type</label>
+                <Input
+                  value={eventType}
+                  onChange={e => setEventType(e.target.value)}
+                  placeholder="e.g. breeding_bonus"
+                  className="h-8 text-sm"
+                />
+              </div>
+              <div className="flex items-end pb-1">
+                <label className="flex cursor-pointer items-center gap-2 text-sm">
+                  <input type="checkbox" checked={isTemplate} onChange={e => setIsTemplate(e.target.checked)} className="rounded" />
+                  Save as template
+                </label>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Starts At</label>
+                <Input type="datetime-local" value={startsAt} onChange={e => setStartsAt(e.target.value)} className="h-8 text-sm" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Ends At</label>
+                <Input type="datetime-local" value={endsAt} onChange={e => setEndsAt(e.target.value)} className="h-8 text-sm" />
+              </div>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Config Overrides (JSON)</label>
+              <textarea
+                value={configJson}
+                onChange={e => setConfigJson(e.target.value)}
+                rows={4}
+                className={cn("w-full rounded-md border bg-background px-3 py-2 font-mono text-xs outline-none focus:border-primary resize-none", jsonError ? "border-destructive" : "border-border")}
               />
+              {jsonError && <p className="text-xs text-destructive">{jsonError}</p>}
             </div>
-            <div className="flex items-end">
-              <label className="flex cursor-pointer items-center gap-2 text-sm">
-                <input type="checkbox" checked={isTemplate} onChange={e => setIsTemplate(e.target.checked)} className="rounded" />
-                Save as template
-              </label>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-xs text-muted-foreground">Starts At</label>
-              <input type="datetime-local" value={startsAt} onChange={e => setStartsAt(e.target.value)} className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary" />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs text-muted-foreground">Ends At</label>
-              <input type="datetime-local" value={endsAt} onChange={e => setEndsAt(e.target.value)} className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary" />
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                onClick={handleCreate}
+                disabled={!eventType || !startsAt || !endsAt || createMutation.isPending}
+              >
+                Create
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => { setShowForm(false); resetForm() }}>
+                Cancel
+              </Button>
             </div>
           </div>
-          <div>
-            <label className="mb-1 block text-xs text-muted-foreground">Config Overrides (JSON)</label>
-            <textarea
-              value={configJson}
-              onChange={e => setConfigJson(e.target.value)}
-              rows={4}
-              className={cn("w-full rounded-md border bg-background px-3 py-2 font-mono text-xs outline-none focus:border-primary resize-none", jsonError ? "border-destructive" : "border-border")}
-            />
-            {jsonError && <p className="mt-1 text-xs text-destructive">{jsonError}</p>}
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={handleCreate}
-              disabled={!eventType || !startsAt || !endsAt || createMutation.isPending}
-              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
-            >
-              Create
-            </button>
-            <button onClick={() => { setShowForm(false); resetForm() }} className="rounded-md border border-border bg-background px-4 py-2 text-sm font-medium hover:bg-muted">
-              Cancel
-            </button>
-          </div>
-        </div>
+        </section>
       )}
 
       <div className="space-y-2">
@@ -141,12 +142,13 @@ function OpsEvents() {
                 </div>
                 <div className="flex shrink-0 gap-2">
                   {!isPast && (
-                    <button
+                    <Button
+                      size="sm"
+                      variant="outline"
                       onClick={() => updateMutation.mutate({ eventId: ev.id, isActive: !ev.isActive, staffUserId: "CURRENT_USER" })}
-                      className="rounded-md border border-border bg-background px-2 py-1 text-xs font-medium hover:bg-muted"
                     >
                       {ev.isActive ? "Deactivate" : "Activate"}
-                    </button>
+                    </Button>
                   )}
                   <button
                     onClick={() => { if (confirm("Delete this event?")) deleteMutation.mutate({ eventId: ev.id, staffUserId: "CURRENT_USER" }) }}

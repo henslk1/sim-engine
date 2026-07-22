@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router"
 import { trpc } from "@/lib/trpc"
 import { useState } from "react"
-import { cn } from "@/lib/utils"
 
 export const Route = createFileRoute("/_authenticated/admin/games/$gameId/economy")({
   component: OpsEconomy,
@@ -35,7 +34,6 @@ const TXN_TYPE_LABELS: Record<string, string> = {
 
 function OpsEconomy() {
   const { gameId } = Route.useParams()
-  const [txnPlayerSearch, setTxnPlayerSearch] = useState("")
   const [txnTypeFilter, setTxnTypeFilter] = useState("")
 
   const { data: stats } = trpc.admin.ops.economy.stats.useQuery(
@@ -51,17 +49,17 @@ function OpsEconomy() {
   const transactions = txnData?.pages.flatMap(p => p.txns) ?? []
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-3 p-4 max-w-4xl mx-auto">
       <h1 className="font-serif text-xl font-semibold text-foreground">Economy</h1>
 
       {stats && (
         <>
           <section>
-            <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Currency in Circulation</h2>
+            <h2 className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Currency in Circulation</h2>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               {stats.circulation.map(c => (
                 <div key={c.id} className="rounded-lg border border-border bg-card p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{c.name}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{c.name}</p>
                   <p className="mt-1 text-2xl font-semibold tabular-nums text-foreground">
                     {c.symbol}{c.totalInCirculation.toLocaleString()}
                   </p>
@@ -72,14 +70,14 @@ function OpsEconomy() {
           </section>
 
           <section>
-            <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">7-Day Volume by Type</h2>
+            <h2 className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">7-Day Volume by Type</h2>
             <div className="rounded-lg border border-border overflow-hidden">
               <table className="w-full text-sm">
-                <thead className="bg-muted/50">
-                  <tr>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Transaction Type</th>
-                    <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Count</th>
-                    <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Total Amount</th>
+                <thead>
+                  <tr className="border-b border-border bg-secondary/40">
+                    <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Transaction Type</th>
+                    <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Count</th>
+                    <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Total Amount</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -102,11 +100,11 @@ function OpsEconomy() {
 
       <section>
         <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Transaction Ledger</h2>
+          <h2 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Transaction Ledger</h2>
           <select
             value={txnTypeFilter}
             onChange={e => setTxnTypeFilter(e.target.value)}
-            className="rounded-md border border-border bg-background px-3 py-1.5 text-sm outline-none focus:border-primary"
+            className="h-8 rounded-md border border-input bg-background px-3 text-sm"
           >
             <option value="">All types</option>
             {Object.entries(TXN_TYPE_LABELS).map(([k, v]) => (
@@ -116,13 +114,13 @@ function OpsEconomy() {
         </div>
         <div className="rounded-lg border border-border overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-muted/50">
-              <tr>
-                <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Type</th>
-                <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Amount</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">From</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">To</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">When</th>
+            <thead>
+              <tr className="border-b border-border bg-secondary/40">
+                <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Type</th>
+                <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Amount</th>
+                <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">From</th>
+                <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">To</th>
+                <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">When</th>
               </tr>
             </thead>
             <tbody>

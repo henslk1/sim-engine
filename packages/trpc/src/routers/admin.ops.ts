@@ -50,7 +50,7 @@ const overviewRouter = router({
                 playerAccounts: { select: { game: { select: { id: true, name: true } } } },
               },
             },
-            _count: { select: { warnings: true } },
+            _count: { select: { warnings: true, animalsOwned: true } },
           },
         }),
         db.adminActionLog.findMany({

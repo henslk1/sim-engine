@@ -18,10 +18,7 @@ const emptyWeight = (): WeightRow => ({ weight: "" })
 function DisciplinesPage() {
   const { gameId } = Route.useParams()
 
-  const { data: disciplines } = trpc.admin.discipline.list.useQuery(
-    { gameId: gameId! },
-    {}
-  )
+  const { data: disciplines } = trpc.admin.discipline.list.useQuery({ gameId: gameId! }, {})
   const { data: stats } = trpc.admin.stat.list.useQuery({ gameId: gameId! }, {})
   const { data: traits } = trpc.admin.personality.list.useQuery({ gameId: gameId! }, {})
   const { data: items } = trpc.admin.item.list.useQuery({ gameId: gameId! }, {})
@@ -32,7 +29,6 @@ function DisciplinesPage() {
     onSuccess: (saved) => {
       utils.admin.discipline.list.invalidate()
       setEditing((prev) => (prev ? { ...prev, id: saved.id } : null))
-      setFormExpanded(false)
     },
   })
   const removeDiscipline = trpc.admin.discipline.remove.useMutation({
@@ -43,7 +39,7 @@ function DisciplinesPage() {
   })
 
   const [editing, setEditing] = useState<DisciplineForm | null>(null)
-  const [formExpanded, setFormExpanded] = useState(false)
+  const [activeTab, setActiveTab] = useState<"stats" | "personality" | "equipment">("stats")
 
   const { data: equipmentRequirements } = trpc.admin.discipline.listEquipmentRequirements.useQuery(
     { disciplineDefId: editing?.id! },
@@ -111,7 +107,7 @@ function DisciplinesPage() {
 
   function openEdit(d: NonNullable<typeof disciplines>[number]) {
     setEditing({ id: d.id, name: d.name, description: d.description ?? "", isConformation: d.isConformation })
-    setFormExpanded(false)
+    setActiveTab("stats")
     setEditingStatWeightId(null)
     setEditingStatWeight(emptyWeight())
     setNewStatWeight({ statDefId: "", weight: "" })
@@ -175,7 +171,7 @@ function DisciplinesPage() {
 
   if (editing !== null) {
     return (
-      <div className="p-6 max-w-2xl space-y-6">
+      <div className="p-4 flex flex-col gap-3 max-w-4xl mx-auto">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setEditing(null)}
@@ -188,34 +184,30 @@ function DisciplinesPage() {
           </h1>
         </div>
 
-        <section className="rounded-lg border border-border bg-card shadow-sm">
-          <header className="flex items-center justify-between border-b border-border bg-secondary/40 px-4 py-2.5">
-            <h2 className="text-sm font-semibold text-foreground">Discipline Details</h2>
-            {!formExpanded && editing.id && (
-              <Button size="sm" variant="ghost" onClick={() => setFormExpanded(true)}>
-                Edit Details
-              </Button>
-            )}
-          </header>
-          {formExpanded || !editing.id ? (
-            <div className="p-4 space-y-3">
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Name</label>
+        <div className="rounded-xl border border-border bg-card shadow-md p-2">
+          <div className="grid grid-cols-[300px_1fr] gap-2 items-start">
+          <section className="rounded-lg border border-border bg-card shadow-sm">
+            <div className="border-b border-border bg-secondary/40 px-3 py-2">
+              <h2 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Discipline Details</h2>
+            </div>
+            <div className="p-3 space-y-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Name</label>
                 <Input
                   value={editing.name}
                   onChange={(e) => setEditing({ ...editing, name: e.target.value })}
                   placeholder="e.g. Dressage, Sprint Racing"
-                  className="mt-1"
+                  className="h-8 text-sm"
                 />
               </div>
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                   Description <span className="font-normal">(optional)</span>
                 </label>
                 <Input
                   value={editing.description}
                   onChange={(e) => setEditing({ ...editing, description: e.target.value })}
-                  className="mt-1"
+                  className="h-8 text-sm"
                 />
               </div>
               <div className="flex items-center gap-2 pt-1">
@@ -230,342 +222,348 @@ function DisciplinesPage() {
                   Conformation discipline
                 </label>
               </div>
-              <div className="flex gap-2 pt-1">
+              <div className="flex flex-col gap-2 pt-1">
                 <Button onClick={submitDiscipline} disabled={saveDiscipline.isPending || !editing.name.trim()}>
                   Save
                 </Button>
                 {editing.id && (
-                  <Button variant="ghost" onClick={() => setFormExpanded(false)}>
-                    Cancel
-                  </Button>
+                  <>
+                    {removeDiscipline.error && (
+                      <p className="text-sm text-destructive">{removeDiscipline.error.message}</p>
+                    )}
+                    <Button
+                      variant="ghost"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => {
+                        if (!confirm("Delete this discipline? This will remove all its tiers and scoring weights.")) return
+                        removeDiscipline.mutate({ id: editing.id! })
+                      }}
+                      disabled={removeDiscipline.isPending}
+                    >
+                      Delete Discipline
+                    </Button>
+                  </>
                 )}
               </div>
               {saveDiscipline.error && (
                 <p className="text-sm text-destructive">{saveDiscipline.error.message}</p>
               )}
             </div>
-          ) : (
-            <div className="p-4 text-sm space-y-1 text-foreground">
-              <p><span className="text-muted-foreground">Name:</span> {editing.name}</p>
-              {editing.description && (
-                <p><span className="text-muted-foreground">Description:</span> {editing.description}</p>
-              )}
-              <p><span className="text-muted-foreground">Type:</span> {editing.isConformation ? "Conformation" : "Sport"}</p>
-            </div>
-          )}
-        </section>
+          </section>
 
-        {editing.id && (
-          <>
+          {editing.id && (
             <section className="rounded-lg border border-border bg-card shadow-sm">
-              <header className="border-b border-border bg-secondary/40 px-4 py-2.5">
-                <h2 className="text-sm font-semibold text-foreground">Stat Weights</h2>
-              </header>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Stat</th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Weight</th>
-                    <th className="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {statWeights?.map((w) =>
-                    editingStatWeightId === w.id ? (
-                      <tr key={w.id} className="border-b border-border last:border-0">
-                        <td className="px-4 py-2 text-foreground">{w.statDef.name}</td>
-                        <td className="px-4 py-2">
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={editingStatWeight.weight}
-                            onChange={(e) => setEditingStatWeight({ weight: e.target.value })}
-                            className="h-7 text-sm max-w-[120px]"
-                          />
-                        </td>
-                        <td className="px-4 py-2 text-right space-x-2">
-                          <Button size="sm" onClick={() => submitEditStatWeight(w.id)} disabled={saveStatWeight.isPending}>
-                            Save
-                          </Button>
-                          <Button size="sm" variant="ghost" onClick={() => { setEditingStatWeightId(null); setEditingStatWeight(emptyWeight()) }}>
-                            Cancel
-                          </Button>
-                        </td>
-                      </tr>
-                    ) : (
-                      <tr key={w.id} className="border-b border-border last:border-0">
-                        <td className="px-4 py-2 font-medium text-foreground">{w.statDef.name}</td>
-                        <td className="px-4 py-2 text-muted-foreground">{w.weight}</td>
-                        <td className="px-4 py-2 text-right space-x-2">
-                          <Button size="sm" variant="ghost" onClick={() => {
-                            setEditingStatWeightId(w.id)
-                            setEditingStatWeight({ weight: w.weight.toString() })
-                          }}>
-                            Edit
-                          </Button>
-                          <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
-                            onClick={() => removeStatWeight.mutate({ id: w.id })}>
-                            Remove
-                          </Button>
-                        </td>
-                      </tr>
-                    )
-                  )}
-                  <tr>
-                    <td className="px-4 py-3">
-                      <select
-                        value={newStatWeight.statDefId}
-                        onChange={(e) => setNewStatWeight({ ...newStatWeight, statDefId: e.target.value })}
-                        className="block w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                      >
-                        <option value="">— Select stat —</option>
-                        {availableStats.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                      </select>
-                    </td>
-                    <td className="px-4 py-3">
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={newStatWeight.weight}
-                        onChange={(e) => setNewStatWeight({ ...newStatWeight, weight: e.target.value })}
-                        placeholder="e.g. 0.5"
-                        className="h-7 text-sm max-w-[120px]"
-                      />
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <Button
-                        size="sm"
-                        onClick={submitNewStatWeight}
-                        disabled={saveStatWeight.isPending || !newStatWeight.statDefId || !newStatWeight.weight}
-                      >
-                        Add
-                      </Button>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-              {removeStatWeight.error && <p className="px-4 pb-3 text-sm text-destructive">{removeStatWeight.error.message}</p>}
-            </section>
+              <div className="border-b border-border bg-secondary/40 px-3 py-2 flex items-center gap-4">
+                {(["stats", "personality", "equipment"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`text-[10px] font-bold uppercase tracking-wider pb-0.5 border-b-2 transition-colors ${
+                      activeTab === tab
+                        ? "border-foreground text-foreground"
+                        : "border-transparent text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {tab === "stats" ? "Stats" : tab === "personality" ? "Personality" : "Equipment"}
+                  </button>
+                ))}
+              </div>
 
-            <section className="rounded-lg border border-border bg-card shadow-sm">
-              <header className="border-b border-border bg-secondary/40 px-4 py-2.5">
-                <h2 className="text-sm font-semibold text-foreground">Personality Weights</h2>
-              </header>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Trait</th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Weight</th>
-                    <th className="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {personalityWeights?.map((w) =>
-                    editingPersonalityWeightId === w.id ? (
-                      <tr key={w.id} className="border-b border-border last:border-0">
-                        <td className="px-4 py-2 text-foreground">{w.traitDef.name}</td>
-                        <td className="px-4 py-2">
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={editingPersonalityWeight.weight}
-                            onChange={(e) => setEditingPersonalityWeight({ weight: e.target.value })}
-                            className="h-7 text-sm max-w-[120px]"
-                          />
-                        </td>
-                        <td className="px-4 py-2 text-right space-x-2">
-                          <Button size="sm" onClick={() => submitEditPersonalityWeight(w.id)} disabled={savePersonalityWeight.isPending}>
-                            Save
-                          </Button>
-                          <Button size="sm" variant="ghost" onClick={() => { setEditingPersonalityWeightId(null); setEditingPersonalityWeight(emptyWeight()) }}>
-                            Cancel
-                          </Button>
-                        </td>
-                      </tr>
-                    ) : (
-                      <tr key={w.id} className="border-b border-border last:border-0">
-                        <td className="px-4 py-2 font-medium text-foreground">{w.traitDef.name}</td>
-                        <td className="px-4 py-2 text-muted-foreground">{w.weight}</td>
-                        <td className="px-4 py-2 text-right space-x-2">
-                          <Button size="sm" variant="ghost" onClick={() => {
-                            setEditingPersonalityWeightId(w.id)
-                            setEditingPersonalityWeight({ weight: w.weight.toString() })
-                          }}>
-                            Edit
-                          </Button>
-                          <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
-                            onClick={() => removePersonalityWeight.mutate({ id: w.id })}>
-                            Remove
-                          </Button>
-                        </td>
-                      </tr>
-                    )
-                  )}
-                  <tr>
-                    <td className="px-4 py-3">
-                      <select
-                        value={newPersonalityWeight.traitDefId}
-                        onChange={(e) => setNewPersonalityWeight({ ...newPersonalityWeight, traitDefId: e.target.value })}
-                        className="block w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                      >
-                        <option value="">— Select trait —</option>
-                        {availableTraits.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                      </select>
-                    </td>
-                    <td className="px-4 py-3">
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={newPersonalityWeight.weight}
-                        onChange={(e) => setNewPersonalityWeight({ ...newPersonalityWeight, weight: e.target.value })}
-                        placeholder="e.g. 0.3"
-                        className="h-7 text-sm max-w-[120px]"
-                      />
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <Button
-                        size="sm"
-                        onClick={submitNewPersonalityWeight}
-                        disabled={savePersonalityWeight.isPending || !newPersonalityWeight.traitDefId || !newPersonalityWeight.weight}
-                      >
-                        Add
-                      </Button>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-              {removePersonalityWeight.error && <p className="px-4 pb-3 text-sm text-destructive">{removePersonalityWeight.error.message}</p>}
-            </section>
-
-            <section className="rounded-lg border border-border bg-card shadow-sm">
-              <header className="border-b border-border bg-secondary/40 px-4 py-2.5">
-                <h2 className="text-sm font-semibold text-foreground">Equipment Requirements</h2>
-              </header>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Item</th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Quantity</th>
-                    <th className="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {equipmentRequirements?.map((r) => (
-                    <tr key={r.id} className="border-b border-border last:border-0">
-                      <td className="px-4 py-2 font-medium text-foreground">{r.itemDef.name}</td>
-                      <td className="px-4 py-2 text-muted-foreground">{r.quantity}</td>
-                      <td className="px-4 py-2 text-right">
-                        <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
-                          onClick={() => removeEquipReq.mutate({ id: r.id })}>
-                          Remove
+              {activeTab === "stats" && (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Stat</th>
+                      <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Weight</th>
+                      <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {statWeights?.map((w) =>
+                      editingStatWeightId === w.id ? (
+                        <tr key={w.id} className="border-b border-border last:border-0">
+                          <td className="px-3 py-2 text-foreground">{w.statDef.name}</td>
+                          <td className="px-3 py-2">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={editingStatWeight.weight}
+                              onChange={(e) => setEditingStatWeight({ weight: e.target.value })}
+                              className="h-7 text-sm max-w-[120px]"
+                            />
+                          </td>
+                          <td className="px-3 py-2 text-right space-x-2">
+                            <Button size="sm" onClick={() => submitEditStatWeight(w.id)} disabled={saveStatWeight.isPending}>
+                              Save
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => { setEditingStatWeightId(null); setEditingStatWeight(emptyWeight()) }}>
+                              Cancel
+                            </Button>
+                          </td>
+                        </tr>
+                      ) : (
+                        <tr key={w.id} className="border-b border-border last:border-0">
+                          <td className="px-3 py-2 font-medium text-foreground">{w.statDef.name}</td>
+                          <td className="px-3 py-2 text-muted-foreground">{w.weight}</td>
+                          <td className="px-3 py-2 text-right space-x-2">
+                            <Button size="sm" variant="ghost" onClick={() => {
+                              setEditingStatWeightId(w.id)
+                              setEditingStatWeight({ weight: w.weight.toString() })
+                            }}>
+                              Edit
+                            </Button>
+                            <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
+                              onClick={() => removeStatWeight.mutate({ id: w.id })}>
+                              Remove
+                            </Button>
+                          </td>
+                        </tr>
+                      )
+                    )}
+                    <tr>
+                      <td className="px-3 py-2">
+                        <select
+                          value={newStatWeight.statDefId}
+                          onChange={(e) => setNewStatWeight({ ...newStatWeight, statDefId: e.target.value })}
+                          className="h-8 rounded-md border border-input bg-background px-3 text-sm w-full"
+                        >
+                          <option value="">— Select stat —</option>
+                          {availableStats.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                        </select>
+                      </td>
+                      <td className="px-3 py-2">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={newStatWeight.weight}
+                          onChange={(e) => setNewStatWeight({ ...newStatWeight, weight: e.target.value })}
+                          placeholder="e.g. 0.5"
+                          className="h-7 text-sm max-w-[120px]"
+                        />
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <Button
+                          size="sm"
+                          onClick={submitNewStatWeight}
+                          disabled={saveStatWeight.isPending || !newStatWeight.statDefId || !newStatWeight.weight}
+                        >
+                          Add
                         </Button>
                       </td>
                     </tr>
-                  ))}
-                  <tr>
-                    <td className="px-4 py-3">
-                      <select value={newEquipReq.itemDefId}
-                        onChange={(e) => setNewEquipReq(r => ({ ...r, itemDefId: e.target.value }))}
-                        className="block w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
-                        <option value="">— Select item —</option>
-                        {items?.filter(i => !equipmentRequirements?.some(r => r.itemDef.id === i.id))
-                          .map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
-                      </select>
-                    </td>
-                    <td className="px-4 py-3">
-                      <Input type="number" step="1" min="1"
-                        value={newEquipReq.quantity}
-                        onChange={(e) => setNewEquipReq(r => ({ ...r, quantity: e.target.value }))}
-                        placeholder="1"
-                        className="h-7 text-sm max-w-[80px]" />
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <Button size="sm"
-                        onClick={() => {
-                          if (!editing?.id || !newEquipReq.itemDefId) return
-                          saveEquipReq.mutate({
-                            disciplineDefId: editing.id,
-                            itemDefId: newEquipReq.itemDefId,
-                            quantity: parseInt(newEquipReq.quantity) || 1,
-                          })
-                        }}
-                        disabled={saveEquipReq.isPending || !newEquipReq.itemDefId}>
-                        Add
-                      </Button>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-              {saveEquipReq.error && <p className="px-4 pb-3 text-sm text-destructive">{saveEquipReq.error.message}</p>}
-              {removeEquipReq.error && <p className="px-4 pb-3 text-sm text-destructive">{removeEquipReq.error.message}</p>}
-            </section>
-          </>
-        )}
+                  </tbody>
+                </table>
+              )}
+              {activeTab === "stats" && removeStatWeight.error && (
+                <p className="px-3 pb-3 text-sm text-destructive">{removeStatWeight.error.message}</p>
+              )}
 
-        {editing.id && (
-          <div className="flex items-center justify-end gap-3">
-            {removeDiscipline.error && (
-              <p className="text-sm text-destructive">{removeDiscipline.error.message}</p>
-            )}
-            <Button
-              variant="ghost"
-              className="text-destructive hover:text-destructive"
-              onClick={() => {
-                if (!confirm("Delete this discipline? This will remove all its tiers and scoring weights.")) return
-                removeDiscipline.mutate({ id: editing.id! })
-              }}
-              disabled={removeDiscipline.isPending}
-            >
-              Delete Discipline
-            </Button>
+              {activeTab === "personality" && (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Trait</th>
+                      <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Weight</th>
+                      <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {personalityWeights?.map((w) =>
+                      editingPersonalityWeightId === w.id ? (
+                        <tr key={w.id} className="border-b border-border last:border-0">
+                          <td className="px-3 py-2 text-foreground">{w.traitDef.name}</td>
+                          <td className="px-3 py-2">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={editingPersonalityWeight.weight}
+                              onChange={(e) => setEditingPersonalityWeight({ weight: e.target.value })}
+                              className="h-7 text-sm max-w-[120px]"
+                            />
+                          </td>
+                          <td className="px-3 py-2 text-right space-x-2">
+                            <Button size="sm" onClick={() => submitEditPersonalityWeight(w.id)} disabled={savePersonalityWeight.isPending}>
+                              Save
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => { setEditingPersonalityWeightId(null); setEditingPersonalityWeight(emptyWeight()) }}>
+                              Cancel
+                            </Button>
+                          </td>
+                        </tr>
+                      ) : (
+                        <tr key={w.id} className="border-b border-border last:border-0">
+                          <td className="px-3 py-2 font-medium text-foreground">{w.traitDef.name}</td>
+                          <td className="px-3 py-2 text-muted-foreground">{w.weight}</td>
+                          <td className="px-3 py-2 text-right space-x-2">
+                            <Button size="sm" variant="ghost" onClick={() => {
+                              setEditingPersonalityWeightId(w.id)
+                              setEditingPersonalityWeight({ weight: w.weight.toString() })
+                            }}>
+                              Edit
+                            </Button>
+                            <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
+                              onClick={() => removePersonalityWeight.mutate({ id: w.id })}>
+                              Remove
+                            </Button>
+                          </td>
+                        </tr>
+                      )
+                    )}
+                    <tr>
+                      <td className="px-3 py-2">
+                        <select
+                          value={newPersonalityWeight.traitDefId}
+                          onChange={(e) => setNewPersonalityWeight({ ...newPersonalityWeight, traitDefId: e.target.value })}
+                          className="h-8 rounded-md border border-input bg-background px-3 text-sm w-full"
+                        >
+                          <option value="">— Select trait —</option>
+                          {availableTraits.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                        </select>
+                      </td>
+                      <td className="px-3 py-2">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={newPersonalityWeight.weight}
+                          onChange={(e) => setNewPersonalityWeight({ ...newPersonalityWeight, weight: e.target.value })}
+                          placeholder="e.g. 0.3"
+                          className="h-7 text-sm max-w-[120px]"
+                        />
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <Button
+                          size="sm"
+                          onClick={submitNewPersonalityWeight}
+                          disabled={savePersonalityWeight.isPending || !newPersonalityWeight.traitDefId || !newPersonalityWeight.weight}
+                        >
+                          Add
+                        </Button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              )}
+              {activeTab === "personality" && removePersonalityWeight.error && (
+                <p className="px-3 pb-3 text-sm text-destructive">{removePersonalityWeight.error.message}</p>
+              )}
+
+              {activeTab === "equipment" && (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Item</th>
+                      <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Quantity</th>
+                      <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {equipmentRequirements?.map((r) => (
+                      <tr key={r.id} className="border-b border-border last:border-0">
+                        <td className="px-3 py-2 font-medium text-foreground">{r.itemDef.name}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{r.quantity}</td>
+                        <td className="px-3 py-2 text-right">
+                          <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
+                            onClick={() => removeEquipReq.mutate({ id: r.id })}>
+                            Remove
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                    <tr>
+                      <td className="px-3 py-2">
+                        <select
+                          value={newEquipReq.itemDefId}
+                          onChange={(e) => setNewEquipReq(r => ({ ...r, itemDefId: e.target.value }))}
+                          className="h-8 rounded-md border border-input bg-background px-3 text-sm w-full"
+                        >
+                          <option value="">— Select item —</option>
+                          {items?.filter(i => !equipmentRequirements?.some(r => r.itemDef.id === i.id))
+                            .map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
+                        </select>
+                      </td>
+                      <td className="px-3 py-2">
+                        <Input type="number" step="1" min="1"
+                          value={newEquipReq.quantity}
+                          onChange={(e) => setNewEquipReq(r => ({ ...r, quantity: e.target.value }))}
+                          placeholder="1"
+                          className="h-7 text-sm max-w-[80px]" />
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <Button size="sm"
+                          onClick={() => {
+                            if (!editing?.id || !newEquipReq.itemDefId) return
+                            saveEquipReq.mutate({
+                              disciplineDefId: editing.id,
+                              itemDefId: newEquipReq.itemDefId,
+                              quantity: parseInt(newEquipReq.quantity) || 1,
+                            })
+                          }}
+                          disabled={saveEquipReq.isPending || !newEquipReq.itemDefId}>
+                          Add
+                        </Button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              )}
+              {activeTab === "equipment" && saveEquipReq.error && (
+                <p className="px-3 pb-3 text-sm text-destructive">{saveEquipReq.error.message}</p>
+              )}
+              {activeTab === "equipment" && removeEquipReq.error && (
+                <p className="px-3 pb-3 text-sm text-destructive">{removeEquipReq.error.message}</p>
+              )}
+            </section>
+          )}
           </div>
-        )}
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="p-6 max-w-2xl space-y-6">
+    <div className="p-4 space-y-3 max-w-4xl mx-auto">
       <div className="flex items-center justify-between">
         <h1 className="font-serif text-2xl font-semibold text-foreground">Disciplines</h1>
-        <Button onClick={() => { setEditing(emptyDiscipline()); setFormExpanded(true) }}>
+        <Button onClick={() => { setEditing(emptyDiscipline()); setActiveTab("stats") }}>
           + New Discipline
         </Button>
       </div>
 
-      <section className="rounded-lg border border-border bg-card shadow-sm">
+      <div className="rounded-xl border border-border bg-card shadow-md p-2">
+        <section className="rounded-lg border border-border bg-card shadow-sm">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border">
-              <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Name</th>
-              <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Type</th>
-              <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Description</th>
-              <th className="px-4 py-2 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">Stat Wts</th>
-              <th className="px-4 py-2 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">Trait Wts</th>
-              <th className="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Actions</th>
+              <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Name</th>
+              <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Type</th>
+              <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Description</th>
+              <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Stat Wts</th>
+              <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Trait Wts</th>
+              <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
             </tr>
           </thead>
           <tbody>
             {disciplines?.map((d) => (
               <tr key={d.id} className="border-b border-border last:border-0">
-                <td className="px-4 py-2 font-medium text-foreground">{d.name}</td>
-                <td className="px-4 py-2 text-muted-foreground">{d.isConformation ? "Conformation" : "Sport"}</td>
-                <td className="px-4 py-2 text-muted-foreground">{d.description ?? "—"}</td>
-                <td className="px-4 py-2 text-center text-muted-foreground">{d._count.statWeights}</td>
-                <td className="px-4 py-2 text-center text-muted-foreground">{d._count.personalityWeights}</td>
-                <td className="px-4 py-2 text-right">
+                <td className="px-3 py-2 font-medium text-foreground">{d.name}</td>
+                <td className="px-3 py-2 text-muted-foreground">{d.isConformation ? "Conformation" : "Sport"}</td>
+                <td className="px-3 py-2 text-muted-foreground">{d.description ?? "—"}</td>
+                <td className="px-3 py-2 text-center text-muted-foreground">{d._count.statWeights}</td>
+                <td className="px-3 py-2 text-center text-muted-foreground">{d._count.personalityWeights}</td>
+                <td className="px-3 py-2 text-right">
                   <Button size="sm" variant="ghost" onClick={() => openEdit(d)}>Edit</Button>
                 </td>
               </tr>
             ))}
             {disciplines?.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-sm text-muted-foreground">No disciplines yet.</td>
+                <td colSpan={6} className="px-3 py-6 text-center text-sm text-muted-foreground">No disciplines yet.</td>
               </tr>
             )}
           </tbody>
         </table>
-      </section>
+        </section>
+      </div>
     </div>
   )
 }

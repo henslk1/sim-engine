@@ -122,15 +122,15 @@ function ExpressionRulesPage() {
   }
 
   return (
-    <div className="p-6 max-w-4xl space-y-6">
+    <div className="p-4 space-y-3 max-w-4xl mx-auto">
       <h1 className="font-serif text-2xl font-semibold text-foreground">Expression Rules</h1>
 
-      <section className="rounded-lg border border-border bg-card shadow-sm p-4">
-        <label className="text-xs font-medium text-muted-foreground">Locus</label>
+      <div className="flex flex-col gap-1">
+        <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Locus</label>
         <select
           value={selectedLocusId ?? ""}
           onChange={(e) => handleLocusChange(e.target.value)}
-          className="mt-1 block w-full max-w-sm rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+          className="h-8 rounded-md border border-input bg-background px-3 text-sm w-full max-w-xs"
         >
           <option value="">— Select a locus —</option>
           {loci?.map((l) => (
@@ -140,64 +140,46 @@ function ExpressionRulesPage() {
           ))}
         </select>
         {selectedLocusId && alleles?.length === 0 && (
-          <p className="mt-2 text-xs text-muted-foreground">
-            No alleles on this locus yet. Add alleles in Loci & Alleles first.
+          <p className="mt-1 text-xs text-muted-foreground">
+            No alleles on this locus yet. Add alleles in Loci &amp; Alleles first.
           </p>
         )}
-      </section>
+      </div>
 
       {selectedLocusId && alleles && alleles.length > 0 && (
-        <>
+        <div className="rounded-xl border border-border bg-card shadow-md p-2 space-y-2">
           <section className="rounded-lg border border-border bg-card shadow-sm">
-            <header className="flex items-center justify-between border-b border-border bg-secondary/40 px-4 py-2.5">
-              <h2 className="text-sm font-semibold text-foreground">Rules</h2>
+            <div className="border-b border-border bg-secondary/40 px-3 py-2 flex items-center justify-between">
+              <h2 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Rules</h2>
               <Button size="sm" onClick={() => setEditingRule(emptyRule())}>
                 + Add Rule
               </Button>
-            </header>
+            </div>
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border">
-                  <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Allele 1
-                  </th>
-                  <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Allele 2
-                  </th>
-                  <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Phenotype
-                  </th>
-                  <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Modifier
-                  </th>
-                  <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Health Condition
-                  </th>
-                  <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Penetrance
-                  </th>
-                  <th className="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Actions
-                  </th>
+                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Allele 1</th>
+                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Allele 2</th>
+                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Phenotype</th>
+                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Modifier</th>
+                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Health Condition</th>
+                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Penetrance</th>
+                  <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {rules?.map((rule) => (
                   <Fragment key={rule.id}>
                     <tr className="border-b border-border">
-                      <td className="px-4 py-2 font-mono text-foreground">{rule.alleleOne.symbol}</td>
-                      <td className="px-4 py-2 font-mono text-foreground">{rule.alleleTwo.symbol}</td>
-                      <td className="px-4 py-2 text-foreground">{rule.phenotype}</td>
-                      <td className="px-4 py-2 text-muted-foreground">
-                        {rule.numericModifier ?? "—"}
-                      </td>
-                      <td className="px-4 py-2 text-muted-foreground">
-                        {rule.healthConditionDef?.name ?? "—"}
-                      </td>
-                      <td className="px-4 py-2 text-muted-foreground">
+                      <td className="px-3 py-2 font-mono text-foreground">{rule.alleleOne.symbol}</td>
+                      <td className="px-3 py-2 font-mono text-foreground">{rule.alleleTwo.symbol}</td>
+                      <td className="px-3 py-2 text-foreground">{rule.phenotype}</td>
+                      <td className="px-3 py-2 text-muted-foreground">{rule.numericModifier ?? "—"}</td>
+                      <td className="px-3 py-2 text-muted-foreground">{rule.healthConditionDef?.name ?? "—"}</td>
+                      <td className="px-3 py-2 text-muted-foreground">
                         {rule.penetrance != null ? `${(rule.penetrance * 100).toFixed(0)}%` : "—"}
                       </td>
-                      <td className="px-4 py-2 text-right space-x-1">
+                      <td className="px-3 py-2 text-right space-x-1">
                         <Button
                           size="sm"
                           variant="ghost"
@@ -241,18 +223,14 @@ function ExpressionRulesPage() {
                         <td colSpan={7} className="px-6 py-4">
                           <div className="grid grid-cols-2 gap-6">
                             <div>
-                              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                              <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                                 Climate Modifiers
                               </p>
                               <table className="w-full text-xs">
                                 <thead>
                                   <tr>
-                                    <th className="pb-1 text-left font-medium text-muted-foreground">
-                                      Climate
-                                    </th>
-                                    <th className="pb-1 text-left font-medium text-muted-foreground">
-                                      Modifier
-                                    </th>
+                                    <th className="pb-1 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Climate</th>
+                                    <th className="pb-1 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Modifier</th>
                                     <th />
                                   </tr>
                                 </thead>
@@ -277,18 +255,14 @@ function ExpressionRulesPage() {
                                     <td className="py-1 pr-2">
                                       <select
                                         value={newClimate.climate}
-                                        onChange={(e) =>
-                                          setNewClimate({ ...newClimate, climate: e.target.value })
-                                        }
-                                        className="w-full rounded border border-input bg-background px-2 py-0.5 text-xs"
+                                        onChange={(e) => setNewClimate({ ...newClimate, climate: e.target.value })}
+                                        className="h-7 rounded-md border border-input bg-background px-2 text-xs w-full"
                                       >
                                         <option value="">Climate</option>
                                         {CLIMATES.filter(
                                           (c) => !rule.climateModifiers.some((m) => m.climate === c)
                                         ).map((c) => (
-                                          <option key={c} value={c}>
-                                            {c}
-                                          </option>
+                                          <option key={c} value={c}>{c}</option>
                                         ))}
                                       </select>
                                     </td>
@@ -297,11 +271,9 @@ function ExpressionRulesPage() {
                                         type="number"
                                         step="0.01"
                                         value={newClimate.modifier}
-                                        onChange={(e) =>
-                                          setNewClimate({ ...newClimate, modifier: e.target.value })
-                                        }
+                                        onChange={(e) => setNewClimate({ ...newClimate, modifier: e.target.value })}
                                         placeholder="0.0"
-                                        className="w-full rounded border border-input bg-background px-2 py-0.5 text-xs"
+                                        className="h-7 w-full rounded-md border border-input bg-background px-2 text-xs"
                                       />
                                     </td>
                                     <td>
@@ -310,11 +282,7 @@ function ExpressionRulesPage() {
                                         variant="ghost"
                                         className="h-5 px-2 text-xs"
                                         onClick={() => submitNewClimate(rule.id)}
-                                        disabled={
-                                          saveClimate.isPending ||
-                                          !newClimate.climate ||
-                                          !newClimate.modifier
-                                        }
+                                        disabled={saveClimate.isPending || !newClimate.climate || !newClimate.modifier}
                                       >
                                         Add
                                       </Button>
@@ -324,18 +292,14 @@ function ExpressionRulesPage() {
                               </table>
                             </div>
                             <div>
-                              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                              <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                                 Terrain Modifiers
                               </p>
                               <table className="w-full text-xs">
                                 <thead>
                                   <tr>
-                                    <th className="pb-1 text-left font-medium text-muted-foreground">
-                                      Terrain
-                                    </th>
-                                    <th className="pb-1 text-left font-medium text-muted-foreground">
-                                      Modifier
-                                    </th>
+                                    <th className="pb-1 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Terrain</th>
+                                    <th className="pb-1 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Modifier</th>
                                     <th />
                                   </tr>
                                 </thead>
@@ -360,18 +324,14 @@ function ExpressionRulesPage() {
                                     <td className="py-1 pr-2">
                                       <select
                                         value={newTerrain.terrain}
-                                        onChange={(e) =>
-                                          setNewTerrain({ ...newTerrain, terrain: e.target.value })
-                                        }
-                                        className="w-full rounded border border-input bg-background px-2 py-0.5 text-xs"
+                                        onChange={(e) => setNewTerrain({ ...newTerrain, terrain: e.target.value })}
+                                        className="h-7 rounded-md border border-input bg-background px-2 text-xs w-full"
                                       >
                                         <option value="">Terrain</option>
                                         {TERRAINS.filter(
                                           (t) => !rule.terrainModifiers.some((m) => m.terrain === t)
                                         ).map((t) => (
-                                          <option key={t} value={t}>
-                                            {t}
-                                          </option>
+                                          <option key={t} value={t}>{t}</option>
                                         ))}
                                       </select>
                                     </td>
@@ -380,11 +340,9 @@ function ExpressionRulesPage() {
                                         type="number"
                                         step="0.01"
                                         value={newTerrain.modifier}
-                                        onChange={(e) =>
-                                          setNewTerrain({ ...newTerrain, modifier: e.target.value })
-                                        }
+                                        onChange={(e) => setNewTerrain({ ...newTerrain, modifier: e.target.value })}
                                         placeholder="0.0"
-                                        className="w-full rounded border border-input bg-background px-2 py-0.5 text-xs"
+                                        className="h-7 w-full rounded-md border border-input bg-background px-2 text-xs"
                                       />
                                     </td>
                                     <td>
@@ -393,11 +351,7 @@ function ExpressionRulesPage() {
                                         variant="ghost"
                                         className="h-5 px-2 text-xs"
                                         onClick={() => submitNewTerrain(rule.id)}
-                                        disabled={
-                                          saveTerrain.isPending ||
-                                          !newTerrain.terrain ||
-                                          !newTerrain.modifier
-                                        }
+                                        disabled={saveTerrain.isPending || !newTerrain.terrain || !newTerrain.modifier}
                                       >
                                         Add
                                       </Button>
@@ -414,7 +368,7 @@ function ExpressionRulesPage() {
                 ))}
                 {rules?.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-4 py-6 text-center text-sm text-muted-foreground">
+                    <td colSpan={7} className="px-3 py-6 text-center text-sm text-muted-foreground">
                       No rules yet. Add a rule to define how allele combinations express.
                     </td>
                   </tr>
@@ -422,84 +376,77 @@ function ExpressionRulesPage() {
               </tbody>
             </table>
             {removeRule.error && (
-              <p className="px-4 pb-3 text-sm text-destructive">{removeRule.error.message}</p>
+              <p className="px-3 pb-3 text-sm text-destructive">{removeRule.error.message}</p>
             )}
           </section>
 
           {editingRule !== null && (
             <section className="rounded-lg border border-border bg-card shadow-sm">
-              <header className="border-b border-border bg-secondary/40 px-4 py-2.5">
-                <h2 className="text-sm font-semibold text-foreground">
+              <div className="border-b border-border bg-secondary/40 px-3 py-2">
+                <h2 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                   {editingRule.id ? "Edit Rule" : "Add Rule"}
                 </h2>
-              </header>
-              <div className="p-4 space-y-3">
+              </div>
+              <div className="p-3 space-y-3">
                 <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">Allele 1</label>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Allele 1</label>
                     <select
                       value={editingRule.alleleOneId}
                       onChange={(e) => setEditingRule({ ...editingRule, alleleOneId: e.target.value })}
-                      className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-ring"
+                      className="h-8 rounded-md border border-input bg-background px-3 text-sm font-mono"
                     >
                       <option value="">Select allele</option>
                       {alleles?.map((a) => (
-                        <option key={a.id} value={a.id}>
-                          {a.symbol}
-                        </option>
+                        <option key={a.id} value={a.id}>{a.symbol}</option>
                       ))}
                     </select>
                   </div>
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">Allele 2</label>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Allele 2</label>
                     <select
                       value={editingRule.alleleTwoId}
                       onChange={(e) => setEditingRule({ ...editingRule, alleleTwoId: e.target.value })}
-                      className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-ring"
+                      className="h-8 rounded-md border border-input bg-background px-3 text-sm font-mono"
                     >
                       <option value="">Select allele</option>
                       {alleles?.map((a) => (
-                        <option key={a.id} value={a.id}>
-                          {a.symbol}
-                        </option>
+                        <option key={a.id} value={a.id}>{a.symbol}</option>
                       ))}
                     </select>
                   </div>
                 </div>
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground">Phenotype</label>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Phenotype</label>
                   <Input
                     value={editingRule.phenotype}
                     onChange={(e) => setEditingRule({ ...editingRule, phenotype: e.target.value })}
                     placeholder="e.g. Bay, Black, Palomino"
-                    className="mt-1"
+                    className="h-8 text-sm"
                   />
                 </div>
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground">
-                    Numeric Modifier{" "}
-                    <span className="font-normal">(optional — e.g. life expectancy multiplier)</span>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Numeric Modifier <span className="font-normal">(optional — e.g. life expectancy multiplier)</span>
                   </label>
                   <Input
                     type="number"
                     step="0.01"
                     value={editingRule.numericModifier}
-                    onChange={(e) =>
-                      setEditingRule({ ...editingRule, numericModifier: e.target.value })
-                    }
+                    onChange={(e) => setEditingRule({ ...editingRule, numericModifier: e.target.value })}
                     placeholder="1.0"
-                    className="mt-1"
+                    className="h-8 text-sm"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                       Health Condition <span className="font-normal">(optional)</span>
                     </label>
                     <select
                       value={editingRule.healthConditionDefId}
                       onChange={(e) => setEditingRule({ ...editingRule, healthConditionDefId: e.target.value })}
-                      className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                      className="h-8 rounded-md border border-input bg-background px-3 text-sm"
                     >
                       <option value="">— None —</option>
                       {healthConditions?.filter((c) => c.isGenetic).map((c) => (
@@ -507,8 +454,8 @@ function ExpressionRulesPage() {
                       ))}
                     </select>
                   </div>
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                       Penetrance <span className="font-normal">(0–1, optional)</span>
                     </label>
                     <Input
@@ -519,7 +466,7 @@ function ExpressionRulesPage() {
                       value={editingRule.penetrance}
                       onChange={(e) => setEditingRule({ ...editingRule, penetrance: e.target.value })}
                       placeholder="e.g. 0.85"
-                      className="mt-1"
+                      className="h-8 text-sm"
                     />
                   </div>
                 </div>
@@ -545,7 +492,7 @@ function ExpressionRulesPage() {
               </div>
             </section>
           )}
-        </>
+        </div>
       )}
     </div>
   )

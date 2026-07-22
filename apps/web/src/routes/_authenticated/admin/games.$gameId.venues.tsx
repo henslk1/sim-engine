@@ -119,7 +119,7 @@ function VenuesPage() {
   const currentVenue = editing?.venueId ? venues?.find((v) => v.id === editing.venueId) : undefined
 
   return (
-    <div className="p-6 max-w-4xl space-y-6">
+    <div className="p-4 space-y-3 max-w-4xl mx-auto">
       <div className="flex items-center justify-between">
         <h1 className="font-serif text-2xl font-semibold text-foreground">Venues</h1>
         <Button size="sm" onClick={startAdd}>Add Venue</Button>
@@ -127,37 +127,47 @@ function VenuesPage() {
 
       {editing && (
         <section className="rounded-lg border border-border bg-card shadow-sm">
-          <header className="border-b border-border bg-secondary/40 px-4 py-2.5">
-            <h2 className="text-sm font-semibold text-foreground">{editing.venueId ? "Edit Venue" : "Add Venue"}</h2>
-          </header>
-          <div className="p-4 space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Name</label>
-                <Input value={editing.venue.name} onChange={(e) => setEditing({ ...editing, venue: { ...editing.venue, name: e.target.value } })} />
+          <div className="border-b border-border bg-secondary/40 px-3 py-2">
+            <h2 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{editing.venueId ? "Edit Venue" : "Add Venue"}</h2>
+          </div>
+          <div className="p-3 space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Name</label>
+                <Input
+                  value={editing.venue.name}
+                  onChange={(e) => setEditing({ ...editing, venue: { ...editing.venue, name: e.target.value } })}
+                  className="h-8 text-sm"
+                />
               </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Rotation Order <span className="font-normal">(optional)</span></label>
-                <Input type="number" value={editing.venue.rotationOrder} onChange={(e) => setEditing({ ...editing, venue: { ...editing.venue, rotationOrder: e.target.value } })} placeholder="e.g. 1" />
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Rotation Order <span className="font-normal">(optional)</span></label>
+                <Input
+                  type="number"
+                  value={editing.venue.rotationOrder}
+                  onChange={(e) => setEditing({ ...editing, venue: { ...editing.venue, rotationOrder: e.target.value } })}
+                  placeholder="e.g. 1"
+                  className="h-8 text-sm"
+                />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Climate</label>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Climate</label>
                 <select
                   value={editing.venue.climate}
                   onChange={(e) => setEditing({ ...editing, venue: { ...editing.venue, climate: e.target.value as typeof CLIMATES[number] } })}
-                  className="block w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  className="h-8 rounded-md border border-input bg-background px-3 text-sm"
                 >
                   {CLIMATES.map((c) => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Terrain</label>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Terrain</label>
                 <select
                   value={editing.venue.terrain}
                   onChange={(e) => setEditing({ ...editing, venue: { ...editing.venue, terrain: e.target.value as typeof TERRAINS[number] } })}
-                  className="block w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  className="h-8 rounded-md border border-input bg-background px-3 text-sm"
                 >
                   {TERRAINS.map((t) => <option key={t} value={t}>{t}</option>)}
                 </select>
@@ -172,23 +182,23 @@ function VenuesPage() {
 
           {editing.venueId && (
             <div className="border-t border-border">
-              <header className="flex items-center justify-between bg-secondary/40 px-4 py-2.5">
-                <h3 className="text-sm font-semibold text-foreground">Disciplines</h3>
+              <div className="flex items-center justify-between border-b border-border bg-secondary/40 px-3 py-2">
+                <h3 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Disciplines</h3>
                 {!discForm && (
                   <Button size="sm" variant="outline" onClick={() => { setDiscForm(emptyDisciplineForm()); setEditingDiscId(null) }}>
                     + Add Discipline
                   </Button>
                 )}
-              </header>
+              </div>
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Discipline</th>
-                    <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Max Entries</th>
-                    <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Wait (h)</th>
-                    <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Max Open</th>
-                    <th className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">Invitational</th>
-                    <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Actions</th>
+                    <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Discipline</th>
+                    <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Max Entries</th>
+                    <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Wait (h)</th>
+                    <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Max Open</th>
+                    <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Invitational</th>
+                    <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -228,39 +238,39 @@ function VenuesPage() {
               </table>
 
               {discForm && (
-                <div className="border-t border-border p-4 space-y-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{editingDiscId ? "Edit Discipline" : "Add Discipline"}</p>
+                <div className="border-t border-border p-3 space-y-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{editingDiscId ? "Edit Discipline" : "Add Discipline"}</p>
                   <div className="grid grid-cols-3 gap-3">
-                    <div>
-                      <label className="text-xs text-muted-foreground">Discipline</label>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Discipline</label>
                       <select
                         value={discForm.disciplineDefId}
                         onChange={(e) => setDiscForm({ ...discForm, disciplineDefId: e.target.value })}
-                        className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                        className="h-8 rounded-md border border-input bg-background px-3 text-sm"
                       >
                         <option value="">— Select —</option>
                         {disciplines?.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                       </select>
                     </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground">Default Max Entries</label>
-                      <Input type="number" min="1" className="mt-1" value={discForm.defaultMaxEntries} onChange={(e) => setDiscForm({ ...discForm, defaultMaxEntries: e.target.value })} />
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Default Max Entries</label>
+                      <Input type="number" min="1" className="h-8 text-sm" value={discForm.defaultMaxEntries} onChange={(e) => setDiscForm({ ...discForm, defaultMaxEntries: e.target.value })} />
                     </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground">Default Wait (hours)</label>
-                      <Input type="number" min="1" className="mt-1" value={discForm.defaultMaxWaitHours} onChange={(e) => setDiscForm({ ...discForm, defaultMaxWaitHours: e.target.value })} />
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Default Wait (hours)</label>
+                      <Input type="number" min="1" className="h-8 text-sm" value={discForm.defaultMaxWaitHours} onChange={(e) => setDiscForm({ ...discForm, defaultMaxWaitHours: e.target.value })} />
                     </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground">Max Open At Once</label>
-                      <Input type="number" min="1" className="mt-1" value={discForm.maxOpenAtOnce} onChange={(e) => setDiscForm({ ...discForm, maxOpenAtOnce: e.target.value })} />
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Max Open At Once</label>
+                      <Input type="number" min="1" className="h-8 text-sm" value={discForm.maxOpenAtOnce} onChange={(e) => setDiscForm({ ...discForm, maxOpenAtOnce: e.target.value })} />
                     </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground">Invitational Max Entries <span className="font-normal">(optional)</span></label>
-                      <Input type="number" min="1" className="mt-1" value={discForm.invitationalMaxEntries} onChange={(e) => setDiscForm({ ...discForm, invitationalMaxEntries: e.target.value })} placeholder="—" />
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Invitational Max Entries <span className="font-normal">(optional)</span></label>
+                      <Input type="number" min="1" className="h-8 text-sm" value={discForm.invitationalMaxEntries} onChange={(e) => setDiscForm({ ...discForm, invitationalMaxEntries: e.target.value })} placeholder="—" />
                     </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground">Invitational Wait (hours) <span className="font-normal">(optional)</span></label>
-                      <Input type="number" min="1" className="mt-1" value={discForm.invitationalMaxWaitHours} onChange={(e) => setDiscForm({ ...discForm, invitationalMaxWaitHours: e.target.value })} placeholder="—" />
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Invitational Wait (hours) <span className="font-normal">(optional)</span></label>
+                      <Input type="number" min="1" className="h-8 text-sm" value={discForm.invitationalMaxWaitHours} onChange={(e) => setDiscForm({ ...discForm, invitationalMaxWaitHours: e.target.value })} placeholder="—" />
                     </div>
                   </div>
                   <label className="flex items-center gap-2 text-sm">
@@ -281,15 +291,16 @@ function VenuesPage() {
         </section>
       )}
 
-      <section className="rounded-lg border border-border bg-card shadow-sm">
+      <div className="rounded-xl border border-border bg-card shadow-md p-2">
+        <section className="rounded-lg border border-border bg-card shadow-sm">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border">
-              <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Name</th>
-              <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Climate</th>
-              <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Terrain</th>
-              <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Disciplines</th>
-              <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Actions</th>
+              <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Name</th>
+              <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Climate</th>
+              <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Terrain</th>
+              <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Disciplines</th>
+              <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -312,7 +323,8 @@ function VenuesPage() {
             )}
           </tbody>
         </table>
-      </section>
+        </section>
+      </div>
     </div>
   )
 }

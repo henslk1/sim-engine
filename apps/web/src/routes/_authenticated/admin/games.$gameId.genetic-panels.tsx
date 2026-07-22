@@ -28,7 +28,6 @@ function GeneticPanelsPage() {
     onSuccess: (saved) => {
       utils.admin.panel.list.invalidate()
       setEditing((prev) => (prev ? { ...prev, id: saved.id } : null))
-      setFormExpanded(false)
     },
   })
   const removePanel = trpc.admin.panel.remove.useMutation({
@@ -41,7 +40,6 @@ function GeneticPanelsPage() {
   const removePanelLocus = trpc.admin.panel.removePanelLocus.useMutation()
 
   const [editing, setEditing] = useState<PanelForm | null>(null)
-  const [formExpanded, setFormExpanded] = useState(false)
   const [stagedLocusIds, setStagedLocusIds] = useState<Set<string> | null>(null)
 
   const { data: panelLoci } = trpc.admin.panel.listPanelLoci.useQuery(
@@ -58,7 +56,6 @@ function GeneticPanelsPage() {
 
   function openEdit(panel: NonNullable<typeof panels>[number]) {
     setEditing({ id: panel.id, name: panel.name, panelType: panel.panelType })
-    setFormExpanded(false)
     setStagedLocusIds(null)
   }
 
@@ -88,83 +85,97 @@ function GeneticPanelsPage() {
     setStagedLocusIds(null)
   }
 
-  if (editing !== null) {
-    return (
-      <div className="p-6 max-w-2xl space-y-6">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setEditing(null)}
-            className="text-sm text-muted-foreground hover:text-foreground"
-          >
-            ← Back to list
-          </button>
-          <h1 className="font-serif text-2xl font-semibold text-foreground">
-            {editing.id ? editing.name : "New Panel"}
-          </h1>
-        </div>
+  return (
+    <div className="p-4 space-y-3 max-w-4xl mx-auto">
+      <h1 className="font-serif text-xl font-semibold text-foreground">Genetic Panels</h1>
 
-        <section className="rounded-lg border border-border bg-card shadow-sm">
-          <header className="flex items-center justify-between border-b border-border bg-secondary/40 px-4 py-2.5">
-            <h2 className="text-sm font-semibold text-foreground">Panel Details</h2>
-            {!formExpanded && editing.id && (
-              <Button size="sm" variant="ghost" onClick={() => setFormExpanded(true)}>
-                Edit Details
+      <div className="rounded-xl border border-border bg-card shadow-md p-2">
+        <div className="grid grid-cols-[300px_1fr] gap-2 items-start">
+        <div className="space-y-3">
+          <section className="rounded-lg border border-border bg-card shadow-sm">
+            <div className="flex items-center justify-between border-b border-border bg-secondary/40 px-3 py-2">
+              <h2 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Panels</h2>
+              <Button size="sm" variant="ghost" onClick={() => { setEditing(emptyPanel()); setStagedLocusIds(null) }}>
+                + New
               </Button>
+            </div>
+            {panels?.length === 0 && (
+              <p className="px-3 py-4 text-sm text-muted-foreground">No panels yet.</p>
             )}
-          </header>
-          {formExpanded || !editing.id ? (
-            <div className="p-4 space-y-3">
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Name</label>
-                <Input
-                  value={editing.name}
-                  onChange={(e) => setEditing({ ...editing, name: e.target.value })}
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Panel Type</label>
-                <select
-                  value={editing.panelType}
-                  onChange={(e) =>
-                    setEditing({ ...editing, panelType: e.target.value as PanelForm["panelType"] })
-                  }
-                  className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+            <ul className="divide-y divide-border">
+              {panels?.map((p) => (
+                <li
+                  key={p.id}
+                  onClick={() => openEdit(p)}
+                  className={`flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-muted/50 ${editing?.id === p.id ? "bg-muted/50" : ""}`}
                 >
-                  <option value="HEALTH">Health</option>
-                  <option value="CONFORMATION">Conformation</option>
-                </select>
+                  <span className="text-sm font-medium text-foreground">{p.name}</span>
+                  <span className="text-[10px] text-muted-foreground">{p.panelType} · {p._count.loci}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          {editing !== null && (
+            <section className="rounded-lg border border-border bg-card shadow-sm">
+              <div className="border-b border-border bg-secondary/40 px-3 py-2">
+                <h2 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  {editing.id ? "Edit Panel" : "New Panel"}
+                </h2>
               </div>
-              <div className="flex gap-2 pt-1">
-                <Button onClick={submitPanel} disabled={savePanel.isPending || !editing.name.trim()}>
-                  Save
-                </Button>
-                {editing.id && (
-                  <Button variant="ghost" onClick={() => setFormExpanded(false)}>
+              <div className="p-3 space-y-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Name</label>
+                  <Input
+                    value={editing.name}
+                    onChange={(e) => setEditing({ ...editing, name: e.target.value })}
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Panel Type</label>
+                  <select
+                    value={editing.panelType}
+                    onChange={(e) => setEditing({ ...editing, panelType: e.target.value as PanelForm["panelType"] })}
+                    className="h-8 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  >
+                    <option value="HEALTH">Health</option>
+                    <option value="CONFORMATION">Conformation</option>
+                  </select>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={submitPanel} disabled={savePanel.isPending || !editing.name.trim()}>
+                    Save
+                  </Button>
+                  {editing.id && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => {
+                        if (!confirm("Delete this genetic panel?")) return
+                        removePanel.mutate({ id: editing.id! })
+                      }}
+                      disabled={removePanel.isPending}
+                    >
+                      Delete
+                    </Button>
+                  )}
+                  <Button size="sm" variant="ghost" onClick={() => { setEditing(null); setStagedLocusIds(null) }}>
                     Cancel
                   </Button>
-                )}
+                </div>
+                {savePanel.error && <p className="text-sm text-destructive">{savePanel.error.message}</p>}
+                {removePanel.error && <p className="text-sm text-destructive">{removePanel.error.message}</p>}
               </div>
-              {savePanel.error && (
-                <p className="text-sm text-destructive">{savePanel.error.message}</p>
-              )}
-            </div>
-          ) : (
-            <div className="p-4 text-sm space-y-1 text-foreground">
-              <p>
-                <span className="text-muted-foreground">Name:</span> {editing.name}
-              </p>
-              <p>
-                <span className="text-muted-foreground">Type:</span> {editing.panelType}
-              </p>
-            </div>
+            </section>
           )}
-        </section>
+        </div>
 
-        {editing.id && (
+        {editing?.id ? (
           <section className="rounded-lg border border-border bg-card shadow-sm">
-            <header className="flex items-center justify-between border-b border-border bg-secondary/40 px-4 py-2.5">
-              <h2 className="text-sm font-semibold text-foreground">Loci Included</h2>
+            <div className="flex items-center justify-between border-b border-border bg-secondary/40 px-3 py-2">
+              <h2 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Loci Included</h2>
               {lociIsDirty && (
                 <div className="flex gap-2">
                   <Button
@@ -179,15 +190,15 @@ function GeneticPanelsPage() {
                   </Button>
                 </div>
               )}
-            </header>
+            </div>
             {!allLoci?.length ? (
-              <p className="px-4 py-4 text-sm text-muted-foreground">
+              <p className="px-3 py-4 text-sm text-muted-foreground">
                 No loci configured yet. Add loci in Loci & Alleles first.
               </p>
             ) : (
               <ul className="divide-y divide-border">
                 {allLoci.map((locus) => (
-                  <li key={locus.id} className="flex items-center justify-between px-4 py-2.5">
+                  <li key={locus.id} className="flex items-center justify-between px-3 py-2">
                     <span className="text-sm text-foreground">
                       {locus.name}
                       {locus.displayGroup && (
@@ -208,85 +219,13 @@ function GeneticPanelsPage() {
               </ul>
             )}
           </section>
-        )}
-
-        {editing.id && (
-          <div className="flex items-center justify-end gap-3">
-            {removePanel.error && (
-              <p className="text-sm text-destructive">{removePanel.error.message}</p>
-            )}
-            <Button
-              variant="ghost"
-              className="text-destructive hover:text-destructive"
-              onClick={() => {
-                if (!confirm("Delete this genetic panel?")) return
-                removePanel.mutate({ id: editing.id! })
-              }}
-              disabled={removePanel.isPending}
-            >
-              Delete Panel
-            </Button>
+        ) : (
+          <div className="rounded-lg border border-dashed border-border px-3 py-12 text-center text-sm text-muted-foreground">
+            Select a panel to manage its loci
           </div>
         )}
+        </div>
       </div>
-    )
-  }
-
-  return (
-    <div className="p-6 max-w-2xl space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="font-serif text-2xl font-semibold text-foreground">Genetic Panels</h1>
-        <Button
-          onClick={() => {
-            setEditing(emptyPanel())
-            setFormExpanded(true)
-          }}
-        >
-          + New Panel
-        </Button>
-      </div>
-
-      <section className="rounded-lg border border-border bg-card shadow-sm">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border">
-              <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Name
-              </th>
-              <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Type
-              </th>
-              <th className="px-4 py-2 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Loci
-              </th>
-              <th className="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {panels?.map((p) => (
-              <tr key={p.id} className="border-b border-border last:border-0">
-                <td className="px-4 py-2 font-medium text-foreground">{p.name}</td>
-                <td className="px-4 py-2 text-muted-foreground">{p.panelType}</td>
-                <td className="px-4 py-2 text-center text-muted-foreground">{p._count.loci}</td>
-                <td className="px-4 py-2 text-right">
-                  <Button size="sm" variant="ghost" onClick={() => openEdit(p)}>
-                    Edit
-                  </Button>
-                </td>
-              </tr>
-            ))}
-            {panels?.length === 0 && (
-              <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-sm text-muted-foreground">
-                  No panels yet.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </section>
     </div>
   )
 }

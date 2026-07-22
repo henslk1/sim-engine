@@ -48,69 +48,90 @@ function OpsOverview() {
           {recentPlayers.length === 0 ? (
             <p className="px-4 py-6 text-center text-sm text-muted-foreground">No new users this week.</p>
           ) : (
-            <div>
-              {recentPlayers.map((p) => {
-                const ban = p.user.banRecords?.[0]
-                const isBanned = ban && (!ban.expiresAt || new Date(ban.expiresAt) > new Date())
-                const lastIp = p.user.userIpLogs?.[0]
-                const staffRoles = p.user.staffRoles ?? []
-                const games = p.user.playerAccounts?.map((pa: { game: { id: string; name: string } }) => pa.game) ?? []
-                const warningCount = p._count?.warnings ?? 0
-                return (
-                  <Link
-                    key={p.id}
-                    to="/admin/users/$playerId"
-                    params={{ playerId: p.id }}
-                    className="flex items-start gap-3 px-4 py-2.5 transition-colors hover:bg-muted/50 border-t border-border first:border-t-0"
-                  >
-                    <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] font-semibold text-primary mt-0.5">
-                      {p.username.slice(0, 2).toUpperCase()}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      {/* Row 1: username + staff badges */}
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="text-sm font-medium text-foreground">{p.username}</span>
-                        {staffRoles.map((r: { role: string }) => (
-                          <span key={r.role} className="rounded bg-primary/10 px-1 py-0.5 text-[9px] font-bold text-primary">
-                            {r.role.slice(0, 3)}
-                          </span>
-                        ))}
-                      </div>
-                      {/* Row 2: email + verified */}
-                      <div className="flex items-center gap-1">
-                        <span className="truncate text-xs text-muted-foreground">{p.user.email}</span>
-                        {p.user.emailVerified
-                          ? <CheckCircle2 className="size-3 shrink-0 text-chart-2" />
-                          : <Circle className="size-3 shrink-0 text-muted-foreground/30" />
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/30">
+                  <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Username</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Email</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Last IP</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Games</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Last Active</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Flags</th>
+                  <th className="px-3 py-2" />
+                </tr>
+              </thead>
+              <tbody>
+                {recentPlayers.map((p) => {
+                  const ban = p.user.banRecords?.[0]
+                  const isBanned = ban && (!ban.expiresAt || new Date(ban.expiresAt) > new Date())
+                  const lastIp = p.user.userIpLogs?.[0]
+                  const staffRoles = p.user.staffRoles ?? []
+                  const games = p.user.playerAccounts?.map((pa: { game: { id: string; name: string } }) => pa.game) ?? []
+                  const warningCount = p._count?.warnings ?? 0
+                  return (
+                    <tr key={p.id} className="border-t border-border hover:bg-muted/30">
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-medium text-foreground">{p.username}</span>
+                          {staffRoles.map((r: { role: string }) => (
+                            <span key={r.role} className="rounded bg-primary/10 px-1 py-0.5 text-[9px] font-bold text-primary">
+                              {r.role.slice(0, 3)}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-1">
+                          <span className="text-muted-foreground">{p.user.email}</span>
+                          {p.user.emailVerified
+                            ? <CheckCircle2 className="size-3 shrink-0 text-chart-2" />
+                            : <Circle className="size-3 shrink-0 text-muted-foreground/30" />
+                          }
+                        </div>
+                      </td>
+                      <td className="px-3 py-2">
+                        {lastIp
+                          ? <span className="font-mono text-xs text-muted-foreground">{lastIp.ipAddress}</span>
+                          : <span className="text-muted-foreground/40">—</span>
                         }
-                      </div>
-                      {/* Row 3: IP + games + flags */}
-                      <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
-                        {lastIp && (
-                          <span className="font-mono text-[10px] text-muted-foreground/60">{lastIp.ipAddress}</span>
-                        )}
-                        {games.map((g: { id: string; name: string }) => (
-                          <span key={g.id} className="rounded bg-muted px-1 py-0.5 text-[9px] text-muted-foreground">{g.name}</span>
-                        ))}
-                        {isBanned && (
-                          <span className="flex items-center gap-0.5 text-[9px] font-semibold text-destructive">
-                            <ShieldBan className="size-2.5" />BAN
-                          </span>
-                        )}
-                        {warningCount > 0 && (
-                          <span className="flex items-center gap-0.5 text-[9px] font-semibold text-orange-500">
-                            <AlertTriangle className="size-2.5" />{warningCount}W
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <span className="shrink-0 text-xs text-muted-foreground pt-0.5">
-                      {new Date(p.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-                    </span>
-                  </Link>
-                )
-              })}
-            </div>
+                      </td>
+                      <td className="px-3 py-2">
+                        <div className="flex flex-wrap gap-1">
+                          {games.map((g: { id: string; name: string }) => (
+                            <span key={g.id} className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">{g.name}</span>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 text-xs text-muted-foreground">—</td>
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-1.5">
+                          {isBanned && (
+                            <span className="flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive">
+                              <ShieldBan className="size-3" />{ban?.expiresAt ? "Temp" : "Banned"}
+                            </span>
+                          )}
+                          {warningCount > 0 && (
+                            <span className="flex items-center gap-1 rounded-full bg-orange-500/10 px-2 py-0.5 text-xs font-medium text-orange-600 dark:text-orange-400">
+                              <AlertTriangle className="size-3" />{warningCount}
+                            </span>
+                          )}
+                          {!isBanned && warningCount === 0 && <span className="text-muted-foreground/40">—</span>}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <Link
+                          to="/admin/users/$playerId"
+                          params={{ playerId: p.id }}
+                          className="text-xs text-primary hover:underline"
+                        >
+                          View
+                        </Link>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
           )}
         </Panel>
 

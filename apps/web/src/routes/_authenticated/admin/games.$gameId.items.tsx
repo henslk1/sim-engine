@@ -41,7 +41,7 @@ function ItemsPage() {
   )
 
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [editing, setEditing] = useState<ItemForm | null>(null)
+  const [editing, setEditing] = useState<ItemForm>(emptyForm())
   const [jsonError, setJsonError] = useState("")
   const utils = trpc.useUtils()
 
@@ -49,7 +49,7 @@ function ItemsPage() {
     onSuccess: () => {
       utils.admin.item.list.invalidate({ gameId: gameId! })
       setEditingId(null)
-      setEditing(null)
+      setEditing(emptyForm())
       setJsonError("")
     },
   })
@@ -60,7 +60,7 @@ function ItemsPage() {
   })
 
   function submit() {
-    if (!editing || !gameId || !editing.name.trim()) return
+    if (!gameId || !editing.name.trim()) return
     let effects: Record<string, unknown> | null = null
     if (editing.effects.trim()) {
       try {
@@ -86,145 +86,81 @@ function ItemsPage() {
   }
 
   return (
-    <div className="p-6 max-w-4xl space-y-6">
-      <h1 className="font-serif text-2xl font-semibold text-foreground">Items</h1>
+    <div className="p-4 space-y-3 max-w-4xl mx-auto">
+      <h1 className="font-serif text-xl font-semibold text-foreground">Items</h1>
 
-      <section className="rounded-lg border border-border bg-card shadow-sm">
-        <header className="flex items-center justify-between border-b border-border bg-secondary/40 px-4 py-2.5">
-          <h2 className="text-sm font-semibold text-foreground">Item Definitions</h2>
-          <Button size="sm" onClick={() => { setEditing(emptyForm()); setEditingId(null); setJsonError("") }}>
-            + Add Item
-          </Button>
-        </header>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border">
-              <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Name</th>
-              <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Type</th>
-              <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Category</th>
-              <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Effect</th>
-              <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Flags</th>
-              <th className="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items?.map((item) => (
-              <tr key={item.id} className="border-b border-border last:border-0">
-                <td className="px-4 py-2 font-medium text-foreground">{item.name}</td>
-                <td className="px-4 py-2 text-muted-foreground">{item.itemType}</td>
-                <td className="px-4 py-2 text-muted-foreground">{item.category}</td>
-                <td className="px-4 py-2 text-muted-foreground">{item.effectType ?? "—"}</td>
-                <td className="px-4 py-2 text-muted-foreground space-x-1">
-                  {item.prizeEligible && <span className="rounded bg-muted px-1 py-0.5 text-xs">prize</span>}
-                  {item.isSellable && <span className="rounded bg-muted px-1 py-0.5 text-xs">sellable</span>}
-                </td>
-                <td className="px-4 py-2 text-right space-x-1">
-                  <Button size="sm" variant="ghost" onClick={() => {
-                    setEditingId(item.id)
-                    setEditing({
-                      name: item.name,
-                      description: item.description ?? "",
-                      itemType: item.itemType as ItemType,
-                      category: item.category as ItemCategory,
-                      effectType: item.effectType ?? "",
-                      effects: item.effects ? JSON.stringify(item.effects, null, 2) : "",
-                      prizeEligible: item.prizeEligible,
-                      isSellable: item.isSellable,
-                    })
-                    setJsonError("")
-                  }}>Edit</Button>
-                  <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
-                    onClick={() => { if (!confirm("Delete this item? This will fail if it exists in any inventories or listings.")) return; remove.mutate({ id: item.id }) }}>
-                    Delete
-                  </Button>
-                </td>
-              </tr>
-            ))}
-            {items?.length === 0 && (
-              <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-sm text-muted-foreground">No items defined yet.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-        {remove.error && <p className="px-4 pb-3 text-sm text-destructive">{remove.error.message}</p>}
-      </section>
-
-      {editing !== null && (
+      <div className="rounded-xl border border-border bg-card shadow-md p-2">
+      <div className="grid grid-cols-[300px_1fr] gap-2 items-start">
         <section className="rounded-lg border border-border bg-card shadow-sm">
-          <header className="border-b border-border bg-secondary/40 px-4 py-2.5">
-            <h2 className="text-sm font-semibold text-foreground">
+          <div className="border-b border-border bg-secondary/40 px-3 py-2">
+            <h2 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
               {editingId ? "Edit Item" : "Add Item"}
             </h2>
-          </header>
-          <div className="p-4 space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Name</label>
-                <Input
-                  value={editing.name}
-                  onChange={(e) => setEditing({ ...editing, name: e.target.value })}
-                  placeholder="e.g. Energy Potion"
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Description <span className="font-normal">(optional)</span></label>
-                <Input
-                  value={editing.description}
-                  onChange={(e) => setEditing({ ...editing, description: e.target.value })}
-                  placeholder="Brief description"
-                  className="mt-1"
-                />
-              </div>
+          </div>
+          <div className="p-3 space-y-3">
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Name</label>
+              <Input
+                value={editing.name}
+                onChange={(e) => setEditing({ ...editing, name: e.target.value })}
+                placeholder="e.g. Energy Potion"
+                className="h-8 text-sm"
+              />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Item Type</label>
-                <select
-                  value={editing.itemType}
-                  onChange={(e) => setEditing({ ...editing, itemType: e.target.value as ItemType, effectType: "" })}
-                  className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                >
-                  {ITEM_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Category</label>
-                <select
-                  value={editing.category}
-                  onChange={(e) => setEditing({ ...editing, category: e.target.value as ItemCategory })}
-                  className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                >
-                  {ITEM_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Description</label>
+              <Input
+                value={editing.description}
+                onChange={(e) => setEditing({ ...editing, description: e.target.value })}
+                placeholder="Brief description"
+                className="h-8 text-sm"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Item Type</label>
+              <select
+                value={editing.itemType}
+                onChange={(e) => setEditing({ ...editing, itemType: e.target.value as ItemType, effectType: "" })}
+                className="h-8 w-full rounded-md border border-input bg-background px-3 text-sm"
+              >
+                {ITEM_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Category</label>
+              <select
+                value={editing.category}
+                onChange={(e) => setEditing({ ...editing, category: e.target.value as ItemCategory })}
+                className="h-8 w-full rounded-md border border-input bg-background px-3 text-sm"
+              >
+                {ITEM_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
             </div>
             {editing.itemType === "PERMANENT_APPLIED" && (
-              <div className="max-w-xs">
-                <label className="text-xs font-medium text-muted-foreground">Effect Type</label>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Effect Type</label>
                 <select
                   value={editing.effectType}
                   onChange={(e) => setEditing({ ...editing, effectType: e.target.value })}
-                  className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  className="h-8 w-full rounded-md border border-input bg-background px-3 text-sm"
                 >
                   <option value="">— None —</option>
                   {EFFECT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
             )}
-            <div>
-              <label className="text-xs font-medium text-muted-foreground">Effects JSON <span className="font-normal">(optional)</span></label>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Effects JSON</label>
               <textarea
                 value={editing.effects}
                 onChange={(e) => { setEditing({ ...editing, effects: e.target.value }); setJsonError("") }}
                 placeholder='e.g. {"energyRestore": 50}'
-                rows={4}
-                className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-1.5 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                rows={3}
+                className="block w-full rounded-md border border-input bg-background px-3 py-1.5 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-ring"
               />
-              {jsonError && <p className="mt-1 text-xs text-destructive">{jsonError}</p>}
+              {jsonError && <p className="text-xs text-destructive">{jsonError}</p>}
             </div>
-            <div className="flex gap-6">
+            <div className="flex gap-4">
               <label className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
@@ -244,21 +180,80 @@ function ItemsPage() {
                 <span>Sellable</span>
               </label>
             </div>
-            <div className="flex gap-2 pt-1">
-              <Button
-                onClick={submit}
-                disabled={save.isPending || !editing.name.trim()}
-              >
+            <div className="flex gap-2">
+              <Button size="sm" onClick={submit} disabled={save.isPending || !editing.name.trim()}>
                 {editingId ? "Save" : "Add Item"}
               </Button>
-              <Button variant="ghost" onClick={() => { setEditingId(null); setEditing(null); setJsonError("") }}>
+              <Button size="sm" variant="ghost" onClick={() => { setEditingId(null); setEditing(emptyForm()); setJsonError("") }}>
                 Cancel
               </Button>
             </div>
             {save.error && <p className="text-sm text-destructive">{save.error.message}</p>}
           </div>
         </section>
-      )}
+
+        <section className="rounded-lg border border-border bg-card shadow-sm">
+          <div className="flex items-center justify-between border-b border-border bg-secondary/40 px-3 py-2">
+            <h2 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Item Definitions</h2>
+            <Button size="sm" variant="ghost" onClick={() => { setEditing(emptyForm()); setEditingId(null); setJsonError("") }}>
+              + New
+            </Button>
+          </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Name</th>
+                <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Type</th>
+                <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Category</th>
+                <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Effect</th>
+                <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Flags</th>
+                <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items?.map((item) => (
+                <tr key={item.id} className="border-b border-border last:border-0">
+                  <td className="px-3 py-2 font-medium text-foreground">{item.name}</td>
+                  <td className="px-3 py-2 text-muted-foreground">{item.itemType}</td>
+                  <td className="px-3 py-2 text-muted-foreground">{item.category}</td>
+                  <td className="px-3 py-2 text-muted-foreground">{item.effectType ?? "—"}</td>
+                  <td className="px-3 py-2 text-muted-foreground space-x-1">
+                    {item.prizeEligible && <span className="rounded bg-muted px-1 py-0.5 text-xs">prize</span>}
+                    {item.isSellable && <span className="rounded bg-muted px-1 py-0.5 text-xs">sellable</span>}
+                  </td>
+                  <td className="px-3 py-2 text-right space-x-1">
+                    <Button size="sm" variant="ghost" onClick={() => {
+                      setEditingId(item.id)
+                      setEditing({
+                        name: item.name,
+                        description: item.description ?? "",
+                        itemType: item.itemType as ItemType,
+                        category: item.category as ItemCategory,
+                        effectType: item.effectType ?? "",
+                        effects: item.effects ? JSON.stringify(item.effects, null, 2) : "",
+                        prizeEligible: item.prizeEligible,
+                        isSellable: item.isSellable,
+                      })
+                      setJsonError("")
+                    }}>Edit</Button>
+                    <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
+                      onClick={() => { if (!confirm("Delete this item? This will fail if it exists in any inventories or listings.")) return; remove.mutate({ id: item.id }) }}>
+                      Delete
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+              {items?.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-3 py-6 text-center text-sm text-muted-foreground">No items defined yet.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+          {remove.error && <p className="px-3 pb-3 text-sm text-destructive">{remove.error.message}</p>}
+        </section>
+      </div>
+      </div>
     </div>
   )
 }

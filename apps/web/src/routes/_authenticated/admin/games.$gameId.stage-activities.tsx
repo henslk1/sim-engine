@@ -21,7 +21,7 @@ function StageActivitiesPage() {
 
   const [selectedStageId, setSelectedStageId] = useState("")
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [editing, setEditing] = useState<ActivityForm | null>(null)
+  const [editing, setEditing] = useState<ActivityForm>(emptyForm())
 
   const { data: activities } = trpc.admin.stageActivity.listByStage.useQuery(
     { lifeStageId: selectedStageId },
@@ -33,25 +33,25 @@ function StageActivitiesPage() {
     onSuccess: () => {
       utils.admin.stageActivity.listByStage.invalidate({ lifeStageId: selectedStageId })
       setEditingId(null)
-      setEditing(null)
+      setEditing(emptyForm())
     },
   })
   const remove = trpc.admin.stageActivity.remove.useMutation({
     onSuccess: () => {
       utils.admin.stageActivity.listByStage.invalidate({ lifeStageId: selectedStageId })
       setEditingId(null)
-      setEditing(null)
+      setEditing(emptyForm())
     },
   })
 
   function handleStageChange(id: string) {
     setSelectedStageId(id)
     setEditingId(null)
-    setEditing(null)
+    setEditing(emptyForm())
   }
 
   function submit() {
-    if (!editing || !gameId || !selectedStageId || !editing.name.trim() || !editing.traitDefId || editing.traitEffect === "" || editing.energyCost === "") return
+    if (!gameId || !selectedStageId || !editing.name.trim() || !editing.traitDefId || editing.traitEffect === "" || editing.energyCost === "") return
     save.mutate({
       id: editingId ?? undefined,
       gameId,
@@ -65,48 +65,122 @@ function StageActivitiesPage() {
   }
 
   return (
-    <div className="p-6 max-w-3xl space-y-6">
-      <h1 className="font-serif text-2xl font-semibold text-foreground">Stage Activities</h1>
+    <div className="p-6 space-y-4 max-w-4xl mx-auto">
+      <h1 className="font-serif text-xl font-semibold text-foreground">Stage Activities</h1>
 
-      <section className="rounded-lg border border-border bg-card shadow-sm p-4">
-        <label className="text-xs font-medium text-muted-foreground">Life Stage</label>
+      <div className="flex flex-col gap-1">
+        <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Life Stage</label>
         <select
           value={selectedStageId}
           onChange={(e) => handleStageChange(e.target.value)}
-          className="mt-1 block w-full max-w-sm rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+          className="h-8 w-64 rounded-md border border-input bg-background px-3 text-sm"
         >
           <option value="">— Select a life stage —</option>
           {lifeStages?.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
-      </section>
+      </div>
 
       {selectedStageId && (
-        <>
+        <div className="grid grid-cols-[300px_1fr] gap-4 items-start">
           <section className="rounded-lg border border-border bg-card shadow-sm">
-            <header className="flex items-center justify-between border-b border-border bg-secondary/40 px-4 py-2.5">
-              <h2 className="text-sm font-semibold text-foreground">Activities</h2>
-              <Button size="sm" onClick={() => { setEditing(emptyForm()); setEditingId(null) }}>
-                + Add Activity
+            <div className="border-b border-border bg-secondary/40 px-3 py-2">
+              <h2 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                {editingId ? "Edit Activity" : "Add Activity"}
+              </h2>
+            </div>
+            <div className="p-3 space-y-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Name</label>
+                <Input
+                  value={editing.name}
+                  onChange={(e) => setEditing({ ...editing, name: e.target.value })}
+                  placeholder="e.g. Playful Roughhousing"
+                  className="h-8 text-sm"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Trait</label>
+                <select
+                  value={editing.traitDefId}
+                  onChange={(e) => setEditing({ ...editing, traitDefId: e.target.value })}
+                  className="h-8 w-full rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  <option value="">— Select trait —</option>
+                  {traits?.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Trait Effect</label>
+                <Input
+                  type="number"
+                  step="0.1"
+                  value={editing.traitEffect}
+                  onChange={(e) => setEditing({ ...editing, traitEffect: e.target.value })}
+                  placeholder="e.g. 2 or -1"
+                  className="h-8 text-sm"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Energy Cost</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={editing.energyCost}
+                  onChange={(e) => setEditing({ ...editing, energyCost: e.target.value })}
+                  placeholder="e.g. 10"
+                  className="h-8 text-sm"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Description</label>
+                <Input
+                  value={editing.description}
+                  onChange={(e) => setEditing({ ...editing, description: e.target.value })}
+                  placeholder="Shown to players"
+                  className="h-8 text-sm"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  onClick={submit}
+                  disabled={save.isPending || !editing.name.trim() || !editing.traitDefId || editing.traitEffect === "" || editing.energyCost === ""}
+                >
+                  {editingId ? "Save" : "Add Activity"}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => { setEditingId(null); setEditing(emptyForm()) }}>
+                  Cancel
+                </Button>
+              </div>
+              {save.error && <p className="text-sm text-destructive">{save.error.message}</p>}
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-border bg-card shadow-sm">
+            <div className="flex items-center justify-between border-b border-border bg-secondary/40 px-3 py-2">
+              <h2 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Activities</h2>
+              <Button size="sm" variant="ghost" onClick={() => { setEditing(emptyForm()); setEditingId(null) }}>
+                + New
               </Button>
-            </header>
+            </div>
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border">
-                  <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Name</th>
-                  <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Trait</th>
-                  <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Effect</th>
-                  <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Energy</th>
-                  <th className="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Actions</th>
+                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Name</th>
+                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Trait</th>
+                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Effect</th>
+                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Energy</th>
+                  <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {activities?.map((a) => (
                   <tr key={a.id} className="border-b border-border last:border-0">
-                    <td className="px-4 py-2 font-medium text-foreground">{a.name}</td>
-                    <td className="px-4 py-2 text-muted-foreground">{a.traitDef.name}</td>
-                    <td className="px-4 py-2 text-muted-foreground">{a.traitEffect > 0 ? `+${a.traitEffect}` : a.traitEffect}</td>
-                    <td className="px-4 py-2 text-muted-foreground">{a.energyCost}</td>
-                    <td className="px-4 py-2 text-right space-x-1">
+                    <td className="px-3 py-2 font-medium text-foreground">{a.name}</td>
+                    <td className="px-3 py-2 text-muted-foreground">{a.traitDef.name}</td>
+                    <td className="px-3 py-2 text-muted-foreground">{a.traitEffect > 0 ? `+${a.traitEffect}` : a.traitEffect}</td>
+                    <td className="px-3 py-2 text-muted-foreground">{a.energyCost}</td>
+                    <td className="px-3 py-2 text-right space-x-1">
                       <Button size="sm" variant="ghost" onClick={() => {
                         setEditingId(a.id)
                         setEditing({
@@ -126,93 +200,14 @@ function StageActivitiesPage() {
                 ))}
                 {activities?.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-4 py-6 text-center text-sm text-muted-foreground">No activities for this stage yet.</td>
+                    <td colSpan={5} className="px-3 py-6 text-center text-sm text-muted-foreground">No activities for this stage yet.</td>
                   </tr>
                 )}
               </tbody>
             </table>
-            {remove.error && <p className="px-4 pb-3 text-sm text-destructive">{remove.error.message}</p>}
+            {remove.error && <p className="px-3 pb-3 text-sm text-destructive">{remove.error.message}</p>}
           </section>
-
-          {editing !== null && (
-            <section className="rounded-lg border border-border bg-card shadow-sm">
-              <header className="border-b border-border bg-secondary/40 px-4 py-2.5">
-                <h2 className="text-sm font-semibold text-foreground">
-                  {editingId ? "Edit Activity" : "Add Activity"}
-                </h2>
-              </header>
-              <div className="p-4 space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">Name</label>
-                    <Input
-                      value={editing.name}
-                      onChange={(e) => setEditing({ ...editing, name: e.target.value })}
-                      placeholder="e.g. Playful Roughhousing"
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">Trait</label>
-                    <select
-                      value={editing.traitDefId}
-                      onChange={(e) => setEditing({ ...editing, traitDefId: e.target.value })}
-                      className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                    >
-                      <option value="">— Select trait —</option>
-                      {traits?.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">Trait Effect <span className="font-normal">— signed, e.g. 2 or -1</span></label>
-                    <Input
-                      type="number"
-                      step="0.1"
-                      value={editing.traitEffect}
-                      onChange={(e) => setEditing({ ...editing, traitEffect: e.target.value })}
-                      placeholder="e.g. 2"
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">Energy Cost</label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={editing.energyCost}
-                      onChange={(e) => setEditing({ ...editing, energyCost: e.target.value })}
-                      placeholder="e.g. 10"
-                      className="mt-1"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground">Description <span className="font-normal">— optional</span></label>
-                  <Input
-                    value={editing.description}
-                    onChange={(e) => setEditing({ ...editing, description: e.target.value })}
-                    placeholder="Shown to players"
-                    className="mt-1"
-                  />
-                </div>
-                <div className="flex gap-2 pt-1">
-                  <Button
-                    onClick={submit}
-                    disabled={save.isPending || !editing.name.trim() || !editing.traitDefId || editing.traitEffect === "" || editing.energyCost === ""}
-                  >
-                    {editingId ? "Save" : "Add Activity"}
-                  </Button>
-                  <Button variant="ghost" onClick={() => { setEditingId(null); setEditing(null) }}>
-                    Cancel
-                  </Button>
-                </div>
-                {save.error && <p className="text-sm text-destructive">{save.error.message}</p>}
-              </div>
-            </section>
-          )}
-        </>
+        </div>
       )}
     </div>
   )

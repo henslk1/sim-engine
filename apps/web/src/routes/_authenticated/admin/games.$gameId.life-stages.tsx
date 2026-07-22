@@ -119,81 +119,79 @@ function LifeStagePage() {
 
   if (editing) {
     return (
-      <div className="p-6 max-w-2xl space-y-6">
-        <h1 className="font-serif text-2xl font-semibold text-foreground">
+      <div className="p-4 space-y-3 max-w-4xl mx-auto">
+        <h1 className="font-serif text-xl font-semibold text-foreground">
           {editing.id ? "Edit Life Stage" : "Add Life Stage"}
         </h1>
 
         <section className="rounded-lg border border-border bg-card shadow-sm">
-          <header className="border-b border-border bg-secondary/40 px-4 py-2.5">
-            <h2 className="text-sm font-semibold text-foreground">Stage Details</h2>
-          </header>
-          <div className="p-4 space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Name</label>
-                <Input value={editing.name} onChange={(e) => update("name", e.target.value)} />
+          <div className="border-b border-border bg-secondary/40 px-3 py-2">
+            <h2 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Stage Details</h2>
+          </div>
+          <div className="p-4">
+            <div className="grid grid-cols-[1fr_1fr] gap-4">
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Name</label>
+                  <Input className="h-8 text-sm" value={editing.name} onChange={(e) => update("name", e.target.value)} />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Stage Index</label>
+                  <Input className="h-8 text-sm" type="number" value={editing.stageIndex} onChange={(e) => update("stageIndex", parseInt(e.target.value))} />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Min Cycle</label>
+                  <Input className="h-8 text-sm" type="number" value={editing.minCycle} onChange={(e) => update("minCycle", parseInt(e.target.value))} />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Max Cycle</label>
+                  <Input className="h-8 text-sm" type="number" value={editing.maxCycle} onChange={(e) => update("maxCycle", parseInt(e.target.value))} />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Profile Layout</label>
+                  <Input className="h-8 text-sm" value={editing.profileLayout} onChange={(e) => update("profileLayout", e.target.value)} />
+                </div>
               </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Stage Index</label>
-                <p className="text-[11px] text-muted-foreground">Order (0 = earliest). No two stages in the same game can share the same index.</p>
-                <Input type="number" value={editing.stageIndex} onChange={(e) => update("stageIndex", parseInt(e.target.value))} />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Min Cycle</label>
-                <Input type="number" value={editing.minCycle} onChange={(e) => update("minCycle", parseInt(e.target.value))} />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Max Cycle</label>
-                <Input type="number" value={editing.maxCycle} onChange={(e) => update("maxCycle", parseInt(e.target.value))} />
-              </div>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Profile Layout</label>
-              <p className="text-[11px] text-muted-foreground">Layout identifier for this stage's animal profile page.</p>
-              <Input value={editing.profileLayout} onChange={(e) => update("profileLayout", e.target.value)} />
-            </div>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Immunity Cap Multiplier</label>
-                <p className="text-[11px] text-muted-foreground">Max immunity as a fraction of innate max (1.0 = no cap reduction)</p>
-                <Input type="number" step="0.01" min="0" max="1" value={editing.immunityCapMultiplier} onChange={(e) => update("immunityCapMultiplier", parseFloat(e.target.value))} />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Energy Cost Multiplier</label>
-                <p className="text-[11px] text-muted-foreground">Multiply training and competition energy costs (1.0 = normal, 1.5 = 50% more expensive)</p>
-                <Input type="number" step="0.05" min="0" value={editing.energyCostMultiplier} onChange={(e) => update("energyCostMultiplier", parseFloat(e.target.value))} />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Death Chance Start Cycle <span className="font-normal text-muted-foreground">(optional)</span></label>
-                <p className="text-[11px] text-muted-foreground">Age at which natural death chance begins</p>
-                <Input type="number" step="1" min="0" value={editing.deathChanceStartCycle} onChange={(e) => update("deathChanceStartCycle", e.target.value)} placeholder="e.g. 120" />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Death Chance Per Cycle <span className="font-normal text-muted-foreground">(optional)</span></label>
-                <p className="text-[11px] text-muted-foreground">Probability of death per cycle once onset is reached (0–1)</p>
-                <Input type="number" step="0.001" min="0" max="1" value={editing.deathChancePerCycle} onChange={(e) => update("deathChancePerCycle", e.target.value)} placeholder="e.g. 0.02" />
-              </div>
-            </div>
-            <div className="flex flex-col gap-2">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Abilities</p>
-              <div className="grid grid-cols-2 gap-2">
-                {checkboxFields.map(([field, label]) => (
-                  <label key={field} className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={editing[field] as boolean}
-                      onChange={(e) => update(field, e.target.checked)}
-                    />
-                    {label}
-                  </label>
-                ))}
+              <div className="flex flex-col gap-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Immunity Cap Multiplier</label>
+                    <Input className="h-8 text-sm" type="number" step="0.01" min="0" max="1" value={editing.immunityCapMultiplier} onChange={(e) => update("immunityCapMultiplier", parseFloat(e.target.value))} />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Energy Cost Multiplier</label>
+                    <Input className="h-8 text-sm" type="number" step="0.05" min="0" value={editing.energyCostMultiplier} onChange={(e) => update("energyCostMultiplier", parseFloat(e.target.value))} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Death Chance Start Cycle <span className="font-normal">(optional)</span></label>
+                    <Input className="h-8 text-sm" type="number" step="1" min="0" value={editing.deathChanceStartCycle} onChange={(e) => update("deathChanceStartCycle", e.target.value)} placeholder="e.g. 120" />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Death Chance Per Cycle <span className="font-normal">(optional)</span></label>
+                    <Input className="h-8 text-sm" type="number" step="0.001" min="0" max="1" value={editing.deathChancePerCycle} onChange={(e) => update("deathChancePerCycle", e.target.value)} placeholder="e.g. 0.02" />
+                  </div>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Abilities</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {checkboxFields.map(([field, label]) => (
+                      <label key={field} className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={editing[field] as boolean}
+                          onChange={(e) => update(field, e.target.checked)}
+                        />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
-            {save.error && <p className="text-sm text-destructive">{save.error.message}</p>}
-            <div className="flex gap-2">
+            {save.error && <p className="mt-3 text-sm text-destructive">{save.error.message}</p>}
+            <div className="mt-4 flex gap-2">
               <Button onClick={handleSave} disabled={save.isPending}>
                 {save.isPending ? "Saving…" : "Save"}
               </Button>
@@ -206,27 +204,28 @@ function LifeStagePage() {
   }
 
   return (
-    <div className="p-6 max-w-4xl space-y-6">
+    <div className="p-4 space-y-3 max-w-4xl mx-auto">
       <div className="flex items-center justify-between">
-        <h1 className="font-serif text-2xl font-semibold text-foreground">Life Stages</h1>
+        <h1 className="font-serif text-xl font-semibold text-foreground">Life Stages</h1>
         <Button size="sm" onClick={startAdd}>Add Stage</Button>
       </div>
 
+      <div className="rounded-xl border border-border bg-card shadow-md p-2">
       <section className="rounded-lg border border-border bg-card shadow-sm">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border">
-              <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">#</th>
-              <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Name</th>
-              <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cycles</th>
-              <th className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">Compete</th>
-              <th className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">Breed</th>
-              <th className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">Surrogate</th>
-              <th className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">Train</th>
-              <th className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">Care</th>
-              <th className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">Unique</th>
-              <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Layout</th>
-              <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Actions</th>
+              <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">#</th>
+              <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Name</th>
+              <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Cycles</th>
+              <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Compete</th>
+              <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Breed</th>
+              <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Surrogate</th>
+              <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Train</th>
+              <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Care</th>
+              <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Unique</th>
+              <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Layout</th>
+              <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -256,6 +255,7 @@ function LifeStagePage() {
           </tbody>
         </table>
       </section>
+      </div>
     </div>
   )
 }

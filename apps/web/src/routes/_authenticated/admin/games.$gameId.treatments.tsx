@@ -62,12 +62,10 @@ function TreatmentsPage() {
   const [editingTreatmentId, setEditingTreatmentId] = useState<string | null>(null)
   const [editingTreatment, setEditingTreatment] = useState<TreatmentForm | null>(null)
 
-  // Items state
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
   const [editingItem, setEditingItem] = useState<ItemRow | null>(null)
   const [newItem, setNewItem] = useState<ItemRow>(emptyItem())
 
-  // Restrictions state
   const [editingRestrictionId, setEditingRestrictionId] = useState<string | null>(null)
   const [editingRestriction, setEditingRestriction] = useState<RestrictionRow | null>(null)
   const [newRestriction, setNewRestriction] = useState<RestrictionRow>(emptyRestriction())
@@ -199,51 +197,107 @@ function TreatmentsPage() {
   }
 
   return (
-    <div className="p-6 max-w-3xl space-y-6">
-      <h1 className="font-serif text-2xl font-semibold text-foreground">Treatments</h1>
+    <div className="p-6 space-y-6 max-w-4xl mx-auto">
+      <h1 className="font-serif text-xl font-semibold text-foreground">Treatments</h1>
 
-      <section className="rounded-lg border border-border bg-card shadow-sm p-4">
-        <label className="text-xs font-medium text-muted-foreground">Condition</label>
-        <select
-          value={selectedConditionId}
-          onChange={(e) => handleConditionChange(e.target.value)}
-          className="mt-1 block w-full max-w-sm rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-        >
-          <option value="">— Select a condition —</option>
-          {conditions?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
+      <section className="rounded-lg border border-border bg-card shadow-sm p-3">
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Condition</label>
+          <select
+            value={selectedConditionId}
+            onChange={(e) => handleConditionChange(e.target.value)}
+            className="h-8 w-full max-w-sm rounded-md border border-input bg-background px-3 text-sm"
+          >
+            <option value="">— Select a condition —</option>
+            {conditions?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </div>
       </section>
 
       {selectedConditionId && (
-        <>
+        <div className={editingTreatment !== null ? "grid grid-cols-[300px_1fr] gap-4 items-start" : ""}>
+          {editingTreatment !== null && (
+            <section className="rounded-lg border border-border bg-card shadow-sm">
+              <div className="border-b border-border bg-secondary/40 px-3 py-2">
+                <h2 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  {editingTreatmentId ? "Edit Treatment" : "Add Treatment"}
+                </h2>
+              </div>
+              <div className="p-3 space-y-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Name</label>
+                  <Input
+                    className="h-8 text-sm"
+                    value={editingTreatment.name}
+                    onChange={(e) => setEditingTreatment({ ...editingTreatment, name: e.target.value })}
+                    placeholder="e.g. Rest & Recovery"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Type</label>
+                  <select
+                    value={editingTreatment.treatmentType}
+                    onChange={(e) => setEditingTreatment({ ...editingTreatment, treatmentType: e.target.value as TreatmentType })}
+                    className="h-8 rounded-md border border-input bg-background px-3 text-sm"
+                  >
+                    {TREATMENT_TYPES.map((type) => <option key={type} value={type}>{TREATMENT_LABELS[type]}</option>)}
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Duration (cycles) <span className="font-normal">— optional</span></label>
+                  <Input
+                    className="h-8 text-sm"
+                    type="number"
+                    min="1"
+                    value={editingTreatment.durationCycles}
+                    onChange={(e) => setEditingTreatment({ ...editingTreatment, durationCycles: e.target.value })}
+                    placeholder="—"
+                  />
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <Button
+                    onClick={submitTreatment}
+                    disabled={saveTreatment.isPending || !editingTreatment.name.trim()}
+                  >
+                    {editingTreatmentId ? "Save" : "Add Treatment"}
+                  </Button>
+                  <Button variant="ghost" onClick={() => { setEditingTreatmentId(null); setEditingTreatment(null) }}>
+                    Cancel
+                  </Button>
+                </div>
+                {saveTreatment.error && <p className="text-sm text-destructive">{saveTreatment.error.message}</p>}
+              </div>
+            </section>
+          )}
+
           <section className="rounded-lg border border-border bg-card shadow-sm">
-            <header className="flex items-center justify-between border-b border-border bg-secondary/40 px-4 py-2.5">
-              <h2 className="text-sm font-semibold text-foreground">Treatments</h2>
+            <div className="flex items-center justify-between border-b border-border bg-secondary/40 px-3 py-2">
+              <h2 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Treatments</h2>
               <Button size="sm" onClick={() => { setEditingTreatment(emptyTreatment()); setEditingTreatmentId(null) }}>
                 + Add Treatment
               </Button>
-            </header>
+            </div>
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border">
-                  <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Name</th>
-                  <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Type</th>
-                  <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Duration</th>
-                  <th className="px-4 py-2 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">Items</th>
-                  <th className="px-4 py-2 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">Restrictions</th>
-                  <th className="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Actions</th>
+                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Name</th>
+                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Type</th>
+                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Duration</th>
+                  <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Items</th>
+                  <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Restrictions</th>
+                  <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {treatments?.map((t: NonNullable<typeof treatments>[number]) => (
                   <Fragment key={t.id}>
                     <tr className={`border-b border-border ${expandedTreatmentId === t.id ? "bg-muted/30" : ""}`}>
-                      <td className="px-4 py-2 font-medium text-foreground">{t.name}</td>
-                      <td className="px-4 py-2 text-muted-foreground">{TREATMENT_LABELS[t.treatmentType as TreatmentType]}</td>
-                      <td className="px-4 py-2 text-muted-foreground">{t.durationCycles ?? "—"}</td>
-                      <td className="px-4 py-2 text-center text-muted-foreground">{t._count.items}</td>
-                      <td className="px-4 py-2 text-center text-muted-foreground">{t._count.restrictionDefs}</td>
-                      <td className="px-4 py-2 text-right space-x-1">
+                      <td className="px-3 py-2 font-medium text-foreground">{t.name}</td>
+                      <td className="px-3 py-2 text-muted-foreground">{TREATMENT_LABELS[t.treatmentType as TreatmentType]}</td>
+                      <td className="px-3 py-2 text-muted-foreground">{t.durationCycles ?? "—"}</td>
+                      <td className="px-3 py-2 text-center text-muted-foreground">{t._count.items}</td>
+                      <td className="px-3 py-2 text-center text-muted-foreground">{t._count.restrictionDefs}</td>
+                      <td className="px-3 py-2 text-right space-x-1">
                         <Button size="sm" variant="ghost" onClick={() => toggleExpand(t.id, "items")} className="text-xs">
                           {expandedTreatmentId === t.id && expandedView === "items" ? "▲" : "▼"} Items
                         </Button>
@@ -270,9 +324,9 @@ function TreatmentsPage() {
                             <table className="w-full text-sm">
                               <thead>
                                 <tr className="border-b border-border">
-                                  <th className="pb-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Item</th>
-                                  <th className="pb-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Quantity</th>
-                                  <th className="pb-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Actions</th>
+                                  <th className="pb-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Item</th>
+                                  <th className="pb-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Quantity</th>
+                                  <th className="pb-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
                                 </tr>
                               </thead>
                               <tbody>
@@ -341,10 +395,10 @@ function TreatmentsPage() {
                           <table className="w-full text-sm">
                             <thead>
                               <tr className="border-b border-border">
-                                <th className="pb-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Restriction Type</th>
-                                <th className="pb-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Max Intensity Tier</th>
-                                <th className="pb-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Duration (cycles)</th>
-                                <th className="pb-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Actions</th>
+                                <th className="pb-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Restriction Type</th>
+                                <th className="pb-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Max Intensity Tier</th>
+                                <th className="pb-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Duration (cycles)</th>
+                                <th className="pb-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -420,72 +474,16 @@ function TreatmentsPage() {
                 ))}
                 {treatments?.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-4 py-6 text-center text-sm text-muted-foreground">No treatments for this condition yet.</td>
+                    <td colSpan={6} className="px-3 py-6 text-center text-sm text-muted-foreground">No treatments for this condition yet.</td>
                   </tr>
                 )}
               </tbody>
             </table>
             {removeTreatment.error && (
-              <p className="px-4 pb-3 text-sm text-destructive">{removeTreatment.error.message}</p>
+              <p className="px-3 pb-3 text-sm text-destructive">{removeTreatment.error.message}</p>
             )}
           </section>
-
-          {editingTreatment !== null && (
-            <section className="rounded-lg border border-border bg-card shadow-sm">
-              <header className="border-b border-border bg-secondary/40 px-4 py-2.5">
-                <h2 className="text-sm font-semibold text-foreground">
-                  {editingTreatmentId ? "Edit Treatment" : "Add Treatment"}
-                </h2>
-              </header>
-              <div className="p-4 space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">Name</label>
-                    <Input
-                      value={editingTreatment.name}
-                      onChange={(e) => setEditingTreatment({ ...editingTreatment, name: e.target.value })}
-                      placeholder="e.g. Rest & Recovery"
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">Type</label>
-                    <select
-                      value={editingTreatment.treatmentType}
-                      onChange={(e) => setEditingTreatment({ ...editingTreatment, treatmentType: e.target.value as TreatmentType })}
-                      className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                    >
-                      {TREATMENT_TYPES.map((type) => <option key={type} value={type}>{TREATMENT_LABELS[type]}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground">Duration (cycles) <span className="font-normal">— optional</span></label>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={editingTreatment.durationCycles}
-                    onChange={(e) => setEditingTreatment({ ...editingTreatment, durationCycles: e.target.value })}
-                    placeholder="—"
-                    className="mt-1 max-w-xs"
-                  />
-                </div>
-                <div className="flex gap-2 pt-1">
-                  <Button
-                    onClick={submitTreatment}
-                    disabled={saveTreatment.isPending || !editingTreatment.name.trim()}
-                  >
-                    {editingTreatmentId ? "Save" : "Add Treatment"}
-                  </Button>
-                  <Button variant="ghost" onClick={() => { setEditingTreatmentId(null); setEditingTreatment(null) }}>
-                    Cancel
-                  </Button>
-                </div>
-                {saveTreatment.error && <p className="text-sm text-destructive">{saveTreatment.error.message}</p>}
-              </div>
-            </section>
-          )}
-        </>
+        </div>
       )}
     </div>
   )
