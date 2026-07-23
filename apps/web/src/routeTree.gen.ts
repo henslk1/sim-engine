@@ -9,16 +9,18 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as VerifyEmailRouteImport } from './routes/verify-email'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
-import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
+import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedVetRouteImport } from './routes/_authenticated/vet'
 import { Route as AuthenticatedVenuesRouteImport } from './routes/_authenticated/venues'
 import { Route as AuthenticatedTownRouteImport } from './routes/_authenticated/town'
 import { Route as AuthenticatedStableRouteImport } from './routes/_authenticated/stable'
 import { Route as AuthenticatedShopRouteImport } from './routes/_authenticated/shop'
 import { Route as AuthenticatedSetupRouteImport } from './routes/_authenticated/setup'
+import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
 import { Route as AuthenticatedVenueVenueIdRouteImport } from './routes/_authenticated/venue.$venueId'
@@ -78,6 +80,11 @@ import { Route as AuthenticatedAdminGamesGameIdCompetitionTiersRouteImport } fro
 import { Route as AuthenticatedAdminGamesGameIdCareActionsRouteImport } from './routes/_authenticated/admin/games.$gameId.care-actions'
 import { Route as AuthenticatedAdminGamesGameIdBreedsRouteImport } from './routes/_authenticated/admin/games.$gameId.breeds'
 
+const VerifyEmailRoute = VerifyEmailRouteImport.update({
+  id: '/verify-email',
+  path: '/verify-email',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
@@ -92,10 +99,10 @@ const AuthenticatedRoute = AuthenticatedRouteImport.update({
   id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
+const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => AuthenticatedRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedVetRoute = AuthenticatedVetRouteImport.update({
   id: '/vet',
@@ -125,6 +132,11 @@ const AuthenticatedShopRoute = AuthenticatedShopRouteImport.update({
 const AuthenticatedSetupRoute = AuthenticatedSetupRouteImport.update({
   id: '/setup',
   path: '/setup',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
@@ -472,10 +484,12 @@ const AuthenticatedAdminGamesGameIdBreedsRoute =
   } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof AuthenticatedIndexRoute
+  '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/verify-email': typeof VerifyEmailRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/dashboard': typeof AuthenticatedDashboardRoute
   '/setup': typeof AuthenticatedSetupRoute
   '/shop': typeof AuthenticatedShopRoute
   '/stable': typeof AuthenticatedStableRoute
@@ -541,15 +555,17 @@ export interface FileRoutesByFullPath {
   '/admin/games/$gameId/': typeof AuthenticatedAdminGamesGameIdIndexRoute
 }
 export interface FileRoutesByTo {
+  '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/verify-email': typeof VerifyEmailRoute
+  '/dashboard': typeof AuthenticatedDashboardRoute
   '/setup': typeof AuthenticatedSetupRoute
   '/shop': typeof AuthenticatedShopRoute
   '/stable': typeof AuthenticatedStableRoute
   '/town': typeof AuthenticatedTownRoute
   '/venues': typeof AuthenticatedVenuesRoute
   '/vet': typeof AuthenticatedVetRoute
-  '/': typeof AuthenticatedIndexRoute
   '/admin/audit': typeof AuthenticatedAdminAuditRoute
   '/admin/broadcast': typeof AuthenticatedAdminBroadcastRoute
   '/admin/integrity': typeof AuthenticatedAdminIntegrityRoute
@@ -606,17 +622,19 @@ export interface FileRoutesByTo {
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/verify-email': typeof VerifyEmailRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/setup': typeof AuthenticatedSetupRoute
   '/_authenticated/shop': typeof AuthenticatedShopRoute
   '/_authenticated/stable': typeof AuthenticatedStableRoute
   '/_authenticated/town': typeof AuthenticatedTownRoute
   '/_authenticated/venues': typeof AuthenticatedVenuesRoute
   '/_authenticated/vet': typeof AuthenticatedVetRoute
-  '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/admin/audit': typeof AuthenticatedAdminAuditRoute
   '/_authenticated/admin/broadcast': typeof AuthenticatedAdminBroadcastRoute
   '/_authenticated/admin/bugs': typeof AuthenticatedAdminBugsRouteWithChildren
@@ -681,7 +699,9 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/signup'
+    | '/verify-email'
     | '/admin'
+    | '/dashboard'
     | '/setup'
     | '/shop'
     | '/stable'
@@ -747,15 +767,17 @@ export interface FileRouteTypes {
     | '/admin/games/$gameId/'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/'
     | '/login'
     | '/signup'
+    | '/verify-email'
+    | '/dashboard'
     | '/setup'
     | '/shop'
     | '/stable'
     | '/town'
     | '/venues'
     | '/vet'
-    | '/'
     | '/admin/audit'
     | '/admin/broadcast'
     | '/admin/integrity'
@@ -811,17 +833,19 @@ export interface FileRouteTypes {
     | '/admin/games/$gameId'
   id:
     | '__root__'
+    | '/'
     | '/_authenticated'
     | '/login'
     | '/signup'
+    | '/verify-email'
     | '/_authenticated/admin'
+    | '/_authenticated/dashboard'
     | '/_authenticated/setup'
     | '/_authenticated/shop'
     | '/_authenticated/stable'
     | '/_authenticated/town'
     | '/_authenticated/venues'
     | '/_authenticated/vet'
-    | '/_authenticated/'
     | '/_authenticated/admin/audit'
     | '/_authenticated/admin/broadcast'
     | '/_authenticated/admin/bugs'
@@ -882,13 +906,22 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   LoginRoute: typeof LoginRoute
   SignupRoute: typeof SignupRoute
+  VerifyEmailRoute: typeof VerifyEmailRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/verify-email': {
+      id: '/verify-email'
+      path: '/verify-email'
+      fullPath: '/verify-email'
+      preLoaderRoute: typeof VerifyEmailRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/signup': {
       id: '/signup'
       path: '/signup'
@@ -910,12 +943,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/': {
-      id: '/_authenticated/'
+    '/': {
+      id: '/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof AuthenticatedIndexRouteImport
-      parentRoute: typeof AuthenticatedRoute
+      preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/vet': {
       id: '/_authenticated/vet'
@@ -957,6 +990,13 @@ declare module '@tanstack/react-router' {
       path: '/setup'
       fullPath: '/setup'
       preLoaderRoute: typeof AuthenticatedSetupRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/dashboard': {
+      id: '/_authenticated/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/admin': {
@@ -1572,13 +1612,13 @@ const AuthenticatedAdminRouteWithChildren =
 
 interface AuthenticatedRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
+  AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedSetupRoute: typeof AuthenticatedSetupRoute
   AuthenticatedShopRoute: typeof AuthenticatedShopRoute
   AuthenticatedStableRoute: typeof AuthenticatedStableRoute
   AuthenticatedTownRoute: typeof AuthenticatedTownRoute
   AuthenticatedVenuesRoute: typeof AuthenticatedVenuesRoute
   AuthenticatedVetRoute: typeof AuthenticatedVetRoute
-  AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedAnimalAnimalIdRoute: typeof AuthenticatedAnimalAnimalIdRoute
   AuthenticatedBreedingOfferIdRoute: typeof AuthenticatedBreedingOfferIdRoute
   AuthenticatedCompetitionCompetitionIdRoute: typeof AuthenticatedCompetitionCompetitionIdRoute
@@ -1587,13 +1627,13 @@ interface AuthenticatedRouteChildren {
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
+  AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedSetupRoute: AuthenticatedSetupRoute,
   AuthenticatedShopRoute: AuthenticatedShopRoute,
   AuthenticatedStableRoute: AuthenticatedStableRoute,
   AuthenticatedTownRoute: AuthenticatedTownRoute,
   AuthenticatedVenuesRoute: AuthenticatedVenuesRoute,
   AuthenticatedVetRoute: AuthenticatedVetRoute,
-  AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedAnimalAnimalIdRoute: AuthenticatedAnimalAnimalIdRoute,
   AuthenticatedBreedingOfferIdRoute: AuthenticatedBreedingOfferIdRoute,
   AuthenticatedCompetitionCompetitionIdRoute:
@@ -1606,9 +1646,11 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
 )
 
 const rootRouteChildren: RootRouteChildren = {
+  IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   LoginRoute: LoginRoute,
   SignupRoute: SignupRoute,
+  VerifyEmailRoute: VerifyEmailRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

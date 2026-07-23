@@ -8,7 +8,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-export const Route = createFileRoute("/_authenticated/")({
+export const Route = createFileRoute("/_authenticated/dashboard")({
   component: DashboardPage,
 })
 
@@ -605,9 +605,9 @@ function DashboardPage() {
           .map((e) => ({
             id: `${comp.id}-${e.animal.id}`,
             animalName: e.animal.name,
-            discipline: comp.disciplineDef.name,
+            discipline: comp.disciplineDef?.name ?? "",
             venue: comp.venue.name,
-            tier: comp.tierDef.name,
+            tier: comp.tierDef?.name ?? "",
             expiresAt: comp.expiresAt,
           }))
       )

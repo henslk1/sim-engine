@@ -7,7 +7,16 @@ export const auth = betterAuth({
   secret: process.env["BETTER_AUTH_SECRET"]!,
   baseURL: process.env["BETTER_AUTH_URL"]!,
   trustedOrigins: ["http://localhost:5173"],
-  emailAndPassword: { enabled: true },
+  emailAndPassword: { 
+    enabled: true,
+    requireEmailVerification: true,
+  },
+  emailVerification: {
+    sendVerificationEmail: async ({ user, url }) => {
+      console.log(`[verify] ${user.email} → ${url}`)
+    },
+    autoSignInAfterVerification: true,
+  },
   socialProviders: {
     google: {
       clientId: process.env["GOOGLE_CLIENT_ID"] ?? "",

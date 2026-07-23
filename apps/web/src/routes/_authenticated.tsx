@@ -4,6 +4,7 @@ import { Header } from "@/components/header"
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: ({ context }) => {
     if (!context.session) throw redirect({ to: "/login" })
+    if(!context.session.user.emailVerified) throw redirect({ to: "/verify-email" })
   },
   component: AuthenticatedLayout,
 })

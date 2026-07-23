@@ -31,7 +31,7 @@ function SignUp() {
       return
     }
 
-    const { error } = await authClient.signUp.email({ name, email, password })
+    const { error } = await authClient.signUp.email({ name, email, password, callbackURL: "/" })
 
     if (error) {
       setError(error.message ?? "Sign up failed")
@@ -40,7 +40,7 @@ function SignUp() {
     }
 
     await router.invalidate()
-    router.navigate({ to: "/" })
+    router.navigate({ to: "/verify-email" })
   }
 
   return (
