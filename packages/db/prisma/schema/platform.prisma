@@ -75,6 +75,7 @@ model Game {
   personalityTraitDefs   PersonalityTraitDef[]
   conformationSections   ConformationSection[]
   predictorUsages        PlayerPredictorUsage[]
+  starterBreedOptions    StarterBreedOption[]
   isActive               Boolean                 @default(false)
   createdAt              DateTime                @default(now())
 }
@@ -234,11 +235,13 @@ model PlayerAccount {
   achievements               PlayerAchievement[]
   profileVisibilitySettings  ProfileVisibilitySetting[]
   predictorUsages            PlayerPredictorUsage[]
+  tutorialAnimalPair         TutorialAnimalPair?
   game                       Game                       @relation(fields: [gameId], references: [id])
   user                       User                       @relation(fields: [userId], references: [id])
   createdAt                  DateTime                   @default(now())
   updatedAt                  DateTime                   @updatedAt
 
+  @@unique([gameId, username])
   @@unique([userId, gameId])
 }
 
@@ -501,6 +504,24 @@ model PlayerPredictorUsage {
   game            Game          @relation(fields: [gameId], references: [id])
 
   @@unique([playerAccountId, gameId, date])
+}
+
+model StarterBreedOption {
+  id           String               @id @default(cuid())
+  gameId       String
+  breedId      String
+  isActive     Boolean              @default(true)
+  colorOptions StarterColorOption[]
+  breed        Breed                @relation(fields: [breedId], references: [id])
+  game         Game                 @relation(fields: [gameId], references: [id])
+}
+
+model StarterColorOption {
+  id                   String             @id @default(cuid())
+  starterBreedOptionId String
+  name                 String
+  isActive             Boolean            @default(true)
+  starterBreedOption   StarterBreedOption @relation(fields: [starterBreedOptionId], references: [id])
 }
 
 enum WarningType {

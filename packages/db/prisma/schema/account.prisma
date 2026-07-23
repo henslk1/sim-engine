@@ -34,8 +34,20 @@ model PlayerSeniority {
   activeDaysPlayed  Int           @default(0)
   lastActiveDateAt  DateTime?
   tutorialCompleted Boolean       @default(false)
-  gatesBypassesd    Boolean       @default(false)
+  gatesBypassed     Boolean       @default(false)
   playerAccount     PlayerAccount @relation(fields: [playerAccountId], references: [id])
+}
+
+model TutorialAnimalPair {
+  id              String        @id @default(cuid())
+  playerAccountId String        @unique
+  ancestorOneId   String        @unique
+  ancestorTwoId   String        @unique
+  embryoId        String        @unique
+  embryo          Animal        @relation("TutorialEmbryo", fields: [embryoId], references: [id])
+  ancestorTwo     Animal        @relation("TutorialAncestorTwo", fields: [ancestorTwoId], references: [id])
+  ancestorOne     Animal        @relation("TutorialAncestorOne", fields: [ancestorOneId], references: [id])
+  playerAccount   PlayerAccount @relation(fields: [playerAccountId], references: [id])
 }
 
 model TutorialStepDef {

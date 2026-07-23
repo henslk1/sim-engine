@@ -57,6 +57,7 @@ model ItemDef {
   groupInventory          GroupInventory[]
   campaignRewardTierItems CampaignRewardTierItem[]
   disciplineRequirements  DisciplineEquipmentRequirement[]
+  seasonPrizeConfigs      SeasonPrizeConfig[]
   prizeEligible           Boolean                          @default(true)
   isSellable              Boolean                          @default(true)
   game                    Game                             @relation(fields: [gameId], references: [id])

@@ -30,6 +30,11 @@ enum RankSubjectType {
   GROUP
 }
 
+enum PrizeType {
+  CURRENCY
+  ITEM
+}
+
 model DisciplineDef {
   id                     String                           @id @default(cuid())
   gameId                 String
@@ -165,18 +170,35 @@ model Season {
 }
 
 model SeasonCategory {
-  id              String             @id @default(cuid())
+  id              String              @id @default(cuid())
   seasonId        String
   name            String
   categoryType    SeasonCategoryType
   breedId         String?
   disciplineDefId String?
   rankings        SeasonRanking[]
-  disciplineDef   DisciplineDef?     @relation(fields: [disciplineDefId], references: [id])
-  breed           Breed?             @relation(fields: [breedId], references: [id])
-  season          Season             @relation(fields: [seasonId], references: [id])
+  prizeConfigs    SeasonPrizeConfig[]
+  disciplineDef   DisciplineDef?      @relation(fields: [disciplineDefId], references: [id])
+  breed           Breed?              @relation(fields: [breedId], references: [id])
+  season          Season              @relation(fields: [seasonId], references: [id])
 
   @@unique([seasonId, name])
+}
+
+model SeasonPrizeConfig {
+  id               String         @id @default(cuid())
+  seasonCategoryId String
+  currencyDefId    String?
+  itemDefId        String?
+  rankFrom         Int
+  rankTo           Int
+  prizeType        PrizeType
+  amount           Int
+  itemDef          ItemDef?       @relation(fields: [itemDefId], references: [id])
+  currencyDef      CurrencyDef?   @relation(fields: [currencyDefId], references: [id])
+  seasonCategory   SeasonCategory @relation(fields: [seasonCategoryId], references: [id])
+
+  @@unique([seasonCategoryId, rankFrom, rankTo])
 }
 
 model RecordDef {
@@ -238,19 +260,19 @@ model Competition {
 }
 
 model CompetitionEntry {
-  id              String                   @id @default(cuid())
+  id              String                 @id @default(cuid())
   competitionId   String
   animalId        String
   playerAccountId String
   tierDefId       String
-  enteredAt       DateTime                 @default(now())
+  enteredAt       DateTime               @default(now())
   cycleNumber     Int?
   result          CompetitionResult?
   entryStats      CompetitionEntryStat[]
-  tierDef         CompetitionTierDef       @relation(fields: [tierDefId], references: [id])
-  playerAccount   PlayerAccount            @relation(fields: [playerAccountId], references: [id])
-  animal          Animal                   @relation(fields: [animalId], references: [id])
-  competition     Competition              @relation(fields: [competitionId], references: [id])
+  tierDef         CompetitionTierDef     @relation(fields: [tierDefId], references: [id])
+  playerAccount   PlayerAccount          @relation(fields: [playerAccountId], references: [id])
+  animal          Animal                 @relation(fields: [animalId], references: [id])
+  competition     Competition            @relation(fields: [competitionId], references: [id])
 
   @@unique([competitionId, animalId])
 }

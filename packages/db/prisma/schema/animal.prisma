@@ -107,6 +107,7 @@ model Breed {
   foundationAnimals           FoundationAnimal[]
   dqTraits                    BreedDqTrait[]
   animalTemplates             AnimalTemplate[]
+  starterBreedOptions         StarterBreedOption[]
   game                        Game                              @relation(fields: [gameId], references: [id])
   species                     Species                           @relation(fields: [speciesId], references: [id])
   foundingPlayer              PlayerAccount?                    @relation("BreedFounder", fields: [foundingPlayerId], references: [id])
@@ -228,6 +229,9 @@ model Animal {
   foundationAnimalRecords             FoundationAnimal[]
   followers                           Follow[]
   userReports                         UserReport[]
+  tutorialPairAncestorOne             TutorialAnimalPair?              @relation("TutorialAncestorOne")
+  tutorialPairAncestorTwo             TutorialAnimalPair?              @relation("TutorialAncestorTwo")
+  tutorialPairEmbryo                  TutorialAnimalPair?              @relation("TutorialEmbryo")
   game                                Game                             @relation(fields: [gameId], references: [id])
   playerAccount                       PlayerAccount                    @relation("AnimalOwner", fields: [playerAccountId], references: [id])
   breeder                             PlayerAccount?                   @relation("AnimalBreeder", fields: [breederId], references: [id])

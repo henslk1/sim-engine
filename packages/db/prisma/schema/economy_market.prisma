@@ -73,19 +73,19 @@ model PlayerStore {
 }
 
 model VetServiceDef {
-  id                    String           @id @default(cuid())
+  id                    String                @id @default(cuid())
   gameId                String
   name                  String
   serviceType           VetServiceType
   baseCost              Int
   currencyDefId         String
-  hasSubscriberDiscount Boolean          @default(false)
+  hasSubscriberDiscount Boolean               @default(false)
   vetVisitLogs          VetVisitLog[]
   conditions            VetServiceCondition[]
   panelDefId            String?
-  panelDef              GeneticPanelDef? @relation(fields: [panelDefId], references: [id])
-  currencyDef           CurrencyDef      @relation(fields: [currencyDefId], references: [id])
-  game                  Game             @relation(fields: [gameId], references: [id])
+  panelDef              GeneticPanelDef?      @relation(fields: [panelDefId], references: [id])
+  currencyDef           CurrencyDef           @relation(fields: [currencyDefId], references: [id])
+  game                  Game                  @relation(fields: [gameId], references: [id])
 
   @@unique([gameId, name])
 }
