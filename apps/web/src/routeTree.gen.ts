@@ -52,6 +52,7 @@ import { Route as AuthenticatedAdminGamesGameIdTrainingActionsRouteImport } from
 import { Route as AuthenticatedAdminGamesGameIdTitlesRouteImport } from './routes/_authenticated/admin/games.$gameId.titles'
 import { Route as AuthenticatedAdminGamesGameIdStoreListingsRouteImport } from './routes/_authenticated/admin/games.$gameId.store-listings'
 import { Route as AuthenticatedAdminGamesGameIdStatsRouteImport } from './routes/_authenticated/admin/games.$gameId.stats'
+import { Route as AuthenticatedAdminGamesGameIdStarterBreedsRouteImport } from './routes/_authenticated/admin/games.$gameId.starter-breeds'
 import { Route as AuthenticatedAdminGamesGameIdStageActivitiesRouteImport } from './routes/_authenticated/admin/games.$gameId.stage-activities'
 import { Route as AuthenticatedAdminGamesGameIdSpeciesRouteImport } from './routes/_authenticated/admin/games.$gameId.species'
 import { Route as AuthenticatedAdminGamesGameIdSeasonsRouteImport } from './routes/_authenticated/admin/games.$gameId.seasons'
@@ -320,6 +321,12 @@ const AuthenticatedAdminGamesGameIdStatsRoute =
     path: '/stats',
     getParentRoute: () => AuthenticatedAdminGamesGameIdRoute,
   } as any)
+const AuthenticatedAdminGamesGameIdStarterBreedsRoute =
+  AuthenticatedAdminGamesGameIdStarterBreedsRouteImport.update({
+    id: '/starter-breeds',
+    path: '/starter-breeds',
+    getParentRoute: () => AuthenticatedAdminGamesGameIdRoute,
+  } as any)
 const AuthenticatedAdminGamesGameIdStageActivitiesRoute =
   AuthenticatedAdminGamesGameIdStageActivitiesRouteImport.update({
     id: '/stage-activities',
@@ -544,6 +551,7 @@ export interface FileRoutesByFullPath {
   '/admin/games/$gameId/seasons': typeof AuthenticatedAdminGamesGameIdSeasonsRoute
   '/admin/games/$gameId/species': typeof AuthenticatedAdminGamesGameIdSpeciesRoute
   '/admin/games/$gameId/stage-activities': typeof AuthenticatedAdminGamesGameIdStageActivitiesRoute
+  '/admin/games/$gameId/starter-breeds': typeof AuthenticatedAdminGamesGameIdStarterBreedsRoute
   '/admin/games/$gameId/stats': typeof AuthenticatedAdminGamesGameIdStatsRoute
   '/admin/games/$gameId/store-listings': typeof AuthenticatedAdminGamesGameIdStoreListingsRoute
   '/admin/games/$gameId/titles': typeof AuthenticatedAdminGamesGameIdTitlesRoute
@@ -610,6 +618,7 @@ export interface FileRoutesByTo {
   '/admin/games/$gameId/seasons': typeof AuthenticatedAdminGamesGameIdSeasonsRoute
   '/admin/games/$gameId/species': typeof AuthenticatedAdminGamesGameIdSpeciesRoute
   '/admin/games/$gameId/stage-activities': typeof AuthenticatedAdminGamesGameIdStageActivitiesRoute
+  '/admin/games/$gameId/starter-breeds': typeof AuthenticatedAdminGamesGameIdStarterBreedsRoute
   '/admin/games/$gameId/stats': typeof AuthenticatedAdminGamesGameIdStatsRoute
   '/admin/games/$gameId/store-listings': typeof AuthenticatedAdminGamesGameIdStoreListingsRoute
   '/admin/games/$gameId/titles': typeof AuthenticatedAdminGamesGameIdTitlesRoute
@@ -683,6 +692,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/games/$gameId/seasons': typeof AuthenticatedAdminGamesGameIdSeasonsRoute
   '/_authenticated/admin/games/$gameId/species': typeof AuthenticatedAdminGamesGameIdSpeciesRoute
   '/_authenticated/admin/games/$gameId/stage-activities': typeof AuthenticatedAdminGamesGameIdStageActivitiesRoute
+  '/_authenticated/admin/games/$gameId/starter-breeds': typeof AuthenticatedAdminGamesGameIdStarterBreedsRoute
   '/_authenticated/admin/games/$gameId/stats': typeof AuthenticatedAdminGamesGameIdStatsRoute
   '/_authenticated/admin/games/$gameId/store-listings': typeof AuthenticatedAdminGamesGameIdStoreListingsRoute
   '/_authenticated/admin/games/$gameId/titles': typeof AuthenticatedAdminGamesGameIdTitlesRoute
@@ -756,6 +766,7 @@ export interface FileRouteTypes {
     | '/admin/games/$gameId/seasons'
     | '/admin/games/$gameId/species'
     | '/admin/games/$gameId/stage-activities'
+    | '/admin/games/$gameId/starter-breeds'
     | '/admin/games/$gameId/stats'
     | '/admin/games/$gameId/store-listings'
     | '/admin/games/$gameId/titles'
@@ -822,6 +833,7 @@ export interface FileRouteTypes {
     | '/admin/games/$gameId/seasons'
     | '/admin/games/$gameId/species'
     | '/admin/games/$gameId/stage-activities'
+    | '/admin/games/$gameId/starter-breeds'
     | '/admin/games/$gameId/stats'
     | '/admin/games/$gameId/store-listings'
     | '/admin/games/$gameId/titles'
@@ -894,6 +906,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/games/$gameId/seasons'
     | '/_authenticated/admin/games/$gameId/species'
     | '/_authenticated/admin/games/$gameId/stage-activities'
+    | '/_authenticated/admin/games/$gameId/starter-breeds'
     | '/_authenticated/admin/games/$gameId/stats'
     | '/_authenticated/admin/games/$gameId/store-listings'
     | '/_authenticated/admin/games/$gameId/titles'
@@ -1216,6 +1229,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminGamesGameIdStatsRouteImport
       parentRoute: typeof AuthenticatedAdminGamesGameIdRoute
     }
+    '/_authenticated/admin/games/$gameId/starter-breeds': {
+      id: '/_authenticated/admin/games/$gameId/starter-breeds'
+      path: '/starter-breeds'
+      fullPath: '/admin/games/$gameId/starter-breeds'
+      preLoaderRoute: typeof AuthenticatedAdminGamesGameIdStarterBreedsRouteImport
+      parentRoute: typeof AuthenticatedAdminGamesGameIdRoute
+    }
     '/_authenticated/admin/games/$gameId/stage-activities': {
       id: '/_authenticated/admin/games/$gameId/stage-activities'
       path: '/stage-activities'
@@ -1485,6 +1505,7 @@ interface AuthenticatedAdminGamesGameIdRouteChildren {
   AuthenticatedAdminGamesGameIdSeasonsRoute: typeof AuthenticatedAdminGamesGameIdSeasonsRoute
   AuthenticatedAdminGamesGameIdSpeciesRoute: typeof AuthenticatedAdminGamesGameIdSpeciesRoute
   AuthenticatedAdminGamesGameIdStageActivitiesRoute: typeof AuthenticatedAdminGamesGameIdStageActivitiesRoute
+  AuthenticatedAdminGamesGameIdStarterBreedsRoute: typeof AuthenticatedAdminGamesGameIdStarterBreedsRoute
   AuthenticatedAdminGamesGameIdStatsRoute: typeof AuthenticatedAdminGamesGameIdStatsRoute
   AuthenticatedAdminGamesGameIdStoreListingsRoute: typeof AuthenticatedAdminGamesGameIdStoreListingsRoute
   AuthenticatedAdminGamesGameIdTitlesRoute: typeof AuthenticatedAdminGamesGameIdTitlesRoute
@@ -1552,6 +1573,8 @@ const AuthenticatedAdminGamesGameIdRouteChildren: AuthenticatedAdminGamesGameIdR
       AuthenticatedAdminGamesGameIdSpeciesRoute,
     AuthenticatedAdminGamesGameIdStageActivitiesRoute:
       AuthenticatedAdminGamesGameIdStageActivitiesRoute,
+    AuthenticatedAdminGamesGameIdStarterBreedsRoute:
+      AuthenticatedAdminGamesGameIdStarterBreedsRoute,
     AuthenticatedAdminGamesGameIdStatsRoute:
       AuthenticatedAdminGamesGameIdStatsRoute,
     AuthenticatedAdminGamesGameIdStoreListingsRoute:
