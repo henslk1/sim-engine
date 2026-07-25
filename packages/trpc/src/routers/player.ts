@@ -4,7 +4,13 @@ import { z } from "zod"
 
 export const playerRouter = router({
   create: publicProcedure
-    .input(z.object({ gameId: z.string(), username: z.string().min(3).max(30) }))
+    .input(z.object({ 
+      gameId: z.string(), 
+      username: z.string().min(3).max(30),
+      starterBreedOptionId: z.string(),
+      starterColorOptionId: z.string(),
+      starterGender: z.string(), 
+    }))
     .mutation(async ({ ctx, input }) => {
       if (!ctx.userId) throw new Error("Not authenticated")
       const existing = await db.playerAccount.findUnique({
@@ -12,10 +18,16 @@ export const playerRouter = router({
       })
       if (existing) throw new Error("Player account already exists")
 
-      const currencyDefs = await db.currencyDef.findMany({
-        where: { gameId: input.gameId },
-        select: { id: true },
-      })
+      const [currencyDefs, topics] = await Promise.all([
+        db.currencyDef.findMany({
+          where: { gameId: input.gameId },
+          select: { id: true },
+        }),
+        db.notificationTopicDef.findMany({
+          where: { gameId: input.gameId },
+          select: { id: true, isDefaultEnabled: true },
+        }),
+      ])
 
       return db.$transaction(async (tx) => {
         const account = await tx.playerAccount.create({
@@ -33,8 +45,22 @@ export const playerRouter = router({
             data: { playerAccountId: account.id, animalSlotBase: 10, subContainerBase: 3, geneticStorageBase: 50 },
           }),
           tx.playerProfile.create({ data: { playerAccountId: account.id } }),
-          tx.playerSeniority.create({ data: { playerAccountId: account.id } }),
+          tx.playerSeniority.create({ 
+            data: { 
+              playerAccountId: account.id,
+              starterBreedOptionId: input.starterBreedOptionId,
+              starterColorOptionId: input.starterColorOptionId,
+              starterGender: input.starterGender, 
+            } ,
+          }),
           tx.playerReputation.create({ data: { playerAccountId: account.id } }),
+          tx.notificationSetting.createMany({
+            data: topics.map((t) => ({
+              playerAccountId: account.id,
+              topicDefId: t.id,
+              isEnabled: t.isDefaultEnabled,
+            })),
+          }),
         ])
         return account
       })
@@ -66,6 +92,22 @@ export const playerRouter = router({
       db.playerBalance.findMany({
         where: { playerAccountId: input.playerAccountId },
         include: { currencyDef: { select: { id: true, name: true, symbol: true } } },
+      })
+    ),
+
+  getStarterBreeds: publicProcedure
+    .input(z.object({ gameId: z.string() }))
+    .query(({ input }) =>
+      db.starterBreedOption.findMany({
+        where: { gameId: input.gameId, isActive: true },
+        include: {
+          breed: { select: { id: true, name: true, image: true } },
+          colorOptions: {
+            where: { isActive: true },
+            orderBy: { name: "asc" },
+          },
+        },
+        orderBy: { breed: { name: "asc" } },
       })
     ),
 })
