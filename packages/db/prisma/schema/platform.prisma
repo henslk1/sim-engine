@@ -520,6 +520,7 @@ model StarterColorOption {
   id                   String             @id @default(cuid())
   starterBreedOptionId String
   name                 String
+  image                String?
   isActive             Boolean            @default(true)
   starterBreedOption   StarterBreedOption @relation(fields: [starterBreedOptionId], references: [id])
 }
