@@ -29,13 +29,16 @@ model ProfileVisibilitySetting {
 }
 
 model PlayerSeniority {
-  id                String        @id @default(cuid())
-  playerAccountId   String        @unique
-  activeDaysPlayed  Int           @default(0)
-  lastActiveDateAt  DateTime?
-  tutorialCompleted Boolean       @default(false)
-  gatesBypassed     Boolean       @default(false)
-  playerAccount     PlayerAccount @relation(fields: [playerAccountId], references: [id])
+  id                   String        @id @default(cuid())
+  playerAccountId      String        @unique
+  activeDaysPlayed     Int           @default(0)
+  lastActiveDateAt     DateTime?
+  starterBreedOptionId String?
+  starterColorOptionId String?
+  starterGender        String?
+  tutorialCompleted    Boolean       @default(false)
+  gatesBypassed        Boolean       @default(false)
+  playerAccount        PlayerAccount @relation(fields: [playerAccountId], references: [id])
 }
 
 model TutorialAnimalPair {
