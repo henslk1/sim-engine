@@ -43,12 +43,13 @@ export const starterBreedAdminRouter = router({
       id: z.string().optional(),
       starterBreedOptionId: z.string(),
       name: z.string().min(1),
+      image: z.string().nullish(),
       isActive: z.boolean(),
     }))
     .mutation(({ input }) => {
-      const { id, starterBreedOptionId, ...data } = input
-      if (id) return db.starterColorOption.update({ where: { id }, data })
-        return db.starterColorOption.create({ data: { starterBreedOptionId, ...data } })
+      const { id, starterBreedOptionId, image, ...data } = input
+      if (id) return db.starterColorOption.update({ where: { id }, data: { ...data, image: image ?? null } })
+        return db.starterColorOption.create({ data: { starterBreedOptionId, ...data, image: image ?? null } })
     }),
 
   removeColorOption: publicProcedure

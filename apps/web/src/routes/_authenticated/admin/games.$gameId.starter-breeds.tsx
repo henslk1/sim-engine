@@ -4,8 +4,8 @@ import { useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 
-type ColorForm = { name: string; isActive: boolean }
-const emptyColorForm = (): ColorForm => ({ name: "", isActive: true })
+type ColorForm = { name: string; isActive: boolean, image: string }
+const emptyColorForm = (): ColorForm => ({ name: "", isActive: true, image: "" })
 
 export const Route = createFileRoute("/_authenticated/admin/games/$gameId/starter-breeds")({
   component: StarterBreedsPage,
@@ -57,6 +57,7 @@ function StarterBreedsPage() {
       id: editingColorId ?? undefined,
       starterBreedOptionId: selected.id,
       name: colorForm.name.trim(),
+      image: colorForm.image || null,
       isActive: colorForm.isActive,
     })
   }
@@ -157,12 +158,21 @@ function StarterBreedsPage() {
                           {editingColorId === c.id ? (
                             <>
                               <td className="py-1.5 pr-2" colSpan={2}>
-                                <Input
-                                  className="h-7 text-sm"
-                                  value={colorForm.name}
-                                  onChange={e => setColorForm({ ...colorForm, name: e.target.value })}
-                                  autoFocus
-                                />
+                                <div className="flex gap-1.5">
+                                  <Input
+                                    className="h-7 text-sm"
+                                    value={colorForm.name}
+                                    onChange={e => setColorForm({ ...colorForm, name: e.target.value })}
+                                    placeholder="Name"
+                                    autoFocus
+                                  />
+                                  <Input
+                                    className="h-7 text-sm"
+                                    value={colorForm.image}
+                                    onChange={e => setColorForm({ ...colorForm, image: e.target.value })}
+                                    placeholder="Image URL"
+                                  />
+                                </div>
                               </td>
                               <td className="py-1.5 text-right space-x-1">
                                 <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={submitColor}>Save</Button>
@@ -179,7 +189,7 @@ function StarterBreedsPage() {
                               </td>
                               <td className="py-1.5 text-right space-x-1">
                                 <Button size="sm" variant="ghost" className="h-7 text-xs"
-                                  onClick={() => { setEditingColorId(c.id); setColorForm({ name: c.name, isActive: c.isActive }) }}>
+                                  onClick={() => { setEditingColorId(c.id); setColorForm({ name: c.name, isActive: c.isActive, image: c.image ?? "" }) }}>
                                   Edit
                                 </Button>
                                 <Button size="sm" variant="ghost" className="h-7 text-xs text-destructive hover:text-destructive"
@@ -207,6 +217,12 @@ function StarterBreedsPage() {
                         value={colorForm.name}
                         onChange={e => setColorForm({ ...colorForm, name: e.target.value })}
                         onKeyDown={e => { if (e.key === "Enter") submitColor() }}
+                      />
+                      <Input
+                        className="h-8 text-sm"
+                        placeholder="Image URL"
+                        value={colorForm.image}
+                        onChange={e => setColorForm({ ...colorForm, image: e.target.value })}
                       />
                       <Button
                         className="h-8 text-sm shrink-0"
