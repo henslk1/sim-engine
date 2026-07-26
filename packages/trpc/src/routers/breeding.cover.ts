@@ -1,23 +1,7 @@
 import { db } from "@sim-engine/db"
 import { router, publicProcedure } from "../trpc.js"
 import { z } from "zod"
-import { generateOffspring, computePhenotypeDescription, computeBreedingQuality, type ParentData } from "@sim-engine/engine"
-
-function computeCOI(
-  sireAncestors: ParentData["ancestors"],
-  damAncestors: ParentData["ancestors"],
-): number {
-  const sireMap = new Map(sireAncestors.map((a) => [a.ancestorId, a]))
-  let coi = 0
-  for (const damEntry of damAncestors) {
-    const sireEntry = sireMap.get(damEntry.ancestorId)
-    if (sireEntry !== undefined) {
-      const fa = sireEntry.ancestor.inbreedingCoefficient
-      coi += Math.pow(0.5, sireEntry.depth + damEntry.depth + 1) * (1 + fa)
-    }
-  }
-  return Math.min(1, coi)
-}
+import { generateOffspring, computePhenotypeDescription, computeBreedingQuality, computeCOI, type ParentData } from "@sim-engine/engine"
 
 const eligibleFemaleSelect = {
   id: true,
@@ -719,7 +703,7 @@ export const breedingCoverRouter = router({
       ].reduce((acc, p) => acc + p.traitDef.conceptionModifier * p.value, 0)
 
       const conceptionChance = Math.max(10, Math.min(100, base + personalityOffset))
-      const offspringCOI = computeCOI(offer.sire.ancestors, offer.dam.ancestors)
+      const offspringCOI = computeCOI(offer.sire.id, offer.sire.inbreedingCoefficient, offer.sire.ancestors, offer.dam.id, offer.dam.inbreedingCoefficient, offer.dam.ancestors)
 
       return {
         ...offer,

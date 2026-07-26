@@ -1,3 +1,5 @@
+import { computeCOI } from "./computeCOI.js"
+
 // fertility is stored as 0–1 decimal in Animal (e.g. 0.93 = 93%).
 // The conception formula treats it as 0–100 by multiplying × 100.
 
@@ -90,27 +92,6 @@ function isSameComposition(
   return true
 }
 
-// Wright's path coefficient over the AnimalAncestor tree.
-// One record per ancestor (shortest path stored), so this is an approximation
-// for pedigrees with multiple paths to the same ancestor.
-function computeCOI(
-  sireAncestors: ParentData["ancestors"],
-  damAncestors: ParentData["ancestors"],
-): number {
-  const sireMap = new Map(sireAncestors.map((a) => [a.ancestorId, a]))
-  const damMap = new Map(damAncestors.map((a) => [a.ancestorId, a]))
-
-  let coi = 0
-  for (const [id, sireEntry] of sireMap) {
-    const damEntry = damMap.get(id)
-    if (damEntry !== undefined) {
-      const fa = sireEntry.ancestor.inbreedingCoefficient
-      coi += Math.pow(0.5, sireEntry.depth + damEntry.depth + 1) * (1 + fa)
-    }
-  }
-  return Math.min(1, coi)
-}
-
 export function generateOffspring(input: GenerateOffspringInput): GenerateOffspringResult {
   const { sire, dam, damCareScore, gameConfig, gameInnateMax, gradeBreedId, targetBreedId } = input
 
@@ -139,7 +120,7 @@ export function generateOffspring(input: GenerateOffspringInput): GenerateOffspr
     Math.random() < gameConfig.identicalMultiplesChance
 
   // ── Shared values (computed once, used for all offspring in the litter) ───────
-  const coi = computeCOI(sire.ancestors, dam.ancestors)
+  const coi = computeCOI(sire.id, sire.inbreedingCoefficient, sire.ancestors, dam.id, dam.inbreedingCoefficient, dam.ancestors)
 
   const sireTotal = sire.stats.reduce((s, x) => s + x.innateValue, 0)
   const damTotal = dam.stats.reduce((s, x) => s + x.innateValue, 0)
