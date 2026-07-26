@@ -195,7 +195,14 @@ export function generateOffspring(input: GenerateOffspringInput): GenerateOffspr
     // Stat total
     let totalInnate: number
     if (isFirstGenCross) {
-      totalInnate = gameConfig.defaultInnateRatio * gameInnateMax.averageTotalInnate
+      const crossBase = gameConfig.defaultInnateRatio * gameInnateMax.averageTotalInnate
+      const headroom = Math.max(0, (gameInnateMax.maxTotalInnate - crossBase) / gameInnateMax.maxTotalInnate)
+      const gain = Math.max(
+        gameConfig.breedingMinGain,
+        gameConfig.breedingBaseGain * Math.sqrt(headroom) * pairQuality,
+      )
+      const variance = gain * (Math.random() * 2 - 1) * gameConfig.breedingVarianceFactor
+      totalInnate = Math.max(crossBase, crossBase + gain + variance)
     } else {
       const headroom = Math.max(
         0,
