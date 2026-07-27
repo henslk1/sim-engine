@@ -128,5 +128,12 @@ export function computeBreedingGrade(
   }
   parts.push(Math.max(0, 1 - animal.healthRecords.filter((r) => r.isActive).length * 0.15))
   const pct = (parts.reduce((a, b) => a + b, 0) / parts.length) * 100
-  return pct >= 100 ? "S" : pct >= 85 ? "A" : pct >= 70 ? "B" : pct >= 55 ? "C" : pct >= 40 ? "D" : "F"
+  const hasTopSportTier = animal.compTiers
+    .filter((t) => !t.disciplineDef.isConformation)
+    .some((t) => t.tierDef.tierIndex >= (t.disciplineDef.compTierDefs[0]?.tierIndex ?? t.tierDef.tierIndex))
+  const hasTopConformationTier = animal.compTiers
+    .filter((t) => t.disciplineDef.isConformation)
+    .some((t) => t.tierDef.tierIndex >= (t.disciplineDef.compTierDefs[0]?.tierIndex ?? t.tierDef.tierIndex))
+  const isS = pct >= 100 && hasTopSportTier && hasTopConformationTier
+  return isS ? "S" : pct >= 85 ? "A" : pct >= 70 ? "B" : pct >= 55 ? "C" : pct >= 40 ? "D" : "F"
 }

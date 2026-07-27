@@ -236,6 +236,7 @@ model PlayerAccount {
   profileVisibilitySettings  ProfileVisibilitySetting[]
   predictorUsages            PlayerPredictorUsage[]
   tutorialAnimalPair         TutorialAnimalPair?
+  tutorialCompetitions       Competition[]              @relation("TutorialCompetitions")
   game                       Game                       @relation(fields: [gameId], references: [id])
   user                       User                       @relation(fields: [userId], references: [id])
   createdAt                  DateTime                   @default(now())
@@ -489,6 +490,7 @@ model GameConfig {
   breedingCooldownCycles          Int      @default(0)
   geneticCollectionCooldownCycles Int      @default(0)
   conformationInspectionMinCycle  Int      @default(0)
+  topGradeDoubleBonusChance       Float    @default(0.1)
   game                            Game     @relation(fields: [gameId], references: [id])
   createdAt                       DateTime @default(now())
   updatedAt                       DateTime @updatedAt
@@ -507,13 +509,17 @@ model PlayerPredictorUsage {
 }
 
 model StarterBreedOption {
-  id           String               @id @default(cuid())
-  gameId       String
-  breedId      String
-  isActive     Boolean              @default(true)
-  colorOptions StarterColorOption[]
-  breed        Breed                @relation(fields: [breedId], references: [id])
-  game         Game                 @relation(fields: [gameId], references: [id])
+  id                       String               @id @default(cuid())
+  gameId                   String
+  breedId                  String
+  isActive                 Boolean              @default(true)
+  tutorialMaleTemplateId   String?
+  tutorialFemaleTemplateId String?
+  colorOptions             StarterColorOption[]
+  breed                    Breed                @relation(fields: [breedId], references: [id])
+  game                     Game                 @relation(fields: [gameId], references: [id])
+  tutorialMaleTemplate     Animal?              @relation("TutorialMaleTemplate",   fields: [tutorialMaleTemplateId],   references: [id])
+  tutorialFemaleTemplate   Animal?              @relation("TutorialFemaleTemplate", fields: [tutorialFemaleTemplateId], references: [id])
 }
 
 model StarterColorOption {

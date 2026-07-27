@@ -9,7 +9,14 @@ export const disciplineAdminRouter = router({
       db.disciplineDef.findMany({
         where: { gameId: input.gameId },
         orderBy: { name: "asc" },
-        include: { _count: { select: { statWeights: true, personalityWeights: true } } },
+        include: {
+          _count: { select: { statWeights: true, personalityWeights: true } },
+          compTierDefs: {
+            select: { id: true, name: true, tierIndex: true, advancementThreshold: true },
+            orderBy: { tierIndex: "asc" },
+            take: 1,
+          },
+        },
       })
     ),
 

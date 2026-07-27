@@ -25,7 +25,7 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
 
   const { data: allDisciplines } = trpc.admin.discipline.list.useQuery(
     { gameId: animal.gameId },
-    { enabled: !animal.disciplineDef && canCompete && !readonly },
+    { enabled: canCompete && !readonly },
   )
   const disciplines = allDisciplines?.filter((d) => !d.isConformation)
 
@@ -36,6 +36,12 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
   const latestWeeklyPoints = animal.weeklyPoints.find(
     (p) => p.disciplineDefId === currentTier?.disciplineDefId
   )?.points
+
+  const confTier = conformationTiers[0]
+  const confDisciplineFromQuery = allDisciplines?.find((d) => d.isConformation)
+  const confDisciplineName = confTier?.disciplineDef.name ?? confDisciplineFromQuery?.name
+  const confStartingTierDef = confDisciplineFromQuery?.compTierDefs?.[0]
+  const confPoints = animal.weeklyPoints.find((p) => p.disciplineDefId === confTier?.disciplineDefId)?.points
   const restrictions = getActiveRestrictions(animal)
   const isRestricted = restrictions.has("COMPETITION") || restrictions.has("ALL")
 
@@ -48,7 +54,8 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
     const cert = animal.healthCertificates.find((c: Cert) => c.certDef.id === def.id)
     return !!cert && cert.isValid && cert.expiresAtCycle > animal.ageInCycles
   })
-  const canBrowseVenues = !isRestricted && allEquipmentMet && allCertsMet
+  const isConformationInspected = animal.conformationScores.length > 0
+  const canBrowseVenues = !isRestricted && allEquipmentMet && allCertsMet && isConformationInspected
 
   return (
     <Panel title="Competition" icon={<Trophy className="size-4 text-chart-1" />}>
@@ -185,29 +192,38 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
           )}
         </div>
       )}
-      {conformationTiers.map((tier) => {
-        const confPoints = animal.weeklyPoints.find((p) => p.disciplineDefId === tier.disciplineDefId)?.points
-        return (
-          <div key={tier.disciplineDefId} className="mt-3 border-t border-border/50 pt-3 space-y-2">
-            <div className="grid grid-cols-3 gap-2">
-              <InfoCard label="Discipline" value={tier.disciplineDef.name} />
-              <InfoCard label="Current Tier" value={tier.tierDef.name} />
-              <InfoCard label="Weekly Points" value={confPoints !== undefined ? `${Math.round(confPoints)} pts` : "—"} />
-            </div>
-            {tier.tierDef.advancementThreshold != null && (
-              <div className="rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2">
-                <div className="mb-1.5 flex items-center justify-between">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Progress to Next Tier</p>
-                  <span className="text-[11px] tabular-nums text-muted-foreground">
-                    {confPoints !== undefined ? Math.round(confPoints) : 0} / {Math.round(tier.tierDef.advancementThreshold)}
-                  </span>
+      {canCompete && confDisciplineName && (
+        <div className="mt-3 border-t border-border/50 pt-3 space-y-2">
+          {animal.conformationScores.length === 0 ? (
+            <p className="text-[11px] text-muted-foreground">
+              Conformation inspection required before entering {confDisciplineName}.
+            </p>
+          ) : (() => {
+            const tierName = confTier?.tierDef.name ?? confStartingTierDef?.name
+            const threshold = confTier?.tierDef.advancementThreshold ?? confStartingTierDef?.advancementThreshold
+            return (
+              <>
+                <div className="grid grid-cols-3 gap-2">
+                  <InfoCard label="Discipline" value={confDisciplineName} />
+                  <InfoCard label="Current Tier" value={tierName ?? "—"} />
+                  <InfoCard label="Weekly Points" value={confPoints !== undefined ? `${Math.round(confPoints)} pts` : "—"} />
                 </div>
-                <Meter value={confPoints ?? 0} max={tier.tierDef.advancementThreshold} tone="condition" className="h-1.5" />
-              </div>
-            )}
-          </div>
-        )
-      })}
+                {threshold != null && (
+                  <div className="rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2">
+                    <div className="mb-1.5 flex items-center justify-between">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Progress to Next Tier</p>
+                      <span className="text-[11px] tabular-nums text-muted-foreground">
+                        {confPoints !== undefined ? Math.round(confPoints) : 0} / {Math.round(threshold)}
+                      </span>
+                    </div>
+                    <Meter value={confPoints ?? 0} max={threshold} tone="condition" className="h-1.5" />
+                  </div>
+                )}
+              </>
+            )
+          })()}
+        </div>
+      )}
       {canCompete && !readonly && (
         <div className="mt-3 border-t border-border/50 pt-3">
           {canBrowseVenues ? (

@@ -45,6 +45,7 @@ model HealthConditionDef {
   expressionRules        ExpressionRule[]
   vetVisitLogs           VetVisitLog[]
   vetServices            VetServiceCondition[]
+  tutorialStepDefs       TutorialStepDef[]
   game                   Game                      @relation(fields: [gameId], references: [id])
 
   @@unique([gameId, name])

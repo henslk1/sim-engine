@@ -30,6 +30,16 @@ export async function enterCompetition(
       throw new Error("Competition is not open")
     }
 
+    if (!competition.disciplineDef.isConformation) {
+      const animalDiscipline = await tx.animal.findUniqueOrThrow({
+        where: { id: animalId },
+        select: { disciplineDefId: true },
+      })
+      if (animalDiscipline.disciplineDefId !== competition.disciplineDefId) {
+        throw new Error("Animal has not been assigned this discipline")
+      }
+    }
+
     let tier = await tx.animalCompetitionTier.findUnique({
       where: { animalId_disciplineDefId: { animalId, disciplineDefId: competition.disciplineDefId } },
       include: { tierDef: true }

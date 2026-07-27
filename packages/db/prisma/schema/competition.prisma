@@ -56,6 +56,7 @@ model DisciplineDef {
   equipmentRequirements  DisciplineEquipmentRequirement[]
   game                   Game                             @relation(fields: [gameId], references: [id])
   groupEntryRequirements GroupEntryRequirement[]
+  tutorialStepDefs       TutorialStepDef[]
 
   @@unique([gameId, name])
 }
@@ -245,16 +246,18 @@ model Competition {
   maxWaitHours       Int
   breedId            String?
   status             CompetitionStatus
-  isInvitational     Boolean             @default(false)
-  entries            CompetitionEntry[]
-  campaignPhaseDefId String?
-  breed              Breed?              @relation(fields: [breedId], references: [id])
-  campaignPhase      CampaignPhaseDef?   @relation(fields: [campaignPhaseDefId], references: [id])
-  season             Season?             @relation(fields: [seasonId], references: [id])
-  tierDef            CompetitionTierDef? @relation(fields: [tierDefId], references: [id])
-  disciplineDef      DisciplineDef       @relation(fields: [disciplineDefId], references: [id])
-  venue              Venue               @relation(fields: [venueId], references: [id])
-  game               Game                @relation(fields: [gameId], references: [id])
+  isInvitational           Boolean             @default(false)
+  tutorialPlayerAccountId  String?
+  entries                  CompetitionEntry[]
+  campaignPhaseDefId       String?
+  breed                    Breed?              @relation(fields: [breedId], references: [id])
+  campaignPhase            CampaignPhaseDef?   @relation(fields: [campaignPhaseDefId], references: [id])
+  season                   Season?             @relation(fields: [seasonId], references: [id])
+  tierDef                  CompetitionTierDef? @relation(fields: [tierDefId], references: [id])
+  disciplineDef            DisciplineDef       @relation(fields: [disciplineDefId], references: [id])
+  venue                    Venue               @relation(fields: [venueId], references: [id])
+  game                     Game                @relation(fields: [gameId], references: [id])
+  tutorialPlayerAccount    PlayerAccount?      @relation("TutorialCompetitions", fields: [tutorialPlayerAccountId], references: [id])
   createdAt          DateTime            @default(now())
   expiresAt          DateTime
 }

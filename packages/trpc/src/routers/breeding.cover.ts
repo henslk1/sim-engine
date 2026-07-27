@@ -51,6 +51,7 @@ const parentSelect = {
       tierDef: { select: { tierIndex: true } },
       disciplineDef: {
         select: {
+          isConformation: true,
           compTierDefs: {
             select: { tierIndex: true },
             orderBy: { tierIndex: "desc" as const },
@@ -345,6 +346,12 @@ export const breedingCoverRouter = router({
                   return sum + Math.min((s.trainedValue ?? 0) / cap, 1)
                 }, 0) / a.stats.length
               : 0
+          const hasTopSportTier = a.compTiers
+            .filter((t) => !t.disciplineDef.isConformation)
+            .some((t) => t.tierDef.tierIndex >= (t.disciplineDef.compTierDefs[0]?.tierIndex ?? t.tierDef.tierIndex))
+          const hasTopConformationTier = a.compTiers
+            .filter((t) => t.disciplineDef.isConformation)
+            .some((t) => t.tierDef.tierIndex >= (t.disciplineDef.compTierDefs[0]?.tierIndex ?? t.tierDef.tierIndex))
           return computeBreedingQuality({
             careScore: a.careScore?.score ?? 0,
             compTier: topTier
@@ -361,6 +368,8 @@ export const breedingCoverRouter = router({
                 : null,
             healthTestedRatio: healthLoci.length > 0 ? healthLoci.filter((g) => g.isTestedByOwner).length / healthLoci.length : null,
             activeConditions: a.healthRecords.filter((r) => r.isActive).length,
+            hasTopSportTier,
+            hasTopConformationTier,
           }).score
         }
 
@@ -601,6 +610,7 @@ export const breedingCoverRouter = router({
             tierDef: { select: { tierIndex: true } },
             disciplineDef: {
               select: {
+                isConformation: true,
                 compTierDefs: {
                   select: { tierIndex: true },
                   orderBy: { tierIndex: "desc" as const },
@@ -679,6 +689,12 @@ export const breedingCoverRouter = router({
           g.locus.panelEntries.some((e) => e.panelDef.panelType === "HEALTH")
         )
         const healthTestedRatio = healthLoci.length > 0 ? healthLoci.filter((g) => g.isTestedByOwner).length / healthLoci.length : null
+        const hasTopSportTier = a.compTiers
+          .filter((t) => !t.disciplineDef.isConformation)
+          .some((t) => t.tierDef.tierIndex >= (t.disciplineDef.compTierDefs[0]?.tierIndex ?? t.tierDef.tierIndex))
+        const hasTopConformationTier = a.compTiers
+          .filter((t) => t.disciplineDef.isConformation)
+          .some((t) => t.tierDef.tierIndex >= (t.disciplineDef.compTierDefs[0]?.tierIndex ?? t.tierDef.tierIndex))
         return computeBreedingQuality({
           careScore: a.careScore?.score ?? 0,
           compTier,
@@ -687,6 +703,8 @@ export const breedingCoverRouter = router({
           conformationAvg,
           healthTestedRatio,
           activeConditions: a.healthRecords.filter((r) => r.isActive).length,
+          hasTopSportTier,
+          hasTopConformationTier,
         }).grade
       }
 
@@ -814,6 +832,12 @@ export const breedingCoverRouter = router({
                 return sum + Math.min((s.trainedValue ?? 0) / cap, 1)
               }, 0) / a.stats.length
             : 0
+        const hasTopSportTier = a.compTiers
+          .filter((t) => !t.disciplineDef.isConformation)
+          .some((t) => t.tierDef.tierIndex >= (t.disciplineDef.compTierDefs[0]?.tierIndex ?? t.tierDef.tierIndex))
+        const hasTopConformationTier = a.compTiers
+          .filter((t) => t.disciplineDef.isConformation)
+          .some((t) => t.tierDef.tierIndex >= (t.disciplineDef.compTierDefs[0]?.tierIndex ?? t.tierDef.tierIndex))
         return computeBreedingQuality({
           careScore: a.careScore?.score ?? 0,
           compTier: topTier
@@ -833,6 +857,8 @@ export const breedingCoverRouter = router({
               ? healthLoci.filter((g) => g.isTestedByOwner).length / healthLoci.length
               : null,
           activeConditions: a.healthRecords.filter((r) => r.isActive).length,
+          hasTopSportTier,
+          hasTopConformationTier,
         }).score
       }
 

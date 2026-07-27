@@ -53,6 +53,7 @@ type AliveAnimal = {
   sex: string
   breed: { id: string; name: string }
   lifeStage: { name: string }
+  disciplineDefId: string | null
   compTiers: { disciplineDefId: string; tierDefId: string }[]
   equipment: { itemDef: { id: string } }[]
   conformationScores: { breedId: string }[]
@@ -404,6 +405,7 @@ function VenueDetailPage() {
   function eligibleAnimalsFor(comp: Competition): AliveAnimal[] {
     return aliveAnimals.filter((a) => {
       if (comp.breedId && a.breed.id !== comp.breedId) return false
+      if (!comp.disciplineDef.isConformation && a.disciplineDefId !== comp.disciplineDef.id) return false
       if (!meetsEquipmentReqs(a, comp)) return false
       if (comp.disciplineDef.isConformation) {
         const hasScore = comp.breedId
@@ -430,6 +432,7 @@ function VenueDetailPage() {
 
   function isEligibleForAnimal(comp: Competition, animal: AliveAnimal): boolean {
     if (comp.breedId && animal.breed.id !== comp.breedId) return false
+    if (!comp.disciplineDef.isConformation && animal.disciplineDefId !== comp.disciplineDef.id) return false
     if (!meetsEquipmentReqs(animal, comp)) return false
     if (comp.disciplineDef.isConformation) {
       const hasScore = comp.breedId

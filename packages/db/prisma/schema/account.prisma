@@ -54,14 +54,19 @@ model TutorialAnimalPair {
 }
 
 model TutorialStepDef {
-  id                   String             @id @default(cuid())
-  gameId               String
-  stepKey              String
-  name                 String
-  description          String?
-  stepIndex            Int
-  tutorialProgressions TutorialProgress[]
-  game                 Game               @relation(fields: [gameId], references: [id])
+  id                      String               @id @default(cuid())
+  gameId                  String
+  stepKey                 String
+  name                    String
+  description             String?
+  stepIndex               Int
+  competitionDisciplineId String?
+  competitionNpcCount     Int?
+  triggerConditionDefId   String?
+  tutorialProgressions    TutorialProgress[]
+  game                    Game                 @relation(fields: [gameId], references: [id])
+  competitionDiscipline   DisciplineDef?       @relation(fields: [competitionDisciplineId], references: [id])
+  triggerCondition        HealthConditionDef?  @relation(fields: [triggerConditionDefId], references: [id])
 
   @@unique([gameId, stepKey])
   @@unique([gameId, stepIndex])

@@ -99,6 +99,7 @@ export const breedingMaterialRouter = router({
                 tierDef: { select: { tierIndex: true, name: true } },
                 disciplineDef: {
                   select: {
+                    isConformation: true,
                     compTierDefs: {
                       select: { tierIndex: true },
                       orderBy: { tierIndex: "desc" },
@@ -244,6 +245,12 @@ export const breedingMaterialRouter = router({
             ? animal.conformationScores.reduce((s, c) => s + c.score, 0) / animal.conformationScores.length
             : null
 
+        const hasTopSportTier = animal.compTiers
+          .filter((t) => !t.disciplineDef.isConformation)
+          .some((t) => t.tierDef.tierIndex >= (t.disciplineDef.compTierDefs[0]?.tierIndex ?? t.tierDef.tierIndex))
+        const hasTopConformationTier = animal.compTiers
+          .filter((t) => t.disciplineDef.isConformation)
+          .some((t) => t.tierDef.tierIndex >= (t.disciplineDef.compTierDefs[0]?.tierIndex ?? t.tierDef.tierIndex))
         const { score: qualityScore, grade: breedingGrade } = computeBreedingQuality({
           careScore: animal.careScore?.score ?? 0,
           compTier: topTier
@@ -257,6 +264,8 @@ export const breedingMaterialRouter = router({
           conformationAvg,
           healthTestedRatio: healthLoci.length > 0 ? healthLoci.filter((g) => g.isTestedByOwner).length / healthLoci.length : null,
           activeConditions,
+          hasTopSportTier,
+          hasTopConformationTier,
         })
 
         const donorSnapshot = {
@@ -649,6 +658,7 @@ export const breedingMaterialRouter = router({
                 tierDef: { select: { tierIndex: true } },
                 disciplineDef: {
                   select: {
+                    isConformation: true,
                     compTierDefs: {
                       select: { tierIndex: true },
                       orderBy: { tierIndex: "desc" as const },
@@ -760,6 +770,12 @@ export const breedingMaterialRouter = router({
         const damHealthLoci = dam.genotypes.filter((g) =>
           g.locus.panelEntries.some((e) => e.panelDef.panelType === "HEALTH")
         )
+        const damHasTopSportTier = dam.compTiers
+          .filter((t) => !t.disciplineDef.isConformation)
+          .some((t) => t.tierDef.tierIndex >= (t.disciplineDef.compTierDefs[0]?.tierIndex ?? t.tierDef.tierIndex))
+        const damHasTopConformationTier = dam.compTiers
+          .filter((t) => t.disciplineDef.isConformation)
+          .some((t) => t.tierDef.tierIndex >= (t.disciplineDef.compTierDefs[0]?.tierIndex ?? t.tierDef.tierIndex))
         const damQuality = computeBreedingQuality({
           careScore: dam.careScore?.score ?? 0,
           compTier: damTopTier
@@ -785,6 +801,8 @@ export const breedingMaterialRouter = router({
               ? damHealthLoci.filter((g) => g.isTestedByOwner).length / damHealthLoci.length
               : null,
           activeConditions: dam.healthRecords.filter((r) => r.isActive).length,
+          hasTopSportTier: damHasTopSportTier,
+          hasTopConformationTier: damHasTopConformationTier,
         }).score
 
         const result = generateOffspring({

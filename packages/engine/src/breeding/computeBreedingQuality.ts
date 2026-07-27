@@ -6,6 +6,8 @@ export type BreedingQualityInput = {
   conformationAvg: number | null
   healthTestedRatio: number | null
   activeConditions: number
+  hasTopSportTier: boolean
+  hasTopConformationTier: boolean
 }
 
 export function computeBreedingQuality(input: BreedingQualityInput): { score: number; grade: string } {
@@ -18,11 +20,7 @@ export function computeBreedingQuality(input: BreedingQualityInput): { score: nu
   if (input.healthTestedRatio !== null) parts.push(input.healthTestedRatio)
   parts.push(Math.max(0, 1 - input.activeConditions * 0.15))
   const score = (parts.reduce((a, b) => a + b, 0) / parts.length) * 100
-  const grade =
-    score >= 100 ? "S" :
-    score >= 85  ? "A" :
-    score >= 70  ? "B" :
-    score >= 55  ? "C" :
-    score >= 40  ? "D" : "F"
+  const isS = score >= 100 && input.hasTopSportTier && input.hasTopConformationTier
+  const grade = isS ? "S" : score >= 85 ? "A" : score >= 70 ? "B" : score >= 55 ? "C" : score >= 40 ? "D" : "F"
   return { score, grade }
 }
