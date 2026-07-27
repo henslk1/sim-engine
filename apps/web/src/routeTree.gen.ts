@@ -16,6 +16,7 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedVetRouteImport } from './routes/_authenticated/vet'
 import { Route as AuthenticatedVenuesRouteImport } from './routes/_authenticated/venues'
+import { Route as AuthenticatedTutorialRouteImport } from './routes/_authenticated/tutorial'
 import { Route as AuthenticatedTownRouteImport } from './routes/_authenticated/town'
 import { Route as AuthenticatedStableRouteImport } from './routes/_authenticated/stable'
 import { Route as AuthenticatedShopRouteImport } from './routes/_authenticated/shop'
@@ -113,6 +114,11 @@ const AuthenticatedVetRoute = AuthenticatedVetRouteImport.update({
 const AuthenticatedVenuesRoute = AuthenticatedVenuesRouteImport.update({
   id: '/venues',
   path: '/venues',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedTutorialRoute = AuthenticatedTutorialRouteImport.update({
+  id: '/tutorial',
+  path: '/tutorial',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedTownRoute = AuthenticatedTownRouteImport.update({
@@ -501,6 +507,7 @@ export interface FileRoutesByFullPath {
   '/shop': typeof AuthenticatedShopRoute
   '/stable': typeof AuthenticatedStableRoute
   '/town': typeof AuthenticatedTownRoute
+  '/tutorial': typeof AuthenticatedTutorialRoute
   '/venues': typeof AuthenticatedVenuesRoute
   '/vet': typeof AuthenticatedVetRoute
   '/admin/audit': typeof AuthenticatedAdminAuditRoute
@@ -572,6 +579,7 @@ export interface FileRoutesByTo {
   '/shop': typeof AuthenticatedShopRoute
   '/stable': typeof AuthenticatedStableRoute
   '/town': typeof AuthenticatedTownRoute
+  '/tutorial': typeof AuthenticatedTutorialRoute
   '/venues': typeof AuthenticatedVenuesRoute
   '/vet': typeof AuthenticatedVetRoute
   '/admin/audit': typeof AuthenticatedAdminAuditRoute
@@ -642,6 +650,7 @@ export interface FileRoutesById {
   '/_authenticated/shop': typeof AuthenticatedShopRoute
   '/_authenticated/stable': typeof AuthenticatedStableRoute
   '/_authenticated/town': typeof AuthenticatedTownRoute
+  '/_authenticated/tutorial': typeof AuthenticatedTutorialRoute
   '/_authenticated/venues': typeof AuthenticatedVenuesRoute
   '/_authenticated/vet': typeof AuthenticatedVetRoute
   '/_authenticated/admin/audit': typeof AuthenticatedAdminAuditRoute
@@ -716,6 +725,7 @@ export interface FileRouteTypes {
     | '/shop'
     | '/stable'
     | '/town'
+    | '/tutorial'
     | '/venues'
     | '/vet'
     | '/admin/audit'
@@ -787,6 +797,7 @@ export interface FileRouteTypes {
     | '/shop'
     | '/stable'
     | '/town'
+    | '/tutorial'
     | '/venues'
     | '/vet'
     | '/admin/audit'
@@ -856,6 +867,7 @@ export interface FileRouteTypes {
     | '/_authenticated/shop'
     | '/_authenticated/stable'
     | '/_authenticated/town'
+    | '/_authenticated/tutorial'
     | '/_authenticated/venues'
     | '/_authenticated/vet'
     | '/_authenticated/admin/audit'
@@ -975,6 +987,13 @@ declare module '@tanstack/react-router' {
       path: '/venues'
       fullPath: '/venues'
       preLoaderRoute: typeof AuthenticatedVenuesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/tutorial': {
+      id: '/_authenticated/tutorial'
+      path: '/tutorial'
+      fullPath: '/tutorial'
+      preLoaderRoute: typeof AuthenticatedTutorialRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/town': {
@@ -1640,6 +1659,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedShopRoute: typeof AuthenticatedShopRoute
   AuthenticatedStableRoute: typeof AuthenticatedStableRoute
   AuthenticatedTownRoute: typeof AuthenticatedTownRoute
+  AuthenticatedTutorialRoute: typeof AuthenticatedTutorialRoute
   AuthenticatedVenuesRoute: typeof AuthenticatedVenuesRoute
   AuthenticatedVetRoute: typeof AuthenticatedVetRoute
   AuthenticatedAnimalAnimalIdRoute: typeof AuthenticatedAnimalAnimalIdRoute
@@ -1655,6 +1675,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedShopRoute: AuthenticatedShopRoute,
   AuthenticatedStableRoute: AuthenticatedStableRoute,
   AuthenticatedTownRoute: AuthenticatedTownRoute,
+  AuthenticatedTutorialRoute: AuthenticatedTutorialRoute,
   AuthenticatedVenuesRoute: AuthenticatedVenuesRoute,
   AuthenticatedVetRoute: AuthenticatedVetRoute,
   AuthenticatedAnimalAnimalIdRoute: AuthenticatedAnimalAnimalIdRoute,

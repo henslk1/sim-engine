@@ -329,8 +329,8 @@ const playersOpsRouter = router({
       await db.$transaction([
         db.playerSeniority.upsert({
           where: { playerAccountId: input.playerAccountId },
-          update: { gatesBypassesd: true },
-          create: { playerAccountId: input.playerAccountId, gatesBypassesd: true },
+          update: { gatesBypassed: true },
+          create: { playerAccountId: input.playerAccountId, gatesBypassed: true },
         }),
         db.adminActionLog.create({
           data: {

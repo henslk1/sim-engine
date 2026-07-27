@@ -82,7 +82,7 @@ function PlayerDetail() {
             <Row label="Joined" value={new Date(player.createdAt).toLocaleString()} />
             <Row label="Active Days" value={String(player.seniority?.activeDaysPlayed ?? 0)} />
             <Row label="Tutorial" value={player.seniority?.tutorialCompleted ? "Complete" : "Incomplete"} />
-            <Row label="Gates Bypassed" value={player.seniority?.gatesBypassesd ? "Yes" : "No"} />
+            <Row label="Gates Bypassed" value={player.seniority?.gatesBypassed ? "Yes" : "No"} />
             <Row label="Animals" value={String(player._count.animalsOwned)} />
             <Row label="Reports Against" value={String(reportsAgainst)} />
           </InfoCard>
@@ -322,10 +322,10 @@ function PlayerDetail() {
           <ActionCard title="Other Actions">
             <button
               onClick={() => bypassMutation.mutate({ playerAccountId: playerId, staffUserId: "CURRENT_USER" })}
-              disabled={player.seniority?.gatesBypassesd || bypassMutation.isPending}
+              disabled={player.seniority?.gatesBypassed || bypassMutation.isPending}
               className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium hover:bg-muted disabled:opacity-50"
             >
-              {player.seniority?.gatesBypassesd ? "Gates Already Bypassed" : "Bypass Seniority Gates"}
+              {player.seniority?.gatesBypassed ? "Gates Already Bypassed" : "Bypass Seniority Gates"}
             </button>
             <div className="flex gap-2">
               <input

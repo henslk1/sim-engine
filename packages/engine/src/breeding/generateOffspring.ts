@@ -36,6 +36,7 @@ export type GameConfigForBreeding = {
   multiplesBirthCap: number
   multiplesChance: number
   identicalMultiplesChance: number
+  topGradeDoubleBonusChance: number
 }
 
 export type GenerateOffspringInput = {
@@ -174,14 +175,20 @@ export function generateOffspring(input: GenerateOffspringInput): GenerateOffspr
   // ── Per-offspring genetics roll ───────────────────────────────────────────────
   function rollGenetics() {
     // Stat total
+    // S-grade double bonus: each S-grade parent (quality >= 100) adds a stacking roll chance
+    const sGradeBonusChance =
+      (sire.quality >= 100 ? gameConfig.topGradeDoubleBonusChance : 0) +
+      (dam.quality >= 100 ? gameConfig.topGradeDoubleBonusChance : 0)
+
     let totalInnate: number
     if (isFirstGenCross) {
       const crossBase = gameConfig.defaultInnateRatio * gameInnateMax.averageTotalInnate
       const headroom = Math.max(0, (gameInnateMax.maxTotalInnate - crossBase) / gameInnateMax.maxTotalInnate)
-      const gain = Math.max(
+      let gain = Math.max(
         gameConfig.breedingMinGain,
         gameConfig.breedingBaseGain * Math.sqrt(headroom) * pairQuality,
       )
+      if (sGradeBonusChance > 0 && Math.random() < sGradeBonusChance) gain *= 2
       const variance = gain * (Math.random() * 2 - 1) * gameConfig.breedingVarianceFactor
       totalInnate = Math.max(crossBase, crossBase + gain + variance)
     } else {
@@ -189,10 +196,11 @@ export function generateOffspring(input: GenerateOffspringInput): GenerateOffspr
         0,
         (gameInnateMax.maxTotalInnate - parentAvgTotal) / gameInnateMax.maxTotalInnate,
       )
-      const gain = Math.max(
+      let gain = Math.max(
         gameConfig.breedingMinGain,
         gameConfig.breedingBaseGain * Math.sqrt(headroom) * pairQuality,
       )
+      if (sGradeBonusChance > 0 && Math.random() < sGradeBonusChance) gain *= 2
       const variance = gain * (Math.random() * 2 - 1) * gameConfig.breedingVarianceFactor
       totalInnate = Math.max(parentAvgTotal, parentAvgTotal + gain + variance)
     }

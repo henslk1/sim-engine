@@ -72,7 +72,12 @@ export const playerRouter = router({
       if (!ctx.userId) return null
       return db.playerAccount.findUnique({
         where: { userId_gameId: { userId: ctx.userId, gameId: input.gameId } },
-        select: { id: true, username: true, avatar: true },
+        select: {
+          id: true,
+          username: true,
+          avatar: true,
+          seniority: { select: { tutorialCompleted: true } },
+        },
       })
     }),
 

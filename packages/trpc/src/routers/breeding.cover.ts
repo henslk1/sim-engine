@@ -97,6 +97,7 @@ const gameConfigBreedingSelect = {
   breedingMinGain: true,
   breedingVarianceFactor: true,
   gestationCareFloor: true,
+  topGradeDoubleBonusChance: true,
   multiplesBirthCap: true,
   multiplesChance: true,
   identicalMultiplesChance: true,
