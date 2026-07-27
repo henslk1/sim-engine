@@ -518,8 +518,8 @@ model StarterBreedOption {
   colorOptions             StarterColorOption[]
   breed                    Breed                @relation(fields: [breedId], references: [id])
   game                     Game                 @relation(fields: [gameId], references: [id])
-  tutorialMaleTemplate     Animal?              @relation("TutorialMaleTemplate",   fields: [tutorialMaleTemplateId],   references: [id])
-  tutorialFemaleTemplate   Animal?              @relation("TutorialFemaleTemplate", fields: [tutorialFemaleTemplateId], references: [id])
+  tutorialMaleTemplate     AnimalTemplate?      @relation("TutorialMaleTemplate",   fields: [tutorialMaleTemplateId],   references: [id])
+  tutorialFemaleTemplate   AnimalTemplate?      @relation("TutorialFemaleTemplate", fields: [tutorialFemaleTemplateId], references: [id])
 }
 
 model StarterColorOption {

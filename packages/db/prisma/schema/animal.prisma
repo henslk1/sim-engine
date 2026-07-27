@@ -66,6 +66,7 @@ model StatDef {
   recordDefs                  RecordDef[]
   groupEntryRequirements      GroupEntryRequirement[]
   groupSaleConditions         GroupSaleProtectionRule[]
+  templateStats               AnimalTemplateStat[]
   game                        Game                         @relation(fields: [gameId], references: [id])
 
   @@unique([gameId, name])
@@ -232,8 +233,7 @@ model Animal {
   tutorialPairAncestorOne             TutorialAnimalPair?              @relation("TutorialAncestorOne")
   tutorialPairAncestorTwo             TutorialAnimalPair?              @relation("TutorialAncestorTwo")
   tutorialPairEmbryo                  TutorialAnimalPair?              @relation("TutorialEmbryo")
-  tutorialMaleTemplateFor             StarterBreedOption[]             @relation("TutorialMaleTemplate")
-  tutorialFemaleTemplateFor           StarterBreedOption[]             @relation("TutorialFemaleTemplate")
+
   game                                Game                             @relation(fields: [gameId], references: [id])
   playerAccount                       PlayerAccount                    @relation("AnimalOwner", fields: [playerAccountId], references: [id])
   breeder                             PlayerAccount?                   @relation("AnimalBreeder", fields: [breederId], references: [id])

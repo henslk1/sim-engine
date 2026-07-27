@@ -54,6 +54,7 @@ model DisciplineDef {
   animals                Animal[]
   groups                 Group[]
   equipmentRequirements  DisciplineEquipmentRequirement[]
+  templateCompTiers      AnimalTemplateCompTier[]
   game                   Game                             @relation(fields: [gameId], references: [id])
   groupEntryRequirements GroupEntryRequirement[]
   tutorialStepDefs       TutorialStepDef[]
