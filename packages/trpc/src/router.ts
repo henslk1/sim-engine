@@ -11,6 +11,8 @@ import { breedingRouter } from "./routers/breeding.js";
 import { stageActivityRouter } from "./routers/stageActivity.js";
 import { inventoryRouter } from "./routers/inventory.js";
 import { vetRouter } from "./routers/vet.js";
+import { notificationRouter } from "./routers/notification.js";
+import { tutorialRouter } from "./routers/tutorial.js";
 
 export const appRouter = router({
   health: publicProcedure.query(() => ({ status: "ok" })),
@@ -26,6 +28,8 @@ export const appRouter = router({
   stageActivity: stageActivityRouter,
   inventory: inventoryRouter,
   vet: vetRouter,
+  notification: notificationRouter,
+  tutorial: tutorialRouter,
 })
 
 export type AppRouter = typeof appRouter
