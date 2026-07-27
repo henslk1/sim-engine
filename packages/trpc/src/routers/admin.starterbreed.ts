@@ -11,8 +11,20 @@ export const starterBreedAdminRouter = router({
         include: {
           breed: { select: { id: true, name: true } },
           colorOptions: { orderBy: { name: "asc" } },
+          tutorialMaleTemplate: { select: { id: true, name: true } },
+          tutorialFemaleTemplate: { select: { id: true, name: true } },
         },
         orderBy: { breed: { name: "asc" } },
+      })
+    ),
+
+  listTutorialAnimals: publicProcedure
+    .input(z.object({ gameId: z.string() }))
+    .query(({ input }) =>
+      db.animal.findMany({
+        where: { gameId: input.gameId, isTutorialAnimal: true },
+        select: { id: true, name: true },
+        orderBy: { name: "asc" },
       })
     ),
 
@@ -22,11 +34,18 @@ export const starterBreedAdminRouter = router({
       gameId: z.string(),
       breedId: z.string(),
       isActive: z.boolean(),
+      tutorialMaleTemplateId: z.string().nullish(),
+      tutorialFemaleTemplateId: z.string().nullish(),
     }))
     .mutation(({ input }) => {
-      const { id, gameId, ...data } = input
-      if (id) return db.starterBreedOption.update({ where: { id }, data })
-      return db.starterBreedOption.create({ data: { gameId, ...data } })
+      const { id, gameId, tutorialMaleTemplateId, tutorialFemaleTemplateId, ...data } = input
+      const fullData = {
+        ...data,
+        tutorialMaleTemplateId: tutorialMaleTemplateId ?? null,
+        tutorialFemaleTemplateId: tutorialFemaleTemplateId ?? null,
+      }
+      if (id) return db.starterBreedOption.update({ where: { id }, data: fullData })
+      return db.starterBreedOption.create({ data: { gameId, ...fullData } })
     }),
 
   remove: publicProcedure

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router"
 import { trpc } from "@/lib/trpc"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 
@@ -17,13 +17,22 @@ function StarterBreedsPage() {
 
   const { data: starterBreeds = [] } = trpc.admin.starterBreed.list.useQuery({ gameId: gameId! })
   const { data: allBreeds = [] } = trpc.admin.breed.list.useQuery({ gameId: gameId! })
+  const { data: tutorialAnimals = [] } = trpc.admin.starterBreed.listTutorialAnimals.useQuery({ gameId: gameId! })
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [editingColorId, setEditingColorId] = useState<string | null>(null)
   const [colorForm, setColorForm] = useState<ColorForm>(emptyColorForm())
+  const [templateForm, setTemplateForm] = useState({ maleId: "", femaleId: "" })
 
   const selected = starterBreeds.find(s => s.id === selectedId) ?? null
   const availableBreeds = allBreeds.filter(b => !starterBreeds.some(s => s.breedId === b.id))
+
+  useEffect(() => {
+    setTemplateForm({
+      maleId: selected?.tutorialMaleTemplateId ?? "",
+      femaleId: selected?.tutorialFemaleTemplateId ?? "",
+    })
+  }, [selected?.id])
 
   const addBreed = trpc.admin.starterBreed.save.useMutation({
     onSuccess: (created) => {
@@ -32,6 +41,9 @@ function StarterBreedsPage() {
     },
   })
   const toggleBreed = trpc.admin.starterBreed.save.useMutation({
+    onSuccess: () => utils.admin.starterBreed.list.invalidate({ gameId: gameId! }),
+  })
+  const saveTemplates = trpc.admin.starterBreed.save.useMutation({
     onSuccess: () => utils.admin.starterBreed.list.invalidate({ gameId: gameId! }),
   })
   const removeBreed = trpc.admin.starterBreed.remove.useMutation({
@@ -50,6 +62,18 @@ function StarterBreedsPage() {
   const removeColor = trpc.admin.starterBreed.removeColorOption.useMutation({
     onSuccess: () => utils.admin.starterBreed.list.invalidate({ gameId: gameId! }),
   })
+
+  function submitTemplates() {
+    if (!selected) return
+    saveTemplates.mutate({
+      id: selected.id,
+      gameId: gameId!,
+      breedId: selected.breedId,
+      isActive: selected.isActive,
+      tutorialMaleTemplateId: templateForm.maleId || null,
+      tutorialFemaleTemplateId: templateForm.femaleId || null,
+    })
+  }
 
   function submitColor() {
     if (!selected || !colorForm.name.trim()) return
@@ -127,7 +151,7 @@ function StarterBreedsPage() {
                       size="sm"
                       variant="ghost"
                       className="h-7 text-xs"
-                      onClick={() => toggleBreed.mutate({ id: selected.id, gameId: gameId!, breedId: selected.breedId, isActive: !selected.isActive })}
+                      onClick={() => toggleBreed.mutate({ id: selected.id, gameId: gameId!, breedId: selected.breedId, isActive: !selected.isActive, tutorialMaleTemplateId: selected.tutorialMaleTemplateId, tutorialFemaleTemplateId: selected.tutorialFemaleTemplateId })}
                     >
                       {selected.isActive ? "Deactivate" : "Activate"}
                     </Button>
@@ -140,6 +164,38 @@ function StarterBreedsPage() {
                       Remove
                     </Button>
                   </div>
+                </div>
+
+                <div className="p-3 space-y-2 border-b border-border">
+                  <h3 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Tutorial Templates</h3>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Male Template</label>
+                      <select
+                        value={templateForm.maleId}
+                        onChange={(e) => setTemplateForm(f => ({ ...f, maleId: e.target.value }))}
+                        className="h-8 rounded-md border border-input bg-background px-2 text-sm"
+                      >
+                        <option value="">— none —</option>
+                        {tutorialAnimals.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                      </select>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Female Template</label>
+                      <select
+                        value={templateForm.femaleId}
+                        onChange={(e) => setTemplateForm(f => ({ ...f, femaleId: e.target.value }))}
+                        className="h-8 rounded-md border border-input bg-background px-2 text-sm"
+                      >
+                        <option value="">— none —</option>
+                        {tutorialAnimals.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <Button size="sm" className="h-7 text-xs" onClick={submitTemplates} disabled={saveTemplates.isPending}>
+                    Save Templates
+                  </Button>
+                  {saveTemplates.error && <p className="text-xs text-destructive">{saveTemplates.error.message}</p>}
                 </div>
 
                 <div className="p-3 space-y-3">

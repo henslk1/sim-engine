@@ -9,6 +9,10 @@ export const tutorialStepAdminRouter = router({
       db.tutorialStepDef.findMany({
         where: { gameId: input.gameId },
         orderBy: { stepIndex: "asc" },
+        include: {
+          competitionDiscipline: { select: { id: true, name: true } },
+          triggerCondition: { select: { id: true, name: true } },
+        },
       })
     ),
   save: publicProcedure
@@ -19,10 +23,19 @@ export const tutorialStepAdminRouter = router({
       name: z.string().min(1),
       description: z.string().nullish(),
       stepIndex: z.number().int().min(0),
+      competitionDisciplineId: z.string().nullish(),
+      competitionNpcCount: z.number().int().min(0).nullish(),
+      triggerConditionDefId: z.string().nullish(),
     }))
     .mutation(({ input }) => {
-      const { id, gameId, description, ...rest } = input
-      const data = { ...rest, description: description ?? null }
+      const { id, gameId, description, competitionDisciplineId, competitionNpcCount, triggerConditionDefId, ...rest } = input
+      const data = {
+        ...rest,
+        description: description ?? null,
+        competitionDisciplineId: competitionDisciplineId ?? null,
+        competitionNpcCount: competitionNpcCount ?? null,
+        triggerConditionDefId: triggerConditionDefId ?? null,
+      }
       if (id) return db.tutorialStepDef.update({ where: { id }, data })
       return db.tutorialStepDef.create({ data: { gameId, ...data } })
     }),

@@ -72,6 +72,7 @@ function GameConfigPage() {
     breedingCooldownCycles: 0,
     geneticCollectionCooldownCycles: 0,
     conformationInspectionMinCycle: 0,
+    topGradeDoubleBonusChance: 0.1,
   })
 
   function n(key: keyof typeof cf, float = false) {
@@ -133,6 +134,7 @@ function GameConfigPage() {
           breedingCooldownCycles: g.breedingCooldownCycles,
           geneticCollectionCooldownCycles: g.geneticCollectionCooldownCycles,
           conformationInspectionMinCycle: g.conformationInspectionMinCycle,
+          topGradeDoubleBonusChance: g.topGradeDoubleBonusChance,
         })
       }
     }
@@ -231,6 +233,7 @@ function GameConfigPage() {
                 <F label="Min Gain"><Input type="number" step="0.1" min="0" {...n("breedingMinGain", true)} /></F>
                 <F label="Variance Factor"><Input type="number" step="0.01" min="0" max="1" {...n("breedingVarianceFactor", true)} /></F>
                 <F label="Gestation Care Floor"><Input type="number" step="0.01" min="0" max="1" {...n("gestationCareFloor", true)} /></F>
+                <F label="Top Grade Bonus Chance"><Input type="number" step="0.01" min="0" max="1" {...n("topGradeDoubleBonusChance", true)} /></F>
               </div>
             </Panel>
 
