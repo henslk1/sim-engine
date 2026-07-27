@@ -4,6 +4,8 @@ import { trpcServer } from "@hono/trpc-server"
 import { appRouter } from "@sim-engine/trpc"
 import { auth } from "./auth.js"
 import { cors } from "hono/cors"
+import type { Server as HttpServer } from "node:http"
+import { initSocket } from "./socket.js"
 import { competitionDispatchQueue, venueRotationDispatchQueue, nightlyDispatchQueue } from "./jobs/queue.js"
 import "./jobs/nightly.dispatcher.js"
 import "./jobs/nightly.worker.js"
@@ -30,20 +32,23 @@ app.use("/trpc/*", trpcServer({
 
 app.on(["GET", "POST"], "/api/auth/**", (c) => auth.handler(c.req.raw))
 
-serve({ fetch: app.fetch, port: 3000 }, async () => {
-  console.log("Server running on port 3000")
+const httpServer =  serve({ fetch: app.fetch, port: 3000 }, async () => {
+    console.log("Server running on port 3000")
 
-  await nightlyDispatchQueue.upsertJobScheduler("nightly-dispatch-cron", {
-  pattern: "0 0 * * *",
-}, { name: "nightly-dispatch", data: {} })
+    await nightlyDispatchQueue.upsertJobScheduler("nightly-dispatch-cron", {
+    pattern: "0 0 * * *",
+  }, { name: "nightly-dispatch", data: {} })
 
-  await competitionDispatchQueue.upsertJobScheduler("competition-dispatch-cron", {
-    pattern: "0 * * * *",
-  }, { name: "competition-dispatch", data: {} })
+    await competitionDispatchQueue.upsertJobScheduler("competition-dispatch-cron", {
+      pattern: "0 * * * *",
+    }, { name: "competition-dispatch", data: {} })
 
-  await venueRotationDispatchQueue.upsertJobScheduler("venue-rotation-dispatch-cron", {
-    pattern: "0 0 * * 5",
-  }, { name: "venue-rotation-dispatch", data: {} })
+    await venueRotationDispatchQueue.upsertJobScheduler("venue-rotation-dispatch-cron", {
+      pattern: "0 0 * * 5",
+    }, { name: "venue-rotation-dispatch", data: {} })
 
-  console.log("Job schedulers registered")
-})
+    console.log("Job schedulers registered")
+
+    initSocket(httpServer as HttpServer)
+    console.log("Socket.io initialized")
+  }) as HttpServer
