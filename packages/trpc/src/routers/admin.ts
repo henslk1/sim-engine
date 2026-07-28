@@ -35,6 +35,7 @@ import { playerAdminRouter } from "./admin.player.js";
 import { competitionAdminRouter } from "./admin.competition.js";
 import { opsAdminRouter } from "./admin.ops.js";
 import { starterBreedAdminRouter } from "./admin.starterbreed.js";
+import { animalTemplateAdminRouter } from "./admin.animaltemplate.js";
 
 export const adminRouter = router({
   game: gameAdminRouter,
@@ -43,6 +44,7 @@ export const adminRouter = router({
   stat: statAdminRouter,
   breed: breedAdminRouter,
   starterBreed: starterBreedAdminRouter,
+  animalTemplate: animalTemplateAdminRouter,
   locus: locusAdminRouter,
   expression: expressionAdminRouter,
   panel: panelAdminRouter,

@@ -18,15 +18,21 @@ export const starterBreedAdminRouter = router({
       })
     ),
 
-  listTutorialAnimals: publicProcedure
-    .input(z.object({ gameId: z.string() }))
-    .query(({ input }) =>
-      db.animal.findMany({
-        where: { gameId: input.gameId, isTutorialAnimal: true },
-        select: { id: true, name: true },
-        orderBy: { name: "asc" },
-      })
-    ),
+  listTemplates: publicProcedure
+  .input(z.object({ gameId: z.string() }))
+  .query(({ input }) =>
+    db.animalTemplate.findMany({
+      where: { gameId: input.gameId },
+      select: {
+        id: true,
+        name: true,
+        sex: true,
+        breedName: true,
+        breed: { select: { name: true } },
+      },
+      orderBy: { name: "asc" },
+    })
+  ),
 
   save: publicProcedure
     .input(z.object({

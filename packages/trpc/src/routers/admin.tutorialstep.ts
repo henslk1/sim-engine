@@ -10,6 +10,7 @@ export const tutorialStepAdminRouter = router({
         where: { gameId: input.gameId },
         orderBy: { stepIndex: "asc" },
         include: {
+          venue: { select: { id: true, name: true } },
           competitionDiscipline: { select: { id: true, name: true } },
           triggerCondition: { select: { id: true, name: true } },
         },
