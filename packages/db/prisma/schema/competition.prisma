@@ -107,17 +107,18 @@ model CompetitionTierDef {
 }
 
 model Venue {
-  id            String            @id @default(cuid())
-  gameId        String
-  name          String
-  climate       VenueClimate
-  terrain       VenueTerrain
-  groupId       String?           @unique
-  rotationOrder Int?
-  disciplines   VenueDiscipline[]
-  competitions  Competition[]
-  group         Group?            @relation(fields: [groupId], references: [id])
-  game          Game              @relation(fields: [gameId], references: [id])
+  id               String            @id @default(cuid())
+  gameId           String
+  name             String
+  climate          VenueClimate
+  terrain          VenueTerrain
+  groupId          String?           @unique
+  rotationOrder    Int?
+  disciplines      VenueDiscipline[]
+  competitions     Competition[]
+  tutorialStepDefs TutorialStepDef[]
+  group            Group?            @relation(fields: [groupId], references: [id])
+  game             Game              @relation(fields: [gameId], references: [id])
 
   @@unique([gameId, name])
 }
@@ -236,31 +237,31 @@ model DirectoryFilterDef {
 }
 
 model Competition {
-  id                 String              @id @default(cuid())
-  gameId             String
-  venueId            String
-  disciplineDefId    String
-  tierDefId          String?
-  seasonId           String?
-  name               String
-  maxEntries         Int
-  maxWaitHours       Int
-  breedId            String?
-  status             CompetitionStatus
-  isInvitational           Boolean             @default(false)
-  tutorialPlayerAccountId  String?
-  entries                  CompetitionEntry[]
-  campaignPhaseDefId       String?
-  breed                    Breed?              @relation(fields: [breedId], references: [id])
-  campaignPhase            CampaignPhaseDef?   @relation(fields: [campaignPhaseDefId], references: [id])
-  season                   Season?             @relation(fields: [seasonId], references: [id])
-  tierDef                  CompetitionTierDef? @relation(fields: [tierDefId], references: [id])
-  disciplineDef            DisciplineDef       @relation(fields: [disciplineDefId], references: [id])
-  venue                    Venue               @relation(fields: [venueId], references: [id])
-  game                     Game                @relation(fields: [gameId], references: [id])
-  tutorialPlayerAccount    PlayerAccount?      @relation("TutorialCompetitions", fields: [tutorialPlayerAccountId], references: [id])
-  createdAt          DateTime            @default(now())
-  expiresAt          DateTime
+  id                      String              @id @default(cuid())
+  gameId                  String
+  venueId                 String
+  disciplineDefId         String
+  tierDefId               String?
+  seasonId                String?
+  name                    String
+  maxEntries              Int
+  maxWaitHours            Int
+  breedId                 String?
+  status                  CompetitionStatus
+  isInvitational          Boolean             @default(false)
+  tutorialPlayerAccountId String?
+  entries                 CompetitionEntry[]
+  campaignPhaseDefId      String?
+  breed                   Breed?              @relation(fields: [breedId], references: [id])
+  campaignPhase           CampaignPhaseDef?   @relation(fields: [campaignPhaseDefId], references: [id])
+  season                  Season?             @relation(fields: [seasonId], references: [id])
+  tierDef                 CompetitionTierDef? @relation(fields: [tierDefId], references: [id])
+  disciplineDef           DisciplineDef       @relation(fields: [disciplineDefId], references: [id])
+  venue                   Venue               @relation(fields: [venueId], references: [id])
+  game                    Game                @relation(fields: [gameId], references: [id])
+  tutorialPlayerAccount   PlayerAccount?      @relation("TutorialCompetitions", fields: [tutorialPlayerAccountId], references: [id])
+  createdAt               DateTime            @default(now())
+  expiresAt               DateTime
 }
 
 model CompetitionEntry {

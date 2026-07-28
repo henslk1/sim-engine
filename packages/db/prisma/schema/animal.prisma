@@ -234,14 +234,14 @@ model Animal {
   tutorialPairAncestorTwo             TutorialAnimalPair?              @relation("TutorialAncestorTwo")
   tutorialPairEmbryo                  TutorialAnimalPair?              @relation("TutorialEmbryo")
 
-  game                                Game                             @relation(fields: [gameId], references: [id])
-  playerAccount                       PlayerAccount                    @relation("AnimalOwner", fields: [playerAccountId], references: [id])
-  breeder                             PlayerAccount?                   @relation("AnimalBreeder", fields: [breederId], references: [id])
-  breed                               Breed                            @relation(fields: [breedId], references: [id])
-  lifeStage                           LifeStageDef                     @relation(fields: [lifeStageId], references: [id])
-  disciplineDef                       DisciplineDef?                   @relation(fields: [disciplineDefId], references: [id])
-  createdAt                           DateTime                         @default(now())
-  updatedAt                           DateTime                         @updatedAt
+  game          Game           @relation(fields: [gameId], references: [id])
+  playerAccount PlayerAccount  @relation("AnimalOwner", fields: [playerAccountId], references: [id])
+  breeder       PlayerAccount? @relation("AnimalBreeder", fields: [breederId], references: [id])
+  breed         Breed          @relation(fields: [breedId], references: [id])
+  lifeStage     LifeStageDef   @relation(fields: [lifeStageId], references: [id])
+  disciplineDef DisciplineDef? @relation(fields: [disciplineDefId], references: [id])
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 }
 
 model AnimalStat {

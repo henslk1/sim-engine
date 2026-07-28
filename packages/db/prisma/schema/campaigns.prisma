@@ -138,29 +138,29 @@ model FoundationAnimal {
 }
 
 model AnimalTemplate {
-  id                    String                   @id @default(cuid())
-  gameId                String
-  breedId               String?
-  breedName             String?
-  sex                   AnimalSex
-  name                  String?
-  fertility             Float?
-  startingAgeInCycles   Int?
-  statMode              AnimalStatMode
-  statFloor             Float?
-  healthClear           Boolean                  @default(false)
-  personalityMode       PersonalityMode
-  personalityMin        Float?
-  personalityMax        Float?
-  alleleQualityBias     Float?
-  genotype                   AnimalTemplateGenotype[]
-  stats                      AnimalTemplateStat[]
-  compTiers                  AnimalTemplateCompTier[]
-  rewardTiers                CampaignRewardTier[]
-  starterBreedOptionsMale    StarterBreedOption[]     @relation("TutorialMaleTemplate")
-  starterBreedOptionsFemale  StarterBreedOption[]     @relation("TutorialFemaleTemplate")
-  breed                      Breed?                   @relation(fields: [breedId], references: [id])
-  game                       Game                     @relation(fields: [gameId], references: [id])
+  id                        String                   @id @default(cuid())
+  gameId                    String
+  breedId                   String?
+  breedName                 String?
+  sex                       AnimalSex
+  name                      String?
+  fertility                 Float?
+  startingAgeInCycles       Int?
+  statMode                  AnimalStatMode
+  statFloor                 Float?
+  healthClear               Boolean                  @default(false)
+  personalityMode           PersonalityMode
+  personalityMin            Float?
+  personalityMax            Float?
+  alleleQualityBias         Float?
+  genotype                  AnimalTemplateGenotype[]
+  stats                     AnimalTemplateStat[]
+  compTiers                 AnimalTemplateCompTier[]
+  rewardTiers               CampaignRewardTier[]
+  starterBreedOptionsMale   StarterBreedOption[]     @relation("TutorialMaleTemplate")
+  starterBreedOptionsFemale StarterBreedOption[]     @relation("TutorialFemaleTemplate")
+  breed                     Breed?                   @relation(fields: [breedId], references: [id])
+  game                      Game                     @relation(fields: [gameId], references: [id])
 }
 
 model AnimalTemplateStat {
