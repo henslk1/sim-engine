@@ -1,6 +1,7 @@
 import { createFileRoute, redirect, Outlet } from "@tanstack/react-router"
 import { Header } from "@/components/header"
 import { trpcVanilla } from "@/lib/trpc"
+import { MessagingWidget } from "@/components/messaging-widget"
 
 const TUTORIAL_EXEMPT = ["/tutorial", "/setup", "/admin"]
 const completedUsers = new Set<string>()
@@ -39,6 +40,7 @@ function AuthenticatedLayout() {
       <main className="min-h-0 flex-1 overflow-auto">
         <Outlet />
       </main>
+      <MessagingWidget />
     </div>
   )
 }
