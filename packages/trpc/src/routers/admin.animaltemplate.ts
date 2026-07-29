@@ -15,8 +15,8 @@ export const animalTemplateAdminRouter = router({
         genotype: {
           include: {
             locus: { select: { id: true, name: true } },
-            alleleOne: { select: { id: true, name: true } },
-            alleleTwo: { select: { id: true, name: true } },
+            alleleOne: { select: { id: true, symbol: true } },
+            alleleTwo: { select: { id: true, symbol: true } },
           },
         },
       },
@@ -36,7 +36,7 @@ export const animalTemplateAdminRouter = router({
       startingAgeInCycles: z.number().int().nullish(),
       statMode: z.enum(["BREED_MAX", "FLOOR", "EXACT"]),
       statFloor: z.number().nullish(),
-      healClear: z.boolean(),
+      healthClear: z.boolean(),
       personalityMode: z.enum(["RANDOM", "RANGE"]),
       personalityMin: z.number().nullish(),
       personalityMax: z.number().nullish(),

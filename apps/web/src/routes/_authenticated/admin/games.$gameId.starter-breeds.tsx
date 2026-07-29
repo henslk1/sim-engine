@@ -17,7 +17,7 @@ function StarterBreedsPage() {
 
   const { data: starterBreeds = [] } = trpc.admin.starterBreed.list.useQuery({ gameId: gameId! })
   const { data: allBreeds = [] } = trpc.admin.breed.list.useQuery({ gameId: gameId! })
-  const { data: tutorialAnimals = [] } = trpc.admin.starterBreed.listTutorialAnimals.useQuery({ gameId: gameId! })
+  const { data: tutorialAnimals = [] } = trpc.admin.starterBreed.listTemplates.useQuery({ gameId: gameId! })
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [editingColorId, setEditingColorId] = useState<string | null>(null)
@@ -177,7 +177,9 @@ function StarterBreedsPage() {
                         className="h-8 rounded-md border border-input bg-background px-2 text-sm"
                       >
                         <option value="">— none —</option>
-                        {tutorialAnimals.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                        {tutorialAnimals.filter(a => a.sex === "MALE").map(a => (
+                          <option key={a.id} value={a.id}>{a.name ?? a.breedName ?? a.breed?.name ?? "(unnamed)"}</option>
+                        ))}
                       </select>
                     </div>
                     <div className="flex flex-col gap-1">
@@ -188,7 +190,9 @@ function StarterBreedsPage() {
                         className="h-8 rounded-md border border-input bg-background px-2 text-sm"
                       >
                         <option value="">— none —</option>
-                        {tutorialAnimals.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                        {tutorialAnimals.filter(a => a.sex === "FEMALE").map(a => (
+                          <option key={a.id} value={a.id}>{a.name ?? a.breedName ?? a.breed?.name ?? "(unnamed)"}</option>
+                        ))}
                       </select>
                     </div>
                   </div>

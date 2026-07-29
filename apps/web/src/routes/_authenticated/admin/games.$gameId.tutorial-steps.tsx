@@ -12,6 +12,7 @@ type StepForm = {
   competitionDisciplineId: string
   competitionNpcCount: string
   triggerConditionDefId: string
+  venueId: string
 }
 const emptyForm = (): StepForm => ({
   name: "",
@@ -21,6 +22,7 @@ const emptyForm = (): StepForm => ({
   competitionDisciplineId: "",
   competitionNpcCount: "",
   triggerConditionDefId: "",
+  venueId: "",
 })
 
 function TutorialStepsPage() {
@@ -29,6 +31,7 @@ function TutorialStepsPage() {
   const { data: steps } = trpc.admin.tutorialStep.list.useQuery({ gameId: gameId! })
   const { data: disciplines } = trpc.admin.discipline.list.useQuery({ gameId: gameId! })
   const { data: conditions } = trpc.admin.health.list.useQuery({ gameId: gameId! })
+  const { data: venues } = trpc.admin.venue.list.useQuery({ gameId: gameId! })
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editing, setEditing] = useState<StepForm>(emptyForm())
@@ -57,6 +60,7 @@ function TutorialStepsPage() {
       competitionDisciplineId: editing.competitionDisciplineId || null,
       competitionNpcCount: editing.competitionNpcCount !== "" ? parseInt(editing.competitionNpcCount) : null,
       triggerConditionDefId: editing.triggerConditionDefId || null,
+      venueId: editing.venueId || null,
     })
   }
 
@@ -107,6 +111,21 @@ function TutorialStepsPage() {
               <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Competition NPC Count</label>
               <Input type="number" min="0" value={editing.competitionNpcCount} onChange={(e) => set("competitionNpcCount", e.target.value)} placeholder="e.g. 4" className="h-8 text-sm" />
             </div>
+            {editing.competitionDisciplineId && (
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Venue</label>
+                <select
+                  value={editing.venueId}
+                  onChange={(e) => set("venueId", e.target.value)}
+                  className="h-8 rounded-md border border-input bg-background px-2 text-sm"
+                >
+                  <option value="">— none —</option>
+                  {venues?.map((v) => (
+                    <option key={v.id} value={v.id}>{v.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="flex flex-col gap-1">
               <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Trigger Condition</label>
               <select
@@ -156,7 +175,9 @@ function TutorialStepsPage() {
                   <td className="px-3 py-2 font-medium text-foreground">{s.name}</td>
                   <td className="px-3 py-2 text-muted-foreground font-mono text-xs">{s.stepKey}</td>
                   <td className="px-3 py-2 text-muted-foreground text-xs">
-                    {s.competitionDiscipline ? `${s.competitionDiscipline.name} ×${s.competitionNpcCount ?? "?"}` : "—"}
+                    {s.competitionDiscipline
+                      ? `${s.competitionDiscipline.name} ×${s.competitionNpcCount ?? "?"} @ ${s.venue?.name ?? "no venue"}`
+                      : "—"}
                   </td>
                   <td className="px-3 py-2 text-right space-x-1">
                     <Button size="sm" variant="ghost" onClick={() => {
@@ -169,6 +190,7 @@ function TutorialStepsPage() {
                         competitionDisciplineId: s.competitionDisciplineId ?? "",
                         competitionNpcCount: s.competitionNpcCount?.toString() ?? "",
                         triggerConditionDefId: s.triggerConditionDefId ?? "",
+                        venueId: s.venueId ?? "",
                       })
                     }}>Edit</Button>
                     <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"

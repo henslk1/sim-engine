@@ -49,6 +49,7 @@ function makeConfigGroups(gameId: string): NavGroupDef[] {
         { to: `/admin/games/${gameId}/personality-traits`, label: "Personality Traits", icon: Sparkles },
         { to: `/admin/games/${gameId}/breeds`, label: "Breeds", icon: Tag },
         { to: `/admin/games/${gameId}/starter-breeds`, label: "Starter Breeds", icon: PawPrint },
+        { to: `/admin/games/${gameId}/animal-templates`, label: "Animal Templates", icon: CircleDot },
       ],
     },
     {
