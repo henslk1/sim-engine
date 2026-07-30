@@ -1,4 +1,4 @@
-import { db } from "@sim-engine/db"
+import { db, ProfileFieldKey } from "@sim-engine/db"
 import { router, publicProcedure } from "../trpc.js"
 import { z } from "zod"
 
@@ -18,7 +18,7 @@ export const playerRouter = router({
       })
       if (existing) throw new Error("Player account already exists")
 
-      const [currencyDefs, topics] = await Promise.all([
+      const [currencyDefs, topics, gameConfig] = await Promise.all([
         db.currencyDef.findMany({
           where: { gameId: input.gameId },
           select: { id: true },
@@ -27,7 +27,13 @@ export const playerRouter = router({
           where: { gameId: input.gameId },
           select: { id: true, isDefaultEnabled: true },
         }),
+        db.gameConfig.findUnique({
+          where: { gameId: input.gameId },
+          select: { defaultAnimalSlots: true, defaultSubContainers: true, subContainerLabel: true },
+        })
       ])
+
+      if (!gameConfig) throw new Error("Game config not found")
 
       return db.$transaction(async (tx) => {
         const account = await tx.playerAccount.create({
@@ -42,7 +48,12 @@ export const playerRouter = router({
             })),
           }),
           tx.playerCapacity.create({
-            data: { playerAccountId: account.id, animalSlotBase: 10, subContainerBase: 3, geneticStorageBase: 50 },
+            data: { 
+              playerAccountId: account.id, 
+              animalSlotBase: gameConfig.defaultAnimalSlots, 
+              subContainerBase: gameConfig.defaultSubContainers, 
+              geneticStorageBase: 50, 
+            },
           }),
           tx.playerProfile.create({ data: { playerAccountId: account.id } }),
           tx.playerSeniority.create({ 
@@ -61,6 +72,29 @@ export const playerRouter = router({
               isEnabled: t.isDefaultEnabled,
             })),
           }),
+          tx.profileVisibilitySetting.createMany({
+            data: [
+              { fieldKey: "BIO", isVisible: true },
+              { fieldKey: "GROUPS", isVisible: true },
+              { fieldKey: "ACHIEVEMENTS", isVisible: true },
+              { fieldKey: "FORUM_ACTIVITY", isVisible: true },
+              { fieldKey: "LEADERBOARD_PLACINGS", isVisible: true },
+              { fieldKey: "MARKETPLACE_LISTINGS", isVisible: true },
+              { fieldKey: "CLINICS", isVisible: false },
+              { fieldKey: "PLAYER_SHOP", isVisible: false },
+            ].map((entry) => ({
+              playerAccountId: account.id,
+              fieldKey: entry.fieldKey as ProfileFieldKey,
+              isVisible: entry.isVisible,
+            })),
+          }),
+          tx.subContainer.create({
+            data: {
+              playerAccountId: account.id,
+              name: gameConfig.subContainerLabel!,
+              displayOrder: 1
+            }
+          })
         ])
         return account
       })
