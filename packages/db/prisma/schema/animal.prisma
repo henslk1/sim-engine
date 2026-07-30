@@ -147,7 +147,8 @@ model Animal {
   id                                  String                           @id @default(cuid())
   gameId                              String
   playerAccountId                     String
-  breedId                             String
+  breedId                             String?
+  breedName                           String?
   breederId                           String?
   name                                String
   sex                                 AnimalSex
@@ -237,7 +238,7 @@ model Animal {
   game          Game           @relation(fields: [gameId], references: [id])
   playerAccount PlayerAccount  @relation("AnimalOwner", fields: [playerAccountId], references: [id])
   breeder       PlayerAccount? @relation("AnimalBreeder", fields: [breederId], references: [id])
-  breed         Breed          @relation(fields: [breedId], references: [id])
+  breed         Breed?         @relation(fields: [breedId], references: [id])
   lifeStage     LifeStageDef   @relation(fields: [lifeStageId], references: [id])
   disciplineDef DisciplineDef? @relation(fields: [disciplineDefId], references: [id])
   createdAt     DateTime       @default(now())
