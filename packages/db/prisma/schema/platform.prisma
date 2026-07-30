@@ -491,6 +491,8 @@ model GameConfig {
   geneticCollectionCooldownCycles Int      @default(0)
   conformationInspectionMinCycle  Int      @default(0)
   topGradeDoubleBonusChance       Float    @default(0.1)
+  defaultAnimalSlots              Int      @default(0)
+  defaultSubContainers            Int      @default(0)
   game                            Game     @relation(fields: [gameId], references: [id])
   createdAt                       DateTime @default(now())
   updatedAt                       DateTime @updatedAt
