@@ -1,6 +1,6 @@
 import { db } from "@sim-engine/db"
 
-function weightedSample(items: { id: string; symbol: string; frequency: number }[]): { id: string; symbol: string } {
+export function weightedSample(items: { id: string; symbol: string; frequency: number }[]): { id: string; symbol: string } {
   const total = items.reduce((s, i) => s + i.frequency, 0)
   let r = Math.random() * total
   for (const item of items) {
@@ -10,7 +10,7 @@ function weightedSample(items: { id: string; symbol: string; frequency: number }
   return items[items.length - 1]!
 }
 
-function canonicalize(a: { id: string; symbol: string }, b: { id: string; symbol: string }): [string, string] {
+export function canonicalize(a: { id: string; symbol: string }, b: { id: string; symbol: string }): [string, string] {
   const aUp = a.symbol.length > 0 && a.symbol[0] !== a.symbol[0]!.toLowerCase()
   const bUp = b.symbol.length > 0 && b.symbol[0] !== b.symbol[0]!.toLowerCase()
   if (aUp && !bUp) return [a.id, b.id]
