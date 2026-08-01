@@ -328,8 +328,8 @@ export const breedingCoverRouter = router({
             gameId: offer.gameId,
             sireId: offer.sireId,
             damId: offer.damId,
-            sireSnapshot: { animalId: offer.sireId, name: sire.name, breedId: sire.breedId, breedName: sire.breed.name },
-            damSnapshot: { animalId: offer.damId, name: dam.name, breedId: dam.breedId, breedName: dam.breed.name },
+            sireSnapshot: { animalId: offer.sireId, name: sire.name, breedId: sire.breedId, breedName: sire.breed?.name ?? "" },
+            damSnapshot: { animalId: offer.damId, name: dam.name, breedId: dam.breedId, breedName: dam.breed?.name ?? "" },
           },
           select: { id: true },
         })
@@ -375,12 +375,12 @@ export const breedingCoverRouter = router({
         }
 
         const result = generateOffspring({
-          sire: { ...sire, quality: parentQuality(sire) },
-          dam: { ...dam, quality: parentQuality(dam) },
+          sire: { ...sire, breedId: sire.breedId!, quality: parentQuality(sire) },
+          dam: { ...dam, breedId: dam.breedId!, quality: parentQuality(dam) },
           damCareScore: damCareScore?.score ?? 100,
           gameConfig,
           gameInnateMax: gameInnateMax ?? { maxTotalInnate: 2000, averageTotalInnate: 1000 },
-          gradeBreedId: gradeBread?.id ?? sire.breedId,
+          gradeBreedId: gradeBread?.id ?? sire.breedId!,
         })
 
         if (!result.conceived) {
@@ -864,12 +864,12 @@ export const breedingCoverRouter = router({
       }
 
       const result = generateOffspring({
-        sire: { ...sire, quality: parentQuality(sire) },
-        dam: { ...dam, quality: parentQuality(dam) },
+        sire: { ...sire, breedId: sire.breedId!, quality: parentQuality(sire) },
+        dam: { ...dam, breedId: dam.breedId!, quality: parentQuality(dam) },
         damCareScore: dam.careScore?.score ?? 100,
         gameConfig,
         gameInnateMax: gameInnateMax ?? { maxTotalInnate: 2000, averageTotalInnate: 1000 },
-        gradeBreedId: gradeBreed?.id ?? sire.breedId,
+        gradeBreedId: gradeBreed?.id ?? sire.breedId!,
         skipConceptionRoll: true,
       })
 
@@ -877,8 +877,8 @@ export const breedingCoverRouter = router({
 
       const statNameMap = new Map(statDefs.map((s) => [s.id, s.name]))
       const breedNameMap = new Map<string, string>([
-        [sire.breedId, sire.breed.name],
-        [dam.breedId, dam.breed.name],
+        ...(sire.breedId ? [[sire.breedId, sire.breed?.name ?? ""] as [string, string]] : []),
+        ...(dam.breedId ? [[dam.breedId, dam.breed?.name ?? ""] as [string, string]] : []),
         ...(gradeBreed ? ([[gradeBreed.id, gradeBreed.name]] as [string, string][]) : []),
       ])
 
