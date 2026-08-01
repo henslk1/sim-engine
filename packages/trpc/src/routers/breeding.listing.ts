@@ -7,7 +7,64 @@ const restrictionInput = {
   statMinimums: z.array(z.object({ statDefId: z.string(), minValue: z.number().min(0) })).default([]),
 }
 
+const listingSelect = {
+  id: true,
+  title: true,
+  pricePerSlot: true,
+  isActive: true,
+  pureBredOnly: true,
+  ownerPlayer: { select: { id: true, username: true } },
+  animal: {
+    select: {
+      id: true,
+      name: true,
+      breedId: true,
+      breedName: true,
+      breed: { select: { name: true } },
+      lifeStage: true,
+      fertility: true,
+      ageInCycles: true,
+      breedGeneration: true,
+    },
+  },
+  currencyDef: { select: { id: true, symbol: true, name: true } },
+  breedRestrictions: { select: { breedId: true } },
+  _count: { select: { slots: { where: { status: "AVAILABLE" as const } } } },
+} as const
+
 export const breedingListingRouter = router({
+  list: publicProcedure
+    .input(z.object({
+      gameId: z.string(),
+      playerAccountId: z.string().optional(),
+      breedId: z.string().optional(),
+    }))
+    .query(async ({ input }) => {
+      if (input.playerAccountId) {
+        const tutorialPair = await db.tutorialAnimalPair.findUnique({
+          where: { playerAccountId: input.playerAccountId },
+          select: { ancestorTwoId: true },
+        })
+        if (tutorialPair) {
+          return db.breedingListing.findMany({
+            where: { gameId: input.gameId, animalId: tutorialPair.ancestorTwoId },
+            select: listingSelect,
+          })
+        }
+      }
+      return db.breedingListing.findMany({
+        where: { 
+          gameId: input.gameId,
+          isActive: true,
+          animal: { 
+            isTutorialAnimal: false,
+            ...(input.breedId ? { breedId: input.breedId } : {}),
+          },
+        },
+        select: listingSelect,
+      })
+    }),
+    
   create: publicProcedure
     .input(z.object({
       animalId: z.string(),

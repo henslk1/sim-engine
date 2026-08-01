@@ -253,6 +253,83 @@ export const breedingCoverRouter = router({
           throw new Error(`Dam is on a breeding cooldown until cycle ${damStatus.breedingCooldownUntilCycle}`)
         }
 
+        // Tutorial embryo implantation - skip generating offspring
+        const tutorialPair = await tx.tutorialAnimalPair.findUnique({
+          where: { ancestorTwoId: offer.sireId },
+          select: { embryoId: true },
+        })
+
+        if (tutorialPair) {
+          const [sireLight, damLight, gestationConfig] = await Promise.all([
+            tx.animal.findUniqueOrThrow({
+              where: { id: offer.sireId },
+              select: { name: true, breedId: true, breedName: true, breed: { select: { name: true } }, ageInCycles: true },
+            }),
+            tx.animal.findUniqueOrThrow({
+              where: { id: offer.damId },
+              select: { name: true, breedId: true, breedName: true, breed: { select: { name: true } }, ageInCycles: true },
+            }),
+            tx.gameConfig.findUniqueOrThrow({
+              where: { gameId: offer.gameId },
+              select: { gestationCycles: true },
+            }),
+          ])
+
+          await tx.coverOffer.update({ where: { id: input.offerId }, data: { status: "ACCEPTED" } })
+
+          const breedingRecord = await tx.breedingRecord.create({
+            data: { 
+              gameId: offer.gameId,
+              sireId: offer.sireId,
+              damId: offer.damId,
+              sireSnapshot: { animalId: offer.sireId, name: sireLight.name, breedId: sireLight.breedId, breedName: sireLight.breed?.name ?? sireLight.breedName ?? "" },
+              damSnapshot: { animalId: offer.damId, name: damLight.name, breedId: damLight.breedId, breedName: damLight.breed?.name ?? damLight.breedName ?? "" },
+            },
+            select: { id: true },
+          })
+
+          const pregnancy = await tx.pregnancy.create({
+            data: { 
+              animalId: offer.damId,
+              breedingRecordId: breedingRecord.id,
+              requiredCycles: gestationConfig.gestationCycles,
+            },
+            select: { id: true },
+          })
+
+          await Promise.all([
+            tx.pregnancyOffspring.create({
+              data: { pregnancyId: pregnancy.id, animalId: tutorialPair.embryoId, birthOrder: 1 },
+            }),
+            tx.animalDailyLog.create({
+              data: {
+                animalId: offer.damId,
+                cycleNumber: damLight.ageInCycles,
+                eventType: "COVER_ACCEPTED",
+                partnerAnimalId: offer.sireId,
+                outcome: "CONCEIVED",
+              },
+            }),
+            tx.animalDailyLog.create({
+              data: {
+                animalId: offer.sireId,
+                cycleNumber: sireLight.ageInCycles,
+                eventType: "COVER_ACCEPTED",
+                partnerAnimalId: offer.damId,
+                outcome: "CONCEIVED",
+              },
+            }),
+          ])
+
+          return {
+            breedingRecordId: breedingRecord.id,
+            conceived: true as const,
+            pregnancyId: pregnancy.id,
+            offspringCount: 1,
+            requiredCycles: gestationConfig.gestationCycles,
+          }
+        }
+
         const [sire, dam, gameConfig, gameInnateMax, gradeBread, firstLifeStage, damCareScore, expressionRules, personalityLabelRanges] =
           await Promise.all([
             tx.animal.findUniqueOrThrow({ where: { id: offer.sireId }, select: parentSelect }),
