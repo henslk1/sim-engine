@@ -122,6 +122,15 @@ export const breedingCoverRouter = router({
       })
     }),
 
+  listEligibleDams: publicProcedure
+  .input(z.object({ playerAccountId: z.string(), gameId: z.string() }))
+  .query(async ({ input }) => {
+    return db.animal.findMany({
+      where: eligibleFemaleWhere(input.playerAccountId, input.gameId),
+      select: eligibleFemaleSelect,
+    })
+  }),
+
   lookupPlayerFemales: publicProcedure
     .input(z.object({ username: z.string().min(1), gameId: z.string(), excludePlayerAccountId: z.string().optional() }))
     .query(async ({ input }) => {
