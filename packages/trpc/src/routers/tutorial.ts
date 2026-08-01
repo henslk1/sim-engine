@@ -342,5 +342,54 @@ export const tutorialRouter = router({
           data: { tutorialCompleted: true },
         })
       }
+    }),
+
+  shopAnimal: protectedProcedure
+    .input(z.object({ gameId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const player = await db.playerAccount.findUnique({
+        where: { userId_gameId: { userId: ctx.userId, gameId: input.gameId } },
+        select: { id: true },
+      })
+      if (!player) return null
+
+      const pair = await db.tutorialAnimalPair.findUnique({
+        where: { playerAccountId: player.id },
+        select: { 
+          ancestorOne: {
+            select: {
+              id: true,
+              name: true,
+              sex: true,
+              breed: { select: { name: true } },
+              breedName: true,
+              lifeStage: { select: { name: true } },
+            },
+          },
+        },
+      })
+
+      return pair?.ancestorOne ?? null
+    }),
+
+    buyFemale: protectedProcedure
+    .input(z.object({ gameId: z.string() }))
+  .mutation(async ({ ctx, input }) => {
+    const player = await db.playerAccount.findUnique({
+      where: { userId_gameId: { userId: ctx.userId, gameId: input.gameId } },
+      select: { id: true },
     })
+    if (!player) throw new Error("Player not found")
+
+    const pair = await db.tutorialAnimalPair.findUnique({
+      where: { playerAccountId: player.id },
+      select: { ancestorOneId: true },
+    })
+    if (!pair) throw new Error("Tutorial not active")
+
+    await db.animal.update({
+      where: { id: pair.ancestorOneId },
+      data: { playerAccountId: player.id },
+    })
+  }),
 })
