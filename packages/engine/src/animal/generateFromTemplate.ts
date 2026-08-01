@@ -85,6 +85,10 @@ export async function generateFromTemplate(tx: Tx, opts: GenerateFromTemplateOpt
     return { traitDefId: pp.traitDefId, value }
   })
 
+  const breedDisplayName = template.breedId
+    ? (await tx.breed.findUnique({ where: { id: template.breedId }, select: { name: true } }))?.name ?? "Unknown"
+    : (template.breedName ?? "Unknown")
+
   const animal = await tx.animal.create({
     data: {
       gameId: opts.gameId,
@@ -93,7 +97,7 @@ export async function generateFromTemplate(tx: Tx, opts: GenerateFromTemplateOpt
       breedName: template.breedId ? null : (template.breedName ?? null),
       lifeStageId: lifeStage.id,
       sex: template.sex,
-      name: template.name ?? `${template.sex === "MALE" ? "Colt" : "Filly"}`,
+      name: template.name ?? `${breedDisplayName} ${template.sex === "MALE" ? "Colt" : "Filly"}`,
       fertility: template.fertility ?? Math.random(),
       ageInCycles: age,
       status: "ALIVE",

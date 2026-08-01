@@ -176,14 +176,14 @@ model AnimalTemplateStat {
 }
 
 model AnimalTemplateCompTier {
-  id           String         @id @default(cuid())
-  templateId   String
-  disciplineId String
-  tier         Int
-  template     AnimalTemplate @relation(fields: [templateId], references: [id])
-  discipline   DisciplineDef  @relation(fields: [disciplineId], references: [id])
+  id              String         @id @default(cuid())
+  templateId      String
+  disciplineDefId String
+  tier            Int
+  template        AnimalTemplate @relation(fields: [templateId], references: [id])
+  discipline      DisciplineDef  @relation(fields: [disciplineDefId], references: [id])
 
-  @@unique([templateId, disciplineId])
+  @@unique([templateId, disciplineDefId])
 }
 
 model AnimalTemplateGenotype {
