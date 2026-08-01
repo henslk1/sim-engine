@@ -1,7 +1,7 @@
 import { z } from "zod"
 import { router, protectedProcedure } from "../trpc.js"
 import { db, AnimalSex } from "@sim-engine/db"
-import { generateFromTemplate, weightedSample, canonicalize } from "@sim-engine/engine"
+import { generateFromTemplate, weightedSample, canonicalize, deleteAnimalsWithChildren } from "@sim-engine/engine"
 
 export const tutorialRouter = router({
   getProgress: protectedProcedure
@@ -297,4 +297,50 @@ export const tutorialRouter = router({
         return { embryoId: embryo.id }
       })
     }),
+
+  completeStep: protectedProcedure
+    .input(z.object({ gameId: z.string(), stepKey: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const { gameId, stepKey } = input
+
+      const [player, stepDef] = await Promise.all([
+        db.playerAccount.findUnique({
+          where: { userId_gameId: { userId: ctx.userId, gameId } },
+          select: { id: true },
+        }),
+        db.tutorialStepDef.findUnique({
+          where: { gameId_stepKey: { gameId, stepKey } },
+          select: { id: true },
+        }),
+      ])
+
+      if (!player) throw new Error("Player not found")
+      if (!stepDef) throw new Error("Step not found")
+
+      await db.tutorialProgress.update({
+        where: { playerAccountId_stepDefId: { playerAccountId: player.id, stepDefId: stepDef.id } },
+        data: { completedAt: new Date() },
+      })
+
+      if (stepKey === "tutorial_complete") {
+        const pair = await db.tutorialAnimalPair.findUnique({
+          where: { playerAccountId: player.id },
+          select: { ancestorOneId: true, ancestorTwoId: true },
+        })
+
+        if (pair) {
+          // Delete ancestors + breeding listing
+          await Promise.all([
+            db.tutorialAnimalPair.delete({ where: { playerAccountId: player.id } }),
+            db.breedingListing.deleteMany({ where: { animalId: pair.ancestorTwoId } }),
+          ])
+          await deleteAnimalsWithChildren([pair.ancestorOneId, pair.ancestorTwoId])
+        }
+
+        await db.playerSeniority.update({
+          where: { playerAccountId: player.id },
+          data: { tutorialCompleted: true },
+        })
+      }
+    })
 })
