@@ -18,6 +18,7 @@ import { Route as AuthenticatedVetRouteImport } from './routes/_authenticated/ve
 import { Route as AuthenticatedVenuesRouteImport } from './routes/_authenticated/venues'
 import { Route as AuthenticatedTutorialRouteImport } from './routes/_authenticated/tutorial'
 import { Route as AuthenticatedTownRouteImport } from './routes/_authenticated/town'
+import { Route as AuthenticatedStudMarketRouteImport } from './routes/_authenticated/stud-market'
 import { Route as AuthenticatedStableRouteImport } from './routes/_authenticated/stable'
 import { Route as AuthenticatedShopRouteImport } from './routes/_authenticated/shop'
 import { Route as AuthenticatedSetupRouteImport } from './routes/_authenticated/setup'
@@ -26,6 +27,7 @@ import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
 import { Route as AuthenticatedVenueVenueIdRouteImport } from './routes/_authenticated/venue.$venueId'
 import { Route as AuthenticatedCompetitionCompetitionIdRouteImport } from './routes/_authenticated/competition.$competitionId'
+import { Route as AuthenticatedBreedingBookRouteImport } from './routes/_authenticated/breeding/book'
 import { Route as AuthenticatedBreedingOfferIdRouteImport } from './routes/_authenticated/breeding/$offerId'
 import { Route as AuthenticatedAnimalAnimalIdRouteImport } from './routes/_authenticated/animal/$animalId'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin/users'
@@ -127,6 +129,11 @@ const AuthenticatedTownRoute = AuthenticatedTownRouteImport.update({
   path: '/town',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedStudMarketRoute = AuthenticatedStudMarketRouteImport.update({
+  id: '/stud-market',
+  path: '/stud-market',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedStableRoute = AuthenticatedStableRouteImport.update({
   id: '/stable',
   path: '/stable',
@@ -167,6 +174,12 @@ const AuthenticatedCompetitionCompetitionIdRoute =
   AuthenticatedCompetitionCompetitionIdRouteImport.update({
     id: '/competition/$competitionId',
     path: '/competition/$competitionId',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedBreedingBookRoute =
+  AuthenticatedBreedingBookRouteImport.update({
+    id: '/breeding/book',
+    path: '/breeding/book',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedBreedingOfferIdRoute =
@@ -513,6 +526,7 @@ export interface FileRoutesByFullPath {
   '/setup': typeof AuthenticatedSetupRoute
   '/shop': typeof AuthenticatedShopRoute
   '/stable': typeof AuthenticatedStableRoute
+  '/stud-market': typeof AuthenticatedStudMarketRoute
   '/town': typeof AuthenticatedTownRoute
   '/tutorial': typeof AuthenticatedTutorialRoute
   '/venues': typeof AuthenticatedVenuesRoute
@@ -527,6 +541,7 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof AuthenticatedAdminUsersRouteWithChildren
   '/animal/$animalId': typeof AuthenticatedAnimalAnimalIdRoute
   '/breeding/$offerId': typeof AuthenticatedBreedingOfferIdRoute
+  '/breeding/book': typeof AuthenticatedBreedingBookRoute
   '/competition/$competitionId': typeof AuthenticatedCompetitionCompetitionIdRoute
   '/venue/$venueId': typeof AuthenticatedVenueVenueIdRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
@@ -586,6 +601,7 @@ export interface FileRoutesByTo {
   '/setup': typeof AuthenticatedSetupRoute
   '/shop': typeof AuthenticatedShopRoute
   '/stable': typeof AuthenticatedStableRoute
+  '/stud-market': typeof AuthenticatedStudMarketRoute
   '/town': typeof AuthenticatedTownRoute
   '/tutorial': typeof AuthenticatedTutorialRoute
   '/venues': typeof AuthenticatedVenuesRoute
@@ -597,6 +613,7 @@ export interface FileRoutesByTo {
   '/admin/system': typeof AuthenticatedAdminSystemRoute
   '/animal/$animalId': typeof AuthenticatedAnimalAnimalIdRoute
   '/breeding/$offerId': typeof AuthenticatedBreedingOfferIdRoute
+  '/breeding/book': typeof AuthenticatedBreedingBookRoute
   '/competition/$competitionId': typeof AuthenticatedCompetitionCompetitionIdRoute
   '/venue/$venueId': typeof AuthenticatedVenueVenueIdRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
@@ -658,6 +675,7 @@ export interface FileRoutesById {
   '/_authenticated/setup': typeof AuthenticatedSetupRoute
   '/_authenticated/shop': typeof AuthenticatedShopRoute
   '/_authenticated/stable': typeof AuthenticatedStableRoute
+  '/_authenticated/stud-market': typeof AuthenticatedStudMarketRoute
   '/_authenticated/town': typeof AuthenticatedTownRoute
   '/_authenticated/tutorial': typeof AuthenticatedTutorialRoute
   '/_authenticated/venues': typeof AuthenticatedVenuesRoute
@@ -672,6 +690,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRouteWithChildren
   '/_authenticated/animal/$animalId': typeof AuthenticatedAnimalAnimalIdRoute
   '/_authenticated/breeding/$offerId': typeof AuthenticatedBreedingOfferIdRoute
+  '/_authenticated/breeding/book': typeof AuthenticatedBreedingBookRoute
   '/_authenticated/competition/$competitionId': typeof AuthenticatedCompetitionCompetitionIdRoute
   '/_authenticated/venue/$venueId': typeof AuthenticatedVenueVenueIdRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
@@ -734,6 +753,7 @@ export interface FileRouteTypes {
     | '/setup'
     | '/shop'
     | '/stable'
+    | '/stud-market'
     | '/town'
     | '/tutorial'
     | '/venues'
@@ -748,6 +768,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/animal/$animalId'
     | '/breeding/$offerId'
+    | '/breeding/book'
     | '/competition/$competitionId'
     | '/venue/$venueId'
     | '/admin/'
@@ -807,6 +828,7 @@ export interface FileRouteTypes {
     | '/setup'
     | '/shop'
     | '/stable'
+    | '/stud-market'
     | '/town'
     | '/tutorial'
     | '/venues'
@@ -818,6 +840,7 @@ export interface FileRouteTypes {
     | '/admin/system'
     | '/animal/$animalId'
     | '/breeding/$offerId'
+    | '/breeding/book'
     | '/competition/$competitionId'
     | '/venue/$venueId'
     | '/admin'
@@ -878,6 +901,7 @@ export interface FileRouteTypes {
     | '/_authenticated/setup'
     | '/_authenticated/shop'
     | '/_authenticated/stable'
+    | '/_authenticated/stud-market'
     | '/_authenticated/town'
     | '/_authenticated/tutorial'
     | '/_authenticated/venues'
@@ -892,6 +916,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/users'
     | '/_authenticated/animal/$animalId'
     | '/_authenticated/breeding/$offerId'
+    | '/_authenticated/breeding/book'
     | '/_authenticated/competition/$competitionId'
     | '/_authenticated/venue/$venueId'
     | '/_authenticated/admin/'
@@ -1016,6 +1041,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedTownRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/stud-market': {
+      id: '/_authenticated/stud-market'
+      path: '/stud-market'
+      fullPath: '/stud-market'
+      preLoaderRoute: typeof AuthenticatedStudMarketRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/stable': {
       id: '/_authenticated/stable'
       path: '/stable'
@@ -1070,6 +1102,13 @@ declare module '@tanstack/react-router' {
       path: '/competition/$competitionId'
       fullPath: '/competition/$competitionId'
       preLoaderRoute: typeof AuthenticatedCompetitionCompetitionIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/breeding/book': {
+      id: '/_authenticated/breeding/book'
+      path: '/breeding/book'
+      fullPath: '/breeding/book'
+      preLoaderRoute: typeof AuthenticatedBreedingBookRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/breeding/$offerId': {
@@ -1681,12 +1720,14 @@ interface AuthenticatedRouteChildren {
   AuthenticatedSetupRoute: typeof AuthenticatedSetupRoute
   AuthenticatedShopRoute: typeof AuthenticatedShopRoute
   AuthenticatedStableRoute: typeof AuthenticatedStableRoute
+  AuthenticatedStudMarketRoute: typeof AuthenticatedStudMarketRoute
   AuthenticatedTownRoute: typeof AuthenticatedTownRoute
   AuthenticatedTutorialRoute: typeof AuthenticatedTutorialRoute
   AuthenticatedVenuesRoute: typeof AuthenticatedVenuesRoute
   AuthenticatedVetRoute: typeof AuthenticatedVetRoute
   AuthenticatedAnimalAnimalIdRoute: typeof AuthenticatedAnimalAnimalIdRoute
   AuthenticatedBreedingOfferIdRoute: typeof AuthenticatedBreedingOfferIdRoute
+  AuthenticatedBreedingBookRoute: typeof AuthenticatedBreedingBookRoute
   AuthenticatedCompetitionCompetitionIdRoute: typeof AuthenticatedCompetitionCompetitionIdRoute
   AuthenticatedVenueVenueIdRoute: typeof AuthenticatedVenueVenueIdRoute
 }
@@ -1697,12 +1738,14 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedSetupRoute: AuthenticatedSetupRoute,
   AuthenticatedShopRoute: AuthenticatedShopRoute,
   AuthenticatedStableRoute: AuthenticatedStableRoute,
+  AuthenticatedStudMarketRoute: AuthenticatedStudMarketRoute,
   AuthenticatedTownRoute: AuthenticatedTownRoute,
   AuthenticatedTutorialRoute: AuthenticatedTutorialRoute,
   AuthenticatedVenuesRoute: AuthenticatedVenuesRoute,
   AuthenticatedVetRoute: AuthenticatedVetRoute,
   AuthenticatedAnimalAnimalIdRoute: AuthenticatedAnimalAnimalIdRoute,
   AuthenticatedBreedingOfferIdRoute: AuthenticatedBreedingOfferIdRoute,
+  AuthenticatedBreedingBookRoute: AuthenticatedBreedingBookRoute,
   AuthenticatedCompetitionCompetitionIdRoute:
     AuthenticatedCompetitionCompetitionIdRoute,
   AuthenticatedVenueVenueIdRoute: AuthenticatedVenueVenueIdRoute,

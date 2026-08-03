@@ -346,7 +346,10 @@ function VenueDetailPage() {
   const { data: me } = trpc.player.me.useQuery({ gameId: gameId! }, { enabled: !!gameId })
   const playerAccountId = me?.id
 
-  const { data: animals } = trpc.animal.list.useQuery()
+  const { data: animals } = trpc.animal.list.useQuery(
+    { playerAccountId: playerAccountId! },
+    { enabled: !!playerAccountId },
+  )
   const aliveAnimals = (animals?.filter((a) => a.status === "ALIVE") ?? []) as AliveAnimal[]
 
   const isAnimalMode = !!initialAnimalId

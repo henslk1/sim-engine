@@ -384,7 +384,10 @@ function StablePage() {
   )
   const conformationName = disciplines?.find((d) => d.isConformation)?.name ?? "Conformation"
 
-  const { data: animals = [], isLoading: animalsLoading } = trpc.animal.list.useQuery()
+  const { data: animals = [], isLoading: animalsLoading } = trpc.animal.list.useQuery(
+    { playerAccountId: playerAccountId! },
+    { enabled: !!playerAccountId },
+  )
   const [selected, setSelected] = useState<Selection>("all")
   const [nameFilter, setNameFilter] = useState("")
   const [sortBy, setSortBy] = useState<SortBy>("name")

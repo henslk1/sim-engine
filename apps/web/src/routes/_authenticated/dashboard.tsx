@@ -579,7 +579,10 @@ function DashboardPage() {
     { playerAccountId: playerAccountId! },
     { enabled: !!playerAccountId },
   )
-  const { data: animals = [] } = trpc.animal.list.useQuery()
+  const { data: animals = [] } = trpc.animal.list.useQuery(
+    { playerAccountId: playerAccountId! },
+    { enabled: !!playerAccountId },
+  )
   const { data: openComps = [] } = trpc.competition.listOpen.useQuery(
     { gameId: gameId! },
     { enabled: !!gameId },

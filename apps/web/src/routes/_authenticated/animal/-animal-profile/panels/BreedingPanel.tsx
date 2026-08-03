@@ -309,12 +309,23 @@ export function BreedingPanel({
               <div className="space-y-2">
                 <p className="text-[11px] text-muted-foreground">Not pregnant</p>
                 {!readonly && (
-                  <ActionButton variant="soft" disabled className="w-full justify-center">
-                    <Search className="size-3.5" /> Browse Stud Market
-                  </ActionButton>
+                  <Link to="/stud-market" search={{ fromAnimalId: animal.id, fromAnimalName: animal.name }} className="w-full">
+                    <ActionButton variant="soft" className="w-full justify-center">
+                      <Search className="size-3.5" /> Browse Stud Market
+                    </ActionButton>
+                  </Link>
                 )}
               </div>
             )
+          )}
+
+          {/* View stud ad — visitors only (owners see it inside the listing card) */}
+          {isMale && readonly && listing?.isActive && (
+            <Link to="/stud-market" search={{ listingId: listing.id }} className="w-full">
+              <ActionButton variant="soft" className="w-full justify-center">
+                View Stud Ad
+              </ActionButton>
+            </Link>
           )}
 
           {/* Male stud listing */}
@@ -388,6 +399,13 @@ export function BreedingPanel({
                       {listing.isActive ? "Deactivate" : "Activate"}
                     </ActionButton>
                   </div>
+                  {listing.isActive && (
+                    <Link to="/stud-market" search={{ listingId: listing.id }} className="w-full">
+                      <ActionButton variant="soft" className="w-full justify-center">
+                        View Stud Ad
+                      </ActionButton>
+                    </Link>
+                  )}
                 </div>
               ) : (
                 <ActionButton

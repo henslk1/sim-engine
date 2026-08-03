@@ -977,7 +977,10 @@ function VetPage() {
   const { data: me } = trpc.player.me.useQuery({ gameId: gameId! }, { enabled: !!gameId })
   const playerAccountId = me?.id
 
-  const { data: animals } = trpc.animal.list.useQuery()
+  const { data: animals } = trpc.animal.list.useQuery(
+    { playerAccountId: playerAccountId! },
+    { enabled: !!playerAccountId },
+  )
   const aliveAnimals = animals?.filter((a) => a.status === "ALIVE") ?? []
 
   const { data: vetServices } = trpc.vet.listServices.useQuery({ gameId: gameId! }, { enabled: !!gameId })

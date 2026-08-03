@@ -10,6 +10,7 @@ const restrictionInput = {
 const listingSelect = {
   id: true,
   title: true,
+  description: true,
   pricePerSlot: true,
   isActive: true,
   pureBredOnly: true,
@@ -21,18 +22,48 @@ const listingSelect = {
       breedId: true,
       breedName: true,
       breed: { select: { name: true } },
-      lifeStage: true,
+      image: true,
       fertility: true,
       ageInCycles: true,
       breedGeneration: true,
+      inbreedingCoefficient: true,
+      lifeStage: { select: { name: true } },
+      mood: { select: { value: true } },
+      stats: { select: { trainedValue: true } },
+      conformationScores: {
+        select: { score: true, breedId: true },
+        orderBy: { calculatedAt: "desc" as const },
+        take: 1,
+      },
+      compTiers: {
+        select: {
+          tierDef: { select: { name: true } },
+          disciplineDef: { select: { name: true } },
+        },
+      },
+      titles: { select: { id: true, titleDef: { select: { name: true } } } },
+      breedComposition: { select: { percentage: true, breed: { select: { name: true } } } },
+      personality: { select: { value: true, traitLabel: true, traitDef: { select: { name: true } } } },
+      _count: { select: { breedingRecordsAsSire: true } },
     },
   },
   currencyDef: { select: { id: true, symbol: true, name: true } },
-  breedRestrictions: { select: { breedId: true } },
+  breedRestrictions: { select: { breedId: true, breed: { select: { name: true } } } },
+  statMinimums: { select: { statDefId: true, minValue: true, statDef: { select: { name: true } } } },
+  requiredTitleDef: { select: { name: true } },
   _count: { select: { slots: { where: { status: "AVAILABLE" as const } } } },
 } as const
 
 export const breedingListingRouter = router({
+  getById: publicProcedure
+    .input(z.object({ listingId: z.string() }))
+    .query(({ input }) =>
+      db.breedingListing.findUniqueOrThrow({
+        where: { id: input.listingId },
+        select: listingSelect,
+      })
+    ),
+
   list: publicProcedure
     .input(z.object({
       gameId: z.string(),

@@ -4,9 +4,12 @@ import { z } from "zod"
 import { advanceAnimalAging, runConformationInspection, pruneAnimalData } from "@sim-engine/engine"
 
 export const animalAnimalRouter = router({
-  list: publicProcedure.query(() =>
+  list: publicProcedure
+    .input(z.object({ playerAccountId: z.string() }))
+    .query(({ input }) =>
     db.animal.findMany({
       where: {
+        playerAccountId: input.playerAccountId,
         status: { not: "EMBRYO_STORED" },
         NOT: { gameShopAnimal: { isAvailable: true } },
       },

@@ -7,8 +7,13 @@ const eligibleFemaleSelect = {
   id: true,
   name: true,
   ageInCycles: true,
+  fertility: true,
+  inbreedingCoefficient: true,
+  breedName: true,
   breed: { select: { id: true, name: true } },
   lifeStage: { select: { name: true } },
+  mood: { select: { value: true } },
+  energy: { select: { currentEnergy: true } },
 } as const
 
 function eligibleFemaleWhere(playerAccountId: string, gameId: string) {
@@ -20,6 +25,7 @@ function eligibleFemaleWhere(playerAccountId: string, gameId: string) {
     status: "ALIVE" as const,
     lifeStage: { canBreed: true },
     pregnancies: { none: { isCompleted: false } },
+    NOT: [{ gameShopAnimal: { isAvailable: true } }],
   }
 }
 
@@ -107,6 +113,104 @@ const gameConfigBreedingSelect = {
   trainingCeilingMultiplier: true,
 } as const
 
+// Shared select used by both previewPair and getForBreeding
+const breedingDisplaySelect = {
+  id: true,
+  name: true,
+  sex: true,
+  fertility: true,
+  inbreedingCoefficient: true,
+  breedId: true,
+  breed: { select: { id: true, name: true } },
+  playerAccount: { select: { id: true, username: true } },
+  lifeStage: { select: { name: true } },
+  mood: { select: { value: true } },
+  personality: { select: { value: true, traitDef: { select: { conceptionModifier: true } } } },
+  careScore: { select: { score: true } },
+  ancestors: { select: { ancestorId: true, depth: true, ancestor: { select: { inbreedingCoefficient: true } } } },
+  compTiers: {
+    select: {
+      tierDef: { select: { tierIndex: true } },
+      disciplineDef: {
+        select: {
+          isConformation: true,
+          compTierDefs: { select: { tierIndex: true }, orderBy: { tierIndex: "desc" as const }, take: 1 },
+        },
+      },
+    },
+    orderBy: { tierDef: { tierIndex: "desc" as const } },
+    take: 1,
+  },
+  stats: { select: { innateValue: true, trainedValue: true } },
+  breedComposition: { select: { breedId: true } },
+  conformationScores: { select: { score: true } },
+  genotypes: {
+    select: {
+      isTestedByOwner: true,
+      locus: { select: { panelEntries: { select: { panelDef: { select: { panelType: true } } } } } },
+    },
+  },
+  healthRecords: { select: { isActive: true } },
+} as const
+
+type AnimalForDisplay = {
+  inbreedingCoefficient: number
+  stats: { innateValue: number; trainedValue: number }[]
+  careScore: { score: number } | null
+  compTiers: Array<{
+    tierDef: { tierIndex: number }
+    disciplineDef: { isConformation: boolean; compTierDefs: { tierIndex: number }[] }
+  }>
+  breedComposition: { breedId: string }[]
+  conformationScores: { score: number }[]
+  genotypes: { isTestedByOwner: boolean; locus: { panelEntries: { panelDef: { panelType: string } }[] } }[]
+  healthRecords: { isActive: boolean }[]
+}
+
+function computeAnimalGrade(a: AnimalForDisplay, trainingCeilingMultiplier: number): string {
+  const topTierEntry = a.compTiers[0]
+  const compTier = topTierEntry
+    ? {
+        tierIndex: topTierEntry.tierDef.tierIndex,
+        maxTierIndex: topTierEntry.disciplineDef.compTierDefs[0]?.tierIndex ?? topTierEntry.tierDef.tierIndex,
+      }
+    : null
+  const trainedStatAvgRatio =
+    a.stats.length > 0
+      ? a.stats.reduce((sum, s) => {
+          const cap = s.innateValue * trainingCeilingMultiplier
+          return sum + Math.min(s.trainedValue / cap, 1)
+        }, 0) / a.stats.length
+      : 0
+  const isCross = a.breedComposition.length > 1
+  const conformationAvg =
+    !isCross && a.conformationScores.length > 0
+      ? a.conformationScores.reduce((s, c) => s + c.score, 0) / a.conformationScores.length
+      : null
+  const healthLoci = a.genotypes.filter((g) =>
+    g.locus.panelEntries.some((e) => e.panelDef.panelType === "HEALTH")
+  )
+  const healthTestedRatio =
+    healthLoci.length > 0 ? healthLoci.filter((g) => g.isTestedByOwner).length / healthLoci.length : null
+  const hasTopSportTier = a.compTiers
+    .filter((t) => !t.disciplineDef.isConformation)
+    .some((t) => t.tierDef.tierIndex >= (t.disciplineDef.compTierDefs[0]?.tierIndex ?? t.tierDef.tierIndex))
+  const hasTopConformationTier = a.compTiers
+    .filter((t) => t.disciplineDef.isConformation)
+    .some((t) => t.tierDef.tierIndex >= (t.disciplineDef.compTierDefs[0]?.tierIndex ?? t.tierDef.tierIndex))
+  return computeBreedingQuality({
+    careScore: a.careScore?.score ?? 0,
+    compTier,
+    inbreedingCoefficient: a.inbreedingCoefficient,
+    trainedStatAvgRatio,
+    conformationAvg,
+    healthTestedRatio,
+    activeConditions: a.healthRecords.filter((r) => r.isActive).length,
+    hasTopSportTier,
+    hasTopConformationTier,
+  }).grade
+}
+
 export const breedingCoverRouter = router({
   listEligibleOwn: publicProcedure
     .input(z.object({ sireId: z.string() }))
@@ -156,6 +260,7 @@ export const breedingCoverRouter = router({
       sireId: z.string(),
       damId: z.string(),
       price: z.number().min(0).default(0),
+      fromListing: z.boolean().default(false),
     }))
     .mutation(async ({ input }) => {
       const [sire, dam] = await Promise.all([
@@ -175,6 +280,7 @@ export const breedingCoverRouter = router({
             sex: true, gameId: true,
             lifeStage: { select: { canBreed: true } },
             gameShopAnimal: { select: { isAvailable: true } },
+            energy: { select: { currentEnergy: true } },
           },
         }),
       ])
@@ -188,13 +294,17 @@ export const breedingCoverRouter = router({
       if (sire.gameId !== dam.gameId) throw new Error("Animals must be in the same game")
 
       const energyCost = sire.game.gameConfig?.breedingEnergyCost ?? 0
-      if (energyCost > 0) {
+      if (energyCost > 0 && !input.fromListing) {
         if ((sire.energy?.currentEnergy ?? 0) < energyCost)
           throw new Error("Sire does not have enough energy to send a cover offer")
         await db.animalEnergy.update({
           where: { animalId: input.sireId },
           data: { currentEnergy: { decrement: energyCost } },
         })
+      }
+      if (energyCost > 0 && input.fromListing) {
+        if ((dam.energy?.currentEnergy ?? 0) < energyCost)
+          throw new Error("Dam does not have enough energy for this breeding")
       }
 
       const offer = await db.coverOffer.create({
@@ -262,6 +372,26 @@ export const breedingCoverRouter = router({
           throw new Error(`Dam is on a breeding cooldown until cycle ${damStatus.breedingCooldownUntilCycle}`)
         }
 
+        const energyConfig = await tx.gameConfig.findUnique({
+          where: { gameId: offer.gameId },
+          select: { breedingEnergyCost: true },
+        })
+        const breedingEnergyCost = energyConfig?.breedingEnergyCost ?? 0
+
+        if (breedingEnergyCost > 0) {
+          const damEnergy = await tx.animalEnergy.findUnique({
+            where: { animalId: offer.damId },
+            select: { currentEnergy: true },
+          })
+          if ((damEnergy?.currentEnergy ?? 0) < breedingEnergyCost) {
+            throw new Error("Dam does not have enough energy to accept this cover")
+          }
+          await tx.animalEnergy.update({
+            where: { animalId: offer.damId },
+            data: { currentEnergy: { decrement: breedingEnergyCost } },
+          })
+        }
+
         // Tutorial embryo implantation - skip generating offspring
         const tutorialPair = await tx.tutorialAnimalPair.findUnique({
           where: { ancestorTwoId: offer.sireId },
@@ -286,8 +416,22 @@ export const breedingCoverRouter = router({
 
           await tx.coverOffer.update({ where: { id: input.offerId }, data: { status: "ACCEPTED" } })
 
+          const tutorialListing = await tx.breedingListing.findFirst({
+            where: { animalId: offer.sireId, isActive: true },
+            select: { id: true },
+          })
+          if (tutorialListing) {
+            const tutorialSlot = await tx.breedingSlot.findFirst({
+              where: { listingId: tutorialListing.id, status: "AVAILABLE" },
+              select: { id: true },
+            })
+            if (tutorialSlot) {
+              await tx.breedingSlot.update({ where: { id: tutorialSlot.id }, data: { status: "USED" } })
+            }
+          }
+
           const breedingRecord = await tx.breedingRecord.create({
-            data: { 
+            data: {
               gameId: offer.gameId,
               sireId: offer.sireId,
               damId: offer.damId,
@@ -408,6 +552,20 @@ export const breedingCoverRouter = router({
           where: { id: input.offerId },
           data: { status: "ACCEPTED" },
         })
+
+        const activeListing = await tx.breedingListing.findFirst({
+          where: { animalId: offer.sireId, isActive: true },
+          select: { id: true },
+        })
+        if (activeListing) {
+          const availableSlot = await tx.breedingSlot.findFirst({
+            where: { listingId: activeListing.id, status: "AVAILABLE" },
+            select: { id: true },
+          })
+          if (availableSlot) {
+            await tx.breedingSlot.update({ where: { id: availableSlot.id }, data: { status: "USED" } })
+          }
+        }
 
         const breedingRecord = await tx.breedingRecord.create({
           data: {
@@ -666,61 +824,56 @@ export const breedingCoverRouter = router({
       })
     }),
 
+  previewPair: publicProcedure
+    .input(z.object({
+      sireId: z.string(),
+      damId: z.string(),
+      playerAccountId: z.string(),
+      gameId: z.string(),
+    }))
+    .query(async ({ input }) => {
+      const [sire, dam, gameConfig] = await Promise.all([
+        db.animal.findUniqueOrThrow({ where: { id: input.sireId }, select: breedingDisplaySelect }),
+        db.animal.findUniqueOrThrow({ where: { id: input.damId }, select: breedingDisplaySelect }),
+        db.gameConfig.findFirst({
+          where: { gameId: input.gameId },
+          select: { trainingCeilingMultiplier: true, predictorDailyLimitFree: true, predictorCost: true },
+        }),
+      ])
+
+      const today = new Date()
+      today.setUTCHours(0, 0, 0, 0)
+      const predictorUsage = await db.playerPredictorUsage.findUnique({
+        where: {
+          playerAccountId_gameId_date: { playerAccountId: input.playerAccountId, gameId: input.gameId, date: today },
+        },
+        select: { usageCount: true },
+      })
+
+      const ctp = gameConfig?.trainingCeilingMultiplier ?? 1
+      const base = (sire.fertility * 100 + dam.fertility * 100 + (sire.mood?.value ?? 50) + (dam.mood?.value ?? 50)) / 4
+      const personalityOffset = [...sire.personality, ...dam.personality].reduce(
+        (acc, p) => acc + p.traitDef.conceptionModifier * p.value, 0
+      )
+
+      return {
+        sire,
+        dam,
+        sireGrade: computeAnimalGrade(sire, ctp),
+        damGrade: computeAnimalGrade(dam, ctp),
+        offspringCOI: computeCOI(sire.id, sire.inbreedingCoefficient, sire.ancestors, dam.id, dam.inbreedingCoefficient, dam.ancestors),
+        conceptionChance: Math.round(Math.max(10, Math.min(100, base + personalityOffset))),
+        predictorQuota: {
+          used: predictorUsage?.usageCount ?? 0,
+          limit: gameConfig?.predictorDailyLimitFree ?? 0,
+          cost: gameConfig?.predictorCost ?? 0,
+        },
+      }
+    }),
+
   getForBreeding: publicProcedure
     .input(z.object({ offerId: z.string() }))
     .query(async ({ input }) => {
-      const ancestorSelect = {
-        ancestorId: true,
-        depth: true,
-        ancestor: { select: { inbreedingCoefficient: true } },
-      } as const
-
-      const animalSelect = {
-        id: true,
-        name: true,
-        sex: true,
-        fertility: true,
-        inbreedingCoefficient: true,
-        breedId: true,
-        breed: { select: { id: true, name: true } },
-        playerAccount: { select: { id: true, username: true } },
-        lifeStage: { select: { name: true } },
-        mood: { select: { value: true } },
-        personality: {
-          select: { value: true, traitDef: { select: { conceptionModifier: true } } },
-        },
-        careScore: { select: { score: true } },
-        ancestors: { select: ancestorSelect },
-        // grade components
-        compTiers: {
-          select: {
-            tierDef: { select: { tierIndex: true } },
-            disciplineDef: {
-              select: {
-                isConformation: true,
-                compTierDefs: {
-                  select: { tierIndex: true },
-                  orderBy: { tierIndex: "desc" as const },
-                  take: 1,
-                },
-              },
-            },
-          },
-          orderBy: { tierDef: { tierIndex: "desc" as const } },
-          take: 1,
-        },
-        stats: { select: { innateValue: true, trainedValue: true } },
-        breedComposition: { select: { breedId: true } },
-        conformationScores: { select: { score: true } },
-        genotypes: {
-          select: {
-            isTestedByOwner: true,
-            locus: { select: { panelEntries: { select: { panelDef: { select: { panelType: true } } } } } },
-          },
-        },
-        healthRecords: { select: { isActive: true } },
-      } as const
-
       const [offer, gameConfig] = await Promise.all([
         db.coverOffer.findUniqueOrThrow({
           where: { id: input.offerId },
@@ -729,8 +882,8 @@ export const breedingCoverRouter = router({
             status: true,
             price: true,
             gameId: true,
-            sire: { select: animalSelect },
-            dam: { select: animalSelect },
+            sire: { select: breedingDisplaySelect },
+            dam: { select: breedingDisplaySelect },
           },
         }),
         db.gameConfig.findFirst({
@@ -752,61 +905,13 @@ export const breedingCoverRouter = router({
         select: { usageCount: true },
       })
 
-      function computeGrade(a: typeof offer.sire): string {
-        const topTierEntry = a.compTiers[0]
-        const compTier = topTierEntry
-          ? {
-              tierIndex: topTierEntry.tierDef.tierIndex,
-              maxTierIndex: topTierEntry.disciplineDef.compTierDefs[0]?.tierIndex ?? topTierEntry.tierDef.tierIndex,
-            }
-          : null
-        const trainedStatAvgRatio =
-          a.stats.length > 0 && gameConfig
-            ? a.stats.reduce((sum, s) => {
-                const cap = s.innateValue * gameConfig.trainingCeilingMultiplier
-                return sum + Math.min(s.trainedValue / cap, 1)
-              }, 0) / a.stats.length
-            : 0
-        const isCross = a.breedComposition.length > 1
-        const conformationAvg =
-          !isCross && a.conformationScores.length > 0
-            ? a.conformationScores.reduce((s, c) => s + c.score, 0) / a.conformationScores.length
-            : null
-        const healthLoci = a.genotypes.filter((g) =>
-          g.locus.panelEntries.some((e) => e.panelDef.panelType === "HEALTH")
-        )
-        const healthTestedRatio = healthLoci.length > 0 ? healthLoci.filter((g) => g.isTestedByOwner).length / healthLoci.length : null
-        const hasTopSportTier = a.compTiers
-          .filter((t) => !t.disciplineDef.isConformation)
-          .some((t) => t.tierDef.tierIndex >= (t.disciplineDef.compTierDefs[0]?.tierIndex ?? t.tierDef.tierIndex))
-        const hasTopConformationTier = a.compTiers
-          .filter((t) => t.disciplineDef.isConformation)
-          .some((t) => t.tierDef.tierIndex >= (t.disciplineDef.compTierDefs[0]?.tierIndex ?? t.tierDef.tierIndex))
-        return computeBreedingQuality({
-          careScore: a.careScore?.score ?? 0,
-          compTier,
-          inbreedingCoefficient: a.inbreedingCoefficient,
-          trainedStatAvgRatio,
-          conformationAvg,
-          healthTestedRatio,
-          activeConditions: a.healthRecords.filter((r) => r.isActive).length,
-          hasTopSportTier,
-          hasTopConformationTier,
-        }).grade
-      }
-
+      const ctp = gameConfig?.trainingCeilingMultiplier ?? 1
       const base =
-        (offer.sire.fertility * 100 +
-          offer.dam.fertility * 100 +
-          (offer.sire.mood?.value ?? 50) +
-          (offer.dam.mood?.value ?? 50)) /
-        4
-
-      const personalityOffset = [
-        ...offer.sire.personality,
-        ...offer.dam.personality,
-      ].reduce((acc, p) => acc + p.traitDef.conceptionModifier * p.value, 0)
-
+        (offer.sire.fertility * 100 + offer.dam.fertility * 100 +
+          (offer.sire.mood?.value ?? 50) + (offer.dam.mood?.value ?? 50)) / 4
+      const personalityOffset = [...offer.sire.personality, ...offer.dam.personality].reduce(
+        (acc, p) => acc + p.traitDef.conceptionModifier * p.value, 0
+      )
       const conceptionChance = Math.max(10, Math.min(100, base + personalityOffset))
       const offspringCOI = computeCOI(offer.sire.id, offer.sire.inbreedingCoefficient, offer.sire.ancestors, offer.dam.id, offer.dam.inbreedingCoefficient, offer.dam.ancestors)
 
@@ -814,8 +919,8 @@ export const breedingCoverRouter = router({
         ...offer,
         conceptionChance: Math.round(conceptionChance),
         offspringCOI,
-        sireGrade: computeGrade(offer.sire),
-        damGrade: computeGrade(offer.dam),
+        sireGrade: computeAnimalGrade(offer.sire, ctp),
+        damGrade: computeAnimalGrade(offer.dam, ctp),
         predictorQuota: {
           used: predictorUsage?.usageCount ?? 0,
           limit: gameConfig?.predictorDailyLimitFree ?? 0,
@@ -825,36 +930,50 @@ export const breedingCoverRouter = router({
     }),
 
   runPredictor: publicProcedure
-    .input(z.object({ offerId: z.string() }))
+    .input(z.union([
+      z.object({ offerId: z.string() }),
+      z.object({ sireId: z.string(), damId: z.string(), playerAccountId: z.string(), gameId: z.string() }),
+    ]))
     .mutation(async ({ input }) => {
-      const offerBase = await db.coverOffer.findUniqueOrThrow({
-        where: { id: input.offerId },
-        select: { status: true, gameId: true, sireId: true, damId: true },
-      })
+      let resolvedSireId: string, resolvedDamId: string, resolvedGameId: string
 
-      if (offerBase.status !== "PENDING") throw new Error("Offer is no longer pending")
+      if ("offerId" in input) {
+        const offerBase = await db.coverOffer.findUniqueOrThrow({
+          where: { id: input.offerId },
+          select: { status: true, gameId: true, sireId: true, damId: true },
+        })
+        if (offerBase.status !== "PENDING") throw new Error("Offer is no longer pending")
+        resolvedSireId = offerBase.sireId
+        resolvedDamId = offerBase.damId
+        resolvedGameId = offerBase.gameId
+      } else {
+        resolvedSireId = input.sireId
+        resolvedDamId = input.damId
+        resolvedGameId = input.gameId
+      }
 
       const [sire, dam, gameConfig, gameInnateMax, gradeBreed, statDefs] = await Promise.all([
-        db.animal.findUniqueOrThrow({ where: { id: offerBase.sireId }, select: parentSelect }),
-        db.animal.findUniqueOrThrow({ where: { id: offerBase.damId }, select: parentSelect }),
+        db.animal.findUniqueOrThrow({ where: { id: resolvedSireId }, select: parentSelect }),
+        db.animal.findUniqueOrThrow({ where: { id: resolvedDamId }, select: parentSelect }),
         db.gameConfig.findUniqueOrThrow({
-          where: { gameId: offerBase.gameId },
+          where: { gameId: resolvedGameId },
           select: { ...gameConfigBreedingSelect, predictorCost: true, predictorDailyLimitFree: true },
         }),
         db.gameInnateMax.findFirst({
-          where: { gameId: offerBase.gameId },
+          where: { gameId: resolvedGameId },
           select: { maxTotalInnate: true, averageTotalInnate: true },
         }),
         db.breed.findFirst({
-          where: { gameId: offerBase.gameId, isUnregistered: true },
+          where: { gameId: resolvedGameId, isUnregistered: true },
           select: { id: true, name: true },
         }),
         db.statDef.findMany({
-          where: { gameId: offerBase.gameId },
+          where: { gameId: resolvedGameId },
           select: { id: true, name: true },
         }),
       ])
 
+      const playerAccountId = "playerAccountId" in input ? input.playerAccountId : dam.playerAccountId
       const dailyLimit = gameConfig.predictorDailyLimitFree
       const today = new Date()
       today.setUTCHours(0, 0, 0, 0)
@@ -863,8 +982,8 @@ export const breedingCoverRouter = router({
         const usage = await db.playerPredictorUsage.findUnique({
           where: {
             playerAccountId_gameId_date: {
-              playerAccountId: dam.playerAccountId,
-              gameId: offerBase.gameId,
+              playerAccountId,
+              gameId: resolvedGameId,
               date: today,
             },
           },
@@ -877,14 +996,14 @@ export const breedingCoverRouter = router({
 
       if (gameConfig.predictorCost > 0) {
         const coverService = await db.vetServiceDef.findFirst({
-          where: { gameId: offerBase.gameId, serviceType: "NATURAL_COVER" },
+          where: { gameId: resolvedGameId, serviceType: "NATURAL_COVER" },
           select: { currencyDefId: true },
         })
         if (coverService?.currencyDefId) {
           await db.playerBalance.update({
             where: {
               playerAccountId_currencyDefId: {
-                playerAccountId: dam.playerAccountId,
+                playerAccountId,
                 currencyDefId: coverService.currencyDefId,
               },
             },
@@ -896,12 +1015,12 @@ export const breedingCoverRouter = router({
       const newUsage = await db.playerPredictorUsage.upsert({
         where: {
           playerAccountId_gameId_date: {
-            playerAccountId: dam.playerAccountId,
-            gameId: offerBase.gameId,
+            playerAccountId,
+            gameId: resolvedGameId,
             date: today,
           },
         },
-        create: { playerAccountId: dam.playerAccountId, gameId: offerBase.gameId, date: today, usageCount: 1 },
+        create: { playerAccountId, gameId: resolvedGameId, date: today, usageCount: 1 },
         update: { usageCount: { increment: 1 } },
         select: { usageCount: true },
       })
