@@ -156,16 +156,17 @@ model PregnancyOffspring {
 }
 
 model CoverOffer {
-  id        String           @id @default(cuid())
-  gameId    String
-  sireId    String
-  damId     String
-  price     Float            @default(0)
-  status    CoverOfferStatus @default(PENDING)
-  createdAt DateTime         @default(now())
-  game      Game             @relation(fields: [gameId], references: [id])
-  sire      Animal           @relation("CoverOfferSire", fields: [sireId], references: [id])
-  dam       Animal           @relation("CoverOfferDam", fields: [damId], references: [id])
+  id          String           @id @default(cuid())
+  gameId      String
+  sireId      String
+  damId       String
+  price       Float            @default(0)
+  status      CoverOfferStatus @default(PENDING)
+  fromListing Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  game        Game             @relation(fields: [gameId], references: [id])
+  sire        Animal           @relation("CoverOfferSire", fields: [sireId], references: [id])
+  dam         Animal           @relation("CoverOfferDam", fields: [damId], references: [id])
 }
 
 model SurrogacyRecord {
