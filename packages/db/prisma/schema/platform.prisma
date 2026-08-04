@@ -99,6 +99,7 @@ model User {
   staffPlayerNotes      StaffPlayerNote[]      @relation("NoteAuthor")
   playerWarningsIssued  PlayerWarning[]        @relation("WarningIssuedBy")
   userDeviceLogs        UserDeviceLog[]
+  claimedBugReports     BugReport[]            @relation("ClaimedBugReports")
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
 }
@@ -332,6 +333,15 @@ enum SupportTicketStatus {
   CLOSED
 }
 
+enum SupportTicketCategory {
+  GENERAL
+  EXPLOIT
+  BILLING
+  ACCOUNT
+  APPEAL
+  DISPUTE
+}
+
 model SupportTicket {
   id              String                 @id @default(cuid())
   playerAccountId String
@@ -339,6 +349,7 @@ model SupportTicket {
   jobContractId   String?
   subject         String
   body            String
+  category        SupportTicketCategory
   status          SupportTicketStatus
   messages        SupportTicketMessage[]
   playerAccount   PlayerAccount          @relation(fields: [playerAccountId], references: [id])
@@ -365,36 +376,47 @@ enum BugSeverity {
 }
 
 enum BugCategory {
-  ART
+  VISUAL
   TEXT
   UI
-  MECHANIC
+  GAMEPLAY
+  ECONOMY
+  PERFORMANCE
 }
 
 enum BugStatus {
   OPEN
   CONFIRMED
   IN_PROGRESS
+  NEEDS_MORE_INFO
+  NOT_A_BUG
   RESOLVED
   CLOSED
 }
 
 model BugReport {
-  id        String             @id @default(cuid())
-  gameId    String
-  authorId  String
-  title     String
-  body      String
-  severity  BugSeverity
-  category  BugCategory
-  isExploit Boolean            @default(false)
-  status    BugStatus
-  upvotes   BugReportUpvote[]
-  comments  BugReportComment[]
-  game      Game               @relation(fields: [gameId], references: [id])
-  author    PlayerAccount      @relation(fields: [authorId], references: [id])
-  createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
+  id               String             @id @default(cuid())
+  gameId           String
+  authorId         String
+  title            String
+  category         BugCategory
+  status           BugStatus          @default(OPEN)
+  pageUrl          String
+  description      String
+  expectedOutcome  String
+  stepsToReproduce String
+  errorMessages    String?
+  screenshotUrls   String[]
+  claimedByUserId  String?
+  claimedAt        DateTime?
+  adminNote        String?
+  upvotes          BugReportUpvote[]
+  comments         BugReportComment[]
+  claimedBy        User?              @relation("ClaimedBugReports", fields: [claimedByUserId], references: [id])
+  game             Game               @relation(fields: [gameId], references: [id])
+  author           PlayerAccount      @relation(fields: [authorId], references: [id])
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
 }
 
 model BugReportUpvote {

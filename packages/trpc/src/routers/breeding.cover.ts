@@ -313,6 +313,7 @@ export const breedingCoverRouter = router({
           sireId: input.sireId,
           damId: input.damId,
           price: input.price,
+          fromListing: input.fromListing,
         },
         select: { id: true, status: true },
       })
@@ -336,7 +337,7 @@ export const breedingCoverRouter = router({
       return db.$transaction(async (tx) => {
         const offer = await tx.coverOffer.findUniqueOrThrow({
           where: { id: input.offerId },
-          select: { status: true, gameId: true, sireId: true, damId: true, price: true },
+          select: { status: true, gameId: true, sireId: true, damId: true, price: true, fromListing: true },
         })
 
         if (offer.status !== "PENDING") throw new Error("Offer is no longer pending")
@@ -416,17 +417,19 @@ export const breedingCoverRouter = router({
 
           await tx.coverOffer.update({ where: { id: input.offerId }, data: { status: "ACCEPTED" } })
 
-          const tutorialListing = await tx.breedingListing.findFirst({
-            where: { animalId: offer.sireId, isActive: true },
-            select: { id: true },
-          })
-          if (tutorialListing) {
-            const tutorialSlot = await tx.breedingSlot.findFirst({
-              where: { listingId: tutorialListing.id, status: "AVAILABLE" },
+          if (offer.fromListing) {
+            const tutorialListing = await tx.breedingListing.findFirst({
+              where: { animalId: offer.sireId, isActive: true },
               select: { id: true },
             })
-            if (tutorialSlot) {
-              await tx.breedingSlot.update({ where: { id: tutorialSlot.id }, data: { status: "USED" } })
+            if (tutorialListing) {
+              const tutorialSlot = await tx.breedingSlot.findFirst({
+                where: { listingId: tutorialListing.id, status: "AVAILABLE" },
+                select: { id: true },
+              })
+              if (tutorialSlot) {
+                await tx.breedingSlot.update({ where: { id: tutorialSlot.id }, data: { status: "USED" } })
+              }
             }
           }
 
@@ -448,6 +451,11 @@ export const breedingCoverRouter = router({
               requiredCycles: gestationConfig.gestationCycles,
             },
             select: { id: true },
+          })
+
+          await tx.breedingListing.updateMany({
+            where: { animalId: offer.sireId },
+            data: { isActive: false },
           })
 
           await Promise.all([
@@ -553,17 +561,19 @@ export const breedingCoverRouter = router({
           data: { status: "ACCEPTED" },
         })
 
-        const activeListing = await tx.breedingListing.findFirst({
-          where: { animalId: offer.sireId, isActive: true },
-          select: { id: true },
-        })
-        if (activeListing) {
-          const availableSlot = await tx.breedingSlot.findFirst({
-            where: { listingId: activeListing.id, status: "AVAILABLE" },
+        if (offer.fromListing) {
+          const activeListing = await tx.breedingListing.findFirst({
+            where: { animalId: offer.sireId, isActive: true },
             select: { id: true },
           })
-          if (availableSlot) {
-            await tx.breedingSlot.update({ where: { id: availableSlot.id }, data: { status: "USED" } })
+          if (activeListing) {
+            const availableSlot = await tx.breedingSlot.findFirst({
+              where: { listingId: activeListing.id, status: "AVAILABLE" },
+              select: { id: true },
+            })
+            if (availableSlot) {
+              await tx.breedingSlot.update({ where: { id: availableSlot.id }, data: { status: "USED" } })
+            }
           }
         }
 
