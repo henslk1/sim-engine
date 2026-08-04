@@ -17,7 +17,6 @@ const overviewRouter = router({
         bugGameBreaking,
         bugMajor,
         bugMinor,
-        exploitCount,
         pendingReports,
         activeBans,
         recentPlayers,
@@ -26,10 +25,9 @@ const overviewRouter = router({
       ] = await Promise.all([
         db.supportTicket.count({ where: { ...gf, status: "OPEN" } }),
         db.supportTicket.count({ where: { ...gf, status: "IN_PROGRESS" } }),
-        db.bugReport.count({ where: { ...gf, severity: "GAME_BREAKING", status: { notIn: ["RESOLVED", "CLOSED"] } } }),
-        db.bugReport.count({ where: { ...gf, severity: "MAJOR", status: { notIn: ["RESOLVED", "CLOSED"] } } }),
-        db.bugReport.count({ where: { ...gf, severity: "MINOR", status: { notIn: ["RESOLVED", "CLOSED"] } } }),
-        db.bugReport.count({ where: { ...gf, isExploit: true, status: { notIn: ["RESOLVED", "CLOSED"] } } }),
+        db.bugReport.count({ where: { ...gf, severity: "GAME_BREAKING", status: { notIn: ["RESOLVED", "CLOSED", "NOT_A_BUG"] } } }),
+        db.bugReport.count({ where: { ...gf, severity: "MAJOR", status: { notIn: ["RESOLVED", "CLOSED", "NOT_A_BUG"] } } }),
+        db.bugReport.count({ where: { ...gf, severity: "MINOR", status: { notIn: ["RESOLVED", "CLOSED", "NOT_A_BUG"] } } }),
         db.userReport.count({ where: { ...gf, status: "PENDING" } }),
         db.banRecord.count({ where: { OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] } }),
         db.playerAccount.findMany({
@@ -64,7 +62,7 @@ const overviewRouter = router({
           orderBy: { startedAt: "desc" },
         }),
       ])
-      return { openTickets, inProgressTickets, bugGameBreaking, bugMajor, bugMinor, exploitCount, pendingReports, activeBans, recentPlayers, recentActions, lastNightlyLog }
+      return { openTickets, inProgressTickets, bugGameBreaking, bugMajor, bugMinor, pendingReports, activeBans, recentPlayers, recentActions, lastNightlyLog }
     }),
 })
 
@@ -136,7 +134,7 @@ const playersOpsRouter = router({
           warnings: { orderBy: { createdAt: "desc" } },
           staffNotes: { orderBy: { createdAt: "desc" }, include: { author: { select: { email: true, name: true } } } },
           supportTickets: { orderBy: { createdAt: "desc" }, take: 10 },
-          bugReports: { select: { id: true, title: true, severity: true, status: true, createdAt: true }, orderBy: { createdAt: "desc" }, take: 10 },
+          bugReports: { select: { id: true, title: true, category: true, status: true, createdAt: true }, orderBy: { createdAt: "desc" }, take: 10 },
           _count: { select: { animalsOwned: true } },
         },
       })
@@ -520,22 +518,20 @@ const bugsOpsRouter = router({
   list: publicProcedure
     .input(z.object({
       gameId: z.string(),
-      status: z.enum(["OPEN", "CONFIRMED", "IN_PROGRESS", "RESOLVED", "CLOSED"]).optional(),
+      status: z.enum(["OPEN", "CONFIRMED", "IN_PROGRESS", "NEEDS_MORE_INFO", "NOT_A_BUG", "RESOLVED", "CLOSED"]).optional(),
       severity: z.enum(["MINOR", "MAJOR", "GAME_BREAKING"]).optional(),
-      category: z.enum(["ART", "TEXT", "UI", "MECHANIC"]).optional(),
-      exploitsOnly: z.boolean().optional(),
+      category: z.enum(["VISUAL", "TEXT", "UI", "GAMEPLAY", "ECONOMY", "PERFORMANCE"]).optional(),
       cursor: z.string().optional(),
       limit: z.number().int().min(1).max(100).default(50),
     }))
     .query(async ({ input }) => {
-      const { gameId, status, severity, category, exploitsOnly, cursor, limit } = input
+      const { gameId, status, severity, category, cursor, limit } = input
       const reports = await db.bugReport.findMany({
         where: {
           gameId,
           ...(status && { status }),
           ...(severity && { severity }),
           ...(category && { category }),
-          ...(exploitsOnly && { isExploit: true }),
         },
         include: {
           author: { select: { id: true, username: true } },
@@ -568,7 +564,7 @@ const bugsOpsRouter = router({
   setStatus: publicProcedure
     .input(z.object({
       reportId: z.string(),
-      status: z.enum(["OPEN", "CONFIRMED", "IN_PROGRESS", "RESOLVED", "CLOSED"]),
+      status: z.enum(["OPEN", "CONFIRMED", "IN_PROGRESS", "NEEDS_MORE_INFO", "NOT_A_BUG", "RESOLVED", "CLOSED"]),
       staffUserId: z.string(),
     }))
     .mutation(async ({ input }) => {
@@ -580,24 +576,6 @@ const bugsOpsRouter = router({
             staffUserId: input.staffUserId,
             gameId: report.gameId,
             action: `bug_status:${input.status}`,
-            targetType: "BugReport",
-            targetId: input.reportId,
-          },
-        }),
-      ])
-    }),
-
-  setExploit: publicProcedure
-    .input(z.object({ reportId: z.string(), isExploit: z.boolean(), staffUserId: z.string() }))
-    .mutation(async ({ input }) => {
-      const report = await db.bugReport.findUniqueOrThrow({ where: { id: input.reportId } })
-      await db.$transaction([
-        db.bugReport.update({ where: { id: input.reportId }, data: { isExploit: input.isExploit } }),
-        db.adminActionLog.create({
-          data: {
-            staffUserId: input.staffUserId,
-            gameId: report.gameId,
-            action: `bug_exploit:${input.isExploit}`,
             targetType: "BugReport",
             targetId: input.reportId,
           },
