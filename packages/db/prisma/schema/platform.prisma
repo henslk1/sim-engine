@@ -432,13 +432,14 @@ model BugReportUpvote {
 }
 
 model BugReportComment {
-  id          String        @id @default(cuid())
-  bugReportId String
-  authorId    String
-  body        String
-  author      PlayerAccount @relation(fields: [authorId], references: [id])
-  bugReport   BugReport     @relation(fields: [bugReportId], references: [id])
-  createdAt   DateTime      @default(now())
+  id             String        @id @default(cuid())
+  bugReportId    String
+  authorId       String
+  body           String
+  isMergedReport Boolean       @default(false)
+  author         PlayerAccount @relation(fields: [authorId], references: [id])
+  bugReport      BugReport     @relation(fields: [bugReportId], references: [id])
+  createdAt      DateTime      @default(now())
 }
 
 model AdminActionLog {
