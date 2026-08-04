@@ -1,4 +1,4 @@
-import { useRouter, Link } from "@tanstack/react-router";
+import { useRouter, Link, useNavigate, useLocation } from "@tanstack/react-router";
 import { authClient } from "@/lib/auth-client";
 import {
   DropdownMenu,
@@ -7,6 +7,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ActionButton } from "./game/ui";
 
 type Session = typeof authClient.$Infer.Session 
 
@@ -30,6 +31,9 @@ export function Header({ session }: { session: Session}) {
 
   const { user } = session
 
+  const navigate = useNavigate()
+  const location = useLocation()
+
   return (
     <header className="border-b border-border bg-card">
       <div className="flex h-14 items-center justify-between px-4">
@@ -39,27 +43,35 @@ export function Header({ session }: { session: Session}) {
           <Link to="/town" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Town</Link>
           <Link to="/shop" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Shop</Link>
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger className="flex items-center gap-2 rounded-md px-2 py-1 text-sm text-foreground hover:bg-muted outline-none">
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground overflow-hidden">
-              {user.image ? (
-                <img src={user.image} alt={user.name ?? ""} className="h-full w-full object-cover" />
-              ) : (
-                getInitials(user.name ?? "?")
-              )}
-            </div>
-            <span>{user.name}</span>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem asChild>
-              <Link to="/admin" className="cursor-pointer">Admin Console</Link>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={handleSignOut} className="cursor-pointer">
-              Sign out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="flex items-center gap-3">
+          <ActionButton
+          variant="danger"
+            onClick={() => navigate({ to: "/bug-reports", search: { from: location.pathname } })}
+          >
+            Bug Report
+          </ActionButton>
+          <DropdownMenu>
+            <DropdownMenuTrigger className="flex items-center gap-2 rounded-md px-2 py-1 text-sm text-foreground hover:bg-muted outline-none">
+              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground overflow-hidden">
+                {user.image ? (
+                  <img src={user.image} alt={user.name ?? ""} className="h-full w-full object-cover" />
+                ) : (
+                  getInitials(user.name ?? "?")
+                )}
+              </div>
+              <span>{user.name}</span>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem asChild>
+                <Link to="/admin" className="cursor-pointer">Admin Console</Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={handleSignOut} className="cursor-pointer">
+                Sign out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
     </header>
   )

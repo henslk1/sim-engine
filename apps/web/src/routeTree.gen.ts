@@ -27,6 +27,7 @@ import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
 import { Route as AuthenticatedVenueVenueIdRouteImport } from './routes/_authenticated/venue.$venueId'
 import { Route as AuthenticatedCompetitionCompetitionIdRouteImport } from './routes/_authenticated/competition.$competitionId'
+import { Route as AuthenticatedBugReportsNewRouteImport } from './routes/_authenticated/bug-reports/new'
 import { Route as AuthenticatedBreedingBookRouteImport } from './routes/_authenticated/breeding/book'
 import { Route as AuthenticatedBreedingOfferIdRouteImport } from './routes/_authenticated/breeding/$offerId'
 import { Route as AuthenticatedAnimalAnimalIdRouteImport } from './routes/_authenticated/animal/$animalId'
@@ -174,6 +175,12 @@ const AuthenticatedCompetitionCompetitionIdRoute =
   AuthenticatedCompetitionCompetitionIdRouteImport.update({
     id: '/competition/$competitionId',
     path: '/competition/$competitionId',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedBugReportsNewRoute =
+  AuthenticatedBugReportsNewRouteImport.update({
+    id: '/bug-reports/new',
+    path: '/bug-reports/new',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedBreedingBookRoute =
@@ -542,6 +549,7 @@ export interface FileRoutesByFullPath {
   '/animal/$animalId': typeof AuthenticatedAnimalAnimalIdRoute
   '/breeding/$offerId': typeof AuthenticatedBreedingOfferIdRoute
   '/breeding/book': typeof AuthenticatedBreedingBookRoute
+  '/bug-reports/new': typeof AuthenticatedBugReportsNewRoute
   '/competition/$competitionId': typeof AuthenticatedCompetitionCompetitionIdRoute
   '/venue/$venueId': typeof AuthenticatedVenueVenueIdRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
@@ -614,6 +622,7 @@ export interface FileRoutesByTo {
   '/animal/$animalId': typeof AuthenticatedAnimalAnimalIdRoute
   '/breeding/$offerId': typeof AuthenticatedBreedingOfferIdRoute
   '/breeding/book': typeof AuthenticatedBreedingBookRoute
+  '/bug-reports/new': typeof AuthenticatedBugReportsNewRoute
   '/competition/$competitionId': typeof AuthenticatedCompetitionCompetitionIdRoute
   '/venue/$venueId': typeof AuthenticatedVenueVenueIdRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
@@ -691,6 +700,7 @@ export interface FileRoutesById {
   '/_authenticated/animal/$animalId': typeof AuthenticatedAnimalAnimalIdRoute
   '/_authenticated/breeding/$offerId': typeof AuthenticatedBreedingOfferIdRoute
   '/_authenticated/breeding/book': typeof AuthenticatedBreedingBookRoute
+  '/_authenticated/bug-reports/new': typeof AuthenticatedBugReportsNewRoute
   '/_authenticated/competition/$competitionId': typeof AuthenticatedCompetitionCompetitionIdRoute
   '/_authenticated/venue/$venueId': typeof AuthenticatedVenueVenueIdRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
@@ -769,6 +779,7 @@ export interface FileRouteTypes {
     | '/animal/$animalId'
     | '/breeding/$offerId'
     | '/breeding/book'
+    | '/bug-reports/new'
     | '/competition/$competitionId'
     | '/venue/$venueId'
     | '/admin/'
@@ -841,6 +852,7 @@ export interface FileRouteTypes {
     | '/animal/$animalId'
     | '/breeding/$offerId'
     | '/breeding/book'
+    | '/bug-reports/new'
     | '/competition/$competitionId'
     | '/venue/$venueId'
     | '/admin'
@@ -917,6 +929,7 @@ export interface FileRouteTypes {
     | '/_authenticated/animal/$animalId'
     | '/_authenticated/breeding/$offerId'
     | '/_authenticated/breeding/book'
+    | '/_authenticated/bug-reports/new'
     | '/_authenticated/competition/$competitionId'
     | '/_authenticated/venue/$venueId'
     | '/_authenticated/admin/'
@@ -1102,6 +1115,13 @@ declare module '@tanstack/react-router' {
       path: '/competition/$competitionId'
       fullPath: '/competition/$competitionId'
       preLoaderRoute: typeof AuthenticatedCompetitionCompetitionIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/bug-reports/new': {
+      id: '/_authenticated/bug-reports/new'
+      path: '/bug-reports/new'
+      fullPath: '/bug-reports/new'
+      preLoaderRoute: typeof AuthenticatedBugReportsNewRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/breeding/book': {
@@ -1728,6 +1748,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedAnimalAnimalIdRoute: typeof AuthenticatedAnimalAnimalIdRoute
   AuthenticatedBreedingOfferIdRoute: typeof AuthenticatedBreedingOfferIdRoute
   AuthenticatedBreedingBookRoute: typeof AuthenticatedBreedingBookRoute
+  AuthenticatedBugReportsNewRoute: typeof AuthenticatedBugReportsNewRoute
   AuthenticatedCompetitionCompetitionIdRoute: typeof AuthenticatedCompetitionCompetitionIdRoute
   AuthenticatedVenueVenueIdRoute: typeof AuthenticatedVenueVenueIdRoute
 }
@@ -1746,6 +1767,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAnimalAnimalIdRoute: AuthenticatedAnimalAnimalIdRoute,
   AuthenticatedBreedingOfferIdRoute: AuthenticatedBreedingOfferIdRoute,
   AuthenticatedBreedingBookRoute: AuthenticatedBreedingBookRoute,
+  AuthenticatedBugReportsNewRoute: AuthenticatedBugReportsNewRoute,
   AuthenticatedCompetitionCompetitionIdRoute:
     AuthenticatedCompetitionCompetitionIdRoute,
   AuthenticatedVenueVenueIdRoute: AuthenticatedVenueVenueIdRoute,
