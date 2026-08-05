@@ -24,6 +24,7 @@ import { Route as AuthenticatedShopRouteImport } from './routes/_authenticated/s
 import { Route as AuthenticatedSetupRouteImport } from './routes/_authenticated/setup'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as AuthenticatedBugReportsIndexRouteImport } from './routes/_authenticated/bug-reports/index'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
 import { Route as AuthenticatedVenueVenueIdRouteImport } from './routes/_authenticated/venue.$venueId'
 import { Route as AuthenticatedCompetitionCompetitionIdRouteImport } from './routes/_authenticated/competition.$competitionId'
@@ -160,6 +161,12 @@ const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedBugReportsIndexRoute =
+  AuthenticatedBugReportsIndexRouteImport.update({
+    id: '/bug-reports/',
+    path: '/bug-reports/',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -553,6 +560,7 @@ export interface FileRoutesByFullPath {
   '/competition/$competitionId': typeof AuthenticatedCompetitionCompetitionIdRoute
   '/venue/$venueId': typeof AuthenticatedVenueVenueIdRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
+  '/bug-reports/': typeof AuthenticatedBugReportsIndexRoute
   '/admin/bugs/$bugId': typeof AuthenticatedAdminBugsBugIdRoute
   '/admin/games/$gameId': typeof AuthenticatedAdminGamesGameIdRouteWithChildren
   '/admin/players/$playerId': typeof AuthenticatedAdminPlayersPlayerIdRoute
@@ -626,6 +634,7 @@ export interface FileRoutesByTo {
   '/competition/$competitionId': typeof AuthenticatedCompetitionCompetitionIdRoute
   '/venue/$venueId': typeof AuthenticatedVenueVenueIdRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
+  '/bug-reports': typeof AuthenticatedBugReportsIndexRoute
   '/admin/bugs/$bugId': typeof AuthenticatedAdminBugsBugIdRoute
   '/admin/players/$playerId': typeof AuthenticatedAdminPlayersPlayerIdRoute
   '/admin/support/$ticketId': typeof AuthenticatedAdminSupportTicketIdRoute
@@ -704,6 +713,7 @@ export interface FileRoutesById {
   '/_authenticated/competition/$competitionId': typeof AuthenticatedCompetitionCompetitionIdRoute
   '/_authenticated/venue/$venueId': typeof AuthenticatedVenueVenueIdRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
+  '/_authenticated/bug-reports/': typeof AuthenticatedBugReportsIndexRoute
   '/_authenticated/admin/bugs/$bugId': typeof AuthenticatedAdminBugsBugIdRoute
   '/_authenticated/admin/games/$gameId': typeof AuthenticatedAdminGamesGameIdRouteWithChildren
   '/_authenticated/admin/players/$playerId': typeof AuthenticatedAdminPlayersPlayerIdRoute
@@ -783,6 +793,7 @@ export interface FileRouteTypes {
     | '/competition/$competitionId'
     | '/venue/$venueId'
     | '/admin/'
+    | '/bug-reports/'
     | '/admin/bugs/$bugId'
     | '/admin/games/$gameId'
     | '/admin/players/$playerId'
@@ -856,6 +867,7 @@ export interface FileRouteTypes {
     | '/competition/$competitionId'
     | '/venue/$venueId'
     | '/admin'
+    | '/bug-reports'
     | '/admin/bugs/$bugId'
     | '/admin/players/$playerId'
     | '/admin/support/$ticketId'
@@ -933,6 +945,7 @@ export interface FileRouteTypes {
     | '/_authenticated/competition/$competitionId'
     | '/_authenticated/venue/$venueId'
     | '/_authenticated/admin/'
+    | '/_authenticated/bug-reports/'
     | '/_authenticated/admin/bugs/$bugId'
     | '/_authenticated/admin/games/$gameId'
     | '/_authenticated/admin/players/$playerId'
@@ -1094,6 +1107,13 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof AuthenticatedAdminRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/bug-reports/': {
+      id: '/_authenticated/bug-reports/'
+      path: '/bug-reports'
+      fullPath: '/bug-reports/'
+      preLoaderRoute: typeof AuthenticatedBugReportsIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/admin/': {
@@ -1751,6 +1771,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedBugReportsNewRoute: typeof AuthenticatedBugReportsNewRoute
   AuthenticatedCompetitionCompetitionIdRoute: typeof AuthenticatedCompetitionCompetitionIdRoute
   AuthenticatedVenueVenueIdRoute: typeof AuthenticatedVenueVenueIdRoute
+  AuthenticatedBugReportsIndexRoute: typeof AuthenticatedBugReportsIndexRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
@@ -1771,6 +1792,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedCompetitionCompetitionIdRoute:
     AuthenticatedCompetitionCompetitionIdRoute,
   AuthenticatedVenueVenueIdRoute: AuthenticatedVenueVenueIdRoute,
+  AuthenticatedBugReportsIndexRoute: AuthenticatedBugReportsIndexRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
