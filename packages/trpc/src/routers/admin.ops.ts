@@ -583,6 +583,31 @@ const bugsOpsRouter = router({
       ])
     }),
 
+  setClaim: publicProcedure
+    .input(z.object({
+      reportId: z.string(),
+      staffUserId: z.string().nullable(),
+    }))
+    .mutation(async ({ input }) => {
+      const report = await db.bugReport.findUniqueOrThrow({ where: { id: input.reportId } })
+      await db.bugReport.update({
+        where: { id: input.reportId },
+        data: {
+          claimedByUserId: input.staffUserId,
+          claimedAt: input.staffUserId ? new Date() : null,
+        },
+      })
+      await db.adminActionLog.create({
+        data: {
+          staffUserId: input.staffUserId ?? report.claimedByUserId ?? "",
+          gameId: report.gameId,
+          action: input.staffUserId ? "bug_claim" : "bug_unclaim",
+          targetType: "BugReport",
+          targetId: input.reportId,
+        },
+      })
+    }),
+
   addComment: publicProcedure
     .input(z.object({ bugReportId: z.string(), authorId: z.string(), body: z.string().min(1) }))
     .mutation(({ input }) =>
@@ -590,6 +615,63 @@ const bugsOpsRouter = router({
         data: { bugReportId: input.bugReportId, authorId: input.authorId, body: input.body },
       })
     ),
+
+  merge: publicProcedure
+    .input(z.object({
+      sourceReportId: z.string(),
+      targetReportId: z.string(),
+      staffUserId: z.string(),
+    }))
+    .mutation(async ({ input }) => {
+      const { sourceReportId, targetReportId, staffUserId } = input
+      if (sourceReportId === targetReportId) throw new Error("Cannot merge a report into itself")
+
+      const source = await db.bugReport.findUniqueOrThrow({
+        where: { id: sourceReportId },
+        include: { author: { select: { id: true, username: true } } },
+      })
+
+      const lines = [
+        `Merged report from ${source.author.username} — ${source.title}`,
+        `Category: ${source.category} | Severity: ${source.severity}`,
+        ``,
+        `Description:\n${source.description}`,
+        ``,
+        `Expected Outcome:\n${source.expectedOutcome}`,
+        ``,
+        `Steps to Reproduce:\n${source.stepsToReproduce}`,
+        ...(source.errorMessages ? [``, `Error Messages:\n${source.errorMessages}`] : []),
+        ...(source.screenshotUrls.length ? [``, `Screenshots: ${source.screenshotUrls.join(", ")}`] : []),
+      ]
+
+      await db.$transaction([
+        db.bugReportComment.updateMany({
+          where: { bugReportId: sourceReportId },
+          data: { bugReportId: targetReportId },
+        }),
+        db.bugReportComment.create({
+          data: {
+            bugReportId: targetReportId,
+            authorId: source.authorId,
+            body: lines.join("\n"),
+            isMergedReport: true,
+          },
+        }),
+        db.bugReportUpvote.deleteMany({ where: { bugReportId: sourceReportId } }),
+        db.bugReport.delete({ where: { id: sourceReportId } }),
+        db.adminActionLog.create({
+          data: {
+            staffUserId,
+            gameId: source.gameId,
+            action: `bug_merge:${targetReportId}`,
+            targetType: "BugReport",
+            targetId: sourceReportId,
+          },
+        }),
+      ])
+
+      return { targetReportId }
+    }),
 })
 
 // ── Moderation ────────────────────────────────────────────────────────────────

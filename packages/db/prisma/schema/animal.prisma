@@ -86,6 +86,9 @@ model Breed {
   lifeExpectancyBaseline      Int?
   immunityMin                 Float?
   immunityMax                 Float?
+  preferredClimate            VenueClimate?
+  preferredTerrain            VenueTerrain?
+  createdAt                   DateTime                          @default(now())
   statProfile                 BreedStatProfile[]
   personalityProfiles         BreedPersonalityProfile[]
   animals                     Animal[]

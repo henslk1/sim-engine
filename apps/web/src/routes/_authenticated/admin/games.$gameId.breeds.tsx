@@ -302,6 +302,7 @@ function BreedsPage() {
   const { gameId } = Route.useParams()
   const [editing, setEditing] = useState<BreedForm | null>(null)
   const [activePanel, setActivePanel] = useState<ActivePanel>("stats")
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   const { data: breeds } = trpc.admin.breed.list.useQuery({ gameId: gameId! })
   const { data: species } = trpc.admin.species.list.useQuery({ gameId: gameId! })
@@ -331,7 +332,9 @@ function BreedsPage() {
       setEditing(prev => prev ? { ...prev, id: saved.id } : null)
     },
   })
-  const removeBreed = trpc.admin.breed.remove.useMutation({ onSuccess: () => utils.admin.breed.list.invalidate() })
+  const removeBreed = trpc.admin.breed.remove.useMutation({
+    onSuccess: () => { utils.admin.breed.list.invalidate(); setEditing(null) },
+  })
   const saveStatProfile = trpc.admin.breed.saveStatProfile.useMutation({ onSuccess: () => utils.admin.breed.listStatProfiles.invalidate() })
   const saveConform = trpc.admin.breed.saveConformationStandard.useMutation({ onSuccess: () => utils.admin.breed.listConformationStandards.invalidate() })
   const removeConform = trpc.admin.breed.removeConformationStandard.useMutation({ onSuccess: () => utils.admin.breed.listConformationStandards.invalidate() })
@@ -518,6 +521,26 @@ function BreedsPage() {
             <Button className="w-full h-8 text-sm" onClick={handleSaveBreed} disabled={saveBreed.isPending}>
               {saveBreed.isPending ? "Saving…" : editing.id ? "Save Breed" : "Create Breed"}
             </Button>
+            {editing.id && (
+              <div className="pt-1 border-t border-border">
+                {confirmDelete ? (
+                  <div className="flex gap-2">
+                    <Button variant="destructive" className="flex-1 h-8 text-sm" disabled={removeBreed.isPending}
+                      onClick={() => removeBreed.mutate({ id: editing.id! })}>
+                      {removeBreed.isPending ? "Deleting…" : "Confirm Delete"}
+                    </Button>
+                    <Button variant="ghost" className="h-8 text-sm px-3" onClick={() => setConfirmDelete(false)}>
+                      Cancel
+                    </Button>
+                  </div>
+                ) : (
+                  <Button variant="ghost" className="w-full h-8 text-sm text-destructive hover:text-destructive hover:bg-destructive/10"
+                    onClick={() => setConfirmDelete(true)}>
+                    Delete Breed
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

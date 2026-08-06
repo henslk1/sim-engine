@@ -1,6 +1,7 @@
 import { z } from "zod"
 import { router, protectedProcedure } from "../trpc.js"
 import { db } from "@sim-engine/db"
+import { notifyStaff } from "../lib/staffNotify.js"
 
 export const supportTicketRouter = router({
   create: protectedProcedure
@@ -16,7 +17,7 @@ export const supportTicketRouter = router({
         where: { userId_gameId: { userId: ctx.userId, gameId: input.gameId } },
         select: { id: true },
       })
-      return db.supportTicket.create({
+      const ticket = await db.supportTicket.create({
         data: {
           gameId: input.gameId,
           playerAccountId: player.id,
@@ -28,6 +29,8 @@ export const supportTicketRouter = router({
         },
         select: { id: true },
       })
+      await notifyStaff(input.gameId, `New support ticket: ${input.subject}`, `/admin/support/${ticket.id}`)
+      return ticket
     }),
 
   list: protectedProcedure

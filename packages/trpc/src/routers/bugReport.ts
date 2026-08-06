@@ -1,6 +1,7 @@
 import { z } from "zod"
 import { router, protectedProcedure } from "../trpc.js"
 import { db } from "@sim-engine/db"
+import { notifyStaff } from "../lib/staffNotify.js"
 
 const bugReportSelect = {
   id: true,
@@ -119,7 +120,7 @@ export const bugReportRouter = router({
         where: { userId_gameId: { userId: ctx.userId, gameId: input.gameId } },
         select: { id: true },
       })
-      return db.bugReport.create({
+      const report = await db.bugReport.create({
         data: {
           gameId: input.gameId,
           authorId: player.id,
@@ -136,6 +137,8 @@ export const bugReportRouter = router({
         },
         select: { id: true },
       })
+      await notifyStaff(input.gameId, `New bug report: ${input.title}`, `/admin/bugs/${report.id}`)
+      return report
     }),
 
   toggleUpvote: protectedProcedure
