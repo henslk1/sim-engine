@@ -3,7 +3,7 @@ import { trpc } from "@/lib/trpc"
 import { useEffect } from "react"
 import {
   AlertTriangle, Baby, Trophy, Coins, PawPrint, ClipboardList,
-  Swords, ArrowRight, ShieldCheck, Mountain, Waves, Wind,
+  ArrowRight, ShieldCheck, Mountain, Waves, Wind,
   ShoppingBag, Ticket, Star, Medal, Newspaper,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -31,74 +31,7 @@ function TerrainIcon({ terrain }: { terrain: string | null }) {
   return <Wind className="size-3.5" strokeWidth={1.2} />
 }
 
-// ─── Mock data ─────────────────────────────────────────────────────────────────
-
-const MOCK_CAMPAIGN = {
-  newBreedName: "Baroque Sport Horse",
-  phase: 2, totalPhases: 4,
-  dam: "Andalusian", sire: "Warmblood",
-  description: "Cross Andalusians with Warmbloods during Phase 2 to contribute toward the Baroque Sport Horse — a breed combining Iberian collection with warmblood scope and power.",
-  progress: 340, goal: 1000,
-  endsIn: "18 days",
-}
-
-const MOCK_LISTINGS = [
-  { id: "1", name: "Astrid",     breed: "Friesian",     sex: "Mare",    age: "4",  price: 12500 },
-  { id: "2", name: "Nightfall",  breed: "Thoroughbred", sex: "Stallion", age: "6", price:  8200 },
-  { id: "3", name: "Solstice",   breed: "Andalusian",   sex: "Mare",    age: "3",  price: 15000 },
-  { id: "4", name: "Ember Rise", breed: "Warmblood",    sex: "Gelding", age: "5",  price:  6800 },
-]
-
-const MOCK_RAFFLES = [
-  {
-    id: "1", isGameRaffle: true,
-    title: "Heritage Andalusian Colt",
-    description: "A young colt from the heritage breeding program. Full genetic panel included at no extra cost.",
-    ticketPrice: 500, ticketsSold: 142,
-    endsIn: "3d 12h",
-  },
-  {
-    id: "2", isGameRaffle: false,
-    hostedBy: "SilverMane_Stables",
-    title: "Friesian Mare — Full Panel",
-    ticketPrice: 200, ticketsSold: 89,
-    endsIn: "1d 4h",
-  },
-  {
-    id: "3", isGameRaffle: false,
-    hostedBy: "CoastalBreeds",
-    title: "Thoroughbred Stallion",
-    ticketPrice: 350, ticketsSold: 54,
-    endsIn: "4d",
-  },
-]
-
-const MOCK_FEATURED = {
-  name: "Tempest Rising",
-  breed: "Thoroughbred",
-  owner: "GoldenPasture",
-  sex: "Stallion",
-  age: "7",
-  discipline: "Flat Racing",
-  tier: "Invitational",
-  record: "3× Invitational champion · Unbeaten in the last 8 cycles",
-}
-
-const MOCK_INVITATIONAL = {
-  venue: "Riverside Track",
-  climate: "WARM" as string,
-  terrain: "FLAT" as string,
-  discipline: "Flat Racing",
-  cycle: 161,
-  date: "July 14, 2026",
-  results: [
-    { rank: 1, animalName: "Tempest Rising",  player: "GoldenPasture", score: 94.2 },
-    { rank: 2, animalName: "Silverwind",       player: "NightStables",  score: 91.8 },
-    { rank: 3, animalName: "Desert Run",       player: "AridRanch",     score: 89.5 },
-    { rank: 4, animalName: "Copperdawn",       player: "MeadowCrest",   score: 87.1 },
-    { rank: 5, animalName: "Stormgate",        player: "IronHoof",      score: 85.6 },
-  ],
-}
+// ─── Dev log ───────────────────────────────────────────────────────────────────
 
 const DEVLOG = [
   {
@@ -156,6 +89,16 @@ function SectionHeader({
           {hrefLabel} <ArrowRight className="size-3" />
         </Link>
       )}
+    </div>
+  )
+}
+
+// ─── Coming soon placeholder ──────────────────────────────────────────────────
+
+function ComingSoonCard({ minHeight = "140px" }: { minHeight?: string }) {
+  return (
+    <div className="flex items-center justify-center" style={{ minHeight }}>
+      <p className="text-sm italic text-muted-foreground/40">Coming soon</p>
     </div>
   )
 }
@@ -381,37 +324,11 @@ function VenuesSection({ venues }: { venues: VenueRow[] }) {
 // ─── Center: Campaign banner ───────────────────────────────────────────────────
 
 function CampaignBanner() {
-  const c = MOCK_CAMPAIGN
-  const pct = Math.round((c.progress / c.goal) * 100)
   return (
-    <div className="border-b border-border bg-chart-2/6 px-6 pt-5 pb-6 space-y-4">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <div className="mb-2 flex items-center gap-2">
-            <Swords className="size-3.5 text-chart-2/60" />
-            <span className="text-xs font-semibold text-chart-2/70 tracking-wide">Breed Campaign</span>
-            <span className="rounded bg-chart-2/15 px-1.5 py-0.5 text-[10px] font-medium text-chart-2/70">
-              Phase {c.phase} of {c.totalPhases}
-            </span>
-          </div>
-          <h2 className="font-serif text-2xl font-semibold leading-tight text-foreground">{c.newBreedName}</h2>
-          <div className="mt-1.5 flex items-center gap-2 text-sm text-muted-foreground">
-            <span>{c.dam}</span>
-            <span className="text-muted-foreground/30">×</span>
-            <span>{c.sire}</span>
-          </div>
-        </div>
-        <span className="shrink-0 pt-0.5 text-xs text-muted-foreground/50">{c.endsIn} remaining</span>
-      </div>
-      <p className="text-sm text-muted-foreground leading-relaxed">{c.description}</p>
-      <div>
-        <div className="mb-2 flex items-center justify-between text-xs">
-          <span className="text-muted-foreground">{c.progress.toLocaleString()} / {c.goal.toLocaleString()} conceptions</span>
-          <span className="font-semibold text-chart-2/80 tabular-nums">{pct}%</span>
-        </div>
-        <div className="h-2 w-full overflow-hidden rounded-full bg-secondary/80">
-          <div className="h-full rounded-full bg-chart-2/50 transition-all" style={{ width: `${pct}%` }} />
-        </div>
+    <div className="flex min-h-50 items-center justify-center border-b border-border bg-chart-2/4 px-6 py-8">
+      <div className="text-center">
+        <p className="text-xs font-semibold uppercase tracking-wide text-chart-2/50">Breed Campaigns</p>
+        <p className="mt-2 text-sm italic text-muted-foreground/40">Coming soon</p>
       </div>
     </div>
   )
@@ -421,112 +338,32 @@ function CampaignBanner() {
 
 function MarketplacePanel() {
   return (
-    <Panel title="Recent Listings" icon={ShoppingBag} href="/shop" hrefLabel="Browse">
-      <div className="grid grid-cols-2 gap-px bg-border">
-        {MOCK_LISTINGS.map((l) => (
-          <div
-            key={l.id}
-            className="flex cursor-pointer items-center gap-3 bg-card px-4 py-3 transition-colors hover:bg-secondary/20"
-          >
-            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-gradient-to-b from-secondary/60 to-card">
-              <PawPrint className="size-4 text-muted-foreground/30" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="font-serif text-sm font-semibold leading-tight text-foreground">{l.name}</p>
-              <p className="text-[11px] text-muted-foreground/60">{l.breed} · {l.sex} · Age {l.age}</p>
-            </div>
-            <div className="flex shrink-0 items-center gap-1">
-              <Coins className="size-3 text-chart-1" />
-              <span className="font-mono text-xs font-bold tabular-nums text-foreground">{l.price.toLocaleString()}</span>
-              <span className="text-[10px] text-muted-foreground/50">GB</span>
-            </div>
-          </div>
-        ))}
-      </div>
+    <Panel title="Recent Listings" icon={ShoppingBag}>
+      <ComingSoonCard minHeight="130px" />
     </Panel>
   )
 }
 
 function RafflePanel() {
-  const gameRaffle = MOCK_RAFFLES.find((r) => r.isGameRaffle)
-  const playerRaffles = MOCK_RAFFLES.filter((r) => !r.isGameRaffle)
   return (
-    <Panel title="Raffles" icon={Ticket} href="/shop" hrefLabel="All raffles">
-      {gameRaffle && (
-        <div className={cn("flex cursor-pointer items-center justify-between gap-3 bg-chart-3/5 px-4 py-2.5 text-xs hover:bg-chart-3/8 transition-colors")}>
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="shrink-0 rounded bg-chart-3/15 px-1.5 py-0.5 text-[10px] font-semibold text-chart-3">Game</span>
-            <p className="truncate font-medium text-foreground">{gameRaffle.title}</p>
-            <p className="shrink-0 text-muted-foreground/60">{gameRaffle.ticketPrice.toLocaleString()} GB</p>
-          </div>
-          <span className="shrink-0 text-muted-foreground/50">{gameRaffle.endsIn}</span>
-        </div>
-      )}
-      {playerRaffles.map((r, i) => (
-        <div
-          key={r.id}
-          className={cn("flex cursor-pointer items-center justify-between gap-3 px-4 py-2.5 text-xs hover:bg-secondary/20 transition-colors", (gameRaffle || i > 0) && "border-t border-border/40")}
-        >
-          <div className="flex min-w-0 items-center gap-2">
-            <p className="truncate font-medium text-foreground">{r.title}</p>
-            <p className="shrink-0 text-muted-foreground/60">{r.hostedBy} · {r.ticketPrice.toLocaleString()} GB</p>
-          </div>
-          <span className={cn("shrink-0 font-mono text-[11px] tabular-nums", r.endsIn.startsWith("1d") ? "text-destructive/80 font-semibold" : "text-muted-foreground/50")}>
-            {r.endsIn}
-          </span>
-        </div>
-      ))}
+    <Panel title="Raffles" icon={Ticket}>
+      <ComingSoonCard minHeight="120px" />
     </Panel>
   )
 }
 
 function FeaturedHorsePanel() {
-  const h = MOCK_FEATURED
   return (
     <Panel title="Featured Horse" icon={Star}>
-      <div className="flex gap-0">
-        <div className="w-1 shrink-0 bg-chart-3/40" />
-        <div className="min-w-0 space-y-2 px-4 py-3.5">
-          <div>
-            <p className="font-serif text-lg font-semibold leading-tight text-foreground">{h.name}</p>
-            <p className="mt-0.5 text-[11px] text-muted-foreground/60">{h.breed} · {h.sex} · Age {h.age}</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="rounded bg-secondary px-2 py-0.5 text-[11px] text-muted-foreground">{h.discipline}</span>
-            <span className="rounded bg-chart-3/12 px-2 py-0.5 text-[11px] font-medium text-chart-3">{h.tier}</span>
-          </div>
-          <p className="text-xs italic text-muted-foreground/70 leading-relaxed">"{h.record}"</p>
-          <p className="text-[11px] text-muted-foreground/40">by {h.owner}</p>
-        </div>
-      </div>
+      <ComingSoonCard minHeight="140px" />
     </Panel>
   )
 }
 
 function LastInvitationalPanel() {
-  const inv = MOCK_INVITATIONAL
-  const winner = inv.results[0]
   return (
     <Panel title="Last Invitational" icon={Medal}>
-      <div className="px-4 py-3 space-y-2">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className={cn("rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide", CLIMATE_BADGE[inv.climate])}>
-            {inv.climate.charAt(0) + inv.climate.slice(1).toLowerCase()}
-          </span>
-          <span className="flex items-center gap-1 text-xs text-foreground/80 font-medium">
-            <TerrainIcon terrain={inv.terrain} />
-            {inv.venue}
-          </span>
-          <span className="text-xs text-muted-foreground/60">· {inv.discipline}</span>
-        </div>
-        <div className="flex items-center gap-2 text-xs">
-          <span className="font-mono font-bold text-chart-3">1</span>
-          <span className="font-medium text-foreground">{winner.animalName}</span>
-          <span className="text-muted-foreground/60">{winner.player}</span>
-          <span className="ml-auto font-mono tabular-nums text-muted-foreground/60">{winner.score}</span>
-        </div>
-        <p className="text-[11px] text-muted-foreground/40">Cycle {inv.cycle} · {inv.date}</p>
-      </div>
+      <ComingSoonCard minHeight="100px" />
     </Panel>
   )
 }

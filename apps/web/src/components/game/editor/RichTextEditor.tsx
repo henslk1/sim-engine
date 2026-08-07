@@ -18,7 +18,7 @@ import {
   Link2, Link2Off, Image, Undo2, Redo2,
   Check, X, Highlighter,
 } from "lucide-react"
-import { useState, useRef } from "react"
+import { useState, useRef, useCallback } from "react"
 import "./rich-text.css"
 
 type InsertMode = "link" | "image" | null
@@ -75,8 +75,12 @@ export function RichTextEditor({
 }) {
   const [insertMode, setInsertMode] = useState<InsertMode>(null)
   const [insertUrl, setInsertUrl] = useState("")
+  const [charCount, setCharCount] = useState(0)
   const colorInputRef = useRef<HTMLInputElement>(null)
   const highlightInputRef = useRef<HTMLInputElement>(null)
+
+  const readCount = useCallback((e: { storage: { characterCount?: { characters?: () => number } } }) =>
+    e.storage.characterCount?.characters?.() ?? 0, [])
 
   const editor = useEditor({
     extensions: [
@@ -92,12 +96,14 @@ export function RichTextEditor({
       CharacterCount.configure(limit != null ? { limit } : {}),
     ],
     content: defaultContent ?? undefined,
-    onUpdate: ({ editor }) => onChange?.(editor.getJSON()),
+    onCreate: ({ editor }) => setCharCount(readCount(editor)),
+    onUpdate: ({ editor }) => {
+      onChange?.(editor.getJSON())
+      setCharCount(readCount(editor))
+    },
   })
 
   if (!editor) return null
-
-  const charCount = editor.storage.characterCount?.characters?.() ?? 0
 
   function confirmLink() {
     if (!insertUrl.trim()) {

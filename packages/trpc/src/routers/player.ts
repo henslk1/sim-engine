@@ -1,5 +1,6 @@
+import { TRPCError } from "@trpc/server"
 import { db, ProfileFieldKey } from "@sim-engine/db"
-import { router, publicProcedure } from "../trpc.js"
+import { router, publicProcedure, protectedProcedure } from "../trpc.js"
 import { z } from "zod"
 
 export const playerRouter = router({
@@ -149,4 +150,162 @@ export const playerRouter = router({
         orderBy: { breed: { name: "asc" } },
       })
     ),
+
+  getProfile: protectedProcedure
+    .input(z.object({ username: z.string() }))
+    .query(async ({ input }) => {
+      const account = await db.playerAccount.findFirst({
+        where: { username: input.username },
+        select: {
+          id: true,
+          username: true,
+          avatar: true,
+          createdAt: true,
+          profile: { select: { bio: true, bannerPath: true } },
+          seniority: { select: { activeDaysPlayed: true } },
+          reputation: { select: { averageRating: true, totalRatings: true } },
+          profileVisibilitySettings: { select: { fieldKey: true, isVisible: true } },
+          playerSubscriptions: {
+            where: { expiresAt: { gt: new Date() }, pausedAt: null },
+            select: { id: true },
+            take: 1,
+          },
+          _count: {
+            select: {
+              animalsOwned: { where: { status: "ALIVE", NOT: { gameShopAnimal: { isAvailable: true } } } },
+              animalsBred: true,
+              groupMemberships: { where: { status: "ACTIVE" } },
+              foundedBreeds: true,
+            },
+          },
+          subContainers: {
+            select: { id: true, name: true, displayOrder: true },
+            orderBy: { displayOrder: "asc" },
+          },
+          animalsOwned: {
+            where: { status: "ALIVE", NOT: { gameShopAnimal: { isAvailable: true } } },
+            select: {
+              id: true,
+              name: true,
+              image: true,
+              subContainerId: true,
+              ageInCycles: true,
+              breed: { select: { name: true, species: { select: { name: true } } } },
+              lifeStage: { select: { name: true } },
+            },
+            orderBy: { updatedAt: "desc" },
+            take: 48,
+          },
+          achievements: {
+            where: { earnedAt: { not: null } },
+            select: {
+              id: true,
+              earnedAt: true,
+              achievementDef: { select: { id: true, name: true, description: true } },
+            },
+            orderBy: { earnedAt: "desc" },
+            take: 24,
+          },
+          groupMemberships: {
+            where: { status: "ACTIVE" },
+            select: {
+              id: true,
+              group: { select: { id: true, name: true } },
+              groupRole: { select: { name: true, isOwner: true } },
+            },
+            take: 12,
+          },
+          seasonRankings: {
+            select: {
+              id: true,
+              rank: true,
+              score: true,
+              season: { select: { name: true } },
+              category: { select: { name: true } },
+            },
+            orderBy: { rank: "asc" },
+            take: 20,
+          },
+          recordEntries: {
+            select: {
+              id: true,
+              value: true,
+              setAt: true,
+              recordDef: { select: { name: true } },
+            },
+            orderBy: { setAt: "desc" },
+            take: 20,
+          },
+          breedingListings: {
+            where: { isActive: true },
+            select: {
+              id: true,
+              animal: { select: { id: true, name: true, image: true, breed: { select: { name: true } } } },
+            },
+            take: 12,
+          },
+          marketplaceListings: {
+            where: { status: "ACTIVE" },
+            select: {
+              id: true,
+              price: true,
+              listingType: true,
+              currencyDef: { select: { symbol: true, name: true } },
+            },
+            take: 12,
+          },
+          hostedClinics: {
+            select: { id: true, name: true, endsAt: true },
+            orderBy: { startedAt: "desc" },
+            take: 12,
+          },
+          foundedBreeds: {
+            where: { isUnregistered: false },
+            select: { id: true, name: true, image: true },
+          },
+        },
+      })
+      if (!account) throw new TRPCError({ code: "NOT_FOUND" })
+      return account
+    }),
+
+  updateProfile: protectedProcedure
+    .input(z.object({
+      playerAccountId: z.string(),
+      bio: z.string().nullable(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const account = await db.playerAccount.findUnique({
+        where: { id: input.playerAccountId },
+        select: { userId: true },
+      })
+      if (!account || account.userId !== ctx.userId) throw new TRPCError({ code: "FORBIDDEN" })
+      return db.playerProfile.update({
+        where: { playerAccountId: input.playerAccountId },
+        data: { bio: input.bio },
+      })
+    }),
+
+  updateVisibility: protectedProcedure
+    .input(z.object({
+      playerAccountId: z.string(),
+      fieldKey: z.string(),
+      isVisible: z.boolean(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const account = await db.playerAccount.findUnique({
+        where: { id: input.playerAccountId },
+        select: { userId: true },
+      })
+      if (!account || account.userId !== ctx.userId) throw new TRPCError({ code: "FORBIDDEN" })
+      return db.profileVisibilitySetting.update({
+        where: {
+          playerAccountId_fieldKey: {
+            playerAccountId: input.playerAccountId,
+            fieldKey: input.fieldKey as ProfileFieldKey,
+          },
+        },
+        data: { isVisible: input.isVisible },
+      })
+    }),
 })

@@ -8,6 +8,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ActionButton } from "./game/ui";
+import { trpc } from "@/lib/trpc";
 
 type Session = typeof authClient.$Infer.Session 
 
@@ -33,6 +34,10 @@ export function Header({ session }: { session: Session}) {
 
   const navigate = useNavigate()
   const location = useLocation()
+
+  const { data: gameData } = trpc.admin.game.get.useQuery()
+  const gameId = gameData?.id ?? ""
+  const { data: me } = trpc.player.me.useQuery({ gameId }, { enabled: !!gameId, staleTime: Infinity })
 
   return (
     <header className="border-b border-border bg-card">
@@ -62,6 +67,16 @@ export function Header({ session }: { session: Session}) {
               <span>{user.name}</span>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              {me?.username && (
+                <>
+                  <DropdownMenuItem asChild>
+                    <Link to="/player/$username" params={{ username: me.username }} className="cursor-pointer">
+                      View Profile
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
               <DropdownMenuItem asChild>
                 <Link to="/admin" className="cursor-pointer">Admin Console</Link>
               </DropdownMenuItem>

@@ -31,6 +31,7 @@ import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authentic
 import { Route as AuthenticatedVenueVenueIdRouteImport } from './routes/_authenticated/venue.$venueId'
 import { Route as AuthenticatedSupportTicketsNewRouteImport } from './routes/_authenticated/support-tickets/new'
 import { Route as AuthenticatedSupportTicketsTicketIdRouteImport } from './routes/_authenticated/support-tickets/$ticketId'
+import { Route as AuthenticatedPlayerUsernameRouteImport } from './routes/_authenticated/player/$username'
 import { Route as AuthenticatedCompetitionCompetitionIdRouteImport } from './routes/_authenticated/competition.$competitionId'
 import { Route as AuthenticatedBugReportsNewRouteImport } from './routes/_authenticated/bug-reports/new'
 import { Route as AuthenticatedBugReportsReportIdRouteImport } from './routes/_authenticated/bug-reports/$reportId'
@@ -206,6 +207,12 @@ const AuthenticatedSupportTicketsTicketIdRoute =
   AuthenticatedSupportTicketsTicketIdRouteImport.update({
     id: '/support-tickets/$ticketId',
     path: '/support-tickets/$ticketId',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedPlayerUsernameRoute =
+  AuthenticatedPlayerUsernameRouteImport.update({
+    id: '/player/$username',
+    path: '/player/$username',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedCompetitionCompetitionIdRoute =
@@ -602,6 +609,7 @@ export interface FileRoutesByFullPath {
   '/bug-reports/$reportId': typeof AuthenticatedBugReportsReportIdRoute
   '/bug-reports/new': typeof AuthenticatedBugReportsNewRoute
   '/competition/$competitionId': typeof AuthenticatedCompetitionCompetitionIdRoute
+  '/player/$username': typeof AuthenticatedPlayerUsernameRoute
   '/support-tickets/$ticketId': typeof AuthenticatedSupportTicketsTicketIdRoute
   '/support-tickets/new': typeof AuthenticatedSupportTicketsNewRoute
   '/venue/$venueId': typeof AuthenticatedVenueVenueIdRoute
@@ -682,6 +690,7 @@ export interface FileRoutesByTo {
   '/bug-reports/$reportId': typeof AuthenticatedBugReportsReportIdRoute
   '/bug-reports/new': typeof AuthenticatedBugReportsNewRoute
   '/competition/$competitionId': typeof AuthenticatedCompetitionCompetitionIdRoute
+  '/player/$username': typeof AuthenticatedPlayerUsernameRoute
   '/support-tickets/$ticketId': typeof AuthenticatedSupportTicketsTicketIdRoute
   '/support-tickets/new': typeof AuthenticatedSupportTicketsNewRoute
   '/venue/$venueId': typeof AuthenticatedVenueVenueIdRoute
@@ -767,6 +776,7 @@ export interface FileRoutesById {
   '/_authenticated/bug-reports/$reportId': typeof AuthenticatedBugReportsReportIdRoute
   '/_authenticated/bug-reports/new': typeof AuthenticatedBugReportsNewRoute
   '/_authenticated/competition/$competitionId': typeof AuthenticatedCompetitionCompetitionIdRoute
+  '/_authenticated/player/$username': typeof AuthenticatedPlayerUsernameRoute
   '/_authenticated/support-tickets/$ticketId': typeof AuthenticatedSupportTicketsTicketIdRoute
   '/_authenticated/support-tickets/new': typeof AuthenticatedSupportTicketsNewRoute
   '/_authenticated/venue/$venueId': typeof AuthenticatedVenueVenueIdRoute
@@ -853,6 +863,7 @@ export interface FileRouteTypes {
     | '/bug-reports/$reportId'
     | '/bug-reports/new'
     | '/competition/$competitionId'
+    | '/player/$username'
     | '/support-tickets/$ticketId'
     | '/support-tickets/new'
     | '/venue/$venueId'
@@ -933,6 +944,7 @@ export interface FileRouteTypes {
     | '/bug-reports/$reportId'
     | '/bug-reports/new'
     | '/competition/$competitionId'
+    | '/player/$username'
     | '/support-tickets/$ticketId'
     | '/support-tickets/new'
     | '/venue/$venueId'
@@ -1017,6 +1029,7 @@ export interface FileRouteTypes {
     | '/_authenticated/bug-reports/$reportId'
     | '/_authenticated/bug-reports/new'
     | '/_authenticated/competition/$competitionId'
+    | '/_authenticated/player/$username'
     | '/_authenticated/support-tickets/$ticketId'
     | '/_authenticated/support-tickets/new'
     | '/_authenticated/venue/$venueId'
@@ -1234,6 +1247,13 @@ declare module '@tanstack/react-router' {
       path: '/support-tickets/$ticketId'
       fullPath: '/support-tickets/$ticketId'
       preLoaderRoute: typeof AuthenticatedSupportTicketsTicketIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/player/$username': {
+      id: '/_authenticated/player/$username'
+      path: '/player/$username'
+      fullPath: '/player/$username'
+      preLoaderRoute: typeof AuthenticatedPlayerUsernameRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/competition/$competitionId': {
@@ -1892,6 +1912,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedBugReportsReportIdRoute: typeof AuthenticatedBugReportsReportIdRoute
   AuthenticatedBugReportsNewRoute: typeof AuthenticatedBugReportsNewRoute
   AuthenticatedCompetitionCompetitionIdRoute: typeof AuthenticatedCompetitionCompetitionIdRoute
+  AuthenticatedPlayerUsernameRoute: typeof AuthenticatedPlayerUsernameRoute
   AuthenticatedSupportTicketsTicketIdRoute: typeof AuthenticatedSupportTicketsTicketIdRoute
   AuthenticatedSupportTicketsNewRoute: typeof AuthenticatedSupportTicketsNewRoute
   AuthenticatedVenueVenueIdRoute: typeof AuthenticatedVenueVenueIdRoute
@@ -1919,6 +1940,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedBugReportsNewRoute: AuthenticatedBugReportsNewRoute,
   AuthenticatedCompetitionCompetitionIdRoute:
     AuthenticatedCompetitionCompetitionIdRoute,
+  AuthenticatedPlayerUsernameRoute: AuthenticatedPlayerUsernameRoute,
   AuthenticatedSupportTicketsTicketIdRoute:
     AuthenticatedSupportTicketsTicketIdRoute,
   AuthenticatedSupportTicketsNewRoute: AuthenticatedSupportTicketsNewRoute,
