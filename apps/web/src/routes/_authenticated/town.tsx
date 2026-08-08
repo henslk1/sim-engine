@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router"
-import { Stethoscope, Trophy, ShoppingBag } from "lucide-react"
+import { Stethoscope, Trophy, ShoppingBag, BookOpen } from "lucide-react"
 
 export const Route = createFileRoute("/_authenticated/town")({
   component: TownPage,
@@ -23,6 +23,12 @@ const FACILITIES = [
     title: "Shop",
     desc: "Purchase items, animals, and premium upgrades.",
     to: "/shop" as const,
+  },
+  {
+    icon: <BookOpen className="size-6 text-chart-2" />,
+    title: "Breed Directory",
+    desc: "Browse registered breeds, their stats, and founding players.",
+    to: "/breeds" as const,
   },
 ]
 

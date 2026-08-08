@@ -38,6 +38,11 @@ export function Header({ session }: { session: Session}) {
   const { data: gameData } = trpc.admin.game.get.useQuery()
   const gameId = gameData?.id ?? ""
   const { data: me } = trpc.player.me.useQuery({ gameId }, { enabled: !!gameId, staleTime: Infinity })
+  const { data: friendRequestData } = trpc.social.getFriendRequests.useQuery(
+    { playerAccountId: me?.id!, gameId },
+    { enabled: !!me?.id && !!gameId }
+  )
+  const pendingRequests = friendRequestData?.pendingCount ?? 0
 
   return (
     <header className="border-b border-border bg-card">
@@ -77,6 +82,19 @@ export function Header({ session }: { session: Session}) {
                   <DropdownMenuSeparator />
                 </>
               )}
+              <DropdownMenuItem asChild>
+                <Link to="/account" className="cursor-pointer">Account Settings</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link to="/friend-requests" className="cursor-pointer">
+                  Friend Requests{pendingRequests > 0 ? ` (${pendingRequests})` : ""}
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link to="/support" className="cursor-pointer">Support</Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
                 <Link to="/admin" className="cursor-pointer">Admin Console</Link>
               </DropdownMenuItem>

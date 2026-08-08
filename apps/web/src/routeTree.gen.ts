@@ -11,7 +11,9 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as VerifyEmailRouteImport } from './routes/verify-email'
 import { Route as SignupRouteImport } from './routes/signup'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedVetRouteImport } from './routes/_authenticated/vet'
@@ -22,13 +24,18 @@ import { Route as AuthenticatedStudMarketRouteImport } from './routes/_authentic
 import { Route as AuthenticatedStableRouteImport } from './routes/_authenticated/stable'
 import { Route as AuthenticatedShopRouteImport } from './routes/_authenticated/shop'
 import { Route as AuthenticatedSetupRouteImport } from './routes/_authenticated/setup'
+import { Route as AuthenticatedFriendRequestsRouteImport } from './routes/_authenticated/friend-requests'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as AuthenticatedAccountRouteImport } from './routes/_authenticated/account'
+import { Route as AuthenticatedSupportIndexRouteImport } from './routes/_authenticated/support/index'
 import { Route as AuthenticatedSupportTicketsIndexRouteImport } from './routes/_authenticated/support-tickets/index'
 import { Route as AuthenticatedBugReportsIndexRouteImport } from './routes/_authenticated/bug-reports/index'
 import { Route as AuthenticatedBreedsIndexRouteImport } from './routes/_authenticated/breeds/index'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
 import { Route as AuthenticatedVenueVenueIdRouteImport } from './routes/_authenticated/venue.$venueId'
+import { Route as AuthenticatedSupportNewRouteImport } from './routes/_authenticated/support/new'
+import { Route as AuthenticatedSupportTicketIdRouteImport } from './routes/_authenticated/support/$ticketId'
 import { Route as AuthenticatedSupportTicketsNewRouteImport } from './routes/_authenticated/support-tickets/new'
 import { Route as AuthenticatedSupportTicketsTicketIdRouteImport } from './routes/_authenticated/support-tickets/$ticketId'
 import { Route as AuthenticatedPlayerUsernameRouteImport } from './routes/_authenticated/player/$username'
@@ -104,9 +111,19 @@ const SignupRoute = SignupRouteImport.update({
   path: '/signup',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
@@ -158,6 +175,12 @@ const AuthenticatedSetupRoute = AuthenticatedSetupRouteImport.update({
   path: '/setup',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedFriendRequestsRoute =
+  AuthenticatedFriendRequestsRouteImport.update({
+    id: '/friend-requests',
+    path: '/friend-requests',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -168,6 +191,17 @@ const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedAccountRoute = AuthenticatedAccountRouteImport.update({
+  id: '/account',
+  path: '/account',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedSupportIndexRoute =
+  AuthenticatedSupportIndexRouteImport.update({
+    id: '/support/',
+    path: '/support/',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedSupportTicketsIndexRoute =
   AuthenticatedSupportTicketsIndexRouteImport.update({
     id: '/support-tickets/',
@@ -195,6 +229,17 @@ const AuthenticatedVenueVenueIdRoute =
   AuthenticatedVenueVenueIdRouteImport.update({
     id: '/venue/$venueId',
     path: '/venue/$venueId',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedSupportNewRoute = AuthenticatedSupportNewRouteImport.update({
+  id: '/support/new',
+  path: '/support/new',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedSupportTicketIdRoute =
+  AuthenticatedSupportTicketIdRouteImport.update({
+    id: '/support/$ticketId',
+    path: '/support/$ticketId',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedSupportTicketsNewRoute =
@@ -581,11 +626,15 @@ const AuthenticatedAdminGamesGameIdAnimalTemplatesRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/verify-email': typeof VerifyEmailRoute
+  '/account': typeof AuthenticatedAccountRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/friend-requests': typeof AuthenticatedFriendRequestsRoute
   '/setup': typeof AuthenticatedSetupRoute
   '/shop': typeof AuthenticatedShopRoute
   '/stable': typeof AuthenticatedStableRoute
@@ -612,11 +661,14 @@ export interface FileRoutesByFullPath {
   '/player/$username': typeof AuthenticatedPlayerUsernameRoute
   '/support-tickets/$ticketId': typeof AuthenticatedSupportTicketsTicketIdRoute
   '/support-tickets/new': typeof AuthenticatedSupportTicketsNewRoute
+  '/support/$ticketId': typeof AuthenticatedSupportTicketIdRoute
+  '/support/new': typeof AuthenticatedSupportNewRoute
   '/venue/$venueId': typeof AuthenticatedVenueVenueIdRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/breeds/': typeof AuthenticatedBreedsIndexRoute
   '/bug-reports/': typeof AuthenticatedBugReportsIndexRoute
   '/support-tickets/': typeof AuthenticatedSupportTicketsIndexRoute
+  '/support/': typeof AuthenticatedSupportIndexRoute
   '/admin/bugs/$bugId': typeof AuthenticatedAdminBugsBugIdRoute
   '/admin/games/$gameId': typeof AuthenticatedAdminGamesGameIdRouteWithChildren
   '/admin/players/$playerId': typeof AuthenticatedAdminPlayersPlayerIdRoute
@@ -666,10 +718,14 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/verify-email': typeof VerifyEmailRoute
+  '/account': typeof AuthenticatedAccountRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/friend-requests': typeof AuthenticatedFriendRequestsRoute
   '/setup': typeof AuthenticatedSetupRoute
   '/shop': typeof AuthenticatedShopRoute
   '/stable': typeof AuthenticatedStableRoute
@@ -693,11 +749,14 @@ export interface FileRoutesByTo {
   '/player/$username': typeof AuthenticatedPlayerUsernameRoute
   '/support-tickets/$ticketId': typeof AuthenticatedSupportTicketsTicketIdRoute
   '/support-tickets/new': typeof AuthenticatedSupportTicketsNewRoute
+  '/support/$ticketId': typeof AuthenticatedSupportTicketIdRoute
+  '/support/new': typeof AuthenticatedSupportNewRoute
   '/venue/$venueId': typeof AuthenticatedVenueVenueIdRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/breeds': typeof AuthenticatedBreedsIndexRoute
   '/bug-reports': typeof AuthenticatedBugReportsIndexRoute
   '/support-tickets': typeof AuthenticatedSupportTicketsIndexRoute
+  '/support': typeof AuthenticatedSupportIndexRoute
   '/admin/bugs/$bugId': typeof AuthenticatedAdminBugsBugIdRoute
   '/admin/players/$playerId': typeof AuthenticatedAdminPlayersPlayerIdRoute
   '/admin/support/$ticketId': typeof AuthenticatedAdminSupportTicketIdRoute
@@ -748,11 +807,15 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
+  '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/verify-email': typeof VerifyEmailRoute
+  '/_authenticated/account': typeof AuthenticatedAccountRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/friend-requests': typeof AuthenticatedFriendRequestsRoute
   '/_authenticated/setup': typeof AuthenticatedSetupRoute
   '/_authenticated/shop': typeof AuthenticatedShopRoute
   '/_authenticated/stable': typeof AuthenticatedStableRoute
@@ -779,11 +842,14 @@ export interface FileRoutesById {
   '/_authenticated/player/$username': typeof AuthenticatedPlayerUsernameRoute
   '/_authenticated/support-tickets/$ticketId': typeof AuthenticatedSupportTicketsTicketIdRoute
   '/_authenticated/support-tickets/new': typeof AuthenticatedSupportTicketsNewRoute
+  '/_authenticated/support/$ticketId': typeof AuthenticatedSupportTicketIdRoute
+  '/_authenticated/support/new': typeof AuthenticatedSupportNewRoute
   '/_authenticated/venue/$venueId': typeof AuthenticatedVenueVenueIdRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/breeds/': typeof AuthenticatedBreedsIndexRoute
   '/_authenticated/bug-reports/': typeof AuthenticatedBugReportsIndexRoute
   '/_authenticated/support-tickets/': typeof AuthenticatedSupportTicketsIndexRoute
+  '/_authenticated/support/': typeof AuthenticatedSupportIndexRoute
   '/_authenticated/admin/bugs/$bugId': typeof AuthenticatedAdminBugsBugIdRoute
   '/_authenticated/admin/games/$gameId': typeof AuthenticatedAdminGamesGameIdRouteWithChildren
   '/_authenticated/admin/players/$playerId': typeof AuthenticatedAdminPlayersPlayerIdRoute
@@ -835,11 +901,15 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/forgot-password'
     | '/login'
+    | '/reset-password'
     | '/signup'
     | '/verify-email'
+    | '/account'
     | '/admin'
     | '/dashboard'
+    | '/friend-requests'
     | '/setup'
     | '/shop'
     | '/stable'
@@ -866,11 +936,14 @@ export interface FileRouteTypes {
     | '/player/$username'
     | '/support-tickets/$ticketId'
     | '/support-tickets/new'
+    | '/support/$ticketId'
+    | '/support/new'
     | '/venue/$venueId'
     | '/admin/'
     | '/breeds/'
     | '/bug-reports/'
     | '/support-tickets/'
+    | '/support/'
     | '/admin/bugs/$bugId'
     | '/admin/games/$gameId'
     | '/admin/players/$playerId'
@@ -920,10 +993,14 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/forgot-password'
     | '/login'
+    | '/reset-password'
     | '/signup'
     | '/verify-email'
+    | '/account'
     | '/dashboard'
+    | '/friend-requests'
     | '/setup'
     | '/shop'
     | '/stable'
@@ -947,11 +1024,14 @@ export interface FileRouteTypes {
     | '/player/$username'
     | '/support-tickets/$ticketId'
     | '/support-tickets/new'
+    | '/support/$ticketId'
+    | '/support/new'
     | '/venue/$venueId'
     | '/admin'
     | '/breeds'
     | '/bug-reports'
     | '/support-tickets'
+    | '/support'
     | '/admin/bugs/$bugId'
     | '/admin/players/$playerId'
     | '/admin/support/$ticketId'
@@ -1001,11 +1081,15 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_authenticated'
+    | '/forgot-password'
     | '/login'
+    | '/reset-password'
     | '/signup'
     | '/verify-email'
+    | '/_authenticated/account'
     | '/_authenticated/admin'
     | '/_authenticated/dashboard'
+    | '/_authenticated/friend-requests'
     | '/_authenticated/setup'
     | '/_authenticated/shop'
     | '/_authenticated/stable'
@@ -1032,11 +1116,14 @@ export interface FileRouteTypes {
     | '/_authenticated/player/$username'
     | '/_authenticated/support-tickets/$ticketId'
     | '/_authenticated/support-tickets/new'
+    | '/_authenticated/support/$ticketId'
+    | '/_authenticated/support/new'
     | '/_authenticated/venue/$venueId'
     | '/_authenticated/admin/'
     | '/_authenticated/breeds/'
     | '/_authenticated/bug-reports/'
     | '/_authenticated/support-tickets/'
+    | '/_authenticated/support/'
     | '/_authenticated/admin/bugs/$bugId'
     | '/_authenticated/admin/games/$gameId'
     | '/_authenticated/admin/players/$playerId'
@@ -1088,7 +1175,9 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
+  ForgotPasswordRoute: typeof ForgotPasswordRoute
   LoginRoute: typeof LoginRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
   VerifyEmailRoute: typeof VerifyEmailRoute
 }
@@ -1109,11 +1198,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignupRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/forgot-password': {
+      id: '/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof ForgotPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated': {
@@ -1186,6 +1289,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSetupRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/friend-requests': {
+      id: '/_authenticated/friend-requests'
+      path: '/friend-requests'
+      fullPath: '/friend-requests'
+      preLoaderRoute: typeof AuthenticatedFriendRequestsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
@@ -1198,6 +1308,20 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof AuthenticatedAdminRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/account': {
+      id: '/_authenticated/account'
+      path: '/account'
+      fullPath: '/account'
+      preLoaderRoute: typeof AuthenticatedAccountRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/support/': {
+      id: '/_authenticated/support/'
+      path: '/support'
+      fullPath: '/support/'
+      preLoaderRoute: typeof AuthenticatedSupportIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/support-tickets/': {
@@ -1233,6 +1357,20 @@ declare module '@tanstack/react-router' {
       path: '/venue/$venueId'
       fullPath: '/venue/$venueId'
       preLoaderRoute: typeof AuthenticatedVenueVenueIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/support/new': {
+      id: '/_authenticated/support/new'
+      path: '/support/new'
+      fullPath: '/support/new'
+      preLoaderRoute: typeof AuthenticatedSupportNewRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/support/$ticketId': {
+      id: '/_authenticated/support/$ticketId'
+      path: '/support/$ticketId'
+      fullPath: '/support/$ticketId'
+      preLoaderRoute: typeof AuthenticatedSupportTicketIdRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/support-tickets/new': {
@@ -1895,8 +2033,10 @@ const AuthenticatedAdminRouteWithChildren =
   AuthenticatedAdminRoute._addFileChildren(AuthenticatedAdminRouteChildren)
 
 interface AuthenticatedRouteChildren {
+  AuthenticatedAccountRoute: typeof AuthenticatedAccountRoute
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedFriendRequestsRoute: typeof AuthenticatedFriendRequestsRoute
   AuthenticatedSetupRoute: typeof AuthenticatedSetupRoute
   AuthenticatedShopRoute: typeof AuthenticatedShopRoute
   AuthenticatedStableRoute: typeof AuthenticatedStableRoute
@@ -1915,15 +2055,20 @@ interface AuthenticatedRouteChildren {
   AuthenticatedPlayerUsernameRoute: typeof AuthenticatedPlayerUsernameRoute
   AuthenticatedSupportTicketsTicketIdRoute: typeof AuthenticatedSupportTicketsTicketIdRoute
   AuthenticatedSupportTicketsNewRoute: typeof AuthenticatedSupportTicketsNewRoute
+  AuthenticatedSupportTicketIdRoute: typeof AuthenticatedSupportTicketIdRoute
+  AuthenticatedSupportNewRoute: typeof AuthenticatedSupportNewRoute
   AuthenticatedVenueVenueIdRoute: typeof AuthenticatedVenueVenueIdRoute
   AuthenticatedBreedsIndexRoute: typeof AuthenticatedBreedsIndexRoute
   AuthenticatedBugReportsIndexRoute: typeof AuthenticatedBugReportsIndexRoute
   AuthenticatedSupportTicketsIndexRoute: typeof AuthenticatedSupportTicketsIndexRoute
+  AuthenticatedSupportIndexRoute: typeof AuthenticatedSupportIndexRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedAccountRoute: AuthenticatedAccountRoute,
   AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedFriendRequestsRoute: AuthenticatedFriendRequestsRoute,
   AuthenticatedSetupRoute: AuthenticatedSetupRoute,
   AuthenticatedShopRoute: AuthenticatedShopRoute,
   AuthenticatedStableRoute: AuthenticatedStableRoute,
@@ -1944,10 +2089,13 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedSupportTicketsTicketIdRoute:
     AuthenticatedSupportTicketsTicketIdRoute,
   AuthenticatedSupportTicketsNewRoute: AuthenticatedSupportTicketsNewRoute,
+  AuthenticatedSupportTicketIdRoute: AuthenticatedSupportTicketIdRoute,
+  AuthenticatedSupportNewRoute: AuthenticatedSupportNewRoute,
   AuthenticatedVenueVenueIdRoute: AuthenticatedVenueVenueIdRoute,
   AuthenticatedBreedsIndexRoute: AuthenticatedBreedsIndexRoute,
   AuthenticatedBugReportsIndexRoute: AuthenticatedBugReportsIndexRoute,
   AuthenticatedSupportTicketsIndexRoute: AuthenticatedSupportTicketsIndexRoute,
+  AuthenticatedSupportIndexRoute: AuthenticatedSupportIndexRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
@@ -1957,7 +2105,9 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
+  ForgotPasswordRoute: ForgotPasswordRoute,
   LoginRoute: LoginRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,
   VerifyEmailRoute: VerifyEmailRoute,
 }

@@ -160,6 +160,65 @@ function StableView({ animals, subContainers, subContainerLabel, speciesNamePlur
   )
 }
 
+function FriendsPanel({
+  friendshipsAsPlayerOne,
+  friendshipsAsPlayerTwo,
+  isOwn,
+  isSubscriber,
+  isEditing,
+  visible,
+  onToggle,
+}: {
+  friendshipsAsPlayerOne: ProfileData["friendshipsAsPlayerOne"]
+  friendshipsAsPlayerTwo: ProfileData["friendshipsAsPlayerTwo"]
+  isOwn: boolean
+  isSubscriber: boolean
+  isEditing: boolean
+  visible: boolean
+  onToggle: (key: string, val: boolean) => void
+}) {
+  const friends = [
+    ...friendshipsAsPlayerOne.map((f) => f.playerTwo),
+    ...friendshipsAsPlayerTwo.map((f) => f.playerOne),
+  ]
+
+  return (
+    <Panel
+      title="Friends"
+      fit
+      action={
+        isOwn && isSubscriber && isEditing ? (
+          <VisibilityToggle fieldKey="FRIENDS" isVisible={visible} onToggle={onToggle} />
+        ) : undefined
+      }
+    >
+      {friends.length === 0 ? (
+        <p className="text-xs text-muted-foreground italic">No friends yet.</p>
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          {friends.map((f) => (
+            <Link
+              key={f.id}
+              to="/player/$username"
+              params={{ username: f.username }}
+              className="flex items-center gap-2 rounded-md border border-border bg-secondary/20 px-2.5 py-2 hover:border-primary/40 transition-colors"
+            >
+              <div className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-secondary text-xs font-semibold text-muted-foreground">
+                {f.avatar ? (
+                  <img src={f.avatar} alt={f.username} className="h-full w-full object-cover" />
+                ) : (
+                  f.username[0].toUpperCase()
+                )}
+              </div>
+              <span className="truncate text-xs font-medium text-foreground">{f.username}</span>
+            </Link>
+          ))}
+        </div>
+      )}
+    </Panel>
+  )
+}
+
 function GroupsPanel({
   memberships,
   isOwn,
@@ -480,8 +539,21 @@ function PlayerProfilePage() {
   const { data: profile, isLoading } = trpc.player.getProfile.useQuery({ username })
 
   const utils = trpc.useUtils()
-  const updateProfile = trpc.player.updateProfile.useMutation()
+  const updateProfile    = trpc.player.updateProfile.useMutation()
   const updateVisibility = trpc.player.updateVisibility.useMutation()
+
+  const { data: relationship, refetch: refetchRelationship } = trpc.social.getRelationship.useQuery(
+    { viewerPlayerAccountId: me?.id!, profilePlayerAccountId: profile?.id!, gameId },
+    { enabled: !!me?.id && !!profile?.id && !!gameId && me?.id !== profile?.id }
+  )
+  const followMutation    = trpc.social.follow.useMutation({ onSuccess: () => refetchRelationship() })
+  const unfollowMutation  = trpc.social.unfollow.useMutation({ onSuccess: () => refetchRelationship() })
+  const sendFRMutation    = trpc.social.sendFriendRequest.useMutation({ onSuccess: () => refetchRelationship() })
+  const cancelFRMutation  = trpc.social.cancelFriendRequest.useMutation({ onSuccess: () => refetchRelationship() })
+  const acceptFRMutation  = trpc.social.acceptFriendRequest.useMutation({
+    onSuccess: () => { refetchRelationship(); utils.player.getProfile.invalidate({ username }) },
+  })
+  const declineFRMutation = trpc.social.declineFriendRequest.useMutation({ onSuccess: () => refetchRelationship() })
 
   const [isEditing, setIsEditing] = useState(false)
   const [editBio, setEditBio] = useState<object | null>(null)
@@ -547,6 +619,8 @@ function PlayerProfilePage() {
   const showMarketplace = isOwn || getVisible("MARKETPLACE_LISTINGS")
   const showClinics = isOwn || getVisible("CLINICS")
   const showRankings = isOwn || getVisible("LEADERBOARD_PLACINGS")
+  const showFriends = isOwn || getVisible("FRIENDS")
+  const friendCount = profile._count.friendshipsAsPlayerOne + profile._count.friendshipsAsPlayerTwo
 
   const speciesName = profile.animalsOwned[0]?.breed.species.name
   const speciesNamePlural = speciesName ? `${speciesName}s` : "Animals"
@@ -606,34 +680,93 @@ function PlayerProfilePage() {
             <span className="cursor-not-allowed italic text-muted-foreground opacity-40">Forum Activity ↗</span>
             <span className="cursor-not-allowed italic text-muted-foreground opacity-40">Leaderboard ↗</span>
           </div>
-          {isOwn && (
+          {isOwn ? (
             <div className="ml-auto flex shrink-0 gap-2">
-            {isEditing ? (
-              <>
+              {isEditing ? (
+                <>
+                  <button
+                    onClick={handleSave}
+                    disabled={updateProfile.isPending}
+                    className="rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
+                  >
+                    {updateProfile.isPending ? "Saving…" : "Save"}
+                  </button>
+                  <button
+                    onClick={handleCancel}
+                    className="rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+                  >
+                    Cancel
+                  </button>
+                </>
+              ) : (
                 <button
-                  onClick={handleSave}
-                  disabled={updateProfile.isPending}
-                  className="rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
-                >
-                  {updateProfile.isPending ? "Saving…" : "Save"}
-                </button>
-                <button
-                  onClick={handleCancel}
+                  onClick={handleStartEdit}
                   className="rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted"
                 >
-                  Cancel
+                  Edit Profile
                 </button>
-              </>
-            ) : (
-              <button
-                onClick={handleStartEdit}
-                className="rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted"
-              >
-                Edit Profile
-              </button>
-            )}
+              )}
             </div>
-          )}
+          ) : me && relationship ? (
+            <div className="ml-auto flex shrink-0 gap-2">
+              <button
+                type="button"
+                onClick={() => relationship.isFollowing
+                  ? unfollowMutation.mutate({ followerPlayerAccountId: me.id, followedPlayerAccountId: profile.id, gameId })
+                  : followMutation.mutate({ followerPlayerAccountId: me.id, followedPlayerAccountId: profile.id, gameId })
+                }
+                disabled={followMutation.isPending || unfollowMutation.isPending}
+                className="rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-50"
+              >
+                {relationship.isFollowing ? "Unfollow" : "Follow"}
+              </button>
+              {relationship.friendStatus === "FRIENDS" && (
+                <span className="rounded-md border border-chart-2/40 bg-chart-2/10 px-2.5 py-1 text-xs font-medium text-chart-2">
+                  Friends
+                </span>
+              )}
+              {relationship.friendStatus === "NONE" && (
+                <button
+                  type="button"
+                  onClick={() => sendFRMutation.mutate({ senderPlayerId: me.id, recipientPlayerId: profile.id, gameId })}
+                  disabled={sendFRMutation.isPending}
+                  className="rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                >
+                  Add Friend
+                </button>
+              )}
+              {relationship.friendStatus === "PENDING_SENT" && (
+                <button
+                  type="button"
+                  onClick={() => relationship.friendRequestId && cancelFRMutation.mutate({ requestId: relationship.friendRequestId })}
+                  disabled={cancelFRMutation.isPending}
+                  className="rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-muted disabled:opacity-50"
+                >
+                  Pending
+                </button>
+              )}
+              {relationship.friendStatus === "PENDING_RECEIVED" && (
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    onClick={() => relationship.friendRequestId && acceptFRMutation.mutate({ requestId: relationship.friendRequestId })}
+                    disabled={acceptFRMutation.isPending}
+                    className="rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                  >
+                    Accept
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => relationship.friendRequestId && declineFRMutation.mutate({ requestId: relationship.friendRequestId })}
+                    disabled={declineFRMutation.isPending}
+                    className="rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50"
+                  >
+                    Decline
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -644,6 +777,17 @@ function PlayerProfilePage() {
 
           {/* Left column */}
           <div className="flex flex-col gap-3">
+            {showFriends && (
+              <FriendsPanel
+                friendshipsAsPlayerOne={profile.friendshipsAsPlayerOne}
+                friendshipsAsPlayerTwo={profile.friendshipsAsPlayerTwo}
+                isOwn={isOwn}
+                isSubscriber={isSubscriber}
+                isEditing={isEditing}
+                visible={getVisible("FRIENDS")}
+                onToggle={handleVisToggle}
+              />
+            )}
             {showGroups && (
               <GroupsPanel
                 memberships={profile.groupMemberships}
@@ -705,6 +849,7 @@ function PlayerProfilePage() {
                   { label: "Animals", value: profile._count.animalsOwned },
                   { label: "Bred", value: profile._count.animalsBred },
                   { label: "Groups", value: profile._count.groupMemberships },
+                  { label: "Friends", value: friendCount },
                   { label: "Breeds Founded", value: profile._count.foundedBreeds },
                 ].map(({ label, value }) => (
                   <div key={label}>

@@ -10,7 +10,7 @@ export const animalAnimalRouter = router({
     db.animal.findMany({
       where: {
         playerAccountId: input.playerAccountId,
-        status: { not: "EMBRYO_STORED" },
+        status: { notIn: ["EMBRYO_STORED", "BURIED"] },
         NOT: { gameShopAnimal: { isAvailable: true } },
       },
       orderBy: { name: "asc" },
@@ -20,6 +20,7 @@ export const animalAnimalRouter = router({
         status: true,
         sex: true,
         image: true,
+        isPinned: true,
         breed: { select: { id: true, name: true } },
         lifeStage: { select: { name: true } },
         disciplineDefId: true,
@@ -38,6 +39,30 @@ export const animalAnimalRouter = router({
       },
     })
   ),
+
+  listInactive: publicProcedure
+    .input(z.object({ playerAccountId: z.string() }))
+    .query(({ input }) =>
+      db.animal.findMany({
+        where: {
+          playerAccountId: input.playerAccountId,
+          status: "BURIED",
+        },
+        orderBy: [{ status: "asc" }, { name: "asc" }],
+        select: {
+          id: true,
+          name: true,
+          status: true,
+          sex: true,
+          image: true,
+          ageInCycles: true,
+          diedAt: true,
+          causeOfDeath: true,
+          breed: { select: { id: true, name: true } },
+          lifeStage: { select: { name: true } },
+        },
+      })
+    ),
 
   archive: publicProcedure
     .input(z.object({ animalId: z.string() }))

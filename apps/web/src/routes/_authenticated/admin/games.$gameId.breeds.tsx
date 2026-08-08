@@ -32,6 +32,13 @@ const emptyBreed: BreedForm = {
 }
 
 type ActivePanel = "stats" | "loci" | "standards" | "personality"
+type WizardStep = 1 | 2 | 3 | 4 | null
+
+const WIZARD_LABELS: Record<2 | 3 | 4, string> = {
+  2: "Allele Frequencies",
+  3: "Stat Profile",
+  4: "Breed Standards",
+}
 
 // ── Primitives ────────────────────────────────────────────────────────────────
 
@@ -296,11 +303,58 @@ function LocusStandardsGroup({ locus, conformStandards, onSave, onRemove }: {
   )
 }
 
+// ── Loci & Standards panel content (shared between wizard and tabs) ────────────
+
+function LociContent({ locusAlleleGroups, alleleFrequencies, onSave }: {
+  locusAlleleGroups: { locus: { id: string; name: string }; alleles: LocusAllele[] }[]
+  alleleFrequencies: AlleleFreq[]
+  onSave: (alleleId: string, id: string | undefined, frequency: number, isDq: boolean) => void
+}) {
+  if (!locusAlleleGroups.length) {
+    return <p className="px-4 py-4 text-sm text-muted-foreground">Configure loci in the Genetics section first.</p>
+  }
+  return (
+    <div className="grid grid-cols-2 divide-x divide-border">
+      {locusAlleleGroups.map(({ locus, alleles: la }) => (
+        <LocusAlleleGroup key={locus.id} locus={locus} locusAlleles={la}
+          alleleFrequencies={alleleFrequencies} onSave={onSave} />
+      ))}
+    </div>
+  )
+}
+
+function StandardsContent({ loci, conformStandards, onSave, onRemove }: {
+  loci: { id: string; name: string }[]
+  conformStandards: ConformStandard[]
+  onSave: (id: string | undefined, locusId: string, label: string, weight: number) => void
+  onRemove: (id: string) => void
+}) {
+  if (!loci.length) {
+    return <p className="px-4 py-4 text-sm text-muted-foreground">Configure loci in the Genetics section first.</p>
+  }
+  return (
+    <div>
+      <p className="px-3 py-2 text-xs text-muted-foreground/60 border-b border-border">
+        Check an expression to include it in this breed's conformation standard. DQ column pending schema update.
+      </p>
+      <div className="grid grid-cols-2 divide-x divide-border">
+        {loci.map(locus => (
+          <LocusStandardsGroup key={locus.id} locus={locus}
+            conformStandards={conformStandards}
+            onSave={onSave}
+            onRemove={onRemove} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 function BreedsPage() {
   const { gameId } = Route.useParams()
   const [editing, setEditing] = useState<BreedForm | null>(null)
+  const [wizardStep, setWizardStep] = useState<WizardStep>(null)
   const [activePanel, setActivePanel] = useState<ActivePanel>("stats")
   const [confirmDelete, setConfirmDelete] = useState(false)
 
@@ -330,15 +384,24 @@ function BreedsPage() {
     onSuccess: (saved) => {
       utils.admin.breed.list.invalidate()
       setEditing(prev => prev ? { ...prev, id: saved.id } : null)
+      setWizardStep(prev => prev === 1 ? 2 : prev)
     },
   })
   const removeBreed = trpc.admin.breed.remove.useMutation({
-    onSuccess: () => { utils.admin.breed.list.invalidate(); setEditing(null) },
+    onSuccess: () => { utils.admin.breed.list.invalidate(); setEditing(null); setWizardStep(null) },
   })
-  const saveStatProfile = trpc.admin.breed.saveStatProfile.useMutation({ onSuccess: () => utils.admin.breed.listStatProfiles.invalidate() })
-  const saveConform = trpc.admin.breed.saveConformationStandard.useMutation({ onSuccess: () => utils.admin.breed.listConformationStandards.invalidate() })
-  const removeConform = trpc.admin.breed.removeConformationStandard.useMutation({ onSuccess: () => utils.admin.breed.listConformationStandards.invalidate() })
-  const savePersonalityProfile = trpc.admin.breed.savePersonalityProfile.useMutation({ onSuccess: () => utils.admin.breed.listPersonalityProfiles.invalidate() })
+  const saveStatProfile = trpc.admin.breed.saveStatProfile.useMutation({
+    onSuccess: () => utils.admin.breed.listStatProfiles.invalidate(),
+  })
+  const saveConform = trpc.admin.breed.saveConformationStandard.useMutation({
+    onSuccess: () => utils.admin.breed.listConformationStandards.invalidate(),
+  })
+  const removeConform = trpc.admin.breed.removeConformationStandard.useMutation({
+    onSuccess: () => utils.admin.breed.listConformationStandards.invalidate(),
+  })
+  const savePersonalityProfile = trpc.admin.breed.savePersonalityProfile.useMutation({
+    onSuccess: () => utils.admin.breed.listPersonalityProfiles.invalidate(),
+  })
   const saveAlleleFreq = trpc.admin.breed.saveAlleleFrequency.useMutation({
     onSuccess: () => utils.admin.breed.listAlleleFrequencies.invalidate({ breedId: editing?.id }),
   })
@@ -385,6 +448,13 @@ function BreedsPage() {
     return Array.from(map.values())
   }, [alleles])
 
+  function advanceWizard() {
+    setWizardStep(s => s === 2 ? 3 : s === 3 ? 4 : null)
+  }
+  function retreatWizard() {
+    setWizardStep(s => s === 4 ? 3 : s === 3 ? 2 : 1)
+  }
+
   // ── List view ─────────────────────────────────────────────────────────────────
 
   if (!editing) {
@@ -393,23 +463,25 @@ function BreedsPage() {
         <h1 className="font-serif text-xl font-semibold text-foreground px-1">Breeds</h1>
         <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
           <div className="grid grid-cols-[300px_1fr] divide-x divide-border">
-            {/* Left: breed list */}
             <div className="flex flex-col">
               <div className="flex items-center justify-between border-b border-border bg-secondary/40 px-3 py-2">
                 <h2 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">All Breeds</h2>
-                <Button size="sm" variant="ghost" onClick={() => setEditing({ ...emptyBreed })}>+ New</Button>
+                <Button size="sm" variant="ghost" onClick={() => { setEditing({ ...emptyBreed }); setWizardStep(1) }}>+ New</Button>
               </div>
               <div className="divide-y divide-border overflow-y-auto">
                 {breeds?.map((b) => (
                   <button
                     key={b.id}
-                    onClick={() => setEditing({
-                      id: b.id, name: b.name, speciesId: b.speciesId, categoryBadge: b.categoryBadge,
-                      image: b.image ?? "", lore: b.lore ?? "", isUnregistered: b.isUnregistered,
-                      convergenceGenerations: b.convergenceGenerations?.toString() ?? "",
-                      lifeExpectancyBaseline: b.lifeExpectancyBaseline?.toString() ?? "",
-                      immunityMin: b.immunityMin?.toString() ?? "", immunityMax: b.immunityMax?.toString() ?? "",
-                    })}
+                    onClick={() => {
+                      setEditing({
+                        id: b.id, name: b.name, speciesId: b.speciesId, categoryBadge: b.categoryBadge,
+                        image: b.image ?? "", lore: b.lore ?? "", isUnregistered: b.isUnregistered,
+                        convergenceGenerations: b.convergenceGenerations?.toString() ?? "",
+                        lifeExpectancyBaseline: b.lifeExpectancyBaseline?.toString() ?? "",
+                        immunityMin: b.immunityMin?.toString() ?? "", immunityMax: b.immunityMax?.toString() ?? "",
+                      })
+                      setWizardStep(null)
+                    }}
                     className="w-full text-left px-3 py-2.5 hover:bg-muted/40 transition-colors"
                   >
                     <div className="text-sm font-medium text-foreground">{b.name}</div>
@@ -421,10 +493,9 @@ function BreedsPage() {
                 )}
               </div>
             </div>
-            {/* Right: placeholder */}
             <div className="flex flex-col items-center justify-center gap-3 py-16 px-8 text-center">
               <p className="text-sm text-muted-foreground">Select a breed to view and edit its details, genetics, and standards.</p>
-              <Button size="sm" variant="outline" onClick={() => setEditing({ ...emptyBreed })}>Add New Breed</Button>
+              <Button size="sm" variant="outline" onClick={() => { setEditing({ ...emptyBreed }); setWizardStep(1) }}>Add New Breed</Button>
             </div>
           </div>
         </div>
@@ -432,7 +503,7 @@ function BreedsPage() {
     )
   }
 
-  // ── Edit view — 2-col layout ──────────────────────────────────────────────────
+  // ── Edit view ─────────────────────────────────────────────────────────────────
 
   const TABS: { key: ActivePanel; label: string }[] = [
     { key: "stats", label: "Stats" },
@@ -444,9 +515,14 @@ function BreedsPage() {
   return (
     <div className="p-4 max-w-5xl mx-auto">
       <div className="flex items-center gap-3 mb-4 px-1">
-        <button onClick={() => setEditing(null)} className="text-sm text-muted-foreground hover:text-foreground">← Breeds</button>
+        <button onClick={() => { setEditing(null); setWizardStep(null) }} className="text-sm text-muted-foreground hover:text-foreground">← Breeds</button>
         <span className="text-muted-foreground">/</span>
         <h1 className="font-serif text-xl font-semibold text-foreground">{editing.id ? editing.name : "New Breed"}</h1>
+        {wizardStep !== null && (
+          <span className="text-xs text-muted-foreground bg-muted rounded px-2 py-0.5">
+            Step {wizardStep} of 4
+          </span>
+        )}
       </div>
 
       <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
@@ -544,10 +620,98 @@ function BreedsPage() {
           </div>
         </div>
 
-        {/* Right: Tabbed panels */}
-        {editing.id ? (
+        {/* Right: Wizard steps or normal tabs */}
+        {wizardStep !== null ? (
+          <div className="flex flex-col">
+            {wizardStep === 1 ? (
+              <div className="flex flex-col items-center justify-center gap-4 py-16 px-8 text-center">
+                <p className="text-sm text-muted-foreground">Fill in the breed details and click Create Breed to continue setting up allele frequencies, stat profiles, and breed standards.</p>
+                <div className="flex items-center gap-3">
+                  {([2, 3, 4] as const).map((s, i) => (
+                    <div key={s} className="flex items-center gap-2">
+                      {i > 0 && <span className="text-muted-foreground/40 text-xs">→</span>}
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground/50">
+                        <span className="w-5 h-5 rounded-full border border-border flex items-center justify-center text-[10px]">{i + 1}</span>
+                        {WIZARD_LABELS[s]}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Step progress header */}
+                <div className="flex items-center gap-4 border-b border-border bg-secondary/40 px-3 py-2">
+                  {([2, 3, 4] as const).map((s, i) => (
+                    <button
+                      key={s}
+                      onClick={() => setWizardStep(s)}
+                      className={cn(
+                        "flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider transition-colors",
+                        wizardStep === s ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      <span className={cn(
+                        "w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold",
+                        wizardStep === s ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                      )}>
+                        {i + 1}
+                      </span>
+                      {WIZARD_LABELS[s]}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Step content */}
+                {wizardStep === 2 && (
+                  <LociContent
+                    locusAlleleGroups={locusAlleleGroups}
+                    alleleFrequencies={alleleFrequencies ?? []}
+                    onSave={handleSaveAlleleFreq}
+                  />
+                )}
+                {wizardStep === 3 && (
+                  !stats?.length ? (
+                    <p className="px-4 py-4 text-sm text-muted-foreground">No stats configured for this game yet.</p>
+                  ) : (
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr><TH>Stat</TH><TH>Weight</TH><TH>Natural Min</TH><TH>Natural Max</TH><TH>Baseline</TH></tr>
+                      </thead>
+                      <tbody>
+                        {stats.map(stat => (
+                          <StatRow key={stat.id} stat={stat}
+                            profile={statProfiles?.find(sp => sp.statDefId === stat.id)}
+                            onSave={handleSaveStatProfile} />
+                        ))}
+                      </tbody>
+                    </table>
+                  )
+                )}
+                {wizardStep === 4 && (
+                  <StandardsContent
+                    loci={loci ?? []}
+                    conformStandards={conformStandards ?? []}
+                    onSave={handleSaveConform}
+                    onRemove={id => removeConform.mutate({ id })}
+                  />
+                )}
+
+                {/* Navigation */}
+                <div className="border-t border-border px-3 py-2 flex items-center justify-between mt-auto">
+                  <Button variant="ghost" size="sm" onClick={retreatWizard}>← Back</Button>
+                  {wizardStep !== 4 ? (
+                    <Button size="sm" onClick={advanceWizard}>Next →</Button>
+                  ) : (
+                    <Button size="sm" onClick={() => setWizardStep(null)}>Done ✓</Button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        ) : editing.id ? (
+          // Normal tab mode
           <div className="overflow-hidden">
-            {/* Tab bar */}
             <div className="flex border-b border-border bg-secondary/40">
               {TABS.map(tab => (
                 <button
@@ -565,7 +729,6 @@ function BreedsPage() {
               ))}
             </div>
 
-            {/* Stats */}
             {activePanel === "stats" && (
               !stats?.length ? (
                 <p className="px-4 py-4 text-sm text-muted-foreground">No stats configured for this game yet.</p>
@@ -585,42 +748,23 @@ function BreedsPage() {
               )
             )}
 
-            {/* Loci & Genetics */}
             {activePanel === "loci" && (
-              !loci?.length ? (
-                <p className="px-4 py-4 text-sm text-muted-foreground">Configure loci in the Genetics section first.</p>
-              ) : (
-                <div className="grid grid-cols-2 divide-x divide-border">
-                  {locusAlleleGroups.map(({ locus, alleles: la }) => (
-                    <LocusAlleleGroup key={locus.id} locus={locus} locusAlleles={la}
-                      alleleFrequencies={alleleFrequencies ?? []} onSave={handleSaveAlleleFreq} />
-                  ))}
-                </div>
-              )
+              <LociContent
+                locusAlleleGroups={locusAlleleGroups}
+                alleleFrequencies={alleleFrequencies ?? []}
+                onSave={handleSaveAlleleFreq}
+              />
             )}
 
-            {/* Breed Standards */}
             {activePanel === "standards" && (
-              !loci?.length ? (
-                <p className="px-4 py-4 text-sm text-muted-foreground">Configure loci in the Genetics section first.</p>
-              ) : (
-                <div>
-                  <p className="px-3 py-2 text-xs text-muted-foreground/60 border-b border-border">
-                    Check an expression to include it in this breed's conformation standard. DQ column pending schema update.
-                  </p>
-                  <div className="grid grid-cols-2 divide-x divide-border">
-                    {loci.map(locus => (
-                      <LocusStandardsGroup key={locus.id} locus={locus}
-                        conformStandards={conformStandards ?? []}
-                        onSave={handleSaveConform}
-                        onRemove={id => removeConform.mutate({ id })} />
-                    ))}
-                  </div>
-                </div>
-              )
+              <StandardsContent
+                loci={loci ?? []}
+                conformStandards={conformStandards ?? []}
+                onSave={handleSaveConform}
+                onRemove={id => removeConform.mutate({ id })}
+              />
             )}
 
-            {/* Personality */}
             {activePanel === "personality" && (
               !personalityTraits?.length ? (
                 <p className="px-4 py-4 text-sm text-muted-foreground">Configure personality traits in the Animals section first.</p>

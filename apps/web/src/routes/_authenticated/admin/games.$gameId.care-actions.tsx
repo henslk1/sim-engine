@@ -265,10 +265,10 @@ function CareActionsPage() {
             </div>
           </section>
 
-          {editing.id && editing.costType === "ITEM" && (
+          {editing.id && (
             <section className="rounded-lg border border-border bg-card shadow-sm">
               <div className="border-b border-border bg-secondary/40 px-3 py-2">
-                <h2 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Required Items</h2>
+                <h2 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Items</h2>
               </div>
               {!itemOptions.length ? (
                 <p className="px-3 py-4 text-sm text-muted-foreground">No items configured yet. Set up Items in the Economy section first.</p>

@@ -476,6 +476,7 @@ const supportOpsRouter = router({
         where: { id: input.ticketId },
         include: {
           playerAccount: { select: { id: true, username: true } },
+          claimedBy: { select: { id: true, name: true } },
           messages: { include: { author: { select: { id: true, email: true, name: true } } }, orderBy: { createdAt: "asc" } },
         },
       })
@@ -488,6 +489,31 @@ const supportOpsRouter = router({
         data: { ticketId: input.ticketId, authorId: input.authorId, body: input.body },
       })
     ),
+
+  setClaim: publicProcedure
+    .input(z.object({
+      ticketId: z.string(),
+      staffUserId: z.string().nullable(),
+    }))
+    .mutation(async ({ input }) => {
+      const ticket = await db.supportTicket.findUniqueOrThrow({ where: { id: input.ticketId } })
+      await db.supportTicket.update({
+        where: { id: input.ticketId },
+        data: {
+          claimedByUserId: input.staffUserId,
+          claimedAt: input.staffUserId ? new Date() : null,
+        },
+      })
+      await db.adminActionLog.create({
+        data: {
+          staffUserId: input.staffUserId ?? ticket.claimedByUserId ?? "",
+          gameId: ticket.gameId,
+          action: input.staffUserId ? "ticket_claim" : "ticket_unclaim",
+          targetType: "SupportTicket",
+          targetId: input.ticketId,
+        },
+      })
+    }),
 
   setStatus: publicProcedure
     .input(z.object({
@@ -576,6 +602,28 @@ const bugsOpsRouter = router({
             staffUserId: input.staffUserId,
             gameId: report.gameId,
             action: `bug_status:${input.status}`,
+            targetType: "BugReport",
+            targetId: input.reportId,
+          },
+        }),
+      ])
+    }),
+
+  setExploit: publicProcedure
+    .input(z.object({
+      reportId: z.string(),
+      isExploit: z.boolean(),
+      staffUserId: z.string(),
+    }))
+    .mutation(async ({ input }) => {
+      const report = await db.bugReport.findUniqueOrThrow({ where: { id: input.reportId } })
+      await db.$transaction([
+        db.bugReport.update({ where: { id: input.reportId }, data: { isExploit: input.isExploit } }),
+        db.adminActionLog.create({
+          data: {
+            staffUserId: input.staffUserId,
+            gameId: report.gameId,
+            action: input.isExploit ? "bug_flag_exploit" : "bug_unflag_exploit",
             targetType: "BugReport",
             targetId: input.reportId,
           },

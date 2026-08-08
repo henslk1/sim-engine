@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import {
   Plus, Pencil, Trash2, Check, X,
   AlertTriangle, MoveRight, FolderOpen,
-  Baby, Search, SlidersHorizontal,
+  Baby, Search, SlidersHorizontal, Pin,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { DisciplineBadge } from "@/components/discipline-badge"
@@ -19,6 +19,7 @@ type Animal = {
   status: string
   sex: string
   image: string | null
+  isPinned: boolean
   breed: { id: string; name: string }
   lifeStage: { name: string }
   subContainerId: string | null
@@ -33,7 +34,7 @@ type Animal = {
 }
 
 type SubContainer = { id: string; name: string }
-type Selection = "all" | "unassigned" | "inactive" | string
+type Selection = "all" | "unassigned" | "archived" | string
 type SortBy = "name" | "oldest" | "youngest" | "alerts"
 
 type StableFilters = {
@@ -72,6 +73,7 @@ function AnimalCard({
     onSuccess: () => { utils.animal.list.invalidate(); setShowMove(false) },
   })
 
+  const isDeceased = animal.status === "DECEASED"
   const hasAlert = animal._count.healthRecords > 0
   const isPregnant = animal.pregnancies.length > 0
   const isInspected = animal.conformationScores.length > 0
@@ -79,17 +81,28 @@ function AnimalCard({
 
   return (
     <div className={cn(
-      "group relative overflow-visible rounded-xl border border-border bg-card transition-all hover:shadow-sm",
-      hasAlert
-        ? "border-l-2 border-l-destructive/50"
+      "group relative overflow-visible rounded-xl border transition-all",
+      isDeceased
+        ? "border-destructive/50 bg-destructive/15 hover:bg-destructive/20"
+        : animal.isPinned
+        ? "border-amber-500/40 bg-card ring-1 ring-amber-500/30 hover:shadow-sm"
+        : hasAlert
+        ? "border-border bg-card border-l-2 border-l-destructive/50 hover:shadow-sm"
         : isPregnant
-        ? "border-l-2 border-l-chart-2/40"
-        : "hover:border-border/70",
+        ? "border-border bg-card border-l-2 border-l-chart-2/40 hover:shadow-sm"
+        : "border-border bg-card hover:shadow-sm hover:border-border/70",
     )}>
       <Link to="/animal/$animalId" params={{ animalId: animal.id }} className="block">
-        <div className="relative h-28 overflow-hidden rounded-t-xl bg-secondary/30">
+        <div className={cn(
+          "relative h-28 overflow-hidden rounded-t-xl",
+          isDeceased ? "bg-destructive/25" : "bg-secondary/30",
+        )}>
           {animal.image ? (
-            <img src={animal.image} alt={animal.name} className="h-full w-full object-cover" />
+            <img
+              src={animal.image}
+              alt={animal.name}
+              className={cn("h-full w-full object-cover", isDeceased && "grayscale opacity-50")}
+            />
           ) : (
             <div className="absolute inset-0 flex items-end justify-end p-2 opacity-[0.07]">
               <svg viewBox="0 0 80 80" className="h-16 w-16 fill-foreground" xmlns="http://www.w3.org/2000/svg">
@@ -97,13 +110,25 @@ function AnimalCard({
               </svg>
             </div>
           )}
+          {isDeceased && (
+            <div className="absolute inset-0 flex items-center justify-center bg-destructive/20">
+              <span className="rounded-full bg-destructive px-2.5 py-1 text-[11px] font-bold uppercase tracking-widest text-destructive-foreground shadow">
+                Deceased
+              </span>
+            </div>
+          )}
+          {animal.isPinned && !isDeceased && (
+            <div className="absolute left-2 top-2 z-10">
+              <Pin className="size-3.5 text-amber-500 drop-shadow-sm" />
+            </div>
+          )}
         </div>
         <div className="p-4 pb-3">
         <div className="mb-1.5 flex items-start justify-between gap-2">
-          <p className="font-serif font-semibold leading-tight text-foreground">{animal.name}</p>
+          <p className={cn("font-serif font-semibold leading-tight", isDeceased ? "text-destructive/80" : "text-foreground")}>{animal.name}</p>
           <div className="flex shrink-0 items-center gap-1.5">
-            {hasAlert && <AlertTriangle className="size-3.5 text-destructive/80" />}
-            {isPregnant && <Baby className="size-3.5 text-chart-2/70" />}
+            {!isDeceased && hasAlert && <AlertTriangle className="size-3.5 text-destructive/80" />}
+            {!isDeceased && isPregnant && <Baby className="size-3.5 text-chart-2/70" />}
           </div>
         </div>
 
@@ -411,14 +436,16 @@ function StablePage() {
     + (filters.inspected ? 1 : 0)
     + (filters.hasDiscipline ? 1 : 0)
 
-  const alive = animals.filter((a) => a.status === "ALIVE") as Animal[]
-  const inactive = animals.filter((a) => a.status !== "ALIVE") as Animal[]
-  const unassigned = alive.filter(
+  const archivedAnimals = animals.filter((a) => a.status === "ARCHIVED") as Animal[]
+  const mainAnimals = animals.filter((a) => a.status !== "ARCHIVED") as Animal[]
+  const liveAnimals = mainAnimals.filter((a) => a.status === "ALIVE")
+  const deceasedAnimals = mainAnimals.filter((a) => a.status === "DECEASED")
+  const unassigned = mainAnimals.filter(
     (a) => a.subContainerId === null || !subContainers.some((sc) => sc.id === a.subContainerId),
   )
 
-  const alertCount = alive.filter((a) => a._count.healthRecords > 0).length
-  const pregnantCount = alive.filter((a) => a.pregnancies.length > 0).length
+  const alertCount = liveAnimals.filter((a) => a._count.healthRecords > 0).length
+  const pregnantCount = liveAnimals.filter((a) => a.pregnancies.length > 0).length
 
   const cycleToAge = (n: number): string => {
     const cpy = gameData?.gameConfig?.cyclesPerYear ?? 12
@@ -426,15 +453,18 @@ function StablePage() {
   }
 
   const selectedAnimals: Animal[] =
-    selected === "all" ? alive
+    selected === "all" ? mainAnimals
     : selected === "unassigned" ? unassigned
-    : selected === "inactive" ? inactive
-    : alive.filter((a) => a.subContainerId === selected)
+    : selected === "archived" ? archivedAnimals
+    : mainAnimals.filter((a) => a.subContainerId === selected)
 
-  const selectedAlerts = selected === "inactive" ? 0 : selectedAnimals.filter((a) => a._count.healthRecords > 0).length
+  const selectedAlerts = selectedAnimals.filter((a) => a.status === "ALIVE" && a._count.healthRecords > 0).length
 
-  let displayAnimals = selectedAnimals.filter((a) => {
+  let displayAnimals = selected === "archived" ? selectedAnimals.filter((a) =>
+    !nameFilter.trim() || a.name.toLowerCase().includes(nameFilter.toLowerCase())
+  ) : selectedAnimals.filter((a) => {
     if (nameFilter.trim() && !a.name.toLowerCase().includes(nameFilter.toLowerCase())) return false
+    if (a.status === "DECEASED") return true // deceased always shown regardless of other filters
     if (filters.sex && a.sex !== filters.sex) return false
     if (filters.hasAlerts && a._count.healthRecords === 0) return false
     if (filters.pregnant && a.pregnancies.length === 0) return false
@@ -443,15 +473,15 @@ function StablePage() {
     return true
   })
 
-  if (selected !== "inactive") {
-    if (sortBy === "oldest") {
-      displayAnimals = [...displayAnimals].sort((a, b) => b.ageInCycles - a.ageInCycles)
-    } else if (sortBy === "youngest") {
-      displayAnimals = [...displayAnimals].sort((a, b) => a.ageInCycles - b.ageInCycles)
-    } else if (sortBy === "alerts") {
-      displayAnimals = [...displayAnimals].sort((a, b) => b._count.healthRecords - a._count.healthRecords)
-    }
-  }
+  displayAnimals = selected === "archived" ? displayAnimals : [...displayAnimals].sort((a, b) => {
+    const rank = (x: Animal) => x.status === "DECEASED" ? 0 : x.isPinned ? 1 : 2
+    const r = rank(a) - rank(b)
+    if (r !== 0) return r
+    if (sortBy === "oldest") return b.ageInCycles - a.ageInCycles
+    if (sortBy === "youngest") return a.ageInCycles - b.ageInCycles
+    if (sortBy === "alerts") return b._count.healthRecords - a._count.healthRecords
+    return a.name.localeCompare(b.name)
+  })
 
   if (gameLoading || (gameId && meLoading)) {
     return <div className="flex h-dvh items-center justify-center text-sm text-muted-foreground">Loading…</div>
@@ -465,7 +495,12 @@ function StablePage() {
         <div>
           <h1 className="font-serif text-3xl font-semibold text-foreground">{stableLabel}</h1>
           <div className="mt-0.5 flex items-center gap-3">
-            <span className="text-sm text-muted-foreground">{alive.length} active</span>
+            <span className="text-sm text-muted-foreground">{liveAnimals.length} alive</span>
+            {deceasedAnimals.length > 0 && (
+              <span className="text-sm font-medium text-destructive">
+                {deceasedAnimals.length} deceased — needs attention
+              </span>
+            )}
             {alertCount > 0 && (
               <span className="text-sm text-destructive/70">{alertCount} alert{alertCount !== 1 ? "s" : ""}</span>
             )}
@@ -593,51 +628,56 @@ function StablePage() {
       </div>
 
       {/* ── Group tabs ───────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-1 overflow-x-auto border-b border-border bg-card/30 px-5 py-2">
-        <Tab
-          label="All"
-          count={alive.length}
-          active={selected === "all"}
-          onClick={() => setSelected("all")}
-        />
-        {(unassigned.length > 0 || subContainers.length > 0) && (
+      <div className="flex items-center border-b border-border bg-card/30 px-5 py-2">
+        <div className="flex flex-1 items-center gap-1 overflow-x-auto">
           <Tab
-            label="Unassigned"
-            count={unassigned.length}
-            active={selected === "unassigned"}
-            onClick={() => setSelected("unassigned")}
+            label="All"
+            count={mainAnimals.length}
+            active={selected === "all"}
+            onClick={() => setSelected("all")}
           />
-        )}
-
-        {subContainers.length > 0 && (
-          <div className="mx-1.5 h-5 w-px shrink-0 bg-border/60" />
-        )}
-
-        {subContainers.map((sc) => (
-          <SubContainerTab
-            key={sc.id}
-            sc={sc}
-            count={alive.filter((a) => a.subContainerId === sc.id).length}
-            active={selected === sc.id}
-            onClick={() => setSelected(sc.id)}
-          />
-        ))}
-
-        {playerAccountId && (
-          <CreateSubContainerTab playerAccountId={playerAccountId} label={subContainerLabel} />
-        )}
-
-        {inactive.length > 0 && (
-          <>
-            <div className="mx-1.5 h-5 w-px shrink-0 bg-border/60" />
+          {(unassigned.length > 0 || subContainers.length > 0) && (
             <Tab
-              label="Inactive"
-              count={inactive.length}
-              active={selected === "inactive"}
-              dim
-              onClick={() => setSelected(selected === "inactive" ? "all" : "inactive")}
+              label="Unassigned"
+              count={unassigned.length}
+              active={selected === "unassigned"}
+              onClick={() => setSelected("unassigned")}
             />
-          </>
+          )}
+
+          {subContainers.length > 0 && (
+            <div className="mx-1.5 h-5 w-px shrink-0 bg-border/60" />
+          )}
+
+          {subContainers.map((sc) => (
+            <SubContainerTab
+              key={sc.id}
+              sc={sc}
+              count={liveAnimals.filter((a) => a.subContainerId === sc.id).length}
+              active={selected === sc.id}
+              onClick={() => setSelected(sc.id)}
+            />
+          ))}
+
+          {playerAccountId && (
+            <CreateSubContainerTab playerAccountId={playerAccountId} label={subContainerLabel} />
+          )}
+        </div>
+
+        {archivedAnimals.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setSelected(selected === "archived" ? "all" : "archived")}
+            className={cn(
+              "ml-3 flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors",
+              selected === "archived"
+                ? "bg-primary text-primary-foreground"
+                : "bg-primary/15 text-primary hover:bg-primary/25",
+            )}
+          >
+            Archived
+            <span className="font-mono">{archivedAnimals.length}</span>
+          </button>
         )}
       </div>
 
@@ -646,29 +686,27 @@ function StablePage() {
         {animalsLoading ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
         ) : displayAnimals.length > 0 ? (
-          selected === "inactive" ? (
+          selected === "archived" ? (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
               {displayAnimals.map((a) => (
                 <Link
                   key={a.id}
                   to="/animal/$animalId"
                   params={{ animalId: a.id }}
-                  className="rounded-xl border border-border/50 bg-card/50 p-4 transition-colors hover:bg-secondary/20"
+                  className="rounded-xl border border-border/40 bg-card/40 p-4 transition-colors hover:bg-secondary/20"
                 >
-                  <p className="font-serif font-semibold leading-tight text-foreground/60">{a.name}</p>
+                  <p className="font-serif font-semibold leading-tight text-foreground/50">{a.name}</p>
                   <p className="mt-1 text-xs text-muted-foreground/60">{a.breed.name}</p>
-                  <p className="mt-0.5 text-[11px] text-muted-foreground/40">
-                    {a.status === "DECEASED" ? "Deceased" : a.status === "ARCHIVED" ? "Archived" : "Buried"}
-                  </p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground/40">{a.lifeStage.name} · {cycleToAge(a.ageInCycles)}</p>
                 </Link>
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
-              {displayAnimals.map((a) => (
-                <AnimalCard key={a.id} animal={a} subContainers={subContainers} cycleToAge={cycleToAge} conformationName={conformationName} />
-              ))}
-            </div>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+            {displayAnimals.map((a) => (
+              <AnimalCard key={a.id} animal={a} subContainers={subContainers} cycleToAge={cycleToAge} conformationName={conformationName} />
+            ))}
+          </div>
           )
         ) : nameFilter.trim() ? (
           <div className="flex h-40 items-center justify-center text-sm italic text-muted-foreground/50">

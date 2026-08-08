@@ -7,6 +7,7 @@ enum ProfileFieldKey {
   MARKETPLACE_LISTINGS
   CLINICS
   PLAYER_SHOP
+  FRIENDS
 }
 
 model PlayerProfile {

@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, useNavigate, Link } from '@tanstack/react-router'
 import React, { useState } from "react"
 import { z } from "zod"
 import { trpc } from "@/lib/trpc"
@@ -65,7 +65,7 @@ function BugReportPage() {
     <div className="mx-auto max-w-2xl px-4 py-8">
       <h1 className="font-serif text-2xl font-semibold text-foreground mb-1">Report a Bug</h1>
       <p className="text-sm text-muted-foreground mb-6">
-        Found an exploit? Please <a href="/support/new" className="underline">submit a support ticket</a> instead.
+        Found an exploit? Please <Link to="/support/new" className="underline">submit a support ticket</Link> instead.
       </p>
 
       <div className="rounded-lg border border-border bg-card shadow-sm p-6">

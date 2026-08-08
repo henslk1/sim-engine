@@ -16,9 +16,11 @@ const STATUS_COLORS: Record<string, string> = {
 
 function TicketDetail() {
   const { ticketId } = Route.useParams()
+  const { session } = Route.useRouteContext()
   const { data, refetch } = trpc.admin.ops.support.getById.useQuery({ ticketId })
   const replyMutation = trpc.admin.ops.support.reply.useMutation({ onSuccess: () => { refetch(); setBody("") } })
   const setStatusMutation = trpc.admin.ops.support.setStatus.useMutation({ onSuccess: () => refetch() })
+  const setClaimMutation = trpc.admin.ops.support.setClaim.useMutation({ onSuccess: () => refetch() })
   const [body, setBody] = useState("")
 
   if (!data) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>
@@ -37,12 +39,27 @@ function TicketDetail() {
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <button
+            onClick={() => setClaimMutation.mutate({
+              ticketId,
+              staffUserId: data.claimedByUserId ? null : session.user.id,
+            })}
+            disabled={setClaimMutation.isPending}
+            className={cn(
+              "rounded-md border px-3 py-1 text-xs font-medium transition-colors",
+              data.claimedByUserId
+                ? "border-primary/30 bg-primary/10 text-primary hover:bg-primary/20"
+                : "border-border bg-background text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {data.claimedByUserId ? `Claimed by ${data.claimedBy?.name ?? "staff"}` : "Claim"}
+          </button>
           <span className={cn("rounded-full border px-2 py-0.5 text-xs font-medium", STATUS_COLORS[data.status])}>
             {data.status.replace("_", " ")}
           </span>
           <select
             value={data.status}
-            onChange={e => setStatusMutation.mutate({ ticketId, status: e.target.value as never, staffUserId: "CURRENT_USER" })}
+            onChange={e => setStatusMutation.mutate({ ticketId, status: e.target.value as never, staffUserId: session.user.id })}
             className="rounded-md border border-border bg-background px-2 py-1 text-xs outline-none focus:border-primary"
           >
             <option value="OPEN">Open</option>
@@ -79,7 +96,7 @@ function TicketDetail() {
           className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary resize-none"
         />
         <button
-          onClick={() => replyMutation.mutate({ ticketId, authorId: "CURRENT_USER", body })}
+          onClick={() => replyMutation.mutate({ ticketId, authorId: session.user.id, body })}
           disabled={!body.trim() || replyMutation.isPending}
           className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
         >

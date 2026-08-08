@@ -24,6 +24,7 @@ export const animalCompetitionRouter = router({
         where: {
           gameId: input.gameId,
           status: "OPEN",
+          NOT: [{ breed: { isUnregistered: true } }],
           ...(input.disciplineDefId ? { disciplineDefId: input.disciplineDefId } : {}),
           ...(input.isConformation != null ? { disciplineDef: { isConformation: input.isConformation } } : {}),
         },

@@ -75,6 +75,11 @@ function LoginPage() {
             Create one
           </Link>
         </p>
+        <p className="mt-2 text-center text-sm text-muted-foreground">
+          <Link to="/forgot-password" className="font-medium text-primary hover:underline">
+            Forgot password?
+          </Link>
+        </p>
       </div>
     </div>
 )

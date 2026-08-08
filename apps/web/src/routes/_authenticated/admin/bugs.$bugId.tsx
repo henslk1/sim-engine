@@ -15,9 +15,16 @@ const SEVERITY_COLORS: Record<string, string> = {
 
 function BugDetail() {
   const { bugId } = Route.useParams()
+  const { session } = Route.useRouteContext()
+  const { data: gameData } = trpc.admin.game.get.useQuery()
+  const { data: me } = trpc.player.me.useQuery(
+    { gameId: gameData?.id ?? "" },
+    { enabled: !!gameData?.id }
+  )
   const { data, refetch } = trpc.admin.ops.bugs.getById.useQuery({ reportId: bugId })
   const setStatusMutation = trpc.admin.ops.bugs.setStatus.useMutation({ onSuccess: () => refetch() })
   const setExploitMutation = trpc.admin.ops.bugs.setExploit.useMutation({ onSuccess: () => refetch() })
+  const setClaimMutation = trpc.admin.ops.bugs.setClaim.useMutation({ onSuccess: () => refetch() })
   const addCommentMutation = trpc.admin.ops.bugs.addComment.useMutation({ onSuccess: () => { refetch(); setCommentBody("") } })
   const [commentBody, setCommentBody] = useState("")
 
@@ -41,11 +48,14 @@ function BugDetail() {
         <h1 className="font-serif text-xl font-semibold text-foreground">{data.title}</h1>
         <p className="text-sm text-muted-foreground">
           by {data.author.username} · {new Date(data.createdAt).toLocaleString()}
+          {data.claimedBy && (
+            <span className="ml-2 text-primary">· Claimed by {data.claimedBy.name}</span>
+          )}
         </p>
       </div>
 
       <div className="rounded-lg border border-border bg-card p-4">
-        <p className="text-sm whitespace-pre-wrap">{data.body}</p>
+        <p className="text-sm whitespace-pre-wrap">{data.description}</p>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
@@ -53,7 +63,7 @@ function BugDetail() {
           <label className="text-xs font-medium text-muted-foreground">Status:</label>
           <select
             value={data.status}
-            onChange={e => setStatusMutation.mutate({ reportId: bugId, status: e.target.value as never, staffUserId: "CURRENT_USER" })}
+            onChange={e => setStatusMutation.mutate({ reportId: bugId, status: e.target.value as never, staffUserId: session.user.id })}
             className="rounded-md border border-border bg-background px-2 py-1 text-xs outline-none focus:border-primary"
           >
             <option value="OPEN">Open</option>
@@ -64,7 +74,7 @@ function BugDetail() {
           </select>
         </div>
         <button
-          onClick={() => setExploitMutation.mutate({ reportId: bugId, isExploit: !data.isExploit, staffUserId: "CURRENT_USER" })}
+          onClick={() => setExploitMutation.mutate({ reportId: bugId, isExploit: !data.isExploit, staffUserId: session.user.id })}
           className={cn(
             "rounded-md border px-3 py-1 text-xs font-medium transition-colors",
             data.isExploit
@@ -73,6 +83,21 @@ function BugDetail() {
           )}
         >
           {data.isExploit ? "Remove Exploit Flag" : "Flag as Exploit"}
+        </button>
+        <button
+          onClick={() => setClaimMutation.mutate({
+            reportId: bugId,
+            staffUserId: data.claimedByUserId ? null : session.user.id,
+          })}
+          disabled={setClaimMutation.isPending}
+          className={cn(
+            "rounded-md border px-3 py-1 text-xs font-medium transition-colors",
+            data.claimedByUserId
+              ? "border-primary/30 bg-primary/10 text-primary hover:bg-primary/20"
+              : "border-border bg-background text-muted-foreground hover:text-foreground"
+          )}
+        >
+          {data.claimedByUserId ? "Unclaim" : "Claim"}
         </button>
       </div>
 
@@ -103,8 +128,8 @@ function BugDetail() {
             className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary resize-none"
           />
           <button
-            onClick={() => addCommentMutation.mutate({ bugReportId: bugId, authorId: "CURRENT_PLAYER_ACCOUNT", body: commentBody })}
-            disabled={!commentBody.trim() || addCommentMutation.isPending}
+            onClick={() => addCommentMutation.mutate({ bugReportId: bugId, authorId: me?.id ?? "", body: commentBody })}
+            disabled={!commentBody.trim() || addCommentMutation.isPending || !me?.id}
             className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
           >
             Post Comment

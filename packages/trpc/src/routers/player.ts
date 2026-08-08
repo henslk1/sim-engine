@@ -83,6 +83,7 @@ export const playerRouter = router({
               { fieldKey: "MARKETPLACE_LISTINGS", isVisible: true },
               { fieldKey: "CLINICS", isVisible: false },
               { fieldKey: "PLAYER_SHOP", isVisible: false },
+              { fieldKey: "FRIENDS", isVisible: true },
             ].map((entry) => ({
               playerAccountId: account.id,
               fieldKey: entry.fieldKey as ProfileFieldKey,
@@ -139,7 +140,7 @@ export const playerRouter = router({
     .input(z.object({ gameId: z.string() }))
     .query(({ input }) =>
       db.starterBreedOption.findMany({
-        where: { gameId: input.gameId, isActive: true },
+        where: { gameId: input.gameId, isActive: true, breed: { isUnregistered: false } },
         include: {
           breed: { select: { id: true, name: true, image: true } },
           colorOptions: {
@@ -176,6 +177,8 @@ export const playerRouter = router({
               animalsBred: true,
               groupMemberships: { where: { status: "ACTIVE" } },
               foundedBreeds: true,
+              friendshipsAsPlayerOne: true,
+              friendshipsAsPlayerTwo: true,
             },
           },
           subContainers: {
@@ -194,6 +197,20 @@ export const playerRouter = router({
               lifeStage: { select: { name: true } },
             },
             orderBy: { updatedAt: "desc" },
+            take: 48,
+          },
+          friendshipsAsPlayerOne: {
+            select: {
+              id: true,
+              playerTwo: { select: { id: true, username: true, avatar: true } },
+            },
+            take: 48,
+          },
+          friendshipsAsPlayerTwo: {
+            select: {
+              id: true,
+              playerOne: { select: { id: true, username: true, avatar: true } },
+            },
             take: 48,
           },
           achievements: {
@@ -306,6 +323,75 @@ export const playerRouter = router({
           },
         },
         data: { isVisible: input.isVisible },
+      })
+    }),
+
+  getMyAccount: protectedProcedure
+    .input(z.object({ gameId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      return db.user.findUnique({
+        where: { id: ctx.userId },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          playerAccounts: {
+            where: { gameId: input.gameId },
+            select: {
+              id: true,
+              username: true,
+              avatar: true,
+              profile: { select: { bio: true, bannerPath: true } },
+            },
+            take: 1,
+          },
+        },
+      })
+    }),
+
+  getNotificationSettings: protectedProcedure
+    .input(z.object({ playerAccountId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const account = await db.playerAccount.findUnique({ where: { id: input.playerAccountId }, select: { userId: true } })
+      if (!account || account.userId !== ctx.userId) throw new TRPCError({ code: "FORBIDDEN" })
+      return db.notificationSetting.findMany({
+        where: { playerAccountId: input.playerAccountId },
+        include: { topicDef: { select: { id: true, name: true, topicKey: true } } },
+        orderBy: { topicDef: { name: "asc" } },
+      })
+    }),
+
+  updateNotificationSetting: protectedProcedure
+    .input(z.object({ playerAccountId: z.string(), topicDefId: z.string(), isEnabled: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const account = await db.playerAccount.findUnique({ where: { id: input.playerAccountId }, select: { userId: true } })
+      if (!account || account.userId !== ctx.userId) throw new TRPCError({ code: "FORBIDDEN" })
+      return db.notificationSetting.update({
+        where: { playerAccountId_topicDefId: { playerAccountId: input.playerAccountId, topicDefId: input.topicDefId } },
+        data: { isEnabled: input.isEnabled },
+      })
+    }),
+
+  getBlockedPlayers: protectedProcedure
+    .input(z.object({ playerAccountId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const account = await db.playerAccount.findUnique({ where: { id: input.playerAccountId }, select: { userId: true } })
+      if (!account || account.userId !== ctx.userId) throw new TRPCError({ code: "FORBIDDEN" })
+      return db.blockedPlayer.findMany({
+        where: { blockerPlayerId: input.playerAccountId },
+        select: { id: true, blockedPlayerId: true, blockedPlayer: { select: { id: true, username: true, avatar: true } } },
+      })
+    }),
+
+  getSubscription: protectedProcedure
+    .input(z.object({ playerAccountId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const account = await db.playerAccount.findUnique({ where: { id: input.playerAccountId }, select: { userId: true } })
+      if (!account || account.userId !== ctx.userId) throw new TRPCError({ code: "FORBIDDEN" })
+      return db.playerSubscription.findFirst({
+        where: { playerAccountId: input.playerAccountId },
+        include: { subscriptionTier: { select: { id: true, name: true, cost: true, hasGeneReveal: true, hasPlayerStore: true } } },
+        orderBy: { startedAt: "desc" },
       })
     }),
 })
