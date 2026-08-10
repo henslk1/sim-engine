@@ -1,6 +1,7 @@
 enum GeneticPanelType {
   HEALTH
   CONFORMATION
+  COLOR
 }
 
 enum LocusBiasTarget {

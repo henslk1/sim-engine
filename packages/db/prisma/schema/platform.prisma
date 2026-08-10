@@ -501,6 +501,8 @@ model GameConfig {
   immunityMax                     Float    @default(100)
   energyLowCareThreshold          Float    @default(0)
   energyLowCarePenalty            Float    @default(0)
+  overworkInjuryThreshold         Float    @default(0)
+  overworkInjuryChance            Float    @default(0)
   cyclesPerYear                   Int      @default(12)
   lifeExpectancyBaseline          Int?
   maxLocusTestsPerCycle           Int      @default(2)

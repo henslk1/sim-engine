@@ -30,19 +30,6 @@ function groupByPanel(genotypes: Genotype[], panelType: "HEALTH" | "CONFORMATION
   return Array.from(panelMap.values())
 }
 
-function groupByAnyPanel(genotypes: Genotype[]) {
-  const panelMap = new Map<string, { panelDef: PanelDef; genotypes: Genotype[] }>()
-  const ungrouped: Genotype[] = []
-  for (const g of genotypes) {
-    const entry = g.locus.panelEntries[0]
-    if (!entry) { ungrouped.push(g); continue }
-    if (!panelMap.has(entry.panelDef.id)) {
-      panelMap.set(entry.panelDef.id, { panelDef: entry.panelDef, genotypes: [] })
-    }
-    panelMap.get(entry.panelDef.id)!.genotypes.push(g)
-  }
-  return { panels: Array.from(panelMap.values()), ungrouped }
-}
 
 function GenotypeCard({
   genotype,
@@ -214,11 +201,9 @@ export function GeneticsTab({
   const testedThisCycle = animal.genotypes.filter((g) => g.testedCycle === animal.ageInCycles).length
   const testsRemaining = Math.max(0, testsPerCycle - testedThisCycle)
 
-  const colorGenotypes = animal.genotypes.filter((g) => g.locus.displayGroup === "Color")
-  const nonColorGenotypes = animal.genotypes.filter((g) => g.locus.displayGroup !== "Color")
-  const { panels: colorPanels, ungrouped: colorUngrouped } = groupByAnyPanel(colorGenotypes)
-  const healthPanels = groupByPanel(nonColorGenotypes, "HEALTH")
-  const conformationPanels = groupByPanel(nonColorGenotypes, "CONFORMATION")
+  const colorPanels = groupByPanel(animal.genotypes, "COLOR")
+  const healthPanels = groupByPanel(animal.genotypes, "HEALTH")
+  const conformationPanels = groupByPanel(animal.genotypes, "CONFORMATION")
 
   return (
     <div className="space-y-3">
@@ -246,12 +231,12 @@ export function GeneticsTab({
       </div>
 
       {subTab === "color" && (
-        colorGenotypes.length === 0 ? (
-          <p className="text-[11px] text-muted-foreground/60">None</p>
+        colorPanels.length === 0 ? (
+          <p className="text-[11px] text-muted-foreground/60">No color panels</p>
         ) : (
           <div className="flex flex-wrap gap-3">
             {colorPanels.map(({ panelDef, genotypes }) => (
-              <div key={panelDef.id} className="min-w-[200px] flex-1">
+              <div key={panelDef.id} className="min-w-50 flex-1">
                 <PanelGroup
                   panelDef={panelDef}
                   genotypes={genotypes}
@@ -265,28 +250,6 @@ export function GeneticsTab({
                 />
               </div>
             ))}
-            {colorUngrouped.length > 0 && (
-              <div className="min-w-[200px] flex-1 rounded-md border border-border bg-card">
-                <div className="border-b border-border/60 px-3 py-2">
-                  <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Other</span>
-                </div>
-                <div className="p-2">
-                  <GenotypeGrid>
-                    {colorUngrouped.map((g) => (
-                      <GenotypeCard
-                        key={g.locusId}
-                        genotype={g}
-                        testsRemaining={testsRemaining}
-                        isTestingThis={testingLocusId === g.locusId}
-                        isAgeGated={g.locus.minTestCycle != null && animal.ageInCycles < g.locus.minTestCycle}
-                        cycleToAge={cycleToAge}
-                        onTest={() => testLocus({ animalId: animal.id, locusId: g.locusId })}
-                      />
-                    ))}
-                  </GenotypeGrid>
-                </div>
-              </div>
-            )}
           </div>
         )
       )}
@@ -297,7 +260,7 @@ export function GeneticsTab({
         ) : (
           <div className="flex flex-wrap gap-3">
             {healthPanels.map(({ panelDef, genotypes }) => (
-              <div key={panelDef.id} className="min-w-[200px] flex-1">
+              <div key={panelDef.id} className="min-w-50 flex-1">
                 <PanelGroup
                   panelDef={panelDef}
                   genotypes={genotypes}
@@ -321,7 +284,7 @@ export function GeneticsTab({
         ) : (
           <div className="flex flex-wrap gap-3">
             {conformationPanels.map(({ panelDef, genotypes }) => (
-              <div key={panelDef.id} className="min-w-[200px] flex-1">
+              <div key={panelDef.id} className="min-w-50 flex-1">
                 <PanelGroup
                   panelDef={panelDef}
                   genotypes={genotypes}

@@ -58,6 +58,7 @@ model ItemDef {
   campaignRewardTierItems CampaignRewardTierItem[]
   disciplineRequirements  DisciplineEquipmentRequirement[]
   seasonPrizeConfigs      SeasonPrizeConfig[]
+  conditionSuppressions   HealthConditionDef[]
   prizeEligible           Boolean                          @default(true)
   isSellable              Boolean                          @default(true)
   game                    Game                             @relation(fields: [gameId], references: [id])

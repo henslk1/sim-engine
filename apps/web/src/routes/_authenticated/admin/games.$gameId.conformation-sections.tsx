@@ -181,7 +181,7 @@ function ConformationSectionsPage() {
                         className="h-8 rounded-md border border-input bg-background px-3 text-sm w-full"
                       >
                         <option value="">Select locus…</option>
-                        {loci?.map((l) => <option key={l.id} value={l.id}>{l.name}{l.displayGroup ? ` (${l.displayGroup})` : ""}</option>)}
+                        {loci?.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
                       </select>
                     </td>
                     <td className="px-3 py-2">

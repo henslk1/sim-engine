@@ -180,6 +180,21 @@ export const breedingPregnancyRouter = router({
 
         const unborn = pregnancy.offspring.filter((o) => o.animal.status === "EMBRYO_STORED")
 
+        // Load expression rules that are lethal at birth (isFatal + fatalMaxCycle 0)
+        const lethalRules = await tx.expressionRule.findMany({
+          where: {
+            locus: { gameId },
+            healthConditionDef: { isFatal: true, fatalMaxCycle: 0 },
+          },
+          select: {
+            locusId: true,
+            alleleOneId: true,
+            alleleTwoId: true,
+            penetrance: true,
+            healthConditionDef: { select: { id: true, name: true } },
+          },
+        })
+
         // Detect IVF offspring (no AnimalStat records written at conception)
         let needsStats = false
         if (unborn.length > 0) {
@@ -246,6 +261,45 @@ export const breedingPregnancyRouter = router({
               if (stats.length > 0) {
                 await tx.animalStat.createMany({ data: stats })
               }
+            }
+          }
+
+          // Stillbirth check: lethal genotype combination
+          if (lethalRules.length > 0) {
+            const genotypes = await tx.animalGenotype.findMany({
+              where: { animalId: o.animal.id },
+              select: { locusId: true, alleleOneId: true, alleleTwoId: true },
+            })
+            let lethalCondition: { id: string; name: string } | null = null
+            for (const g of genotypes) {
+              const match = lethalRules.find(
+                (r) => r.locusId === g.locusId &&
+                       r.alleleOneId === g.alleleOneId &&
+                       r.alleleTwoId === g.alleleTwoId
+              )
+              if (!match?.healthConditionDef) continue
+              if (Math.random() < (match.penetrance ?? 1.0)) {
+                lethalCondition = match.healthConditionDef
+                break
+              }
+            }
+            if (lethalCondition) {
+              await tx.animal.update({
+                where: { id: o.animal.id },
+                data: {
+                  status: "DECEASED",
+                  name: nameMap.get(o.animal.id) ?? "Unnamed Foal",
+                  diedAt: new Date(),
+                  causeOfDeath: lethalCondition.name,
+                },
+              })
+              await tx.animalHealthRecord.create({
+                data: { animalId: o.animal.id, conditionDefId: lethalCondition.id, isActive: false },
+              })
+              await tx.animalDailyLog.create({
+                data: { animalId: o.animal.id, cycleNumber: 0, eventType: "BORN_DECEASED", outcome: lethalCondition.name },
+              })
+              continue
             }
           }
 

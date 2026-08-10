@@ -11,6 +11,16 @@ const TREATMENT_LABELS: Record<TreatmentType, string> = {
   ACTIVITY_RESTRICTION: "Activity Restriction", PLAYER_ACTION: "Player Action",
 }
 
+const ITEM_TYPES = ["OTC_MEDICATION", "CARE_CONSUMABLE", "EQUIPMENT", "DIRECT_EFFECT", "PERMANENT_APPLIED", "ANIMAL_SLOT_EXPAND", "SUBCONTAINER_EXPAND", "AGING_BASE", "AGING_PREMIUM"] as const
+type ItemType = typeof ITEM_TYPES[number]
+const ITEM_TYPE_LABELS: Record<ItemType, string> = {
+  OTC_MEDICATION: "OTC Medication", CARE_CONSUMABLE: "Care Consumable", EQUIPMENT: "Equipment",
+  DIRECT_EFFECT: "Direct Effect", PERMANENT_APPLIED: "Permanent Applied", ANIMAL_SLOT_EXPAND: "Slot Expand",
+  SUBCONTAINER_EXPAND: "Sub Expand", AGING_BASE: "Aging Base", AGING_PREMIUM: "Aging Premium",
+}
+const ITEM_CATEGORIES = ["AGING", "CARE", "HEALTH", "EQUIPMENT", "BREEDING", "STORAGE", "MISC"] as const
+type ItemCategory = typeof ITEM_CATEGORIES[number]
+
 type ConditionForm = {
   id?: string
   name: string
@@ -29,11 +39,19 @@ const emptyCondition = (): ConditionForm => ({ name: "", conditionType: "ILLNESS
 type BehaviorRow = { symptomText: string; careActionDefId: string }
 const emptyBehavior = (): BehaviorRow => ({ symptomText: "", careActionDefId: "" })
 
-type TreatmentForm = { name: string; treatmentType: TreatmentType; durationCycles: string }
-const emptyTreatment = (): TreatmentForm => ({ name: "", treatmentType: "OTC", durationCycles: "" })
+type TreatmentForm = { name: string; treatmentType: TreatmentType; durationCycles: string; isLifelong: boolean }
+const emptyTreatment = (): TreatmentForm => ({ name: "", treatmentType: "OTC", durationCycles: "", isLifelong: false })
 
 type ItemRow = { itemDefId: string; quantity: string }
 const emptyItem = (): ItemRow => ({ itemDefId: "", quantity: "1" })
+
+type EditRuleForm = { alleleOneId: string; alleleTwoId: string; phenotype: string; penetrance: string }
+
+type CreateRuleForm = { locusId: string; alleleOneId: string; alleleTwoId: string; phenotype: string; penetrance: string }
+const emptyCreateRule = (): CreateRuleForm => ({ locusId: "", alleleOneId: "", alleleTwoId: "", phenotype: "", penetrance: "1" })
+
+type CreateItemForm = { name: string; itemType: ItemType; category: ItemCategory }
+const emptyCreateItem = (): CreateItemForm => ({ name: "", itemType: "OTC_MEDICATION", category: "HEALTH" })
 
 function HealthConditionsPage() {
   const { gameId } = Route.useParams()
@@ -41,6 +59,7 @@ function HealthConditionsPage() {
   const { data: conditions } = trpc.admin.health.list.useQuery({ gameId: gameId! }, {})
   const { data: careActions } = trpc.admin.care.list.useQuery({ gameId: gameId! }, {})
   const { data: itemDefs } = trpc.admin.item.list.useQuery({ gameId: gameId! }, {})
+  const { data: loci } = trpc.admin.locus.list.useQuery({ gameId: gameId! })
 
   const utils = trpc.useUtils()
 
@@ -55,7 +74,7 @@ function HealthConditionsPage() {
   })
 
   const [editing, setEditing] = useState<ConditionForm | null>(null)
-  const [rightTab, setRightTab] = useState<"behaviors" | "treatments">("behaviors")
+  const [rightTab, setRightTab] = useState<"behaviors" | "treatments" | "genetics">("behaviors")
 
   // Behavior state
   const { data: behaviors } = trpc.admin.health.listBehaviors.useQuery(
@@ -97,6 +116,64 @@ function HealthConditionsPage() {
     { treatmentDefId: expandedTreatmentId! },
     { enabled: !!expandedTreatmentId }
   )
+
+  // Genetics state
+  const [linkRuleId, setLinkRuleId] = useState("")
+  const [creatingRule, setCreatingRule] = useState(false)
+  const [createRuleForm, setCreateRuleForm] = useState<CreateRuleForm>(emptyCreateRule())
+  const { data: createRuleAlleles } = trpc.admin.locus.listAlleles.useQuery(
+    { locusId: createRuleForm.locusId },
+    { enabled: !!createRuleForm.locusId }
+  )
+  const [editingRuleId, setEditingRuleId] = useState<string | null>(null)
+  const [editingRuleForm, setEditingRuleForm] = useState<EditRuleForm | null>(null)
+  const [editingRuleLocusId, setEditingRuleLocusId] = useState("")
+  const { data: editRuleAlleles } = trpc.admin.locus.listAlleles.useQuery(
+    { locusId: editingRuleLocusId },
+    { enabled: !!editingRuleLocusId }
+  )
+  const [creatingItem, setCreatingItem] = useState(false)
+  const [createItemForm, setCreateItemForm] = useState<CreateItemForm>(emptyCreateItem())
+
+  const { data: linkedRules } = trpc.admin.expression.listByCondition.useQuery(
+    { conditionDefId: editing?.id! },
+    { enabled: !!editing?.id && rightTab === "genetics" }
+  )
+  const { data: unlinkedRules } = trpc.admin.expression.listUnlinkedByGame.useQuery(
+    { gameId: gameId! },
+    { enabled: !!editing?.id && rightTab === "genetics" }
+  )
+  const setCondition = trpc.admin.expression.setCondition.useMutation({
+    onSuccess: () => {
+      utils.admin.expression.listByCondition.invalidate({ conditionDefId: editing?.id })
+      utils.admin.expression.listUnlinkedByGame.invalidate({ gameId: gameId! })
+      setLinkRuleId("")
+    },
+  })
+  const saveExpression = trpc.admin.expression.save.useMutation({
+    onSuccess: () => {
+      utils.admin.expression.listByCondition.invalidate({ conditionDefId: editing?.id })
+      utils.admin.expression.listUnlinkedByGame.invalidate({ gameId: gameId! })
+      setCreatingRule(false)
+      setCreateRuleForm(emptyCreateRule())
+    },
+  })
+  const updateExpression = trpc.admin.expression.save.useMutation({
+    onSuccess: () => {
+      utils.admin.expression.listByCondition.invalidate({ conditionDefId: editing?.id })
+      setEditingRuleId(null)
+      setEditingRuleForm(null)
+      setEditingRuleLocusId("")
+    },
+  })
+  const saveItemInline = trpc.admin.item.save.useMutation({
+    onSuccess: (saved) => {
+      utils.admin.item.list.invalidate({ gameId: gameId! })
+      setCreatingItem(false)
+      setCreateItemForm(emptyCreateItem())
+      setNewItem({ itemDefId: saved.id, quantity: "1" })
+    },
+  })
 
   const saveTreatment = trpc.admin.treatment.save.useMutation({
     onSuccess: () => {
@@ -143,6 +220,9 @@ function HealthConditionsPage() {
     setEditingBehaviorId(null); setEditingBehavior(null); setNewBehavior(emptyBehavior())
     setExpandedTreatmentId(null); setEditingTreatmentId(null); setEditingTreatment(null)
     setEditingItemId(null); setEditingItem(null); setNewItem(emptyItem())
+    setLinkRuleId("")
+    setCreatingRule(false); setCreateRuleForm(emptyCreateRule())
+    setCreatingItem(false); setCreateItemForm(emptyCreateItem())
   }
 
   function submitCondition() {
@@ -174,7 +254,7 @@ function HealthConditionsPage() {
       conditionDefId: editing.id,
       name: editingTreatment.name.trim(),
       treatmentType: editingTreatment.treatmentType,
-      durationCycles: editingTreatment.durationCycles ? parseInt(editingTreatment.durationCycles) : null,
+      durationCycles: editingTreatment.isLifelong ? null : (editingTreatment.durationCycles ? parseInt(editingTreatment.durationCycles) : null),
     })
   }
 
@@ -182,6 +262,43 @@ function HealthConditionsPage() {
     const form = id ? editingItem : newItem
     if (!form || !expandedTreatmentId || !form.itemDefId) return
     saveItem.mutate({ id, treatmentDefId: expandedTreatmentId, itemDefId: form.itemDefId, quantity: parseInt(form.quantity) || 1 })
+  }
+
+  function submitCreateRule() {
+    if (!createRuleForm.locusId || !createRuleForm.alleleOneId || !createRuleForm.alleleTwoId || !createRuleForm.phenotype.trim() || !editing?.id) return
+    saveExpression.mutate({
+      locusId: createRuleForm.locusId,
+      alleleOneId: createRuleForm.alleleOneId,
+      alleleTwoId: createRuleForm.alleleTwoId,
+      phenotype: createRuleForm.phenotype.trim(),
+      penetrance: createRuleForm.penetrance ? parseFloat(createRuleForm.penetrance) : null,
+      healthConditionDefId: editing.id,
+    })
+  }
+
+  function submitEditRule() {
+    if (!editingRuleId || !editingRuleForm || !editingRuleLocusId || !editingRuleForm.alleleOneId || !editingRuleForm.alleleTwoId || !editingRuleForm.phenotype.trim()) return
+    updateExpression.mutate({
+      id: editingRuleId,
+      locusId: editingRuleLocusId,
+      alleleOneId: editingRuleForm.alleleOneId,
+      alleleTwoId: editingRuleForm.alleleTwoId,
+      phenotype: editingRuleForm.phenotype.trim(),
+      penetrance: editingRuleForm.penetrance ? parseFloat(editingRuleForm.penetrance) : null,
+      healthConditionDefId: editing?.id,
+    })
+  }
+
+  function submitCreateItem() {
+    if (!gameId || !createItemForm.name.trim()) return
+    saveItemInline.mutate({
+      gameId,
+      name: createItemForm.name.trim(),
+      itemType: createItemForm.itemType,
+      category: createItemForm.category,
+      prizeEligible: true,
+      isSellable: true,
+    })
   }
 
   if (editing !== null) {
@@ -278,12 +395,12 @@ function HealthConditionsPage() {
             <section className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
               {/* Tab bar */}
               <div className="flex items-center gap-4 border-b border-border bg-secondary/40 px-3 py-2">
-                {(["behaviors", "treatments"] as const).map(tab => (
+                {(["behaviors", "treatments", "genetics"] as const).map(tab => (
                   <button key={tab} onClick={() => setRightTab(tab)}
                     className={`text-[10px] font-bold uppercase tracking-wider pb-0.5 border-b-2 transition-colors ${
                       rightTab === tab ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
                     }`}>
-                    {tab === "behaviors" ? "Behaviors & Symptoms" : "Treatments"}
+                    {tab === "behaviors" ? "Behaviors & Symptoms" : tab === "treatments" ? "Treatments" : "Linked Genes"}
                   </button>
                 ))}
               </div>
@@ -348,7 +465,6 @@ function HealthConditionsPage() {
               {/* Treatments tab */}
               {rightTab === "treatments" && (
                 <div className={editingTreatment !== null ? "grid grid-cols-[280px_1fr] divide-x divide-border" : ""}>
-                  {/* Treatment form (when editing/adding) */}
                   {editingTreatment !== null && (
                     <div className="p-3 space-y-3">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -365,8 +481,18 @@ function HealthConditionsPage() {
                         </select>
                       </div>
                       <div className="flex flex-col gap-1">
-                        <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Duration (cycles) — optional</label>
-                        <Input className="h-8 text-sm" type="number" min="1" value={editingTreatment.durationCycles} onChange={(e) => setEditingTreatment({ ...editingTreatment, durationCycles: e.target.value })} placeholder="—" />
+                        <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Duration (cycles)</label>
+                        <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={editingTreatment.isLifelong}
+                            onChange={(e) => setEditingTreatment({ ...editingTreatment, isLifelong: e.target.checked, durationCycles: e.target.checked ? "" : "1" })}
+                          />
+                          Lifelong (no expiry)
+                        </label>
+                        {!editingTreatment.isLifelong && (
+                          <Input className="h-8 text-sm" type="number" min="1" value={editingTreatment.durationCycles} onChange={(e) => setEditingTreatment({ ...editingTreatment, durationCycles: e.target.value })} placeholder="Number of cycles" />
+                        )}
                       </div>
                       <div className="flex gap-2">
                         <Button size="sm" onClick={submitTreatment} disabled={saveTreatment.isPending || !editingTreatment.name.trim()}>
@@ -378,7 +504,6 @@ function HealthConditionsPage() {
                     </div>
                   )}
 
-                  {/* Treatment list */}
                   <div>
                     <div className="flex items-center justify-between border-b border-border bg-muted/20 px-3 py-1.5">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Treatments</span>
@@ -400,12 +525,14 @@ function HealthConditionsPage() {
                             <tr className={`border-b border-border ${expandedTreatmentId === t.id ? "bg-muted/30" : ""}`}>
                               <td className="px-3 py-2 font-medium text-foreground">{t.name}</td>
                               <td className="px-3 py-2 text-muted-foreground">{TREATMENT_LABELS[t.treatmentType as TreatmentType]}</td>
-                              <td className="px-3 py-2 text-muted-foreground">{t.durationCycles ?? "—"}</td>
+                              <td className="px-3 py-2 text-muted-foreground">{t.durationCycles != null ? `${t.durationCycles} cycles` : <span className="italic">Lifelong</span>}</td>
                               <td className="px-3 py-2 text-center">
                                 <Button size="sm" variant="ghost" className="text-xs h-6 px-2"
                                   onClick={() => {
-                                    setExpandedTreatmentId(expandedTreatmentId === t.id ? null : t.id)
+                                    const next = expandedTreatmentId === t.id ? null : t.id
+                                    setExpandedTreatmentId(next)
                                     setEditingItemId(null); setEditingItem(null); setNewItem(emptyItem())
+                                    setCreatingItem(false); setCreateItemForm(emptyCreateItem())
                                   }}>
                                   {t._count.items} {expandedTreatmentId === t.id ? "▲" : "▼"}
                                 </Button>
@@ -413,7 +540,7 @@ function HealthConditionsPage() {
                               <td className="px-3 py-2 text-right space-x-1">
                                 <Button size="sm" variant="ghost" onClick={() => {
                                   setEditingTreatmentId(t.id)
-                                  setEditingTreatment({ name: t.name, treatmentType: t.treatmentType as TreatmentType, durationCycles: t.durationCycles?.toString() ?? "" })
+                                  setEditingTreatment({ name: t.name, treatmentType: t.treatmentType as TreatmentType, durationCycles: t.durationCycles?.toString() ?? "", isLifelong: t.durationCycles == null })
                                 }}>Edit</Button>
                                 <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
                                   onClick={() => { if (!confirm("Delete this treatment?")) return; removeTreatment.mutate({ id: t.id }) }}>
@@ -424,62 +551,91 @@ function HealthConditionsPage() {
                             {expandedTreatmentId === t.id && (
                               <tr className="border-b border-border bg-muted/10">
                                 <td colSpan={5} className="px-6 py-3">
-                                  {!itemDefs?.length ? (
-                                    <p className="text-sm text-muted-foreground">No items configured. Set up Items in the Economy section first.</p>
-                                  ) : (
-                                    <table className="w-full text-sm">
-                                      <thead>
-                                        <tr className="border-b border-border">
-                                          <th className="pb-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Item</th>
-                                          <th className="pb-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Quantity</th>
-                                          <th className="pb-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
-                                        </tr>
-                                      </thead>
-                                      <tbody>
-                                        {treatmentItems?.map((item: NonNullable<typeof treatmentItems>[number]) =>
-                                          editingItemId === item.id ? (
-                                            <tr key={item.id} className="border-b border-border last:border-0">
-                                              <td className="py-1.5 pr-4">
-                                                <select value={editingItem?.itemDefId ?? ""} onChange={(e) => setEditingItem(p => p ? { ...p, itemDefId: e.target.value } : null)} className="h-7 rounded border border-input bg-background px-2 text-xs">
-                                                  {itemDefs.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                                                </select>
-                                              </td>
-                                              <td className="py-1.5 pr-4">
-                                                <Input type="number" min="1" value={editingItem?.quantity ?? "1"} onChange={(e) => setEditingItem(p => p ? { ...p, quantity: e.target.value } : null)} className="h-7 text-sm w-20" />
-                                              </td>
-                                              <td className="py-1.5 text-right space-x-2">
-                                                <Button size="sm" onClick={() => submitItem(item.id)} disabled={saveItem.isPending}>Save</Button>
-                                                <Button size="sm" variant="ghost" onClick={() => { setEditingItemId(null); setEditingItem(null) }}>Cancel</Button>
-                                              </td>
-                                            </tr>
-                                          ) : (
-                                            <tr key={item.id} className="border-b border-border last:border-0">
-                                              <td className="py-1.5 pr-4 font-medium text-foreground">{item.itemDef.name}</td>
-                                              <td className="py-1.5 pr-4 text-muted-foreground">{item.quantity}</td>
-                                              <td className="py-1.5 text-right space-x-2">
-                                                <Button size="sm" variant="ghost" onClick={() => { setEditingItemId(item.id); setEditingItem({ itemDefId: item.itemDefId, quantity: item.quantity.toString() }) }}>Edit</Button>
-                                                <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => removeItem.mutate({ id: item.id })}>Delete</Button>
-                                              </td>
-                                            </tr>
-                                          )
-                                        )}
-                                        <tr>
-                                          <td className="py-1.5 pr-4">
-                                            <select value={newItem.itemDefId} onChange={(e) => setNewItem({ ...newItem, itemDefId: e.target.value })} className="h-7 rounded border border-input bg-background px-2 text-xs">
-                                              <option value="">Select item…</option>
-                                              {itemDefs.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                                            </select>
-                                          </td>
-                                          <td className="py-1.5 pr-4">
-                                            <Input type="number" min="1" value={newItem.quantity} onChange={(e) => setNewItem({ ...newItem, quantity: e.target.value })} className="h-7 text-sm w-20" />
-                                          </td>
-                                          <td className="py-1.5 text-right">
-                                            <Button size="sm" onClick={() => submitItem()} disabled={!newItem.itemDefId || saveItem.isPending}>Add</Button>
-                                          </td>
-                                        </tr>
-                                      </tbody>
-                                    </table>
+                                  {creatingItem && (
+                                    <div className="mb-3 p-3 rounded-lg border border-border bg-card space-y-2">
+                                      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">New Item</p>
+                                      <div className="grid grid-cols-3 gap-2">
+                                        <div className="flex flex-col gap-1 col-span-3">
+                                          <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Name</label>
+                                          <Input className="h-8 text-sm" value={createItemForm.name} onChange={(e) => setCreateItemForm({ ...createItemForm, name: e.target.value })} placeholder="e.g. Antibiotic" />
+                                        </div>
+                                        <div className="flex flex-col gap-1 col-span-2">
+                                          <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Type</label>
+                                          <select value={createItemForm.itemType} onChange={(e) => setCreateItemForm({ ...createItemForm, itemType: e.target.value as ItemType })} className="h-8 rounded-md border border-input bg-background px-3 text-sm">
+                                            {ITEM_TYPES.map((it) => <option key={it} value={it}>{ITEM_TYPE_LABELS[it]}</option>)}
+                                          </select>
+                                        </div>
+                                        <div className="flex flex-col gap-1">
+                                          <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Category</label>
+                                          <select value={createItemForm.category} onChange={(e) => setCreateItemForm({ ...createItemForm, category: e.target.value as ItemCategory })} className="h-8 rounded-md border border-input bg-background px-3 text-sm">
+                                            {ITEM_CATEGORIES.map((c) => <option key={c} value={c}>{c.charAt(0) + c.slice(1).toLowerCase()}</option>)}
+                                          </select>
+                                        </div>
+                                      </div>
+                                      <div className="flex gap-2">
+                                        <Button size="sm" onClick={submitCreateItem} disabled={!createItemForm.name.trim() || saveItemInline.isPending}>Create Item</Button>
+                                        <Button size="sm" variant="ghost" onClick={() => { setCreatingItem(false); setCreateItemForm(emptyCreateItem()) }}>Cancel</Button>
+                                      </div>
+                                      {saveItemInline.error && <p className="text-sm text-destructive">{saveItemInline.error.message}</p>}
+                                    </div>
                                   )}
+                                  <table className="w-full text-sm">
+                                    <thead>
+                                      <tr className="border-b border-border">
+                                        <th className="pb-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Item</th>
+                                        <th className="pb-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Quantity</th>
+                                        <th className="pb-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {treatmentItems?.map((item: NonNullable<typeof treatmentItems>[number]) =>
+                                        editingItemId === item.id ? (
+                                          <tr key={item.id} className="border-b border-border last:border-0">
+                                            <td className="py-1.5 pr-4">
+                                              <select value={editingItem?.itemDefId ?? ""} onChange={(e) => setEditingItem(p => p ? { ...p, itemDefId: e.target.value } : null)} className="h-7 rounded border border-input bg-background px-2 text-xs">
+                                                {itemDefs?.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                                              </select>
+                                            </td>
+                                            <td className="py-1.5 pr-4">
+                                              <Input type="number" min="1" value={editingItem?.quantity ?? "1"} onChange={(e) => setEditingItem(p => p ? { ...p, quantity: e.target.value } : null)} className="h-7 text-sm w-20" />
+                                            </td>
+                                            <td className="py-1.5 text-right space-x-2">
+                                              <Button size="sm" onClick={() => submitItem(item.id)} disabled={saveItem.isPending}>Save</Button>
+                                              <Button size="sm" variant="ghost" onClick={() => { setEditingItemId(null); setEditingItem(null) }}>Cancel</Button>
+                                            </td>
+                                          </tr>
+                                        ) : (
+                                          <tr key={item.id} className="border-b border-border last:border-0">
+                                            <td className="py-1.5 pr-4 font-medium text-foreground">{item.itemDef.name}</td>
+                                            <td className="py-1.5 pr-4 text-muted-foreground">{item.quantity}</td>
+                                            <td className="py-1.5 text-right space-x-2">
+                                              <Button size="sm" variant="ghost" onClick={() => { setEditingItemId(item.id); setEditingItem({ itemDefId: item.itemDefId, quantity: item.quantity.toString() }) }}>Edit</Button>
+                                              <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => removeItem.mutate({ id: item.id })}>Delete</Button>
+                                            </td>
+                                          </tr>
+                                        )
+                                      )}
+                                      <tr>
+                                        <td className="py-1.5 pr-4">
+                                          <div className="flex items-center gap-2">
+                                            <select value={newItem.itemDefId} onChange={(e) => setNewItem({ ...newItem, itemDefId: e.target.value })} className="h-7 rounded border border-input bg-background px-2 text-xs">
+                                              <option value="">{itemDefs?.length ? "Select item…" : "No items yet"}</option>
+                                              {itemDefs?.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                                            </select>
+                                            {!creatingItem && (
+                                              <button className="text-xs text-muted-foreground hover:text-foreground whitespace-nowrap" onClick={() => setCreatingItem(true)}>+ New</button>
+                                            )}
+                                          </div>
+                                        </td>
+                                        <td className="py-1.5 pr-4">
+                                          <Input type="number" min="1" value={newItem.quantity} onChange={(e) => setNewItem({ ...newItem, quantity: e.target.value })} className="h-7 text-sm w-20" />
+                                        </td>
+                                        <td className="py-1.5 text-right">
+                                          <Button size="sm" onClick={() => submitItem()} disabled={!newItem.itemDefId || saveItem.isPending}>Add</Button>
+                                        </td>
+                                      </tr>
+                                    </tbody>
+                                  </table>
                                 </td>
                               </tr>
                             )}
@@ -493,6 +649,165 @@ function HealthConditionsPage() {
                       </tbody>
                     </table>
                   </div>
+                </div>
+              )}
+
+              {/* Genetics tab */}
+              {rightTab === "genetics" && (
+                <div>
+                  {editingRuleId && editingRuleForm ? (
+                    <div className="p-3 border-b border-border space-y-3">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Edit Rule</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="flex flex-col gap-1 col-span-2">
+                          <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Locus</label>
+                          <p className="text-sm text-muted-foreground px-1">{linkedRules?.find(r => r.id === editingRuleId)?.locus.name}</p>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Allele 1</label>
+                          <select value={editingRuleForm.alleleOneId} onChange={(e) => setEditingRuleForm({ ...editingRuleForm, alleleOneId: e.target.value })}
+                            className="h-8 rounded-md border border-input bg-background px-3 text-sm font-mono">
+                            <option value="">Select…</option>
+                            {editRuleAlleles?.map((a) => <option key={a.id} value={a.id}>{a.symbol}</option>)}
+                          </select>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Allele 2</label>
+                          <select value={editingRuleForm.alleleTwoId} onChange={(e) => setEditingRuleForm({ ...editingRuleForm, alleleTwoId: e.target.value })}
+                            className="h-8 rounded-md border border-input bg-background px-3 text-sm font-mono">
+                            <option value="">Select…</option>
+                            {editRuleAlleles?.map((a) => <option key={a.id} value={a.id}>{a.symbol}</option>)}
+                          </select>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Phenotype</label>
+                          <Input className="h-8 text-sm" value={editingRuleForm.phenotype} onChange={(e) => setEditingRuleForm({ ...editingRuleForm, phenotype: e.target.value })} />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Penetrance</label>
+                          <Input className="h-8 text-sm" type="number" min="0" max="1" step="0.01" value={editingRuleForm.penetrance} onChange={(e) => setEditingRuleForm({ ...editingRuleForm, penetrance: e.target.value })} />
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" onClick={submitEditRule}
+                          disabled={!editingRuleForm.alleleOneId || !editingRuleForm.alleleTwoId || !editingRuleForm.phenotype.trim() || updateExpression.isPending}>
+                          Save
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => { setEditingRuleId(null); setEditingRuleForm(null); setEditingRuleLocusId("") }}>Cancel</Button>
+                      </div>
+                      {updateExpression.error && <p className="text-sm text-destructive">{updateExpression.error.message}</p>}
+                    </div>
+                  ) : creatingRule ? (
+                    <div className="p-3 border-b border-border space-y-3">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Create & Link Rule</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="flex flex-col gap-1 col-span-2">
+                          <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Locus</label>
+                          <select value={createRuleForm.locusId} onChange={(e) => setCreateRuleForm({ ...createRuleForm, locusId: e.target.value, alleleOneId: "", alleleTwoId: "" })}
+                            className="h-8 rounded-md border border-input bg-background px-3 text-sm">
+                            <option value="">Select locus…</option>
+                            {loci?.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+                          </select>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Allele 1</label>
+                          <select value={createRuleForm.alleleOneId} onChange={(e) => setCreateRuleForm({ ...createRuleForm, alleleOneId: e.target.value })}
+                            className="h-8 rounded-md border border-input bg-background px-3 text-sm font-mono" disabled={!createRuleForm.locusId}>
+                            <option value="">Select…</option>
+                            {createRuleAlleles?.map((a) => <option key={a.id} value={a.id}>{a.symbol}</option>)}
+                          </select>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Allele 2</label>
+                          <select value={createRuleForm.alleleTwoId} onChange={(e) => setCreateRuleForm({ ...createRuleForm, alleleTwoId: e.target.value })}
+                            className="h-8 rounded-md border border-input bg-background px-3 text-sm font-mono" disabled={!createRuleForm.locusId}>
+                            <option value="">Select…</option>
+                            {createRuleAlleles?.map((a) => <option key={a.id} value={a.id}>{a.symbol}</option>)}
+                          </select>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Phenotype</label>
+                          <Input className="h-8 text-sm" value={createRuleForm.phenotype} onChange={(e) => setCreateRuleForm({ ...createRuleForm, phenotype: e.target.value })} placeholder="e.g. dominant_white_lethal" />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Penetrance</label>
+                          <Input className="h-8 text-sm" type="number" min="0" max="1" step="0.01" value={createRuleForm.penetrance} onChange={(e) => setCreateRuleForm({ ...createRuleForm, penetrance: e.target.value })} />
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" onClick={submitCreateRule}
+                          disabled={!createRuleForm.locusId || !createRuleForm.alleleOneId || !createRuleForm.alleleTwoId || !createRuleForm.phenotype.trim() || saveExpression.isPending}>
+                          Create & Link
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => { setCreatingRule(false); setCreateRuleForm(emptyCreateRule()) }}>Cancel</Button>
+                      </div>
+                      {saveExpression.error && <p className="text-sm text-destructive">{saveExpression.error.message}</p>}
+                    </div>
+                  ) : (
+                    <div className="flex justify-end px-3 py-2 border-b border-border">
+                      <Button size="sm" variant="ghost" className="h-6 text-xs px-2" onClick={() => setCreatingRule(true)}>+ Create Rule</Button>
+                    </div>
+                  )}
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Locus</th>
+                        <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Genotype</th>
+                        <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Phenotype</th>
+                        <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Penetrance</th>
+                        <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {linkedRules?.map((r) => (
+                        <tr key={r.id} className="border-b border-border last:border-0">
+                          <td className="px-3 py-2 text-muted-foreground">{r.locus.name}</td>
+                          <td className="px-3 py-2 font-mono font-medium text-foreground">{r.alleleOne.symbol}/{r.alleleTwo.symbol}</td>
+                          <td className="px-3 py-2 text-muted-foreground">{r.phenotype}</td>
+                          <td className="px-3 py-2 text-muted-foreground">{r.penetrance ?? "1.0"}</td>
+                          <td className="px-3 py-2 text-right space-x-1">
+                            <Button size="sm" variant="ghost"
+                              onClick={() => {
+                                setEditingRuleId(r.id)
+                                setEditingRuleLocusId(r.locus.id)
+                                setEditingRuleForm({ alleleOneId: r.alleleOne.id, alleleTwoId: r.alleleTwo.id, phenotype: r.phenotype, penetrance: r.penetrance?.toString() ?? "1" })
+                                setCreatingRule(false)
+                              }}
+                              disabled={!!editingRuleId}>
+                              Edit
+                            </Button>
+                            <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
+                              onClick={() => setCondition.mutate({ id: r.id, conditionDefId: null })}
+                              disabled={setCondition.isPending || !!editingRuleId}>
+                              Unlink
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                      <tr>
+                        <td colSpan={4} className="px-3 py-2">
+                          <select
+                            value={linkRuleId}
+                            onChange={(e) => setLinkRuleId(e.target.value)}
+                            className="h-8 w-full rounded-md border border-input bg-background px-3 text-sm"
+                          >
+                            <option value="">Link existing rule…</option>
+                            {unlinkedRules?.map((r) => (
+                              <option key={r.id} value={r.id}>
+                                {r.locus.name} — {r.alleleOne.symbol}/{r.alleleTwo.symbol} ({r.phenotype})
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <Button size="sm" onClick={() => setCondition.mutate({ id: linkRuleId, conditionDefId: editing!.id! })}
+                            disabled={!linkRuleId || setCondition.isPending}>
+                            Link
+                          </Button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
               )}
             </section>

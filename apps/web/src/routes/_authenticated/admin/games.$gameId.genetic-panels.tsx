@@ -15,12 +15,11 @@ export const Route = createFileRoute("/_authenticated/admin/games/$gameId/geneti
 type PanelForm = {
   id?: string
   name: string
-  panelType: "HEALTH" | "CONFORMATION"
+  panelType: "HEALTH" | "CONFORMATION" | "COLOR"
 }
 
 type LocusCreateForm = {
   name: string
-  displayGroup: string
   biasTarget: "FAVORABILITY" | "RARITY" | "NONE"
   minTestCycle: string
 }
@@ -36,7 +35,7 @@ type RuleForm = {
 }
 
 const emptyPanel = (): PanelForm => ({ name: "", panelType: "HEALTH" })
-const emptyLocusCreate = (): LocusCreateForm => ({ name: "", displayGroup: "", biasTarget: "NONE", minTestCycle: "" })
+const emptyLocusCreate = (): LocusCreateForm => ({ name: "", biasTarget: "NONE", minTestCycle: "" })
 const emptyRule = (): RuleForm => ({ alleleOneId: "", alleleTwoId: "", phenotype: "", numericModifier: "", penetrance: "", healthConditionDefId: "" })
 
 // ── Field label ───────────────────────────────────────────────────────────────
@@ -332,7 +331,6 @@ function GenesTab({ panelId, gameId }: { panelId: string; gameId: string }) {
     saveLocus.mutate({
       gameId,
       name: newGene.name.trim(),
-      displayGroup: newGene.displayGroup || null,
       biasTarget: newGene.biasTarget,
       minTestCycle: newGene.minTestCycle !== "" ? parseInt(newGene.minTestCycle) : null,
     })
@@ -358,9 +356,6 @@ function GenesTab({ panelId, gameId }: { panelId: string; gameId: string }) {
                   ? <ChevronDown className="size-3.5 text-muted-foreground" />
                   : <ChevronRight className="size-3.5 text-muted-foreground" />}
                 <span className="text-sm font-medium text-foreground">{locus.name}</span>
-                {locus.displayGroup && (
-                  <span className="text-xs text-muted-foreground/60">({locus.displayGroup})</span>
-                )}
                 <span className="rounded-full bg-secondary px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
                   {locus._count.alleles} allele{locus._count.alleles !== 1 ? "s" : ""}
                 </span>
@@ -391,11 +386,6 @@ function GenesTab({ panelId, gameId }: { panelId: string; gameId: string }) {
               <FL>Name</FL>
               <Input value={newGene.name} onChange={e => setNewGene(p => ({ ...p, name: e.target.value }))}
                 placeholder="e.g. Extension, Agouti" className="h-7 text-xs" autoFocus />
-            </div>
-            <div className="flex flex-col gap-1">
-              <FL>Display Group <span className="font-normal normal-case">(optional)</span></FL>
-              <Input value={newGene.displayGroup} onChange={e => setNewGene(p => ({ ...p, displayGroup: e.target.value }))}
-                placeholder='e.g. "Color Base"' className="h-7 text-xs" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -557,6 +547,7 @@ function GeneticPanelsPage() {
                   className="h-8 rounded-md border border-input bg-background px-3 text-sm">
                   <option value="HEALTH">Health</option>
                   <option value="CONFORMATION">Conformation</option>
+                  <option value="COLOR">Color</option>
                 </select>
               </div>
               {savePanel.error && <p className="text-sm text-destructive">{savePanel.error.message}</p>}

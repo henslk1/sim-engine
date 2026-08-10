@@ -9,7 +9,10 @@ export const locusAdminRouter = router({
       db.locus.findMany({
         where: { gameId: input.gameId },
         orderBy: { name: "asc" },
-        include: { _count: { select: { alleles: true } } },
+        include: {
+          _count: { select: { alleles: true } },
+          panelEntries: { include: { panelDef: { select: { id: true, name: true, panelType: true } } } },
+        },
       })
     ),
 
@@ -18,15 +21,18 @@ export const locusAdminRouter = router({
       id: z.string().optional(),
       gameId: z.string(),
       name: z.string().min(1),
-      displayGroup: z.string().nullish(),
       biasTarget: z.enum(["FAVORABILITY", "RARITY", "NONE"]),
       minTestCycle: z.number().int().min(0).nullish(),
     }))
     .mutation(({ input }) => {
-      const { id, gameId, displayGroup, minTestCycle, ...rest } = input
-      const data = { ...rest, displayGroup: displayGroup ?? null, minTestCycle: minTestCycle ?? null }
+      const { id, gameId, minTestCycle, ...rest } = input
+      const data = { ...rest, minTestCycle: minTestCycle ?? null }
       if (id) return db.locus.update({ where: { id }, data })
-      return db.locus.create({ data: { gameId, ...data } })
+      return db.locus.upsert({
+        where: { gameId_name: { gameId, name: data.name } },
+        create: { gameId, ...data },
+        update: data,
+      })
     }),
 
   remove: publicProcedure
@@ -90,4 +96,21 @@ export const locusAdminRouter = router({
         return tx.allele.delete({ where: { id: input.id } })
       })
     ),
+
+  saveAlleleBySymbol: publicProcedure
+    .input(z.object({ locusId: z.string(), symbol: z.string().min(1) }))
+    .mutation(async ({ input }) => {
+      const { locusId, symbol } = input
+      const allele = await db.allele.upsert({
+        where: { locusId_symbol: { locusId, symbol } },
+        create: { locusId, symbol },
+        update: {},
+      })
+      await db.geneAvailabilityState.upsert({
+        where: { alleleId: allele.id },
+        update: {},
+        create: { alleleId: allele.id, isAvailable: true },
+      })
+      return allele
+    }),
 })

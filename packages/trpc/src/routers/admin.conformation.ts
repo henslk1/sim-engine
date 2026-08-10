@@ -40,7 +40,7 @@ export const conformationAdminRouter = router({
     .query(({ input }) =>
       db.conformationSectionEntry.findMany({
         where: { sectionId: input.sectionId },
-        include: { locus: { select: { id: true, name: true, displayGroup: true } } },
+        include: { locus: { select: { id: true, name: true } } },
         orderBy: { displayOrder: "asc" },
       })
     ),

@@ -118,14 +118,16 @@ export function HealthPanel({
                         <span className="text-[11px] font-medium text-foreground">{t.treatmentDef.name}</span>
                         <Badge tone="muted">{TREATMENT_LABEL[treatmentType]}</Badge>
                       </div>
-                      {t.treatmentDef.durationCycles != null && (() => {
+                      {t.treatmentDef.durationCycles != null ? (() => {
                         const remaining = (t.startedCycle + t.treatmentDef.durationCycles) - animal.ageInCycles
                         return (
                           <p className="mt-0.5 text-[11px] text-muted-foreground">
                             {remaining} cycle{remaining !== 1 ? "s" : ""} remaining
                           </p>
                         )
-                      })()}
+                      })() : (
+                        <p className="mt-0.5 text-[11px] text-muted-foreground">Lifelong medication</p>
+                      )}
                       {t.treatmentDef.restrictionDefs.map((rd) => {
                         const live = t.activityRestriction.find(
                           (r) => r.isActive && r.restrictionType === rd.restrictionType
@@ -156,7 +158,7 @@ export function HealthPanel({
                             <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-chart-2">
                               <CheckCircle2 className="size-3.5 shrink-0" />
                               <span>
-                                Administered{cyclesRemaining != null ? ` · ${cyclesRemaining} cycle${cyclesRemaining !== 1 ? "s" : ""} remaining` : ""}
+                                Administered{cyclesRemaining != null ? ` · ${cyclesRemaining} cycle${cyclesRemaining !== 1 ? "s" : ""} remaining` : " · Lifelong"}
                               </span>
                             </div>
                           )

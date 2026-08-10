@@ -145,27 +145,23 @@ function CollapsibleGroup({ group }: { group: NavGroupDef }) {
     <div>
       <button
         onClick={() => setOpen(o => !o)}
-        className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-left text-xs font-semibold uppercase tracking-widest text-muted-foreground/50 transition-colors hover:text-muted-foreground"
+        className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-left text-xs font-semibold uppercase tracking-widest text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
       >
         <Chevron className="size-3 shrink-0" />
         {group.label}
       </button>
       {open && (
         <div className="mt-0.5 space-y-0.5 pl-2">
-          {group.links.map((link) => {
-            const Icon = link.icon
-            return (
-              <Link
-                key={link.to}
-                to={link.to as never}
-                className="flex items-center gap-3 rounded-md px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                activeProps={{ className: "flex items-center gap-3 rounded-md px-3 py-1.5 text-sm bg-primary text-primary-foreground font-semibold" }}
-              >
-                <Icon className="size-3.5 shrink-0" />
-                {link.label}
-              </Link>
-            )
-          })}
+          {group.links.map((link) => (
+            <Link
+              key={link.to}
+              to={link.to as never}
+              className="block rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              activeProps={{ className: "block rounded-md px-3 py-2 text-sm bg-primary text-primary-foreground font-semibold shadow-sm" }}
+            >
+              {link.label}
+            </Link>
+          ))}
         </div>
       )}
     </div>
@@ -204,7 +200,7 @@ function GameSection({ game }: { game: { id: string; name: string; isActive: boo
 
           <button
             onClick={() => setConfigOpen(o => !o)}
-            className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-left text-xs font-semibold uppercase tracking-widest text-muted-foreground/40 transition-colors hover:text-muted-foreground"
+            className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-left text-xs font-semibold uppercase tracking-widest text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             {configOpen ? <ChevronDown className="size-3 shrink-0" /> : <ChevronRight className="size-3 shrink-0" />}
             Config

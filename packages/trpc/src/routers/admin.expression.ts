@@ -85,4 +85,41 @@ export const expressionAdminRouter = router({
   removeTerrainModifier: publicProcedure
     .input(z.object({ id: z.string() }))
     .mutation(({ input }) => db.expressionTerrainModifier.delete({ where: { id: input.id } })),
+
+  listByCondition: publicProcedure
+    .input(z.object({ conditionDefId: z.string() }))
+    .query(({ input }) =>
+      db.expressionRule.findMany({
+        where: { healthConditionDefId: input.conditionDefId },
+        include: {
+          locus: { select: { id: true, name: true } },
+          alleleOne: { select: { id: true, symbol: true } },
+          alleleTwo: { select: { id: true, symbol: true } },
+        },
+        orderBy: [{ locus: { name: "asc" } }, { alleleOne: { symbol: "asc" } }],
+      })
+    ),
+
+  listUnlinkedByGame: publicProcedure
+    .input(z.object({ gameId: z.string() }))
+    .query(({ input }) =>
+      db.expressionRule.findMany({
+        where: { healthConditionDefId: null, locus: { gameId: input.gameId } },
+        include: {
+          locus: { select: { id: true, name: true } },
+          alleleOne: { select: { id: true, symbol: true } },
+          alleleTwo: { select: { id: true, symbol: true } },
+        },
+        orderBy: [{ locus: { name: "asc" } }, { alleleOne: { symbol: "asc" } }],
+      })
+    ),
+
+  setCondition: publicProcedure
+    .input(z.object({ id: z.string(), conditionDefId: z.string().nullable() }))
+    .mutation(({ input }) =>
+      db.expressionRule.update({
+        where: { id: input.id },
+        data: { healthConditionDefId: input.conditionDefId },
+      })
+    ),
 })
