@@ -41,8 +41,9 @@ type RestrictionRow = {
   restrictionType: RestrictionType
   maxIntensityTier: string
   durationCycles: string
+  isLifelong: boolean
 }
-const emptyRestriction = (): RestrictionRow => ({ restrictionType: "TRAINING", maxIntensityTier: "", durationCycles: "" })
+const emptyRestriction = (): RestrictionRow => ({ restrictionType: "TRAINING", maxIntensityTier: "", durationCycles: "", isLifelong: false })
 
 function TreatmentsPage() {
   const { gameId } = Route.useParams()
@@ -192,7 +193,7 @@ function TreatmentsPage() {
       treatmentDefId: expandedTreatmentId,
       restrictionType: form.restrictionType,
       maxIntensityTier: form.maxIntensityTier ? parseInt(form.maxIntensityTier) : null,
-      durationCycles: form.durationCycles ? parseInt(form.durationCycles) : null,
+      durationCycles: form.isLifelong ? null : (form.durationCycles ? parseInt(form.durationCycles) : null),
     })
   }
 
@@ -243,17 +244,19 @@ function TreatmentsPage() {
                     {TREATMENT_TYPES.map((type) => <option key={type} value={type}>{TREATMENT_LABELS[type]}</option>)}
                   </select>
                 </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Duration (cycles) <span className="font-normal">— optional</span></label>
-                  <Input
-                    className="h-8 text-sm"
-                    type="number"
-                    min="1"
-                    value={editingTreatment.durationCycles}
-                    onChange={(e) => setEditingTreatment({ ...editingTreatment, durationCycles: e.target.value })}
-                    placeholder="—"
-                  />
-                </div>
+                {editingTreatment.treatmentType !== "VET_PROCEDURE" && (
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Duration (cycles) <span className="font-normal">— optional</span></label>
+                    <Input
+                      className="h-8 text-sm"
+                      type="number"
+                      min="1"
+                      value={editingTreatment.durationCycles}
+                      onChange={(e) => setEditingTreatment({ ...editingTreatment, durationCycles: e.target.value })}
+                      placeholder="—"
+                    />
+                  </div>
+                )}
                 <div className="flex gap-2 pt-1">
                   <Button
                     onClick={submitTreatment}
@@ -415,10 +418,20 @@ function TreatmentsPage() {
                                       </select>
                                     </td>
                                     <td className="py-2 pr-4">
-                                      <Input type="number" min="1" value={editingRestriction?.maxIntensityTier ?? ""} onChange={(e) => setEditingRestriction((p) => p ? { ...p, maxIntensityTier: e.target.value } : null)} className="h-7 text-sm w-20" placeholder="—" />
+                                      {(editingRestriction?.restrictionType === "TRAINING" || editingRestriction?.restrictionType === "ALL") && (
+                                        <Input type="number" min="1" value={editingRestriction?.maxIntensityTier ?? ""} onChange={(e) => setEditingRestriction((p) => p ? { ...p, maxIntensityTier: e.target.value } : null)} className="h-7 text-sm w-20" placeholder="Any" />
+                                      )}
                                     </td>
                                     <td className="py-2 pr-4">
-                                      <Input type="number" min="1" value={editingRestriction?.durationCycles ?? ""} onChange={(e) => setEditingRestriction((p) => p ? { ...p, durationCycles: e.target.value } : null)} className="h-7 text-sm w-20" placeholder="—" />
+                                      <div className="flex items-center gap-2">
+                                        <label className="flex items-center gap-1.5 text-xs cursor-pointer select-none shrink-0">
+                                          <input type="checkbox" checked={editingRestriction?.isLifelong ?? false} onChange={(e) => setEditingRestriction((p) => p ? { ...p, isLifelong: e.target.checked, durationCycles: "" } : null)} />
+                                          Lifelong
+                                        </label>
+                                        {!editingRestriction?.isLifelong && (
+                                          <Input type="number" min="1" value={editingRestriction?.durationCycles ?? ""} onChange={(e) => setEditingRestriction((p) => p ? { ...p, durationCycles: e.target.value } : null)} className="h-7 text-sm w-20" />
+                                        )}
+                                      </div>
                                     </td>
                                     <td className="py-2 text-right space-x-2">
                                       <Button size="sm" onClick={() => submitRestriction(r.id)} disabled={saveRestriction.isPending}>Save</Button>
@@ -428,8 +441,8 @@ function TreatmentsPage() {
                                 ) : (
                                   <tr key={r.id} className="border-b border-border last:border-0">
                                     <td className="py-2 pr-4 font-medium text-foreground">{RESTRICTION_LABELS[r.restrictionType as RestrictionType]}</td>
-                                    <td className="py-2 pr-4 text-muted-foreground">{r.maxIntensityTier ?? "—"}</td>
-                                    <td className="py-2 pr-4 text-muted-foreground">{r.durationCycles ?? "—"}</td>
+                                    <td className="py-2 pr-4 text-muted-foreground">{(r.restrictionType === "TRAINING" || r.restrictionType === "ALL") ? (r.maxIntensityTier ?? <span className="italic">Any</span>) : <span className="italic text-muted-foreground/50">—</span>}</td>
+                                    <td className="py-2 pr-4 text-muted-foreground">{r.durationCycles != null ? `${r.durationCycles} cycles` : <span className="italic">Lifelong</span>}</td>
                                     <td className="py-2 text-right space-x-2">
                                       <Button size="sm" variant="ghost" onClick={() => {
                                         setEditingRestrictionId(r.id)
@@ -437,6 +450,7 @@ function TreatmentsPage() {
                                           restrictionType: r.restrictionType as RestrictionType,
                                           maxIntensityTier: r.maxIntensityTier?.toString() ?? "",
                                           durationCycles: r.durationCycles?.toString() ?? "",
+                                          isLifelong: r.durationCycles == null,
                                         })
                                       }}>Edit</Button>
                                       <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
@@ -456,10 +470,20 @@ function TreatmentsPage() {
                                   </select>
                                 </td>
                                 <td className="py-2 pr-4">
-                                  <Input type="number" min="1" value={newRestriction.maxIntensityTier} onChange={(e) => setNewRestriction({ ...newRestriction, maxIntensityTier: e.target.value })} className="h-7 text-sm w-20" placeholder="—" />
+                                  {(newRestriction.restrictionType === "TRAINING" || newRestriction.restrictionType === "ALL") && (
+                                    <Input type="number" min="1" value={newRestriction.maxIntensityTier} onChange={(e) => setNewRestriction({ ...newRestriction, maxIntensityTier: e.target.value })} className="h-7 text-sm w-20" placeholder="Any" />
+                                  )}
                                 </td>
                                 <td className="py-2 pr-4">
-                                  <Input type="number" min="1" value={newRestriction.durationCycles} onChange={(e) => setNewRestriction({ ...newRestriction, durationCycles: e.target.value })} className="h-7 text-sm w-20" placeholder="—" />
+                                  <div className="flex items-center gap-2">
+                                    <label className="flex items-center gap-1.5 text-xs cursor-pointer select-none shrink-0">
+                                      <input type="checkbox" checked={newRestriction.isLifelong} onChange={(e) => setNewRestriction({ ...newRestriction, isLifelong: e.target.checked, durationCycles: "" })} />
+                                      Lifelong
+                                    </label>
+                                    {!newRestriction.isLifelong && (
+                                      <Input type="number" min="1" value={newRestriction.durationCycles} onChange={(e) => setNewRestriction({ ...newRestriction, durationCycles: e.target.value })} className="h-7 text-sm w-20" />
+                                    )}
+                                  </div>
                                 </td>
                                 <td className="py-2 text-right">
                                   <Button size="sm" onClick={() => submitRestriction()} disabled={saveRestriction.isPending}>Add</Button>

@@ -130,9 +130,9 @@ export function OwnerView({ animal, animalId, playerAccountId }: { animal: Anima
           </div>
 
           {/* Col 3 — Animal image + WorkspaceTabs */}
-          <div className="order-first flex min-h-0 flex-col gap-3 min-[1400px]:order-none min-[1400px]:grid min-[1400px]:grid-rows-[auto_minmax(0,1fr)]">
-            <div className="relative flex aspect-[9/5] w-full shrink-0 items-end overflow-hidden rounded-lg border border-border bg-gradient-to-br from-secondary to-muted shadow-sm">
-              <div className="w-full bg-gradient-to-t from-card/90 to-transparent px-4 py-3">
+          <div className="order-first flex min-h-0 flex-col gap-3 min-[1400px]:order-0 min-[1400px]:grid min-[1400px]:grid-rows-[auto_minmax(0,1fr)]">
+            <div className="relative flex aspect-9/5 w-full shrink-0 items-end overflow-hidden rounded-lg border border-border bg-linear-to-br from-secondary to-muted shadow-sm">
+              <div className="w-full bg-linear-to-t from-card/90 to-transparent px-4 py-3">
                 <p className="font-serif text-lg font-semibold text-foreground">{animal.name}</p>
                 <p className="text-xs text-muted-foreground">
                   {animal.breed.name} · {animal.lifeStage.name}

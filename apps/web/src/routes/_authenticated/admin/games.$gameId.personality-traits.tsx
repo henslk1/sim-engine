@@ -8,14 +8,12 @@ type TraitForm = {
   id?: string
   name: string
   description: string
-  trainingModifier: string
-  moodModifier: string
   conceptionModifier: string
 }
-const emptyTrait = (): TraitForm => ({ name: "", description: "", trainingModifier: "0", moodModifier: "0", conceptionModifier: "0" })
+const emptyTrait = (): TraitForm => ({ name: "", description: "", conceptionModifier: "0" })
 
-type LabelRangeRow = { label: string; minValue: string; maxValue: string }
-const emptyRange = (): LabelRangeRow => ({ label: "", minValue: "", maxValue: "" })
+type LabelRangeRow = { label: string; minValue: string; maxValue: string; trainingModifier: string; moodModifier: string }
+const emptyRange = (): LabelRangeRow => ({ label: "", minValue: "", maxValue: "", trainingModifier: "0", moodModifier: "0" })
 
 function PersonalityTraitsPage() {
   const { gameId } = Route.useParams()
@@ -64,8 +62,6 @@ function PersonalityTraitsPage() {
       id: trait.id,
       name: trait.name,
       description: trait.description ?? "",
-      trainingModifier: trait.trainingModifier.toString(),
-      moodModifier: trait.moodModifier.toString(),
       conceptionModifier: trait.conceptionModifier.toString(),
     })
     setEditingRangeId(null)
@@ -80,8 +76,6 @@ function PersonalityTraitsPage() {
         ...editing,
         gameId,
         description: editing.description || null,
-        trainingModifier: editing.trainingModifier !== "" ? parseFloat(editing.trainingModifier) : 0,
-        moodModifier: editing.moodModifier !== "" ? parseFloat(editing.moodModifier) : 0,
         conceptionModifier: editing.conceptionModifier !== "" ? parseFloat(editing.conceptionModifier) : 0,
       },
       {
@@ -100,6 +94,8 @@ function PersonalityTraitsPage() {
         label: newRange.label.trim(),
         minValue: parseFloat(newRange.minValue),
         maxValue: parseFloat(newRange.maxValue),
+        trainingModifier: newRange.trainingModifier !== "" ? parseFloat(newRange.trainingModifier) : 0,
+        moodModifier: newRange.moodModifier !== "" ? parseFloat(newRange.moodModifier) : 0,
       },
       { onSuccess: () => setNewRange(emptyRange()) }
     )
@@ -114,6 +110,8 @@ function PersonalityTraitsPage() {
         label: editingRange.label,
         minValue: parseFloat(editingRange.minValue),
         maxValue: parseFloat(editingRange.maxValue),
+        trainingModifier: editingRange.trainingModifier !== "" ? parseFloat(editingRange.trainingModifier) : 0,
+        moodModifier: editingRange.moodModifier !== "" ? parseFloat(editingRange.moodModifier) : 0,
       },
       {
         onSuccess: () => {
@@ -161,26 +159,6 @@ function PersonalityTraitsPage() {
                 <Input
                   value={editing.description}
                   onChange={(e) => setEditing({ ...editing, description: e.target.value })}
-                  className="h-8 text-sm"
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Training Modifier</label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={editing.trainingModifier}
-                  onChange={(e) => setEditing({ ...editing, trainingModifier: e.target.value })}
-                  className="h-8 text-sm"
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Mood Modifier</label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={editing.moodModifier}
-                  onChange={(e) => setEditing({ ...editing, moodModifier: e.target.value })}
                   className="h-8 text-sm"
                 />
               </div>
@@ -233,18 +211,12 @@ function PersonalityTraitsPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      Label
-                    </th>
-                    <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      Min
-                    </th>
-                    <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      Max
-                    </th>
-                    <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      Actions
-                    </th>
+                    <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Label</th>
+                    <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Min</th>
+                    <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Max</th>
+                    <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Train Mod</th>
+                    <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Mood Mod</th>
+                    <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -252,48 +224,23 @@ function PersonalityTraitsPage() {
                     editingRangeId === r.id ? (
                       <tr key={r.id} className="border-b border-border last:border-0">
                         <td className="px-3 py-2">
-                          <Input
-                            value={editingRange.label}
-                            onChange={(e) => setEditingRange({ ...editingRange, label: e.target.value })}
-                            className="h-7 text-sm"
-                          />
+                          <Input value={editingRange.label} onChange={(e) => setEditingRange({ ...editingRange, label: e.target.value })} className="h-7 text-sm" />
                         </td>
                         <td className="px-3 py-2">
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={editingRange.minValue}
-                            onChange={(e) => setEditingRange({ ...editingRange, minValue: e.target.value })}
-                            className="h-7 text-sm"
-                          />
+                          <Input type="number" step="0.01" value={editingRange.minValue} onChange={(e) => setEditingRange({ ...editingRange, minValue: e.target.value })} className="h-7 text-sm" />
                         </td>
                         <td className="px-3 py-2">
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={editingRange.maxValue}
-                            onChange={(e) => setEditingRange({ ...editingRange, maxValue: e.target.value })}
-                            className="h-7 text-sm"
-                          />
+                          <Input type="number" step="0.01" value={editingRange.maxValue} onChange={(e) => setEditingRange({ ...editingRange, maxValue: e.target.value })} className="h-7 text-sm" />
+                        </td>
+                        <td className="px-3 py-2">
+                          <Input type="number" step="0.01" value={editingRange.trainingModifier} onChange={(e) => setEditingRange({ ...editingRange, trainingModifier: e.target.value })} className="h-7 text-sm" />
+                        </td>
+                        <td className="px-3 py-2">
+                          <Input type="number" step="0.01" value={editingRange.moodModifier} onChange={(e) => setEditingRange({ ...editingRange, moodModifier: e.target.value })} className="h-7 text-sm" />
                         </td>
                         <td className="px-3 py-2 text-right space-x-2">
-                          <Button
-                            size="sm"
-                            onClick={() => submitEditRange(r.id)}
-                            disabled={saveLabelRange.isPending}
-                          >
-                            Save
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => {
-                              setEditingRangeId(null)
-                              setEditingRange(emptyRange())
-                            }}
-                          >
-                            Cancel
-                          </Button>
+                          <Button size="sm" onClick={() => submitEditRange(r.id)} disabled={saveLabelRange.isPending}>Save</Button>
+                          <Button size="sm" variant="ghost" onClick={() => { setEditingRangeId(null); setEditingRange(emptyRange()) }}>Cancel</Button>
                         </td>
                       </tr>
                     ) : (
@@ -301,6 +248,8 @@ function PersonalityTraitsPage() {
                         <td className="px-3 py-2 font-medium text-foreground">{r.label}</td>
                         <td className="px-3 py-2 text-muted-foreground">{r.minValue}</td>
                         <td className="px-3 py-2 text-muted-foreground">{r.maxValue}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{r.trainingModifier}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{r.moodModifier}</td>
                         <td className="px-3 py-2 text-right space-x-2">
                           <Button
                             size="sm"
@@ -311,6 +260,8 @@ function PersonalityTraitsPage() {
                                 label: r.label,
                                 minValue: r.minValue.toString(),
                                 maxValue: r.maxValue.toString(),
+                                trainingModifier: r.trainingModifier.toString(),
+                                moodModifier: r.moodModifier.toString(),
                               })
                             }}
                           >
@@ -330,45 +281,22 @@ function PersonalityTraitsPage() {
                   )}
                   <tr>
                     <td className="px-3 py-2">
-                      <Input
-                        value={newRange.label}
-                        onChange={(e) => setNewRange({ ...newRange, label: e.target.value })}
-                        placeholder="e.g. Timid"
-                        onKeyDown={(e) => e.key === "Enter" && submitNewRange()}
-                        className="h-7 text-sm"
-                      />
+                      <Input value={newRange.label} onChange={(e) => setNewRange({ ...newRange, label: e.target.value })} placeholder="e.g. Timid" onKeyDown={(e) => e.key === "Enter" && submitNewRange()} className="h-7 text-sm" />
                     </td>
                     <td className="px-3 py-2">
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={newRange.minValue}
-                        onChange={(e) => setNewRange({ ...newRange, minValue: e.target.value })}
-                        placeholder="0"
-                        className="h-7 text-sm"
-                      />
+                      <Input type="number" step="0.01" value={newRange.minValue} onChange={(e) => setNewRange({ ...newRange, minValue: e.target.value })} placeholder="0" className="h-7 text-sm" />
                     </td>
                     <td className="px-3 py-2">
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={newRange.maxValue}
-                        onChange={(e) => setNewRange({ ...newRange, maxValue: e.target.value })}
-                        placeholder="0"
-                        className="h-7 text-sm"
-                      />
+                      <Input type="number" step="0.01" value={newRange.maxValue} onChange={(e) => setNewRange({ ...newRange, maxValue: e.target.value })} placeholder="0" className="h-7 text-sm" />
+                    </td>
+                    <td className="px-3 py-2">
+                      <Input type="number" step="0.01" value={newRange.trainingModifier} onChange={(e) => setNewRange({ ...newRange, trainingModifier: e.target.value })} placeholder="0" className="h-7 text-sm" />
+                    </td>
+                    <td className="px-3 py-2">
+                      <Input type="number" step="0.01" value={newRange.moodModifier} onChange={(e) => setNewRange({ ...newRange, moodModifier: e.target.value })} placeholder="0" className="h-7 text-sm" />
                     </td>
                     <td className="px-3 py-2 text-right">
-                      <Button
-                        size="sm"
-                        onClick={submitNewRange}
-                        disabled={
-                          saveLabelRange.isPending ||
-                          !newRange.label.trim() ||
-                          !newRange.minValue ||
-                          !newRange.maxValue
-                        }
-                      >
+                      <Button size="sm" onClick={submitNewRange} disabled={saveLabelRange.isPending || !newRange.label.trim() || !newRange.minValue || !newRange.maxValue}>
                         Add
                       </Button>
                     </td>

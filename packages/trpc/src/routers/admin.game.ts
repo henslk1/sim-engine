@@ -71,6 +71,8 @@ export const gameAdminRouter = router({
         geneticCollectionCooldownCycles: z.number().int().min(0).default(0),
         conformationInspectionMinCycle: z.number().int().min(0).default(0),
         topGradeDoubleBonusChance: z.number().min(0).max(1).default(0.1),
+        overworkInjuryThreshold: z.number().default(0),
+        overworkInjuryChance: z.number().default(0),
       }))
       .mutation(({ input }) => {
         const { gameId, containerLabel, subContainerLabel, lifeExpectancyBaseline, maxBreedingSlots, ...rest } = input

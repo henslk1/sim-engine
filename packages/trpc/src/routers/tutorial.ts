@@ -1,7 +1,7 @@
 import { z } from "zod"
 import { router, protectedProcedure } from "../trpc.js"
 import { db, AnimalSex } from "@sim-engine/db"
-import { generateFromTemplate, weightedSample, canonicalize, deleteAnimalsWithChildren } from "@sim-engine/engine"
+import { generateFromTemplate, weightedSample, canonicalize, deleteAnimalsWithChildren, computeFixedFields } from "@sim-engine/engine"
 
 export const tutorialRouter = router({
   getProgress: protectedProcedure
@@ -226,6 +226,8 @@ export const tutorialRouter = router({
         const sortedStages = [...lifeStages].sort((a, b) => a.stageIndex - b.stageIndex)
         const embryoLifeStage = sortedStages[0]!
 
+        const { structuralRisk, preferredTerrain, preferredClimate } = await computeFixedFields(tx, embryoGenotypes)
+
         const embryo = await tx.animal.create({
           data: {
             gameId,
@@ -241,6 +243,9 @@ export const tutorialRouter = router({
             inbreedingCoefficient: 0,
             breedGeneration: 1,
             isTutorialAnimal: false,
+            structuralRisk,
+            preferredTerrain: preferredTerrain as any,
+            preferredClimate: preferredClimate as any,
           },
           select: { id: true },
         })

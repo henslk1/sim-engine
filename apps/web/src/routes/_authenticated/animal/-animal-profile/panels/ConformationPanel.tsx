@@ -3,6 +3,7 @@ import { Panel } from "@/components/game/ui"
 import { Ruler } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { trpc } from "@/lib/trpc"
+import { cn } from "@/lib/utils"
 
 function letterGrade(score: number) {
   if (score >= 90) return "A"
@@ -10,6 +11,18 @@ function letterGrade(score: number) {
   if (score >= 70) return "C"
   if (score >= 60) return "D"
   return "F"
+}
+
+function structuralRiskLabel(value: number): { label: string; className: string } {
+  if (value <= 0) return { label: "None", className: "text-muted-foreground" }
+  if (value <= 0.1) return { label: "Low", className: "text-chart-3" }
+  if (value <= 0.25) return { label: "Medium", className: "text-amber-500" }
+  return { label: "High", className: "text-destructive" }
+}
+
+function fmtEnumList(values: string[]): string {
+  if (values.length === 0) return "—"
+  return values.map(v => v.charAt(0) + v.slice(1).toLowerCase()).join(" / ")
 }
 
 export function ConformationPanel({ animal }: { animal: AnimalProfile }) {
@@ -43,42 +56,61 @@ export function ConformationPanel({ animal }: { animal: AnimalProfile }) {
     </span>
   ) : undefined
 
+  const risk = structuralRiskLabel(animal.structuralRisk ?? 0)
+
   return (
     <Panel title={title} icon={<Ruler className="size-4 text-chart-2" />} action={action}>
-      {isCross ? (
-        <p className="text-[11px] text-muted-foreground">Conformation scoring applies to purebreds only</p>
-      ) : awaitingAge ? (
-        <p className="text-[11px] text-muted-foreground">Eligible for inspection at cycle {minCycle}</p>
-      ) : eligibleForInspection ? (
-        <div className="flex flex-col gap-2">
-          <p className="text-[11px] text-muted-foreground">This animal has not yet been inspected.</p>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => inspect.mutate({ animalId: animal.id })}
-            disabled={inspect.isPending}
-          >
-            {inspect.isPending ? "Inspecting…" : "Request Inspection"}
-          </Button>
-          {inspect.error && <p className="text-xs text-destructive">{inspect.error.message}</p>}
+      <div className="space-y-3">
+        {isCross ? (
+          <p className="text-[11px] text-muted-foreground">Conformation scoring applies to purebreds only</p>
+        ) : awaitingAge ? (
+          <p className="text-[11px] text-muted-foreground">Eligible for inspection at cycle {minCycle}</p>
+        ) : eligibleForInspection ? (
+          <div className="flex flex-col gap-2">
+            <p className="text-[11px] text-muted-foreground">This animal has not yet been inspected.</p>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => inspect.mutate({ animalId: animal.id })}
+              disabled={inspect.isPending}
+            >
+              {inspect.isPending ? "Inspecting…" : "Request Inspection"}
+            </Button>
+            {inspect.error && <p className="text-xs text-destructive">{inspect.error.message}</p>}
+          </div>
+        ) : !overallScore ? (
+          <p className="text-[11px] text-muted-foreground">No section scores recorded</p>
+        ) : sectionScores.length === 0 ? (
+          <p className="text-[11px] text-muted-foreground">No section scores recorded</p>
+        ) : (
+          <div className="grid grid-cols-3 gap-2">
+            {sectionScores.map((ss) => {
+              const grade = letterGrade(ss.score)
+              return (
+                <div key={ss.id} className="rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2">
+                  <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{ss.section.name}</p>
+                  <p className="text-sm font-semibold text-foreground">{grade}</p>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        <div className="grid grid-cols-3 gap-2 border-t border-border/50 pt-3">
+          <div className="rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2">
+            <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Injury Risk</p>
+            <p className={cn("text-sm font-semibold", risk.className)}>{risk.label}</p>
+          </div>
+          <div className="rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2">
+            <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Terrain</p>
+            <p className="text-sm font-semibold text-foreground">{fmtEnumList(animal.preferredTerrain)}</p>
+          </div>
+          <div className="rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2">
+            <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Climate</p>
+            <p className="text-sm font-semibold text-foreground">{fmtEnumList(animal.preferredClimate)}</p>
+          </div>
         </div>
-      ) : !overallScore ? (
-        <p className="text-[11px] text-muted-foreground">No section scores recorded</p>
-      ) : sectionScores.length === 0 ? (
-        <p className="text-[11px] text-muted-foreground">No section scores recorded</p>
-      ) : (
-        <div className="grid grid-cols-3 gap-2">
-          {sectionScores.map((ss) => {
-            const grade = letterGrade(ss.score)
-            return (
-              <div key={ss.id} className="rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2">
-                <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{ss.section.name}</p>
-                <p className="text-sm font-semibold text-foreground">{grade}</p>
-              </div>
-            )
-          })}
-        </div>
-      )}
+      </div>
     </Panel>
   )
 }

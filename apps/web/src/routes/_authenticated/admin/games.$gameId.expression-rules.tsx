@@ -10,10 +10,8 @@ type RuleForm = {
   alleleTwoId: string
   phenotype: string
   numericModifier: string
-  penetrance: string
-  healthConditionDefId: string
 }
-const emptyRule = (): RuleForm => ({ alleleOneId: "", alleleTwoId: "", phenotype: "", numericModifier: "", penetrance: "", healthConditionDefId: "" })
+const emptyRule = (): RuleForm => ({ alleleOneId: "", alleleTwoId: "", phenotype: "", numericModifier: "" })
 
 const CLIMATES = ["HOT", "WARM", "COLD", "TEMPERATE"] as const
 const TERRAINS = ["FLAT", "COASTAL", "HILLY", "MOUNTAIN"] as const
@@ -22,10 +20,6 @@ function ExpressionRulesPage() {
   const { gameId } = Route.useParams()
 
   const { data: loci } = trpc.admin.locus.list.useQuery(
-    { gameId: gameId! },
-    {}
-  )
-  const { data: healthConditions } = trpc.admin.health.list.useQuery(
     { gameId: gameId! },
     {}
   )
@@ -98,8 +92,6 @@ function ExpressionRulesPage() {
       ...editingRule,
       locusId: selectedLocusId,
       numericModifier: editingRule.numericModifier !== "" ? parseFloat(editingRule.numericModifier) : undefined,
-      penetrance: editingRule.penetrance !== "" ? parseFloat(editingRule.penetrance) : undefined,
-      healthConditionDefId: editingRule.healthConditionDefId || undefined,
     })
   }
 
@@ -162,8 +154,6 @@ function ExpressionRulesPage() {
                   <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Allele 2</th>
                   <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Phenotype</th>
                   <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Modifier</th>
-                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Health Condition</th>
-                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Penetrance</th>
                   <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
                 </tr>
               </thead>
@@ -175,10 +165,6 @@ function ExpressionRulesPage() {
                       <td className="px-3 py-2 font-mono text-foreground">{rule.alleleTwo.symbol}</td>
                       <td className="px-3 py-2 text-foreground">{rule.phenotype}</td>
                       <td className="px-3 py-2 text-muted-foreground">{rule.numericModifier ?? "—"}</td>
-                      <td className="px-3 py-2 text-muted-foreground">{rule.healthConditionDef?.name ?? "—"}</td>
-                      <td className="px-3 py-2 text-muted-foreground">
-                        {rule.penetrance != null ? `${(rule.penetrance * 100).toFixed(0)}%` : "—"}
-                      </td>
                       <td className="px-3 py-2 text-right space-x-1">
                         <Button
                           size="sm"
@@ -198,8 +184,6 @@ function ExpressionRulesPage() {
                               alleleTwoId: rule.alleleTwoId,
                               phenotype: rule.phenotype,
                               numericModifier: rule.numericModifier?.toString() ?? "",
-                              penetrance: rule.penetrance?.toString() ?? "",
-                              healthConditionDefId: rule.healthConditionDefId ?? "",
                             })
                           }
                         >
@@ -220,7 +204,7 @@ function ExpressionRulesPage() {
                     </tr>
                     {expandedRuleId === rule.id && (
                       <tr className="border-b border-border bg-muted/30">
-                        <td colSpan={7} className="px-6 py-4">
+                        <td colSpan={6} className="px-6 py-4">
                           <div className="grid grid-cols-2 gap-6">
                             <div>
                               <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -368,7 +352,7 @@ function ExpressionRulesPage() {
                 ))}
                 {rules?.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-3 py-6 text-center text-sm text-muted-foreground">
+                    <td colSpan={6} className="px-3 py-6 text-center text-sm text-muted-foreground">
                       No rules yet. Add a rule to define how allele combinations express.
                     </td>
                   </tr>
@@ -437,38 +421,6 @@ function ExpressionRulesPage() {
                     placeholder="1.0"
                     className="h-8 text-sm"
                   />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                      Health Condition <span className="font-normal">(optional)</span>
-                    </label>
-                    <select
-                      value={editingRule.healthConditionDefId}
-                      onChange={(e) => setEditingRule({ ...editingRule, healthConditionDefId: e.target.value })}
-                      className="h-8 rounded-md border border-input bg-background px-3 text-sm"
-                    >
-                      <option value="">— None —</option>
-                      {healthConditions?.filter((c) => c.isGenetic).map((c) => (
-                        <option key={c.id} value={c.id}>{c.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                      Penetrance <span className="font-normal">(0–1, optional)</span>
-                    </label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      max="1"
-                      value={editingRule.penetrance}
-                      onChange={(e) => setEditingRule({ ...editingRule, penetrance: e.target.value })}
-                      placeholder="e.g. 0.85"
-                      className="h-8 text-sm"
-                    />
-                  </div>
                 </div>
                 <div className="flex gap-2 pt-1">
                   <Button

@@ -19,6 +19,7 @@ type BreedForm = {
   image: string
   lore: string
   isUnregistered: boolean
+  isAvailable: boolean
   convergenceGenerations: string
   lifeExpectancyBaseline: string
   immunityMin: string
@@ -27,7 +28,7 @@ type BreedForm = {
 
 const emptyBreed: BreedForm = {
   name: "", speciesId: "", categoryBadge: "BASE", image: "", lore: "",
-  isUnregistered: false, convergenceGenerations: "", lifeExpectancyBaseline: "",
+  isUnregistered: false, isAvailable: false, convergenceGenerations: "", lifeExpectancyBaseline: "",
   immunityMin: "", immunityMax: "",
 }
 
@@ -411,7 +412,7 @@ function BreedsPage() {
     saveBreed.mutate({
       id: editing.id, gameId,
       name: editing.name, speciesId: editing.speciesId, categoryBadge: editing.categoryBadge,
-      image: editing.image || null, lore: editing.lore || null, isUnregistered: editing.isUnregistered,
+      image: editing.image || null, lore: editing.lore || null, isUnregistered: editing.isUnregistered, isAvailable: editing.isAvailable,
       convergenceGenerations: editing.convergenceGenerations ? parseInt(editing.convergenceGenerations) : null,
       lifeExpectancyBaseline: editing.lifeExpectancyBaseline ? parseInt(editing.lifeExpectancyBaseline) : null,
       immunityMin: editing.immunityMin !== "" ? parseFloat(editing.immunityMin) : null,
@@ -475,7 +476,7 @@ function BreedsPage() {
                     onClick={() => {
                       setEditing({
                         id: b.id, name: b.name, speciesId: b.speciesId, categoryBadge: b.categoryBadge,
-                        image: b.image ?? "", lore: b.lore ?? "", isUnregistered: b.isUnregistered,
+                        image: b.image ?? "", lore: b.lore ?? "", isUnregistered: b.isUnregistered, isAvailable: b.isAvailable,
                         convergenceGenerations: b.convergenceGenerations?.toString() ?? "",
                         lifeExpectancyBaseline: b.lifeExpectancyBaseline?.toString() ?? "",
                         immunityMin: b.immunityMin?.toString() ?? "", immunityMax: b.immunityMax?.toString() ?? "",
@@ -589,9 +590,14 @@ function BreedsPage() {
                 rows={3} className="rounded-md border border-input bg-background px-3 py-2 text-sm resize-none" />
             </div>
             <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
+              <input type="checkbox" checked={editing.isAvailable}
+                onChange={e => setEditing(p => p && { ...p, isAvailable: e.target.checked })} />
+              Available (visible to players)
+            </label>
+            <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
               <input type="checkbox" checked={editing.isUnregistered}
                 onChange={e => setEditing(p => p && { ...p, isUnregistered: e.target.checked })} />
-              Unregistered
+              Unregistered (cross pool)
             </label>
             {saveBreed.error && <p className="text-sm text-destructive">{saveBreed.error.message}</p>}
             <Button className="w-full h-8 text-sm" onClick={handleSaveBreed} disabled={saveBreed.isPending}>

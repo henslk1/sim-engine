@@ -7,7 +7,7 @@ export const breedRouter = router({
     .input(z.object({ gameId: z.string() }))
     .query(async ({ input }) => {
       return db.breed.findMany({
-        where: { gameId: input.gameId, isUnregistered: false },
+        where: { gameId: input.gameId, isUnregistered: false, isAvailable: true },
         select: {
           id: true,
           name: true,
@@ -103,10 +103,10 @@ export const breedRouter = router({
                       },
                     },
                     expressionRulesAsAlleleOne: {
-                      include: { healthConditionDef: { select: { id: true, name: true } } },
+                      include: { ruleConditions: { include: { healthConditionDef: { select: { id: true, name: true } } } } },
                     },
                     expressionRulesAsAlleleTwo: {
-                      include: { healthConditionDef: { select: { id: true, name: true } } },
+                      include: { ruleConditions: { include: { healthConditionDef: { select: { id: true, name: true } } } } },
                     },
                   },
                 },
@@ -141,8 +141,10 @@ export const breedRouter = router({
           ...af.allele.expressionRulesAsAlleleTwo,
         ]
         for (const rule of rules) {
-          if (rule.healthConditionDef) {
-            healthConditions.set(rule.healthConditionDef.id, rule.healthConditionDef.name)
+          if (rule.ruleConditions.length > 0) {
+            for (const rc of rule.ruleConditions) {
+              healthConditions.set(rc.healthConditionDef.id, rc.healthConditionDef.name)
+            }
           } else if (!healthLocusIds.has(af.allele.locusId)) {
             coatColors.add(rule.phenotype)
           }

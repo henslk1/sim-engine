@@ -1,7 +1,7 @@
 import { db } from "@sim-engine/db"
 import { router, publicProcedure } from "../trpc.js"
 import { z } from "zod"
-import { generateOffspring, computePhenotypeDescription, computeBreedingQuality, computeCOI, type ParentData } from "@sim-engine/engine"
+import { generateOffspring, computePhenotypeDescription, computeBreedingQuality, computeCOI, computeFixedFields, type ParentData } from "@sim-engine/engine"
 
 const eligibleFemaleSelect = {
   id: true,
@@ -687,6 +687,7 @@ export const breedingCoverRouter = router({
 
         for (const [i, offspring] of result.offspring.entries()) {
           const phenotypeDescription = computePhenotypeDescription(offspring.genotypes, expressionRules)
+          const { structuralRisk, preferredTerrain, preferredClimate } = await computeFixedFields(tx, offspring.genotypes)
           const animal = await tx.animal.create({
             data: {
               gameId: offer.gameId,
@@ -704,6 +705,9 @@ export const breedingCoverRouter = router({
               lifeExpectancy,
               status: "EMBRYO_STORED",
               phenotypeDescription,
+              structuralRisk,
+              preferredTerrain: preferredTerrain as any,
+              preferredClimate: preferredClimate as any,
             },
             select: { id: true },
           })

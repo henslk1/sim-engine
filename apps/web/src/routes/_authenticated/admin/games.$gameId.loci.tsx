@@ -1,16 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router"
 import { trpc } from "@/lib/trpc"
-import { useState } from "react"
+import React, { useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { RichTextEditor } from "@/components/game/editor/RichTextEditor"
 
 type LocusForm = {
   id?: string
   name: string
   biasTarget: "FAVORABILITY" | "RARITY" | "NONE"
   minTestCycle: number | null
+  description: object | null
 }
-const emptyLocus = (): LocusForm => ({ name: "", biasTarget: "NONE", minTestCycle: null })
+const emptyLocus = (): LocusForm => ({ name: "", biasTarget: "NONE", minTestCycle: null, description: null })
 
 type AlleleRow = { symbol: string; isAvailable: boolean }
 const emptyAllele = (): AlleleRow => ({ symbol: "", isAvailable: false })
@@ -71,7 +73,7 @@ function LociPage() {
   const [selectedPanelId, setSelectedPanelId] = useState("")
 
   function openEdit(locus: NonNullable<typeof loci>[number]) {
-    setEditing({ id: locus.id, name: locus.name, biasTarget: locus.biasTarget, minTestCycle: locus.minTestCycle ?? null })
+    setEditing({ id: locus.id, name: locus.name, biasTarget: locus.biasTarget, minTestCycle: locus.minTestCycle ?? null, description: (locus.description as object | null) ?? null })
     setRightTab("alleles")
     setEditingAlleleId(null)
     setEditingAllele(emptyAllele())
@@ -137,7 +139,7 @@ function LociPage() {
           <span className="text-foreground">{editing.name || "New Locus"}</span>
         </div>
 
-        <div className="rounded-xl border border-border bg-card shadow-md p-2">
+        <div className="rounded-xl border border-border bg-card shadow-md p-2 space-y-2">
         <div className="grid grid-cols-[300px_1fr] gap-2 items-start">
           {/* Left: locus details */}
           <div className="rounded-lg border border-border bg-card shadow-sm">
@@ -323,6 +325,16 @@ function LociPage() {
             )}
           </div>
         </div>
+        <section className="rounded-lg border border-border bg-card shadow-sm p-3 space-y-2">
+          <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Description</label>
+          <RichTextEditor
+            key={editing.id ?? "new"}
+            defaultContent={editing.description}
+            onChange={(json) => setEditing({ ...editing, description: json })}
+            placeholder="Describe what this locus controls, how it affects phenotype…"
+            minHeight="7rem"
+          />
+        </section>
         </div>
       </div>
     )
@@ -369,8 +381,8 @@ function LociPage() {
           </thead>
           <tbody>
             {groups.map((group) => (
-              <>
-                <tr key={`group-${group.id}`} className="border-b border-border bg-secondary/40">
+              <React.Fragment key={group.id}>
+                <tr className="border-b border-border bg-secondary/40">
                   <td colSpan={COLS} className="px-3 py-1.5">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                       {group.name}
@@ -381,7 +393,7 @@ function LociPage() {
                   </td>
                 </tr>
                 <LocusRows rows={group.loci} />
-              </>
+              </React.Fragment>
             ))}
             {uncategorized.length > 0 && (
               <>

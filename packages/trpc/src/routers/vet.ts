@@ -30,6 +30,8 @@ export const vetRouter = router({
                   name: true,
                   treatmentType: true,
                   durationCycles: true,
+                  cost: true,
+                  currencyDef: { select: { id: true, symbol: true, name: true } },
                   restrictionDefs: {
                     select: { restrictionType: true, durationCycles: true, maxIntensityTier: true },
                   },
@@ -84,12 +86,6 @@ export const vetRouter = router({
           }),
           tx.animalHealthRecord.findMany({
             where: { animalId: input.animalId, isActive: true, diagnosedAt: null },
-            include: {
-              conditionDef: {
-                include: { treatments: { include: { restrictionDefs: true } } },
-              },
-              treatmentRecords: { where: { isActive: true } },
-            },
           }),
         ])
 
@@ -139,30 +135,6 @@ export const vetRouter = router({
             where: { id: record.id },
             data: { diagnosedAt: new Date(), diagnosedCycle: animal.ageInCycles },
           })
-          const treatment = record.conditionDef.treatments[0]
-          if (treatment) {
-            const treatmentRecord = await tx.animalTreatmentRecord.create({
-              data: {
-                animalId: input.animalId,
-                treatmentDefId: treatment.id,
-                healthRecordId: record.id,
-                startedCycle: animal.ageInCycles,
-                isActive: true,
-              },
-            })
-            for (const rd of treatment.restrictionDefs) {
-              await tx.activityRestriction.create({
-                data: {
-                  animalId: input.animalId,
-                  treatmentRecordId: treatmentRecord.id,
-                  restrictionType: rd.restrictionType,
-                  maxIntensityTier: rd.maxIntensityTier ?? null,
-                  remainingCycles: rd.durationCycles ?? 1,
-                  isActive: true,
-                },
-              })
-            }
-          }
           diagnosedCount++
         }
 
@@ -246,27 +218,240 @@ export const vetRouter = router({
         }
 
         if (record.treatmentDef.treatmentType === "VET_PROCEDURE") {
+          throw new Error("Procedures are booked via startTreatment")
+        }
+
+        await tx.animalTreatmentRecord.update({
+          where: { id: input.treatmentRecordId },
+          data: { lastAdministeredCycle: record.animal.ageInCycles },
+        })
+
+        return { success: true }
+      })
+    ),
+
+  startTreatment: publicProcedure
+    .input(z.object({
+      animalId: z.string(),
+      playerAccountId: z.string(),
+      healthRecordId: z.string(),
+      treatmentDefId: z.string(),
+    }))
+    .mutation(({ input }) =>
+      db.$transaction(async (tx) => {
+        const [animal, healthRecord, treatmentDef] = await Promise.all([
+          tx.animal.findUniqueOrThrow({
+            where: { id: input.animalId },
+            select: { ageInCycles: true, status: true, gameId: true },
+          }),
+          tx.animalHealthRecord.findUniqueOrThrow({
+            where: { id: input.healthRecordId },
+            select: { isActive: true },
+          }),
+          tx.treatmentDef.findUniqueOrThrow({
+            where: { id: input.treatmentDefId },
+            include: {
+              restrictionDefs: true,
+              currencyDef: { select: { id: true, name: true } },
+            },
+          }),
+        ])
+
+        if (animal.status !== "ALIVE") throw new Error("Animal is not alive")
+        if (!healthRecord.isActive) throw new Error("Condition is no longer active")
+
+        // Close any existing non-procedure active treatment for this health record
+        const activeTreatments = await tx.animalTreatmentRecord.findMany({
+          where: {
+            healthRecordId: input.healthRecordId,
+            isActive: true,
+            treatmentDef: { treatmentType: { not: "VET_PROCEDURE" } },
+          },
+          select: { id: true },
+        })
+        for (const t of activeTreatments) {
           await tx.animalTreatmentRecord.update({
-            where: { id: input.treatmentRecordId },
-            data: { isActive: false, completedCycle: record.animal.ageInCycles, completedAt: new Date() },
+            where: { id: t.id },
+            data: { isActive: false, completedCycle: animal.ageInCycles, completedAt: new Date() },
           })
-          const remaining = await tx.animalTreatmentRecord.count({
-            where: { healthRecordId: record.healthRecord.id, isActive: true },
-          })
-          if (remaining === 0) {
-            await tx.animalHealthRecord.update({
-              where: { id: record.healthRecord.id },
-              data: { isActive: false, resolvedCycle: record.animal.ageInCycles, resolvedAt: new Date() },
-            })
-          }
-        } else {
-          await tx.animalTreatmentRecord.update({
-            where: { id: input.treatmentRecordId },
-            data: { lastAdministeredCycle: record.animal.ageInCycles },
+          await tx.activityRestriction.updateMany({
+            where: { treatmentRecordId: t.id, isActive: true },
+            data: { isActive: false, remainingCycles: 0 },
           })
         }
 
-        return { success: true }
+        if (treatmentDef.cost && treatmentDef.cost > 0 && treatmentDef.currencyDefId) {
+          const balance = await tx.playerBalance.findUnique({
+            where: {
+              playerAccountId_currencyDefId: {
+                playerAccountId: input.playerAccountId,
+                currencyDefId: treatmentDef.currencyDefId,
+              },
+            },
+          })
+          if (!balance || balance.balance < treatmentDef.cost) {
+            throw new Error(`Insufficient ${treatmentDef.currencyDef?.name ?? "currency"} balance`)
+          }
+          await tx.playerBalance.update({
+            where: {
+              playerAccountId_currencyDefId: {
+                playerAccountId: input.playerAccountId,
+                currencyDefId: treatmentDef.currencyDefId,
+              },
+            },
+            data: { balance: { decrement: treatmentDef.cost } },
+          })
+          await tx.transaction.create({
+            data: {
+              gameId: animal.gameId,
+              fromPlayerAccountId: input.playerAccountId,
+              currencyDefId: treatmentDef.currencyDefId,
+              amount: treatmentDef.cost,
+              txnType: "TREATMENT_FEE",
+            },
+          })
+        }
+
+        const treatmentRecord = await tx.animalTreatmentRecord.create({
+          data: {
+            animalId: input.animalId,
+            treatmentDefId: input.treatmentDefId,
+            healthRecordId: input.healthRecordId,
+            startedCycle: animal.ageInCycles,
+            isActive: true,
+          },
+        })
+
+        for (const rd of treatmentDef.restrictionDefs) {
+          const isLifelong = rd.durationCycles == null && treatmentDef.durationCycles == null
+          await tx.activityRestriction.create({
+            data: {
+              animalId: input.animalId,
+              treatmentRecordId: treatmentRecord.id,
+              restrictionType: rd.restrictionType,
+              maxIntensityTier: rd.maxIntensityTier ?? null,
+              remainingCycles: rd.durationCycles ?? treatmentDef.durationCycles ?? 0,
+              isLifelong,
+              isActive: true,
+            },
+          })
+        }
+
+        let triggeredConditionName: string | null = null
+        if (treatmentDef.treatmentType === "VET_PROCEDURE") {
+          const genotypes = await tx.animalGenotype.findMany({ where: { animalId: input.animalId } })
+          for (const genotype of genotypes) {
+            const rule = await tx.expressionRule.findUnique({
+              where: {
+                locusId_alleleOneId_alleleTwoId: {
+                  locusId: genotype.locusId,
+                  alleleOneId: genotype.alleleOneId,
+                  alleleTwoId: genotype.alleleTwoId,
+                },
+              },
+              include: {
+                ruleConditions: {
+                  include: {
+                    healthConditionDef: {
+                      include: { conditionTriggers: { where: { triggerType: "VET_PROCEDURE" } } },
+                    },
+                  },
+                },
+              },
+            })
+            if (!rule?.ruleConditions.length) continue
+            for (const rc of rule.ruleConditions) {
+              const condDef = rc.healthConditionDef
+              if (!condDef.conditionTriggers.length) continue
+
+              const alreadyActive = await tx.animalHealthRecord.findFirst({
+                where: { animalId: input.animalId, conditionDefId: condDef.id, isActive: true },
+              })
+              if (alreadyActive) continue
+
+              if (condDef.flareupCooldownCycles) {
+                const lastResolved = await tx.animalHealthRecord.findFirst({
+                  where: { animalId: input.animalId, conditionDefId: condDef.id, isActive: false },
+                  orderBy: { resolvedCycle: "desc" },
+                  select: { resolvedCycle: true },
+                })
+                if (lastResolved?.resolvedCycle != null && animal.ageInCycles < lastResolved.resolvedCycle + condDef.flareupCooldownCycles) continue
+              }
+
+              if (condDef.suppressionItemDefId) {
+                const suppItem = await tx.playerInventory.findUnique({
+                  where: {
+                    playerAccountId_itemDefId: {
+                      playerAccountId: input.playerAccountId,
+                      itemDefId: condDef.suppressionItemDefId,
+                    },
+                  },
+                })
+                if (suppItem && suppItem.quantity > 0) {
+                  if (suppItem.quantity <= 1) {
+                    await tx.playerInventory.delete({
+                      where: { playerAccountId_itemDefId: { playerAccountId: input.playerAccountId, itemDefId: condDef.suppressionItemDefId } },
+                    })
+                  } else {
+                    await tx.playerInventory.update({
+                      where: { playerAccountId_itemDefId: { playerAccountId: input.playerAccountId, itemDefId: condDef.suppressionItemDefId } },
+                      data: { quantity: { decrement: 1 } },
+                    })
+                  }
+                  continue
+                }
+              }
+
+              for (const trigger of condDef.conditionTriggers) {
+                if (Math.random() < trigger.triggerChance) {
+                  const fatalityRisk = condDef.procedureFatalityRisk ?? 0
+                  if (fatalityRisk > 0 && Math.random() < fatalityRisk) {
+                    await tx.animal.update({
+                      where: { id: input.animalId },
+                      data: { status: "DECEASED", diedAt: new Date(), causeOfDeath: condDef.name },
+                    })
+                    await tx.animalTreatmentRecord.update({
+                      where: { id: treatmentRecord.id },
+                      data: { isActive: false, completedCycle: animal.ageInCycles, completedAt: new Date() },
+                    })
+                    await tx.animalHealthRecord.update({
+                      where: { id: input.healthRecordId },
+                      data: { isActive: false, resolvedCycle: animal.ageInCycles, resolvedAt: new Date() },
+                    })
+                    return { treatmentRecordId: treatmentRecord.id, diedFromProcedure: true, conditionName: condDef.name }
+                  }
+                  await tx.animalHealthRecord.create({
+                    data: {
+                      animalId: input.animalId,
+                      conditionDefId: condDef.id,
+                      isActive: true,
+                      diagnosedAt: new Date(),
+                      diagnosedCycle: animal.ageInCycles,
+                    },
+                  })
+                  triggeredConditionName = condDef.name
+                  break
+                }
+              }
+            }
+          }
+
+          await tx.animalTreatmentRecord.update({
+            where: { id: treatmentRecord.id },
+            data: { isActive: false, completedCycle: animal.ageInCycles, completedAt: new Date() },
+          })
+          const remaining = await tx.animalTreatmentRecord.count({
+            where: { healthRecordId: input.healthRecordId, isActive: true },
+          })
+          if (remaining === 0) {
+            await tx.animalHealthRecord.update({
+              where: { id: input.healthRecordId },
+              data: { isActive: false, resolvedCycle: animal.ageInCycles, resolvedAt: new Date() },
+            })
+          }
+        }
+
+        return { treatmentRecordId: treatmentRecord.id, triggeredCondition: triggeredConditionName ?? undefined }
       })
     ),
 

@@ -26,9 +26,9 @@ const FACILITIES = [
   },
   {
     icon: <BookOpen className="size-6 text-chart-2" />,
-    title: "Breed Directory",
-    desc: "Browse registered breeds, their stats, and founding players.",
-    to: "/breeds" as const,
+    title: "Directories",
+    desc: "Reference guides for diseases, genetics, conformation, and coat colors.",
+    to: "/directory" as const,
   },
 ]
 

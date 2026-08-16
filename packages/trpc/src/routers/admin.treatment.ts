@@ -9,7 +9,10 @@ export const treatmentAdminRouter = router({
       db.treatmentDef.findMany({
         where: { conditionDefId: input.conditionDefId },
         orderBy: { name: "asc" },
-        include: { _count: { select: { items: true, restrictionDefs: true } } },
+        include: {
+          _count: { select: { items: true, restrictionDefs: true } },
+          currencyDef: { select: { id: true, name: true, symbol: true } },
+        },
       })
     ),
 
@@ -20,9 +23,12 @@ export const treatmentAdminRouter = router({
       name: z.string().min(1),
       treatmentType: z.enum(["OTC", "PRESCRIPTION", "VET_PROCEDURE", "ACTIVITY_RESTRICTION", "PLAYER_ACTION"]),
       durationCycles: z.number().int().nullable(),
+      cost: z.number().int().min(0).nullish(),
+      currencyDefId: z.string().nullish(),
     }))
     .mutation(({ input }) => {
-      const { id, conditionDefId, ...data } = input
+      const { id, conditionDefId, cost, currencyDefId, ...rest } = input
+      const data = { ...rest, cost: cost ?? null, currencyDefId: currencyDefId ?? null }
       if (id) return db.treatmentDef.update({ where: { id }, data })
       return db.treatmentDef.create({ data: { conditionDefId, ...data } })
     }),

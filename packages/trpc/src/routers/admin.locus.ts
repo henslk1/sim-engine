@@ -10,7 +10,7 @@ export const locusAdminRouter = router({
         where: { gameId: input.gameId },
         orderBy: { name: "asc" },
         include: {
-          _count: { select: { alleles: true } },
+          _count: { select: { alleles: true, sectionEntries: true } },
           panelEntries: { include: { panelDef: { select: { id: true, name: true, panelType: true } } } },
         },
       })
@@ -23,10 +23,11 @@ export const locusAdminRouter = router({
       name: z.string().min(1),
       biasTarget: z.enum(["FAVORABILITY", "RARITY", "NONE"]),
       minTestCycle: z.number().int().min(0).nullish(),
+      description: z.unknown().nullish(),
     }))
     .mutation(({ input }) => {
-      const { id, gameId, minTestCycle, ...rest } = input
-      const data = { ...rest, minTestCycle: minTestCycle ?? null }
+      const { id, gameId, minTestCycle, description, ...rest } = input
+      const data = { ...rest, minTestCycle: minTestCycle ?? null, description: description ?? null }
       if (id) return db.locus.update({ where: { id }, data })
       return db.locus.upsert({
         where: { gameId_name: { gameId, name: data.name } },

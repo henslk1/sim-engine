@@ -3,6 +3,7 @@ import { trpc } from "@/lib/trpc"
 import { useState, Fragment } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { RichTextEditor } from "@/components/game/editor/RichTextEditor"
 
 const TREATMENT_TYPES = ["OTC", "PRESCRIPTION", "VET_PROCEDURE", "ACTIVITY_RESTRICTION", "PLAYER_ACTION"] as const
 type TreatmentType = typeof TREATMENT_TYPES[number]
@@ -21,34 +22,57 @@ const ITEM_TYPE_LABELS: Record<ItemType, string> = {
 const ITEM_CATEGORIES = ["AGING", "CARE", "HEALTH", "EQUIPMENT", "BREEDING", "STORAGE", "MISC"] as const
 type ItemCategory = typeof ITEM_CATEGORIES[number]
 
+const RESTRICTION_TYPES = ["TRAINING", "COMPETITION", "BREEDING", "CARE_ACTION", "ALL"] as const
+type RestrictionType = typeof RESTRICTION_TYPES[number]
+const RESTRICTION_LABELS: Record<RestrictionType, string> = {
+  TRAINING: "Training", COMPETITION: "Competition", BREEDING: "Breeding",
+  CARE_ACTION: "Care Actions", ALL: "All Activities",
+}
+
 type ConditionForm = {
   id?: string
   name: string
   conditionType: "ILLNESS" | "INJURY"
   isGenetic: boolean
+  isEpisodic: boolean
   isFatal: boolean
   moodEffect: string
   energyEffect: string
   onsetMinCycle: string
   fatalityChance: string
   fatalMaxCycle: string
+  flareupCooldownCycles: string
+  procedureFatalityRisk: string
+  suppressionItemDefId: string
+  baseWeight: string
+  description: object | null
 }
 
-const emptyCondition = (): ConditionForm => ({ name: "", conditionType: "ILLNESS", isGenetic: false, isFatal: false, moodEffect: "", energyEffect: "", onsetMinCycle: "", fatalityChance: "", fatalMaxCycle: "" })
+const emptyCondition = (): ConditionForm => ({
+  name: "", conditionType: "ILLNESS", isGenetic: false, isEpisodic: false, isFatal: false,
+  moodEffect: "", energyEffect: "", onsetMinCycle: "", fatalityChance: "", fatalMaxCycle: "",
+  flareupCooldownCycles: "", procedureFatalityRisk: "", suppressionItemDefId: "", baseWeight: "1", description: null,
+})
+
+type TriggerForm = { triggerType: "VET_PROCEDURE" | "TRAINING_TIER"; minTierIndex: string; triggerChance: string }
+const emptyTrigger = (): TriggerForm => ({ triggerType: "VET_PROCEDURE", minTierIndex: "", triggerChance: "1" })
 
 type BehaviorRow = { symptomText: string; careActionDefId: string }
 const emptyBehavior = (): BehaviorRow => ({ symptomText: "", careActionDefId: "" })
 
-type TreatmentForm = { name: string; treatmentType: TreatmentType; durationCycles: string; isLifelong: boolean }
-const emptyTreatment = (): TreatmentForm => ({ name: "", treatmentType: "OTC", durationCycles: "", isLifelong: false })
+type TreatmentForm = { name: string; treatmentType: TreatmentType; durationCycles: string; isLifelong: boolean; cost: string; currencyDefId: string }
+const emptyTreatment = (): TreatmentForm => ({ name: "", treatmentType: "OTC", durationCycles: "", isLifelong: false, cost: "", currencyDefId: "" })
 
 type ItemRow = { itemDefId: string; quantity: string }
 const emptyItem = (): ItemRow => ({ itemDefId: "", quantity: "1" })
 
-type EditRuleForm = { alleleOneId: string; alleleTwoId: string; phenotype: string; penetrance: string }
+type RestrictionRow = { restrictionType: RestrictionType; maxIntensityTier: string; durationCycles: string; isLifelong: boolean }
+const emptyRestriction = (): RestrictionRow => ({ restrictionType: "TRAINING", maxIntensityTier: "", durationCycles: "", isLifelong: false })
 
-type CreateRuleForm = { locusId: string; alleleOneId: string; alleleTwoId: string; phenotype: string; penetrance: string }
-const emptyCreateRule = (): CreateRuleForm => ({ locusId: "", alleleOneId: "", alleleTwoId: "", phenotype: "", penetrance: "1" })
+type EditRuleForm = { alleleOneId: string; alleleTwoId: string; phenotype: string; penetrance: string; environmentalRiskModifier: string }
+
+type CreateRuleForm = { locusId: string; alleleOneId: string; alleleTwoId: string; phenotype: string; penetrance: string; environmentalRiskModifier: string }
+const emptyCreateRule = (): CreateRuleForm => ({ locusId: "", alleleOneId: "", alleleTwoId: "", phenotype: "", penetrance: "1", environmentalRiskModifier: "0" })
 
 type CreateItemForm = { name: string; itemType: ItemType; category: ItemCategory }
 const emptyCreateItem = (): CreateItemForm => ({ name: "", itemType: "OTC_MEDICATION", category: "HEALTH" })
@@ -60,6 +84,7 @@ function HealthConditionsPage() {
   const { data: careActions } = trpc.admin.care.list.useQuery({ gameId: gameId! }, {})
   const { data: itemDefs } = trpc.admin.item.list.useQuery({ gameId: gameId! }, {})
   const { data: loci } = trpc.admin.locus.list.useQuery({ gameId: gameId! })
+  const { data: currencies } = trpc.admin.currency.list.useQuery({ gameId: gameId! })
 
   const utils = trpc.useUtils()
 
@@ -74,7 +99,7 @@ function HealthConditionsPage() {
   })
 
   const [editing, setEditing] = useState<ConditionForm | null>(null)
-  const [rightTab, setRightTab] = useState<"behaviors" | "treatments" | "genetics">("behaviors")
+  const [rightTab, setRightTab] = useState<"behaviors" | "treatments" | "genetics" | "triggers">("behaviors")
 
   // Behavior state
   const { data: behaviors } = trpc.admin.health.listBehaviors.useQuery(
@@ -99,14 +124,21 @@ function HealthConditionsPage() {
   const [editingBehaviorId, setEditingBehaviorId] = useState<string | null>(null)
   const [editingBehavior, setEditingBehavior] = useState<BehaviorRow | null>(null)
   const [newBehavior, setNewBehavior] = useState<BehaviorRow>(emptyBehavior())
+  const [editingTriggerId, setEditingTriggerId] = useState<string | null>(null)
+  const [editingTrigger, setEditingTrigger] = useState<TriggerForm | null>(null)
+  const [newTrigger, setNewTrigger] = useState<TriggerForm>(emptyTrigger())
 
   // Treatment state
   const [expandedTreatmentId, setExpandedTreatmentId] = useState<string | null>(null)
+  const [expandedView, setExpandedView] = useState<"items" | "restrictions" | null>(null)
   const [editingTreatmentId, setEditingTreatmentId] = useState<string | null>(null)
   const [editingTreatment, setEditingTreatment] = useState<TreatmentForm | null>(null)
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
   const [editingItem, setEditingItem] = useState<ItemRow | null>(null)
   const [newItem, setNewItem] = useState<ItemRow>(emptyItem())
+  const [editingRestrictionId, setEditingRestrictionId] = useState<string | null>(null)
+  const [editingRestriction, setEditingRestriction] = useState<RestrictionRow | null>(null)
+  const [newRestriction, setNewRestriction] = useState<RestrictionRow>(emptyRestriction())
 
   const { data: treatments } = trpc.admin.treatment.listByCondition.useQuery(
     { conditionDefId: editing?.id! },
@@ -116,9 +148,28 @@ function HealthConditionsPage() {
     { treatmentDefId: expandedTreatmentId! },
     { enabled: !!expandedTreatmentId }
   )
+  const { data: treatmentRestrictions } = trpc.admin.treatment.listRestrictions.useQuery(
+    { treatmentDefId: expandedTreatmentId! },
+    { enabled: !!expandedTreatmentId }
+  )
+  const saveRestriction = trpc.admin.treatment.saveRestriction.useMutation({
+    onSuccess: () => {
+      utils.admin.treatment.listRestrictions.invalidate({ treatmentDefId: expandedTreatmentId! })
+      setEditingRestrictionId(null)
+      setEditingRestriction(null)
+      setNewRestriction(emptyRestriction())
+    },
+  })
+  const removeRestriction = trpc.admin.treatment.removeRestriction.useMutation({
+    onSuccess: () => utils.admin.treatment.listRestrictions.invalidate({ treatmentDefId: expandedTreatmentId! }),
+  })
 
   // Genetics state
   const [linkRuleId, setLinkRuleId] = useState("")
+  const [linkLocusId, setLinkLocusId] = useState("")
+  const [linkPhenotype, setLinkPhenotype] = useState("")
+  const [linkEnvRisk, setLinkEnvRisk] = useState("0")
+  const [linkPenetrance, setLinkPenetrance] = useState("")
   const [creatingRule, setCreatingRule] = useState(false)
   const [createRuleForm, setCreateRuleForm] = useState<CreateRuleForm>(emptyCreateRule())
   const { data: createRuleAlleles } = trpc.admin.locus.listAlleles.useQuery(
@@ -126,6 +177,7 @@ function HealthConditionsPage() {
     { enabled: !!createRuleForm.locusId }
   )
   const [editingRuleId, setEditingRuleId] = useState<string | null>(null)
+  const [editingLinkId, setEditingLinkId] = useState<string | null>(null)
   const [editingRuleForm, setEditingRuleForm] = useState<EditRuleForm | null>(null)
   const [editingRuleLocusId, setEditingRuleLocusId] = useState("")
   const { data: editRuleAlleles } = trpc.admin.locus.listAlleles.useQuery(
@@ -135,25 +187,76 @@ function HealthConditionsPage() {
   const [creatingItem, setCreatingItem] = useState(false)
   const [createItemForm, setCreateItemForm] = useState<CreateItemForm>(emptyCreateItem())
 
+  const { data: triggers } = trpc.admin.health.listTriggers.useQuery(
+    { conditionDefId: editing?.id! },
+    { enabled: !!editing?.id && rightTab === "triggers" }
+  )
+  const saveTrigger = trpc.admin.health.saveTrigger.useMutation({
+    onSuccess: () => {
+      utils.admin.health.listTriggers.invalidate({ conditionDefId: editing?.id })
+      setEditingTriggerId(null)
+      setEditingTrigger(null)
+      setNewTrigger(emptyTrigger())
+    },
+  })
+  const removeTrigger = trpc.admin.health.removeTrigger.useMutation({
+    onSuccess: () => utils.admin.health.listTriggers.invalidate({ conditionDefId: editing?.id }),
+  })
+
   const { data: linkedRules } = trpc.admin.expression.listByCondition.useQuery(
     { conditionDefId: editing?.id! },
     { enabled: !!editing?.id && rightTab === "genetics" }
   )
-  const { data: unlinkedRules } = trpc.admin.expression.listUnlinkedByGame.useQuery(
+  const { data: availableRules } = trpc.admin.expression.listAvailableForCondition.useQuery(
+    { gameId: gameId!, conditionDefId: editing?.id! },
+    { enabled: !!editing?.id && rightTab === "genetics" }
+  )
+  const { data: allLoci } = trpc.admin.locus.list.useQuery(
     { gameId: gameId! },
     { enabled: !!editing?.id && rightTab === "genetics" }
   )
-  const setCondition = trpc.admin.expression.setCondition.useMutation({
+  const { data: linkLocusRules } = trpc.admin.expression.listByLocus.useQuery(
+    { locusId: linkLocusId },
+    { enabled: !!linkLocusId }
+  )
+  const addConditionLink = trpc.admin.expression.addConditionLink.useMutation({
     onSuccess: () => {
       utils.admin.expression.listByCondition.invalidate({ conditionDefId: editing?.id })
-      utils.admin.expression.listUnlinkedByGame.invalidate({ gameId: gameId! })
+      utils.admin.expression.listAvailableForCondition.invalidate({ gameId: gameId!, conditionDefId: editing?.id! })
       setLinkRuleId("")
     },
   })
-  const saveExpression = trpc.admin.expression.save.useMutation({
+  const addLinkByPhenotype = trpc.admin.expression.addConditionLinkByPhenotype.useMutation({
     onSuccess: () => {
       utils.admin.expression.listByCondition.invalidate({ conditionDefId: editing?.id })
-      utils.admin.expression.listUnlinkedByGame.invalidate({ gameId: gameId! })
+      utils.admin.expression.listAvailableForCondition.invalidate({ gameId: gameId!, conditionDefId: editing?.id! })
+      setLinkLocusId("")
+      setLinkPhenotype("")
+      setLinkEnvRisk("0")
+      setLinkPenetrance("")
+    },
+  })
+  const removeConditionLink = trpc.admin.expression.removeConditionLink.useMutation({
+    onSuccess: () => {
+      utils.admin.expression.listByCondition.invalidate({ conditionDefId: editing?.id })
+      utils.admin.expression.listAvailableForCondition.invalidate({ gameId: gameId!, conditionDefId: editing?.id! })
+    },
+  })
+  const updateConditionLink = trpc.admin.expression.updateConditionLink.useMutation({
+    onSuccess: () => utils.admin.expression.listByCondition.invalidate({ conditionDefId: editing?.id }),
+  })
+  const saveExpression = trpc.admin.expression.save.useMutation({
+    onSuccess: (saved) => {
+      if (editing?.id) {
+        addConditionLink.mutate({
+          expressionRuleId: saved.id,
+          healthConditionDefId: editing.id,
+          penetrance: editing.isGenetic && createRuleForm.penetrance ? parseFloat(createRuleForm.penetrance) : null,
+          environmentalRiskModifier: !editing.isGenetic && createRuleForm.environmentalRiskModifier ? parseFloat(createRuleForm.environmentalRiskModifier) : 0,
+        })
+      }
+      utils.admin.expression.listByCondition.invalidate({ conditionDefId: editing?.id })
+      utils.admin.expression.listAvailableForCondition.invalidate({ gameId: gameId!, conditionDefId: editing?.id! })
       setCreatingRule(false)
       setCreateRuleForm(emptyCreateRule())
     },
@@ -162,6 +265,7 @@ function HealthConditionsPage() {
     onSuccess: () => {
       utils.admin.expression.listByCondition.invalidate({ conditionDefId: editing?.id })
       setEditingRuleId(null)
+      setEditingLinkId(null)
       setEditingRuleForm(null)
       setEditingRuleLocusId("")
     },
@@ -209,20 +313,28 @@ function HealthConditionsPage() {
   function openEdit(condition: NonNullable<typeof conditions>[number]) {
     setEditing({
       id: condition.id, name: condition.name, conditionType: condition.conditionType,
-      isGenetic: condition.isGenetic, isFatal: condition.isFatal,
+      isGenetic: condition.isGenetic, isEpisodic: condition.isEpisodic, isFatal: condition.isFatal,
       moodEffect: condition.moodEffect?.toString() ?? "",
       energyEffect: condition.energyEffect?.toString() ?? "",
       onsetMinCycle: condition.onsetMinCycle?.toString() ?? "",
       fatalityChance: condition.fatalityChance?.toString() ?? "",
       fatalMaxCycle: condition.fatalMaxCycle?.toString() ?? "",
+      flareupCooldownCycles: condition.flareupCooldownCycles?.toString() ?? "",
+      procedureFatalityRisk: condition.procedureFatalityRisk?.toString() ?? "",
+      suppressionItemDefId: condition.suppressionItemDefId ?? "",
+      baseWeight: condition.baseWeight?.toString() ?? "1",
+      description: (condition.description as object | null) ?? null,
     })
     setRightTab("behaviors")
     setEditingBehaviorId(null); setEditingBehavior(null); setNewBehavior(emptyBehavior())
-    setExpandedTreatmentId(null); setEditingTreatmentId(null); setEditingTreatment(null)
+    setExpandedTreatmentId(null); setExpandedView(null); setEditingTreatmentId(null); setEditingTreatment(null)
     setEditingItemId(null); setEditingItem(null); setNewItem(emptyItem())
+    setEditingRestrictionId(null); setEditingRestriction(null); setNewRestriction(emptyRestriction())
     setLinkRuleId("")
+    setLinkLocusId(""); setLinkPhenotype(""); setLinkEnvRisk("0"); setLinkPenetrance("")
     setCreatingRule(false); setCreateRuleForm(emptyCreateRule())
     setCreatingItem(false); setCreateItemForm(emptyCreateItem())
+    setEditingTriggerId(null); setEditingTrigger(null); setNewTrigger(emptyTrigger())
   }
 
   function submitCondition() {
@@ -230,12 +342,17 @@ function HealthConditionsPage() {
     saveCondition.mutate(
       {
         id: editing.id, gameId, name: editing.name, conditionType: editing.conditionType,
-        isGenetic: editing.isGenetic, isFatal: editing.isFatal,
+        isGenetic: editing.isGenetic, isEpisodic: editing.isEpisodic, isFatal: editing.isFatal,
         moodEffect: editing.moodEffect !== "" ? parseFloat(editing.moodEffect) : null,
         energyEffect: editing.energyEffect !== "" ? parseFloat(editing.energyEffect) : null,
         onsetMinCycle: editing.onsetMinCycle !== "" ? parseInt(editing.onsetMinCycle) : null,
         fatalityChance: editing.fatalityChance !== "" ? parseFloat(editing.fatalityChance) : null,
         fatalMaxCycle: editing.fatalMaxCycle !== "" ? parseInt(editing.fatalMaxCycle) : null,
+        flareupCooldownCycles: editing.flareupCooldownCycles !== "" ? parseInt(editing.flareupCooldownCycles) : null,
+        procedureFatalityRisk: editing.procedureFatalityRisk !== "" ? parseFloat(editing.procedureFatalityRisk) : null,
+        suppressionItemDefId: editing.suppressionItemDefId || null,
+        baseWeight: editing.baseWeight !== "" ? parseFloat(editing.baseWeight) : 1,
+        description: editing.description,
       },
       { onSuccess: (saved) => setEditing((prev) => (prev ? { ...prev, id: saved.id } : null)) }
     )
@@ -247,14 +364,19 @@ function HealthConditionsPage() {
     saveBehavior.mutate({ id, conditionDefId: editing.id, symptomText: form.symptomText.trim(), careActionDefId: form.careActionDefId || null })
   }
 
+  const PAID_TYPES: TreatmentType[] = ["PRESCRIPTION", "VET_PROCEDURE"]
+
   function submitTreatment() {
     if (!editingTreatment || !editing?.id || !editingTreatment.name.trim()) return
+    const hasCost = PAID_TYPES.includes(editingTreatment.treatmentType)
     saveTreatment.mutate({
       id: editingTreatmentId ?? undefined,
       conditionDefId: editing.id,
       name: editingTreatment.name.trim(),
       treatmentType: editingTreatment.treatmentType,
       durationCycles: editingTreatment.isLifelong ? null : (editingTreatment.durationCycles ? parseInt(editingTreatment.durationCycles) : null),
+      cost: hasCost && editingTreatment.cost !== "" ? parseInt(editingTreatment.cost) : null,
+      currencyDefId: hasCost && editingTreatment.currencyDefId ? editingTreatment.currencyDefId : null,
     })
   }
 
@@ -264,6 +386,29 @@ function HealthConditionsPage() {
     saveItem.mutate({ id, treatmentDefId: expandedTreatmentId, itemDefId: form.itemDefId, quantity: parseInt(form.quantity) || 1 })
   }
 
+  function toggleExpand(treatmentId: string, view: "items" | "restrictions") {
+    if (expandedTreatmentId === treatmentId && expandedView === view) {
+      setExpandedTreatmentId(null); setExpandedView(null)
+    } else {
+      setExpandedTreatmentId(treatmentId); setExpandedView(view)
+    }
+    setEditingItemId(null); setEditingItem(null); setNewItem(emptyItem())
+    setCreatingItem(false); setCreateItemForm(emptyCreateItem())
+    setEditingRestrictionId(null); setEditingRestriction(null); setNewRestriction(emptyRestriction())
+  }
+
+  function submitRestriction(id?: string) {
+    const form = id ? editingRestriction : newRestriction
+    if (!form || !expandedTreatmentId) return
+    saveRestriction.mutate({
+      id,
+      treatmentDefId: expandedTreatmentId,
+      restrictionType: form.restrictionType,
+      maxIntensityTier: form.maxIntensityTier !== "" ? parseInt(form.maxIntensityTier) : null,
+      durationCycles: form.isLifelong ? null : (form.durationCycles !== "" ? parseInt(form.durationCycles) : null),
+    })
+  }
+
   function submitCreateRule() {
     if (!createRuleForm.locusId || !createRuleForm.alleleOneId || !createRuleForm.alleleTwoId || !createRuleForm.phenotype.trim() || !editing?.id) return
     saveExpression.mutate({
@@ -271,8 +416,6 @@ function HealthConditionsPage() {
       alleleOneId: createRuleForm.alleleOneId,
       alleleTwoId: createRuleForm.alleleTwoId,
       phenotype: createRuleForm.phenotype.trim(),
-      penetrance: createRuleForm.penetrance ? parseFloat(createRuleForm.penetrance) : null,
-      healthConditionDefId: editing.id,
     })
   }
 
@@ -284,9 +427,14 @@ function HealthConditionsPage() {
       alleleOneId: editingRuleForm.alleleOneId,
       alleleTwoId: editingRuleForm.alleleTwoId,
       phenotype: editingRuleForm.phenotype.trim(),
-      penetrance: editingRuleForm.penetrance ? parseFloat(editingRuleForm.penetrance) : null,
-      healthConditionDefId: editing?.id,
     })
+    if (editingLinkId) {
+      updateConditionLink.mutate({
+        id: editingLinkId,
+        penetrance: editingRuleForm.penetrance ? parseFloat(editingRuleForm.penetrance) : null,
+        environmentalRiskModifier: editingRuleForm.environmentalRiskModifier ? parseFloat(editingRuleForm.environmentalRiskModifier) : 0,
+      })
+    }
   }
 
   function submitCreateItem() {
@@ -301,6 +449,18 @@ function HealthConditionsPage() {
     })
   }
 
+  function submitTrigger(id?: string) {
+    const form = id ? editingTrigger : newTrigger
+    if (!form || !editing?.id) return
+    saveTrigger.mutate({
+      id,
+      conditionDefId: editing.id,
+      triggerType: form.triggerType,
+      minTierIndex: form.minTierIndex !== "" ? parseInt(form.minTierIndex) : null,
+      triggerChance: parseFloat(form.triggerChance) || 1.0,
+    })
+  }
+
   if (editing !== null) {
     return (
       <div className="p-4 space-y-3 max-w-5xl mx-auto">
@@ -311,7 +471,7 @@ function HealthConditionsPage() {
           </h1>
         </div>
 
-        <div className="rounded-xl border border-border bg-card shadow-md p-2">
+        <div className="rounded-xl border border-border bg-card shadow-md p-2 space-y-2">
         <div className="grid grid-cols-[300px_1fr] gap-2 items-start">
           {/* Left: condition details */}
           <section className="rounded-lg border border-border bg-card shadow-sm">
@@ -331,16 +491,46 @@ function HealthConditionsPage() {
                   <option value="INJURY">Injury</option>
                 </select>
               </div>
-              <div className="flex gap-6">
+              <div className="flex gap-4 flex-wrap">
                 <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
-                  <input type="checkbox" checked={editing.isGenetic} onChange={(e) => setEditing({ ...editing, isGenetic: e.target.checked })} />
+                  <input type="checkbox" checked={editing.isGenetic} onChange={(e) => setEditing({ ...editing, isGenetic: e.target.checked, isEpisodic: e.target.checked ? editing.isEpisodic : false })} />
                   Genetic
                 </label>
+                {editing.isGenetic && (
+                  <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
+                    <input type="checkbox" checked={editing.isEpisodic} onChange={(e) => setEditing({ ...editing, isEpisodic: e.target.checked })} />
+                    Episodic
+                  </label>
+                )}
                 <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
                   <input type="checkbox" checked={editing.isFatal} onChange={(e) => setEditing({ ...editing, isFatal: e.target.checked })} />
                   Fatal
                 </label>
               </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Flareup Cooldown (cycles)</label>
+                <Input className="h-8 text-sm" type="number" step="1" min="0" value={editing.flareupCooldownCycles}
+                  onChange={(e) => setEditing({ ...editing, flareupCooldownCycles: e.target.value })} placeholder="e.g. 12" />
+              </div>
+              {editing.isGenetic && (
+                <>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Procedure Fatality Risk</label>
+                    <Input className="h-8 text-sm" type="number" step="0.01" min="0" max="1" value={editing.procedureFatalityRisk}
+                      onChange={(e) => setEditing({ ...editing, procedureFatalityRisk: e.target.value })} placeholder="0–1" />
+                  </div>
+                  {editing.procedureFatalityRisk !== "" && parseFloat(editing.procedureFatalityRisk) > 0 && (
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Suppression Item</label>
+                      <select value={editing.suppressionItemDefId} onChange={(e) => setEditing({ ...editing, suppressionItemDefId: e.target.value })}
+                        className="h-8 rounded-md border border-input bg-background px-3 text-sm">
+                        <option value="">None</option>
+                        {itemDefs?.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                      </select>
+                    </div>
+                  )}
+                </>
+              )}
               <div className="grid grid-cols-2 gap-2">
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Mood Effect</label>
@@ -357,6 +547,11 @@ function HealthConditionsPage() {
                 <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Onset Min Cycle</label>
                 <Input className="h-8 text-sm" type="number" step="1" min="0" value={editing.onsetMinCycle}
                   onChange={(e) => setEditing({ ...editing, onsetMinCycle: e.target.value })} placeholder="e.g. 24" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Base Weight <span className="font-normal normal-case">(illness selection)</span></label>
+                <Input className="h-8 text-sm" type="number" step="0.1" min="0" value={editing.baseWeight}
+                  onChange={(e) => setEditing({ ...editing, baseWeight: e.target.value })} placeholder="1" />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div className="flex flex-col gap-1">
@@ -395,12 +590,12 @@ function HealthConditionsPage() {
             <section className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
               {/* Tab bar */}
               <div className="flex items-center gap-4 border-b border-border bg-secondary/40 px-3 py-2">
-                {(["behaviors", "treatments", "genetics"] as const).map(tab => (
+                {(["behaviors", "treatments", "genetics", "triggers"] as const).map(tab => (
                   <button key={tab} onClick={() => setRightTab(tab)}
                     className={`text-[10px] font-bold uppercase tracking-wider pb-0.5 border-b-2 transition-colors ${
                       rightTab === tab ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
                     }`}>
-                    {tab === "behaviors" ? "Behaviors & Symptoms" : tab === "treatments" ? "Treatments" : "Linked Genes"}
+                    {tab === "behaviors" ? "Behaviors & Symptoms" : tab === "treatments" ? "Treatments" : tab === "genetics" ? "Linked Genes" : "Triggers"}
                   </button>
                 ))}
               </div>
@@ -480,20 +675,37 @@ function HealthConditionsPage() {
                           {TREATMENT_TYPES.map((t) => <option key={t} value={t}>{TREATMENT_LABELS[t]}</option>)}
                         </select>
                       </div>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Duration (cycles)</label>
-                        <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
-                          <input
-                            type="checkbox"
-                            checked={editingTreatment.isLifelong}
-                            onChange={(e) => setEditingTreatment({ ...editingTreatment, isLifelong: e.target.checked, durationCycles: e.target.checked ? "" : "1" })}
-                          />
-                          Lifelong (no expiry)
-                        </label>
-                        {!editingTreatment.isLifelong && (
-                          <Input className="h-8 text-sm" type="number" min="1" value={editingTreatment.durationCycles} onChange={(e) => setEditingTreatment({ ...editingTreatment, durationCycles: e.target.value })} placeholder="Number of cycles" />
-                        )}
-                      </div>
+                      {editingTreatment.treatmentType !== "VET_PROCEDURE" && (
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Duration (cycles)</label>
+                          <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={editingTreatment.isLifelong}
+                              onChange={(e) => setEditingTreatment({ ...editingTreatment, isLifelong: e.target.checked, durationCycles: e.target.checked ? "" : "1" })}
+                            />
+                            Lifelong (no expiry)
+                          </label>
+                          {!editingTreatment.isLifelong && (
+                            <Input className="h-8 text-sm" type="number" min="1" value={editingTreatment.durationCycles} onChange={(e) => setEditingTreatment({ ...editingTreatment, durationCycles: e.target.value })} placeholder="Number of cycles" />
+                          )}
+                        </div>
+                      )}
+                      {PAID_TYPES.includes(editingTreatment.treatmentType) && (
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Cost</label>
+                            <Input className="h-8 text-sm" type="number" min="0" step="1" value={editingTreatment.cost} onChange={(e) => setEditingTreatment({ ...editingTreatment, cost: e.target.value })} placeholder="e.g. 50" />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Currency</label>
+                            <select value={editingTreatment.currencyDefId} onChange={(e) => setEditingTreatment({ ...editingTreatment, currencyDefId: e.target.value })} className="h-8 rounded-md border border-input bg-background px-3 text-sm">
+                              <option value="">None (free)</option>
+                              {currencies?.map((c) => <option key={c.id} value={c.id}>{c.name}{c.symbol ? ` (${c.symbol})` : ""}</option>)}
+                            </select>
+                          </div>
+                        </div>
+                      )}
                       <div className="flex gap-2">
                         <Button size="sm" onClick={submitTreatment} disabled={saveTreatment.isPending || !editingTreatment.name.trim()}>
                           {editingTreatmentId ? "Save" : "Add Treatment"}
@@ -515,7 +727,9 @@ function HealthConditionsPage() {
                           <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Name</th>
                           <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Type</th>
                           <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Duration</th>
+                          <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Cost</th>
                           <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Items</th>
+                          <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Restrictions</th>
                           <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
                         </tr>
                       </thead>
@@ -526,21 +740,19 @@ function HealthConditionsPage() {
                               <td className="px-3 py-2 font-medium text-foreground">{t.name}</td>
                               <td className="px-3 py-2 text-muted-foreground">{TREATMENT_LABELS[t.treatmentType as TreatmentType]}</td>
                               <td className="px-3 py-2 text-muted-foreground">{t.durationCycles != null ? `${t.durationCycles} cycles` : <span className="italic">Lifelong</span>}</td>
-                              <td className="px-3 py-2 text-center">
-                                <Button size="sm" variant="ghost" className="text-xs h-6 px-2"
-                                  onClick={() => {
-                                    const next = expandedTreatmentId === t.id ? null : t.id
-                                    setExpandedTreatmentId(next)
-                                    setEditingItemId(null); setEditingItem(null); setNewItem(emptyItem())
-                                    setCreatingItem(false); setCreateItemForm(emptyCreateItem())
-                                  }}>
-                                  {t._count.items} {expandedTreatmentId === t.id ? "▲" : "▼"}
-                                </Button>
-                              </td>
+                              <td className="px-3 py-2 text-muted-foreground">{t.cost ? `${t.currencyDef?.symbol ?? ""}${t.cost}` : <span className="italic text-muted-foreground/50">—</span>}</td>
+                              <td className="px-3 py-2 text-center text-muted-foreground">{t._count.items}</td>
+                              <td className="px-3 py-2 text-center text-muted-foreground">{t._count.restrictionDefs}</td>
                               <td className="px-3 py-2 text-right space-x-1">
+                                <Button size="sm" variant="ghost" className="text-xs h-6 px-2" onClick={() => toggleExpand(t.id, "items")}>
+                                  {expandedTreatmentId === t.id && expandedView === "items" ? "▲" : "▼"} Items
+                                </Button>
+                                <Button size="sm" variant="ghost" className="text-xs h-6 px-2" onClick={() => toggleExpand(t.id, "restrictions")}>
+                                  {expandedTreatmentId === t.id && expandedView === "restrictions" ? "▲" : "▼"} Restrictions
+                                </Button>
                                 <Button size="sm" variant="ghost" onClick={() => {
                                   setEditingTreatmentId(t.id)
-                                  setEditingTreatment({ name: t.name, treatmentType: t.treatmentType as TreatmentType, durationCycles: t.durationCycles?.toString() ?? "", isLifelong: t.durationCycles == null })
+                                  setEditingTreatment({ name: t.name, treatmentType: t.treatmentType as TreatmentType, durationCycles: t.durationCycles?.toString() ?? "", isLifelong: t.durationCycles == null, cost: t.cost?.toString() ?? "", currencyDefId: t.currencyDef?.id ?? "" })
                                 }}>Edit</Button>
                                 <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
                                   onClick={() => { if (!confirm("Delete this treatment?")) return; removeTreatment.mutate({ id: t.id }) }}>
@@ -548,9 +760,9 @@ function HealthConditionsPage() {
                                 </Button>
                               </td>
                             </tr>
-                            {expandedTreatmentId === t.id && (
+                            {expandedTreatmentId === t.id && expandedView === "items" && (
                               <tr className="border-b border-border bg-muted/10">
-                                <td colSpan={5} className="px-6 py-3">
+                                <td colSpan={7} className="px-6 py-3">
                                   {creatingItem && (
                                     <div className="mb-3 p-3 rounded-lg border border-border bg-card space-y-2">
                                       <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">New Item</p>
@@ -639,11 +851,96 @@ function HealthConditionsPage() {
                                 </td>
                               </tr>
                             )}
+                            {expandedTreatmentId === t.id && expandedView === "restrictions" && (
+                              <tr className="border-b border-border bg-muted/10">
+                                <td colSpan={7} className="px-6 py-3">
+                                  <table className="w-full text-sm">
+                                    <thead>
+                                      <tr className="border-b border-border">
+                                        <th className="pb-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Restriction Type</th>
+                                        <th className="pb-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Max Intensity Tier</th>
+                                        <th className="pb-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Duration (cycles)</th>
+                                        <th className="pb-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {treatmentRestrictions?.map((r: NonNullable<typeof treatmentRestrictions>[number]) =>
+                                        editingRestrictionId === r.id ? (
+                                          <tr key={r.id} className="border-b border-border last:border-0">
+                                            <td className="py-1.5 pr-4">
+                                              <select value={editingRestriction?.restrictionType ?? "TRAINING"} onChange={(e) => setEditingRestriction(p => p ? { ...p, restrictionType: e.target.value as RestrictionType } : null)} className="h-7 rounded border border-input bg-background px-2 text-xs">
+                                                {RESTRICTION_TYPES.map((rt) => <option key={rt} value={rt}>{RESTRICTION_LABELS[rt]}</option>)}
+                                              </select>
+                                            </td>
+                                            <td className="py-1.5 pr-4">
+                                              {(editingRestriction?.restrictionType === "TRAINING" || editingRestriction?.restrictionType === "ALL") && (
+                                                <Input type="number" min="0" value={editingRestriction?.maxIntensityTier ?? ""} onChange={(e) => setEditingRestriction(p => p ? { ...p, maxIntensityTier: e.target.value } : null)} className="h-7 text-sm w-20" placeholder="Any" />
+                                              )}
+                                            </td>
+                                            <td className="py-1.5 pr-4">
+                                              <div className="flex items-center gap-2">
+                                                <label className="flex items-center gap-1.5 text-xs cursor-pointer select-none shrink-0">
+                                                  <input type="checkbox" checked={editingRestriction?.isLifelong ?? false} onChange={(e) => setEditingRestriction(p => p ? { ...p, isLifelong: e.target.checked, durationCycles: "" } : null)} />
+                                                  Lifelong
+                                                </label>
+                                                {!editingRestriction?.isLifelong && (
+                                                  <Input type="number" min="1" value={editingRestriction?.durationCycles ?? ""} onChange={(e) => setEditingRestriction(p => p ? { ...p, durationCycles: e.target.value } : null)} className="h-7 text-sm w-20" />
+                                                )}
+                                              </div>
+                                            </td>
+                                            <td className="py-1.5 text-right space-x-2">
+                                              <Button size="sm" onClick={() => submitRestriction(r.id)} disabled={saveRestriction.isPending}>Save</Button>
+                                              <Button size="sm" variant="ghost" onClick={() => { setEditingRestrictionId(null); setEditingRestriction(null) }}>Cancel</Button>
+                                            </td>
+                                          </tr>
+                                        ) : (
+                                          <tr key={r.id} className="border-b border-border last:border-0">
+                                            <td className="py-1.5 pr-4 font-medium text-foreground">{RESTRICTION_LABELS[r.restrictionType as RestrictionType]}</td>
+                                            <td className="py-1.5 pr-4 text-muted-foreground">{(r.restrictionType === "TRAINING" || r.restrictionType === "ALL") ? (r.maxIntensityTier ?? <span className="italic">Any</span>) : <span className="italic text-muted-foreground/50">—</span>}</td>
+                                            <td className="py-1.5 pr-4 text-muted-foreground">{r.durationCycles != null ? `${r.durationCycles} cycles` : <span className="italic">Lifelong</span>}</td>
+                                            <td className="py-1.5 text-right space-x-2">
+                                              <Button size="sm" variant="ghost" onClick={() => { setEditingRestrictionId(r.id); setEditingRestriction({ restrictionType: r.restrictionType as RestrictionType, maxIntensityTier: r.maxIntensityTier?.toString() ?? "", durationCycles: r.durationCycles?.toString() ?? "", isLifelong: r.durationCycles == null }) }}>Edit</Button>
+                                              <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => removeRestriction.mutate({ id: r.id })}>Delete</Button>
+                                            </td>
+                                          </tr>
+                                        )
+                                      )}
+                                      <tr>
+                                        <td className="py-1.5 pr-4">
+                                          <select value={newRestriction.restrictionType} onChange={(e) => setNewRestriction({ ...newRestriction, restrictionType: e.target.value as RestrictionType })} className="h-7 rounded border border-input bg-background px-2 text-xs">
+                                            {RESTRICTION_TYPES.map((rt) => <option key={rt} value={rt}>{RESTRICTION_LABELS[rt]}</option>)}
+                                          </select>
+                                        </td>
+                                        <td className="py-1.5 pr-4">
+                                          {(newRestriction.restrictionType === "TRAINING" || newRestriction.restrictionType === "ALL") && (
+                                            <Input type="number" min="0" value={newRestriction.maxIntensityTier} onChange={(e) => setNewRestriction({ ...newRestriction, maxIntensityTier: e.target.value })} className="h-7 text-sm w-20" placeholder="Any" />
+                                          )}
+                                        </td>
+                                        <td className="py-1.5 pr-4">
+                                          <div className="flex items-center gap-2">
+                                            <label className="flex items-center gap-1.5 text-xs cursor-pointer select-none shrink-0">
+                                              <input type="checkbox" checked={newRestriction.isLifelong} onChange={(e) => setNewRestriction({ ...newRestriction, isLifelong: e.target.checked, durationCycles: "" })} />
+                                              Lifelong
+                                            </label>
+                                            {!newRestriction.isLifelong && (
+                                              <Input type="number" min="1" value={newRestriction.durationCycles} onChange={(e) => setNewRestriction({ ...newRestriction, durationCycles: e.target.value })} className="h-7 text-sm w-20" />
+                                            )}
+                                          </div>
+                                        </td>
+                                        <td className="py-1.5 text-right">
+                                          <Button size="sm" onClick={() => submitRestriction()} disabled={saveRestriction.isPending}>Add</Button>
+                                        </td>
+                                      </tr>
+                                    </tbody>
+                                  </table>
+                                </td>
+                              </tr>
+                            )}
                           </Fragment>
                         ))}
                         {treatments?.length === 0 && (
                           <tr>
-                            <td colSpan={5} className="px-3 py-6 text-center text-sm text-muted-foreground">No treatments yet.</td>
+                            <td colSpan={7} className="px-3 py-6 text-center text-sm text-muted-foreground">No treatments yet.</td>
                           </tr>
                         )}
                       </tbody>
@@ -661,7 +958,7 @@ function HealthConditionsPage() {
                       <div className="grid grid-cols-2 gap-2">
                         <div className="flex flex-col gap-1 col-span-2">
                           <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Locus</label>
-                          <p className="text-sm text-muted-foreground px-1">{linkedRules?.find(r => r.id === editingRuleId)?.locus.name}</p>
+                          <p className="text-sm text-muted-foreground px-1">{linkedRules?.find(rc => rc.expressionRule.id === editingRuleId)?.expressionRule.locus.name}</p>
                         </div>
                         <div className="flex flex-col gap-1">
                           <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Allele 1</label>
@@ -683,10 +980,17 @@ function HealthConditionsPage() {
                           <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Phenotype</label>
                           <Input className="h-8 text-sm" value={editingRuleForm.phenotype} onChange={(e) => setEditingRuleForm({ ...editingRuleForm, phenotype: e.target.value })} />
                         </div>
-                        <div className="flex flex-col gap-1">
-                          <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Penetrance</label>
-                          <Input className="h-8 text-sm" type="number" min="0" max="1" step="0.01" value={editingRuleForm.penetrance} onChange={(e) => setEditingRuleForm({ ...editingRuleForm, penetrance: e.target.value })} />
-                        </div>
+                        {editing.isGenetic ? (
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Penetrance</label>
+                            <Input className="h-8 text-sm" type="number" min="0" max="1" step="0.01" value={editingRuleForm.penetrance} onChange={(e) => setEditingRuleForm({ ...editingRuleForm, penetrance: e.target.value })} />
+                          </div>
+                        ) : (
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Env Risk Modifier <span className="font-normal normal-case">(0.5 = 1.5× risk)</span></label>
+                            <Input className="h-8 text-sm" type="number" min="0" step="0.1" value={editingRuleForm.environmentalRiskModifier} onChange={(e) => setEditingRuleForm({ ...editingRuleForm, environmentalRiskModifier: e.target.value })} placeholder="0" />
+                          </div>
+                        )}
                       </div>
                       <div className="flex gap-2">
                         <Button size="sm" onClick={submitEditRule}
@@ -729,10 +1033,17 @@ function HealthConditionsPage() {
                           <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Phenotype</label>
                           <Input className="h-8 text-sm" value={createRuleForm.phenotype} onChange={(e) => setCreateRuleForm({ ...createRuleForm, phenotype: e.target.value })} placeholder="e.g. dominant_white_lethal" />
                         </div>
-                        <div className="flex flex-col gap-1">
-                          <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Penetrance</label>
-                          <Input className="h-8 text-sm" type="number" min="0" max="1" step="0.01" value={createRuleForm.penetrance} onChange={(e) => setCreateRuleForm({ ...createRuleForm, penetrance: e.target.value })} />
-                        </div>
+                        {editing.isGenetic ? (
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Penetrance</label>
+                            <Input className="h-8 text-sm" type="number" min="0" max="1" step="0.01" value={createRuleForm.penetrance} onChange={(e) => setCreateRuleForm({ ...createRuleForm, penetrance: e.target.value })} />
+                          </div>
+                        ) : (
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Env Risk Modifier <span className="font-normal normal-case">(0.5 = 1.5× risk)</span></label>
+                            <Input className="h-8 text-sm" type="number" min="0" step="0.1" value={createRuleForm.environmentalRiskModifier} onChange={(e) => setCreateRuleForm({ ...createRuleForm, environmentalRiskModifier: e.target.value })} placeholder="0" />
+                          </div>
+                        )}
                       </div>
                       <div className="flex gap-2">
                         <Button size="sm" onClick={submitCreateRule}
@@ -754,55 +1065,82 @@ function HealthConditionsPage() {
                         <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Locus</th>
                         <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Genotype</th>
                         <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Phenotype</th>
-                        <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Penetrance</th>
+                        <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{editing.isGenetic ? "Penetrance" : "Env Risk Mod"}</th>
                         <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {linkedRules?.map((r) => (
-                        <tr key={r.id} className="border-b border-border last:border-0">
-                          <td className="px-3 py-2 text-muted-foreground">{r.locus.name}</td>
-                          <td className="px-3 py-2 font-mono font-medium text-foreground">{r.alleleOne.symbol}/{r.alleleTwo.symbol}</td>
-                          <td className="px-3 py-2 text-muted-foreground">{r.phenotype}</td>
-                          <td className="px-3 py-2 text-muted-foreground">{r.penetrance ?? "1.0"}</td>
+                      {linkedRules?.map((rc) => (
+                        <tr key={rc.id} className="border-b border-border last:border-0">
+                          <td className="px-3 py-2 text-muted-foreground">{rc.expressionRule.locus.name}</td>
+                          <td className="px-3 py-2 font-mono font-medium text-foreground">{rc.expressionRule.alleleOne.symbol}/{rc.expressionRule.alleleTwo.symbol}</td>
+                          <td className="px-3 py-2 text-muted-foreground">{rc.expressionRule.phenotype}</td>
+                          <td className="px-3 py-2 text-muted-foreground">{editing.isGenetic ? (rc.penetrance ?? "1.0") : rc.environmentalRiskModifier}</td>
                           <td className="px-3 py-2 text-right space-x-1">
                             <Button size="sm" variant="ghost"
                               onClick={() => {
-                                setEditingRuleId(r.id)
-                                setEditingRuleLocusId(r.locus.id)
-                                setEditingRuleForm({ alleleOneId: r.alleleOne.id, alleleTwoId: r.alleleTwo.id, phenotype: r.phenotype, penetrance: r.penetrance?.toString() ?? "1" })
+                                setEditingRuleId(rc.expressionRule.id)
+                                setEditingLinkId(rc.id)
+                                setEditingRuleLocusId(rc.expressionRule.locus.id)
+                                setEditingRuleForm({ alleleOneId: rc.expressionRule.alleleOne.id, alleleTwoId: rc.expressionRule.alleleTwo.id, phenotype: rc.expressionRule.phenotype, penetrance: rc.penetrance?.toString() ?? "1", environmentalRiskModifier: rc.environmentalRiskModifier?.toString() ?? "0" })
                                 setCreatingRule(false)
                               }}
                               disabled={!!editingRuleId}>
                               Edit
                             </Button>
                             <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
-                              onClick={() => setCondition.mutate({ id: r.id, conditionDefId: null })}
-                              disabled={setCondition.isPending || !!editingRuleId}>
+                              onClick={() => removeConditionLink.mutate({ id: rc.id })}
+                              disabled={removeConditionLink.isPending || !!editingRuleId}>
                               Unlink
                             </Button>
                           </td>
                         </tr>
                       ))}
                       <tr>
-                        <td colSpan={4} className="px-3 py-2">
-                          <select
-                            value={linkRuleId}
-                            onChange={(e) => setLinkRuleId(e.target.value)}
+                        <td colSpan={2} className="px-3 py-2">
+                          <select value={linkLocusId} onChange={(e) => { setLinkLocusId(e.target.value); setLinkPhenotype("") }}
+                            className="h-8 w-full rounded-md border border-input bg-background px-3 text-sm">
+                            <option value="">Select locus…</option>
+                            {allLoci?.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                          </select>
+                        </td>
+                        <td colSpan={3} className="px-3 py-2">
+                          <select value={linkPhenotype} onChange={(e) => setLinkPhenotype(e.target.value)}
                             className="h-8 w-full rounded-md border border-input bg-background px-3 text-sm"
-                          >
-                            <option value="">Link existing rule…</option>
-                            {unlinkedRules?.map((r) => (
-                              <option key={r.id} value={r.id}>
-                                {r.locus.name} — {r.alleleOne.symbol}/{r.alleleTwo.symbol} ({r.phenotype})
-                              </option>
+                            disabled={!linkLocusId}>
+                            <option value="">Select phenotype…</option>
+                            {[...new Set(linkLocusRules?.map(r => r.phenotype) ?? [])].map(ph => (
+                              <option key={ph} value={ph}>{ph}</option>
                             ))}
                           </select>
                         </td>
-                        <td className="px-3 py-2 text-right">
-                          <Button size="sm" onClick={() => setCondition.mutate({ id: linkRuleId, conditionDefId: editing!.id! })}
-                            disabled={!linkRuleId || setCondition.isPending}>
-                            Link
+                      </tr>
+                      <tr>
+                        <td colSpan={2} className="px-3 py-2">
+                          <div className="flex gap-2">
+                            <div className="flex flex-col gap-0.5">
+                              <label className="text-[10px] text-muted-foreground">Env Risk</label>
+                              <Input type="number" step="0.1" min="0" value={linkEnvRisk}
+                                onChange={e => setLinkEnvRisk(e.target.value)} className="h-7 text-sm w-20" />
+                            </div>
+                            <div className="flex flex-col gap-0.5">
+                              <label className="text-[10px] text-muted-foreground">Penetrance (opt)</label>
+                              <Input type="number" step="0.01" min="0" max="1" value={linkPenetrance}
+                                onChange={e => setLinkPenetrance(e.target.value)} placeholder="0–1" className="h-7 text-sm w-20" />
+                            </div>
+                          </div>
+                        </td>
+                        <td colSpan={3} className="px-3 py-2 text-right">
+                          <Button size="sm"
+                            disabled={!linkLocusId || !linkPhenotype || addLinkByPhenotype.isPending}
+                            onClick={() => addLinkByPhenotype.mutate({
+                              locusId: linkLocusId,
+                              phenotype: linkPhenotype,
+                              healthConditionDefId: editing!.id!,
+                              environmentalRiskModifier: parseFloat(linkEnvRisk) || 0,
+                              penetrance: linkPenetrance !== "" ? parseFloat(linkPenetrance) : null,
+                            })}>
+                            Apply to Phenotype
                           </Button>
                         </td>
                       </tr>
@@ -810,9 +1148,90 @@ function HealthConditionsPage() {
                   </table>
                 </div>
               )}
+
+              {/* Triggers tab */}
+              {rightTab === "triggers" && (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Type</th>
+                      <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Min Tier</th>
+                      <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Chance</th>
+                      <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {triggers?.map((t) =>
+                      editingTriggerId === t.id ? (
+                        <tr key={t.id} className="border-b border-border last:border-0">
+                          <td className="px-3 py-2">
+                            <select value={editingTrigger?.triggerType ?? "VET_PROCEDURE"} onChange={(e) => setEditingTrigger(p => p ? { ...p, triggerType: e.target.value as "VET_PROCEDURE" | "TRAINING_TIER" } : null)}
+                              className="h-7 rounded border border-input bg-background px-2 text-xs">
+                              <option value="VET_PROCEDURE">Vet Procedure</option>
+                              <option value="TRAINING_TIER">Training Tier</option>
+                            </select>
+                          </td>
+                          <td className="px-3 py-2">
+                            {editingTrigger?.triggerType === "TRAINING_TIER" && (
+                              <Input type="number" min="0" value={editingTrigger.minTierIndex} onChange={(e) => setEditingTrigger(p => p ? { ...p, minTierIndex: e.target.value } : null)} className="h-7 text-sm w-16" placeholder="≥" />
+                            )}
+                          </td>
+                          <td className="px-3 py-2">
+                            <Input type="number" min="0" max="1" step="0.01" value={editingTrigger?.triggerChance ?? "1"} onChange={(e) => setEditingTrigger(p => p ? { ...p, triggerChance: e.target.value } : null)} className="h-7 text-sm w-16" />
+                          </td>
+                          <td className="px-3 py-2 text-right space-x-2">
+                            <Button size="sm" onClick={() => submitTrigger(t.id)} disabled={saveTrigger.isPending}>Save</Button>
+                            <Button size="sm" variant="ghost" onClick={() => { setEditingTriggerId(null); setEditingTrigger(null) }}>Cancel</Button>
+                          </td>
+                        </tr>
+                      ) : (
+                        <tr key={t.id} className="border-b border-border last:border-0">
+                          <td className="px-3 py-2 text-foreground">{t.triggerType === "VET_PROCEDURE" ? "Vet Procedure" : "Training Tier"}</td>
+                          <td className="px-3 py-2 text-muted-foreground">{t.minTierIndex != null ? `≥ ${t.minTierIndex}` : "—"}</td>
+                          <td className="px-3 py-2 text-muted-foreground">{t.triggerChance}</td>
+                          <td className="px-3 py-2 text-right space-x-2">
+                            <Button size="sm" variant="ghost" onClick={() => { setEditingTriggerId(t.id); setEditingTrigger({ triggerType: t.triggerType, minTierIndex: t.minTierIndex?.toString() ?? "", triggerChance: t.triggerChance.toString() }) }}>Edit</Button>
+                            <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => removeTrigger.mutate({ id: t.id })}>Delete</Button>
+                          </td>
+                        </tr>
+                      )
+                    )}
+                    <tr>
+                      <td className="px-3 py-3">
+                        <select value={newTrigger.triggerType} onChange={(e) => setNewTrigger({ ...newTrigger, triggerType: e.target.value as "VET_PROCEDURE" | "TRAINING_TIER" })}
+                          className="h-7 rounded border border-input bg-background px-2 text-xs">
+                          <option value="VET_PROCEDURE">Vet Procedure</option>
+                          <option value="TRAINING_TIER">Training Tier</option>
+                        </select>
+                      </td>
+                      <td className="px-3 py-3">
+                        {newTrigger.triggerType === "TRAINING_TIER" && (
+                          <Input type="number" min="0" value={newTrigger.minTierIndex} onChange={(e) => setNewTrigger({ ...newTrigger, minTierIndex: e.target.value })} className="h-7 text-sm w-16" placeholder="≥" />
+                        )}
+                      </td>
+                      <td className="px-3 py-3">
+                        <Input type="number" min="0" max="1" step="0.01" value={newTrigger.triggerChance} onChange={(e) => setNewTrigger({ ...newTrigger, triggerChance: e.target.value })} className="h-7 text-sm w-16" />
+                      </td>
+                      <td className="px-3 py-3 text-right">
+                        <Button size="sm" onClick={() => submitTrigger()} disabled={saveTrigger.isPending}>Add</Button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              )}
             </section>
           )}
         </div>
+        <section className="rounded-lg border border-border bg-card shadow-sm p-3 space-y-2">
+          <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Description</label>
+          <RichTextEditor
+            key={editing.id ?? "new"}
+            defaultContent={editing.description}
+            onChange={(json) => setEditing({ ...editing, description: json })}
+            placeholder="Describe this condition, prognosis, notes for players…"
+            minHeight="7rem"
+          />
+        </section>
         </div>
       </div>
     )

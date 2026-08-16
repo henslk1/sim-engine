@@ -82,6 +82,7 @@ model Breed {
   image                       String?
   lore                        String?
   isUnregistered              Boolean                           @default(false)
+  isAvailable                 Boolean                           @default(false)
   convergenceGenerations      Int?
   lifeExpectancyBaseline      Int?
   immunityMin                 Float?
@@ -167,6 +168,9 @@ model Animal {
   isCastrated                         Boolean                          @default(false)
   isPinned                            Boolean                          @default(false)
   phenotypeDescription                String?
+  structuralRisk                      Float                            @default(0)
+  preferredTerrain                    VenueTerrain?
+  preferredClimate                    VenueClimate?
   notes                               Json?
   inbreedingCoefficient               Float                            @default(0)
   fertility                           Float

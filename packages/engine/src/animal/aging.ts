@@ -82,10 +82,14 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
     })
 
     // Illness contraction roll
-    const immunity = await tx.animalImmunity.findUnique({ where: { animalId } })
+    const [immunity, careScore] = await Promise.all([
+      tx.animalImmunity.findUnique({ where: { animalId } }),
+      tx.animalCareScore.findUnique({ where: { animalId } }),
+    ])
     if (immunity && immunity.innateMax > 0) {
       const immunityRatio = immunity.value / immunity.innateMax
-      if (Math.random() > immunityRatio) {
+      const careRatio = careScore ? careScore.score / 100 : 1
+      if (Math.random() > immunityRatio * careRatio) {
         const eligible = await tx.healthConditionDef.findMany({
           where: {
             gameId: animal.gameId,
@@ -93,9 +97,47 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
             isGenetic: false,
             healthRecords: { none: { animalId, isActive: true } },
           },
+          include: {
+            healthRecords: {
+              where: { animalId, isActive: false },
+              orderBy: { resolvedCycle: "desc" },
+              take: 1,
+              select: { resolvedCycle: true },
+            },
+            ruleConditions: {
+              where: { environmentalRiskModifier: { gt: 0 } },
+              select: {
+                environmentalRiskModifier: true,
+                expressionRule: { select: { locusId: true, alleleOneId: true, alleleTwoId: true } },
+              },
+            },
+          },
         })
-        if (eligible.length > 0) {
-          const picked = eligible[Math.floor(Math.random() * eligible.length)]!
+        const eligibleFiltered = eligible.filter(cond => {
+          if (!cond.flareupCooldownCycles) return true
+          const lastResolved = cond.healthRecords[0]
+          if (lastResolved?.resolvedCycle == null) return true
+          return newAge >= lastResolved.resolvedCycle + cond.flareupCooldownCycles
+        })
+        if (eligibleFiltered.length > 0) {
+          const genotypes = await tx.animalGenotype.findMany({
+            where: { animalId },
+            select: { locusId: true, alleleOneId: true, alleleTwoId: true },
+          })
+          const genotypeSet = new Set(genotypes.map(g => `${g.locusId}:${g.alleleOneId}:${g.alleleTwoId}`))
+          const weights = eligibleFiltered.map(cond => {
+            const bonus = cond.ruleConditions
+              .filter(rc => genotypeSet.has(`${rc.expressionRule.locusId}:${rc.expressionRule.alleleOneId}:${rc.expressionRule.alleleTwoId}`))
+              .reduce((sum, rc) => sum + rc.environmentalRiskModifier, 0)
+            return cond.baseWeight + bonus
+          })
+          const totalWeight = weights.reduce((s, w) => s + w, 0)
+          let roll = Math.random() * totalWeight
+          let picked = eligibleFiltered[0]!
+          for (let i = 0; i < eligibleFiltered.length; i++) {
+            roll -= weights[i]!
+            if (roll <= 0) { picked = eligibleFiltered[i]!; break }
+          }
           await tx.animalHealthRecord.create({
             data: { animalId, conditionDefId: picked.id, isActive: true },
           })
@@ -114,23 +156,38 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
             alleleTwoId: genotype.alleleTwoId,
           },
         },
-        include: { healthConditionDef: true },
+        include: { ruleConditions: { include: { healthConditionDef: true } } },
       })
 
-      if (!rule?.healthConditionDef) continue
+      if (!rule?.ruleConditions.length) continue
 
-      const condDef = rule.healthConditionDef
-      if (condDef.onsetMinCycle !== null && newAge < condDef.onsetMinCycle) continue
+      for (const rc of rule.ruleConditions) {
+        const condDef = rc.healthConditionDef
+        if (condDef.onsetMinCycle !== null && newAge < condDef.onsetMinCycle) continue
 
-      const alreadyExists = await tx.animalHealthRecord.findFirst({
-        where: { animalId, conditionDefId: condDef.id },
-      })
-      if (alreadyExists) continue
-
-      if (Math.random() < (rule.penetrance ?? 1.0)) {
-        await tx.animalHealthRecord.create({
-          data: { animalId, conditionDefId: condDef.id, isActive: true },
+        const alreadyExists = await tx.animalHealthRecord.findFirst({
+          where: {
+            animalId,
+            conditionDefId: condDef.id,
+            ...(condDef.isEpisodic ? { isActive: true } : {}),
+          },
         })
+        if (alreadyExists) continue
+
+        if (condDef.isEpisodic && condDef.flareupCooldownCycles) {
+          const lastResolved = await tx.animalHealthRecord.findFirst({
+            where: { animalId, conditionDefId: condDef.id, isActive: false },
+            orderBy: { resolvedCycle: "desc" },
+            select: { resolvedCycle: true },
+          })
+          if (lastResolved?.resolvedCycle != null && newAge < lastResolved.resolvedCycle + condDef.flareupCooldownCycles) continue
+        }
+
+        if (Math.random() < (rc.penetrance ?? 1.0)) {
+          await tx.animalHealthRecord.create({
+            data: { animalId, conditionDefId: condDef.id, isActive: true },
+          })
+        }
       }
     }
 
@@ -163,7 +220,7 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
         treatmentDef: { select: { treatmentType: true, durationCycles: true } },
         activityRestriction: {
           where: { isActive: true },
-          select: { id: true, remainingCycles: true },
+          select: { id: true, remainingCycles: true, isLifelong: true },
         },
       },
     })
@@ -172,6 +229,7 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
       const { treatmentType, durationCycles } = treatment.treatmentDef
 
       for (const restriction of treatment.activityRestriction) {
+        if (restriction.isLifelong) continue
         const newRemaining = restriction.remainingCycles - 1
         await tx.activityRestriction.update({
           where: { id: restriction.id },
@@ -184,7 +242,7 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
       let shouldClose = false
       if (treatmentType === "ACTIVITY_RESTRICTION") {
         const allDone = treatment.activityRestriction.length === 0 ||
-          treatment.activityRestriction.every(r => r.remainingCycles <= 1)
+          treatment.activityRestriction.every(r => r.isLifelong ? false : r.remainingCycles <= 1)
         if (allDone) shouldClose = true
       } else if (durationCycles !== null) {
         if (newAge >= treatment.startedCycle + durationCycles) shouldClose = true
@@ -209,7 +267,7 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
 
     // Check if work was done this cycle — suppresses condition decay
     const currentCycle = animal.ageInCycles
-    const [workedThisCycle, allCareDone, energy, mood, condition, careScore, activeHealthRecords] = await Promise.all([
+    const [workedThisCycle, allCareDone, energy, mood, condition, activeHealthRecords] = await Promise.all([
       Promise.all([
         tx.trainingLog.count({ where: { animalId, cycleNumber: currentCycle } }),
         tx.competitionEntry.count({ where: { animalId, cycleNumber: currentCycle } }),
@@ -222,12 +280,19 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
       tx.animalEnergy.findUnique({ where: { animalId } }),
       tx.animalMood.findUnique({ where: { animalId } }),
       tx.animalCondition.findUnique({ where: { animalId } }),
-      tx.animalCareScore.findUnique({ where: { animalId } }),
       tx.animalHealthRecord.findMany({
         where: { animalId, isActive: true },
         include: {
-          conditionDef: true,
-          treatmentRecords: { where: { isActive: true }, select: { lastAdministeredCycle: true } },
+          conditionDef: {
+            include: { treatments: { select: { id: true, treatmentType: true } } },
+          },
+          treatmentRecords: {
+            where: { isActive: true },
+            select: {
+              lastAdministeredCycle: true,
+              treatmentDef: { select: { treatmentType: true } },
+            },
+          },
         },
       }),
     ])
@@ -244,12 +309,41 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
     const neglected = careScore != null && careScore.score < gameConfig.energyLowCareThreshold
     const carePenalty = neglected ? gameConfig.energyLowCarePenalty : 0
 
+    const TIME_BASED = new Set(["OTC", "PRESCRIPTION", "PLAYER_ACTION"])
+    const untreatedCondition = activeHealthRecords.some(r => {
+      if (r.conditionDef.treatments.length === 0) return false
+      if (r.treatmentRecords.length === 0) return true
+      const hasTimeBasedActive = r.treatmentRecords.some(t => TIME_BASED.has(t.treatmentDef.treatmentType))
+      if (!hasTimeBasedActive) return false
+      return !r.treatmentRecords.some(t => TIME_BASED.has(t.treatmentDef.treatmentType) && t.lastAdministeredCycle === currentCycle)
+    })
+    const effectivelyNeglected = neglected || untreatedCondition
+
+    // Overwork injury: fires if animal ends the cycle with critically low energy
+    if (energy && gameConfig.overworkInjuryThreshold > 0 && energy.currentEnergy < gameConfig.overworkInjuryThreshold) {
+      if (Math.random() < gameConfig.overworkInjuryChance + animal.structuralRisk) {
+        const injuryPool = await tx.healthConditionDef.findMany({
+          where: {
+            gameId: animal.gameId,
+            conditionType: "INJURY",
+            healthRecords: { none: { animalId, isActive: true } },
+          },
+        })
+        if (injuryPool.length > 0) {
+          const picked = injuryPool[Math.floor(Math.random() * injuryPool.length)]!
+          await tx.animalHealthRecord.create({
+            data: { animalId, conditionDefId: picked.id, isActive: true },
+          })
+        }
+      }
+    }
+
     const newEnergy = energy
-      ? Math.max(0, (neglected ? energy.currentEnergy : energy.maxEnergy) + conditionEnergyEffect - carePenalty)
+      ? Math.max(0, (effectivelyNeglected ? energy.currentEnergy : energy.maxEnergy) + conditionEnergyEffect - carePenalty)
       : null
 
-    // Neglect death: energy drained to 0 by care penalty → rolling death chance each cycle
-    if (neglected && newEnergy === 0 && energy && energy.maxEnergy > 0) {
+    // Neglect death: energy drained to 0 → rolling death chance each cycle
+    if (effectivelyNeglected && newEnergy === 0 && energy && energy.maxEnergy > 0) {
       const neglectDeathChance = carePenalty / energy.maxEnergy
       if (Math.random() < neglectDeathChance) {
         await tx.animal.update({

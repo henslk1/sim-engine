@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { ChevronDown, ChevronRight } from "lucide-react"
+import { RichTextEditor } from "@/components/game/editor/RichTextEditor"
 
 export const Route = createFileRoute("/_authenticated/admin/games/$gameId/genetic-panels")({
   component: GeneticPanelsPage,
@@ -22,6 +23,7 @@ type LocusCreateForm = {
   name: string
   biasTarget: "FAVORABILITY" | "RARITY" | "NONE"
   minTestCycle: string
+  description: object | null
 }
 
 type RuleForm = {
@@ -30,13 +32,14 @@ type RuleForm = {
   alleleTwoId: string
   phenotype: string
   numericModifier: string
-  penetrance: string
-  healthConditionDefId: string
 }
 
 const emptyPanel = (): PanelForm => ({ name: "", panelType: "HEALTH" })
-const emptyLocusCreate = (): LocusCreateForm => ({ name: "", biasTarget: "NONE", minTestCycle: "" })
-const emptyRule = (): RuleForm => ({ alleleOneId: "", alleleTwoId: "", phenotype: "", numericModifier: "", penetrance: "", healthConditionDefId: "" })
+const emptyLocusCreate = (): LocusCreateForm => ({ name: "", biasTarget: "NONE", minTestCycle: "", description: null })
+const emptyRule = (): RuleForm => ({ alleleOneId: "", alleleTwoId: "", phenotype: "", numericModifier: "" })
+
+type PLinkForm = { phenotype: string; healthConditionDefId: string; environmentalRiskModifier: string; penetrance: string }
+const emptyPLinkForm = (): PLinkForm => ({ phenotype: "", healthConditionDefId: "", environmentalRiskModifier: "0", penetrance: "" })
 
 // ── Field label ───────────────────────────────────────────────────────────────
 
@@ -50,11 +53,19 @@ function FL({ children }: { children: React.ReactNode }) {
 
 // ── Locus Editor ──────────────────────────────────────────────────────────────
 
-function LocusEditor({ locusId, gameId }: { locusId: string; gameId: string }) {
+type LocusRecord = {
+  id: string
+  name: string
+  biasTarget: "FAVORABILITY" | "RARITY" | "NONE"
+  minTestCycle: number | null
+  description: unknown
+}
+
+function LocusEditor({ locus, gameId }: { locus: LocusRecord; gameId: string }) {
+  const locusId = locus.id
   const utils = trpc.useUtils()
   const { data: alleles } = trpc.admin.locus.listAlleles.useQuery({ locusId })
   const { data: rules } = trpc.admin.expression.listByLocus.useQuery({ locusId })
-  const { data: healthConditions } = trpc.admin.health.list.useQuery({ gameId })
 
   const saveAllele = trpc.admin.locus.saveAllele.useMutation({
     onSuccess: () => {
@@ -76,12 +87,36 @@ function LocusEditor({ locusId, gameId }: { locusId: string; gameId: string }) {
   const removeRule = trpc.admin.expression.remove.useMutation({
     onSuccess: () => utils.admin.expression.listByLocus.invalidate({ locusId }),
   })
+  const saveLocus = trpc.admin.locus.save.useMutation({
+    onSuccess: () => utils.admin.locus.list.invalidate(),
+  })
+
+  const { data: conditionLinks } = trpc.admin.expression.listConditionLinksByLocus.useQuery({ locusId })
+  const { data: allConditions } = trpc.admin.health.list.useQuery({ gameId })
+  const addLinkByPhenotype = trpc.admin.expression.addConditionLinkByPhenotype.useMutation({
+    onSuccess: () => utils.admin.expression.listConditionLinksByLocus.invalidate({ locusId }),
+  })
+  const removeLinkByPhenotype = trpc.admin.expression.removeConditionLinkByPhenotype.useMutation({
+    onSuccess: () => utils.admin.expression.listConditionLinksByLocus.invalidate({ locusId }),
+  })
 
   const [newSymbol, setNewSymbol] = useState("")
   const [editingAlleleId, setEditingAlleleId] = useState<string | null>(null)
   const [editSymbol, setEditSymbol] = useState("")
   const [editIsAvailable, setEditIsAvailable] = useState(false)
   const [editingRule, setEditingRule] = useState<RuleForm | null>(null)
+  const [locusDesc, setLocusDesc] = useState<object | null>((locus.description as object | null) ?? null)
+  const [newLink, setNewLink] = useState<PLinkForm>(emptyPLinkForm())
+
+  const distinctPhenotypes = [...new Set(rules?.map(r => r.phenotype) ?? [])]
+  const uniqueLinks = (() => {
+    const seen = new Map<string, NonNullable<typeof conditionLinks>[0]>()
+    for (const link of conditionLinks ?? []) {
+      const key = `${link.expressionRule.phenotype}:${link.healthConditionDefId}`
+      if (!seen.has(key)) seen.set(key, link)
+    }
+    return [...seen.values()]
+  })()
 
   function addAllele() {
     if (!newSymbol.trim()) return
@@ -94,13 +129,30 @@ function LocusEditor({ locusId, gameId }: { locusId: string; gameId: string }) {
       ...editingRule,
       locusId,
       numericModifier: editingRule.numericModifier !== "" ? parseFloat(editingRule.numericModifier) : undefined,
-      penetrance: editingRule.penetrance !== "" ? parseFloat(editingRule.penetrance) : undefined,
-      healthConditionDefId: editingRule.healthConditionDefId || undefined,
     })
   }
 
   return (
     <div className="border-t border-border">
+      {/* Description */}
+      <div className="border-b border-border px-4 py-3 space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Description</span>
+          <Button size="sm" className="h-6 px-2 text-xs" onClick={() => saveLocus.mutate({ id: locusId, gameId, name: locus.name, biasTarget: locus.biasTarget, minTestCycle: locus.minTestCycle ?? null, description: locusDesc })}
+            disabled={saveLocus.isPending}>
+            {saveLocus.isPending ? "Saving…" : "Save"}
+          </Button>
+        </div>
+        <RichTextEditor
+          key={locusId}
+          defaultContent={locusDesc}
+          onChange={setLocusDesc}
+          placeholder="Describe what this locus controls, how it affects phenotype, notes for players…"
+          minHeight="5rem"
+        />
+        {saveLocus.error && <p className="text-xs text-destructive">{saveLocus.error.message}</p>}
+      </div>
+
       {/* Alleles */}
       <div className="border-b border-border">
         <div className="bg-muted/20 px-4 py-1.5">
@@ -204,28 +256,11 @@ function LocusEditor({ locusId, gameId }: { locusId: string; gameId: string }) {
               <Input value={editingRule.phenotype} onChange={e => setEditingRule({ ...editingRule, phenotype: e.target.value })}
                 placeholder="e.g. Bay, Black, Palomino" className="h-7 text-xs" />
             </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="flex flex-col gap-1">
-                <FL>Numeric Modifier</FL>
-                <Input type="number" step="0.01" value={editingRule.numericModifier}
-                  onChange={e => setEditingRule({ ...editingRule, numericModifier: e.target.value })}
-                  placeholder="optional" className="h-7 text-xs" />
-              </div>
-              <div className="flex flex-col gap-1">
-                <FL>Penetrance (0–1)</FL>
-                <Input type="number" step="0.01" min="0" max="1" value={editingRule.penetrance}
-                  onChange={e => setEditingRule({ ...editingRule, penetrance: e.target.value })}
-                  placeholder="optional" className="h-7 text-xs" />
-              </div>
-              <div className="flex flex-col gap-1">
-                <FL>Health Condition</FL>
-                <select value={editingRule.healthConditionDefId}
-                  onChange={e => setEditingRule({ ...editingRule, healthConditionDefId: e.target.value })}
-                  className="h-7 rounded-md border border-input bg-background px-2 text-xs">
-                  <option value="">— None —</option>
-                  {healthConditions?.filter(c => c.isGenetic).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </div>
+            <div className="flex flex-col gap-1">
+              <FL>Numeric Modifier</FL>
+              <Input type="number" step="0.01" value={editingRule.numericModifier}
+                onChange={e => setEditingRule({ ...editingRule, numericModifier: e.target.value })}
+                placeholder="optional" className="h-7 text-xs" />
             </div>
             <div className="flex gap-2">
               <Button size="sm" className="h-7 px-3 text-xs" onClick={submitRule}
@@ -248,8 +283,6 @@ function LocusEditor({ locusId, gameId }: { locusId: string; gameId: string }) {
                 <th className="px-4 py-1.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">A2</th>
                 <th className="px-4 py-1.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Phenotype</th>
                 <th className="px-4 py-1.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Modifier</th>
-                <th className="px-4 py-1.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Penetrance</th>
-                <th className="px-4 py-1.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Condition</th>
                 <th />
               </tr>
             </thead>
@@ -260,16 +293,11 @@ function LocusEditor({ locusId, gameId }: { locusId: string; gameId: string }) {
                   <td className="px-4 py-1.5 font-mono">{rule.alleleTwo.symbol}</td>
                   <td className="px-4 py-1.5 text-foreground">{rule.phenotype}</td>
                   <td className="px-4 py-1.5 text-muted-foreground">{rule.numericModifier ?? "—"}</td>
-                  <td className="px-4 py-1.5 text-muted-foreground">
-                    {rule.penetrance != null ? `${(rule.penetrance * 100).toFixed(0)}%` : "—"}
-                  </td>
-                  <td className="px-4 py-1.5 text-muted-foreground">{rule.healthConditionDef?.name ?? "—"}</td>
                   <td className="px-4 py-1.5 text-right space-x-1 opacity-0 transition-opacity group-hover:opacity-100 whitespace-nowrap">
                     <Button size="sm" variant="ghost" className="h-6 px-2 text-xs"
                       onClick={() => setEditingRule({
                         id: rule.id, alleleOneId: rule.alleleOneId, alleleTwoId: rule.alleleTwoId,
                         phenotype: rule.phenotype, numericModifier: rule.numericModifier?.toString() ?? "",
-                        penetrance: rule.penetrance?.toString() ?? "", healthConditionDefId: rule.healthConditionDefId ?? "",
                       })}>Edit</Button>
                     <Button size="sm" variant="ghost" className="h-6 px-2 text-xs text-destructive hover:text-destructive"
                       onClick={() => { if (confirm("Delete this rule?")) removeRule.mutate({ id: rule.id }) }}>✕</Button>
@@ -277,10 +305,101 @@ function LocusEditor({ locusId, gameId }: { locusId: string; gameId: string }) {
                 </tr>
               ))}
               {rules?.length === 0 && !editingRule && (
-                <tr><td colSpan={7} className="px-4 py-4 text-center text-xs text-muted-foreground">No rules yet.</td></tr>
+                <tr><td colSpan={5} className="px-4 py-4 text-center text-xs text-muted-foreground">No rules yet.</td></tr>
               )}
             </tbody>
           </table>
+        )}
+      </div>
+
+      {/* Phenotype Condition Links */}
+      <div className="border-t border-border">
+        <div className="bg-muted/20 px-4 py-1.5">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Phenotype Condition Links</span>
+        </div>
+        {distinctPhenotypes.length === 0 ? (
+          <p className="px-4 py-3 text-xs text-muted-foreground/60">Define expression rules first.</p>
+        ) : (
+          <>
+            {uniqueLinks.length > 0 && (
+              <table className="w-full text-xs border-b border-border">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="px-4 py-1.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Phenotype</th>
+                    <th className="px-4 py-1.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Condition</th>
+                    <th className="px-4 py-1.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Env Risk</th>
+                    <th className="px-4 py-1.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Penetrance</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {uniqueLinks.map(link => (
+                    <tr key={`${link.expressionRule.phenotype}:${link.healthConditionDefId}`} className="border-b border-border last:border-0 group">
+                      <td className="px-4 py-1.5 text-foreground">{link.expressionRule.phenotype}</td>
+                      <td className="px-4 py-1.5 text-foreground">{link.healthConditionDef.name}</td>
+                      <td className="px-4 py-1.5 text-muted-foreground">{link.environmentalRiskModifier}</td>
+                      <td className="px-4 py-1.5 text-muted-foreground">{link.penetrance ?? "—"}</td>
+                      <td className="px-4 py-1.5 text-right opacity-0 transition-opacity group-hover:opacity-100">
+                        <Button size="sm" variant="ghost" className="h-6 px-2 text-xs text-destructive hover:text-destructive"
+                          disabled={removeLinkByPhenotype.isPending}
+                          onClick={() => removeLinkByPhenotype.mutate({
+                            locusId,
+                            phenotype: link.expressionRule.phenotype,
+                            healthConditionDefId: link.healthConditionDefId,
+                          })}>✕</Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+            <div className="px-4 py-2.5 space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="flex flex-col gap-1">
+                  <FL>Phenotype</FL>
+                  <select value={newLink.phenotype} onChange={e => setNewLink(p => ({ ...p, phenotype: e.target.value }))}
+                    className="h-7 rounded-md border border-input bg-background px-2 text-xs">
+                    <option value="">Select…</option>
+                    {distinctPhenotypes.map(ph => <option key={ph} value={ph}>{ph}</option>)}
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <FL>Condition</FL>
+                  <select value={newLink.healthConditionDefId} onChange={e => setNewLink(p => ({ ...p, healthConditionDefId: e.target.value }))}
+                    className="h-7 rounded-md border border-input bg-background px-2 text-xs">
+                    <option value="">Select…</option>
+                    {allConditions?.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="flex gap-2 items-end">
+                <div className="flex flex-col gap-1">
+                  <FL>Env Risk</FL>
+                  <Input type="number" step="0.1" min="0" value={newLink.environmentalRiskModifier}
+                    onChange={e => setNewLink(p => ({ ...p, environmentalRiskModifier: e.target.value }))}
+                    className="h-7 text-xs w-20" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <FL>Penetrance <span className="font-normal normal-case">(opt)</span></FL>
+                  <Input type="number" step="0.01" min="0" max="1" value={newLink.penetrance}
+                    onChange={e => setNewLink(p => ({ ...p, penetrance: e.target.value }))}
+                    placeholder="0–1" className="h-7 text-xs w-20" />
+                </div>
+                <Button size="sm" className="h-7 px-3 text-xs"
+                  disabled={!newLink.phenotype || !newLink.healthConditionDefId || addLinkByPhenotype.isPending}
+                  onClick={() => addLinkByPhenotype.mutate({
+                    locusId,
+                    phenotype: newLink.phenotype,
+                    healthConditionDefId: newLink.healthConditionDefId,
+                    environmentalRiskModifier: parseFloat(newLink.environmentalRiskModifier) || 0,
+                    penetrance: newLink.penetrance !== "" ? parseFloat(newLink.penetrance) : null,
+                  }, { onSuccess: () => setNewLink(emptyPLinkForm()) })}>
+                  Apply to Phenotype
+                </Button>
+              </div>
+              {addLinkByPhenotype.error && <p className="text-xs text-destructive">{addLinkByPhenotype.error.message}</p>}
+            </div>
+          </>
         )}
       </div>
     </div>
@@ -333,6 +452,7 @@ function GenesTab({ panelId, gameId }: { panelId: string; gameId: string }) {
       name: newGene.name.trim(),
       biasTarget: newGene.biasTarget,
       minTestCycle: newGene.minTestCycle !== "" ? parseInt(newGene.minTestCycle) : null,
+      description: newGene.description,
     })
   }
 
@@ -368,7 +488,7 @@ function GenesTab({ panelId, gameId }: { panelId: string; gameId: string }) {
                 Remove
               </Button>
             </div>
-            {isExpanded && <LocusEditor locusId={locus.id} gameId={gameId} />}
+            {isExpanded && <LocusEditor locus={locus} gameId={gameId} />}
           </div>
         )
       })}
@@ -405,6 +525,15 @@ function GenesTab({ panelId, gameId }: { panelId: string; gameId: string }) {
                 onChange={e => setNewGene(p => ({ ...p, minTestCycle: e.target.value }))}
                 placeholder="e.g. 6" className="h-7 text-xs" />
             </div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <FL>Description <span className="font-normal normal-case">(optional)</span></FL>
+            <RichTextEditor
+              defaultContent={newGene.description}
+              onChange={(json) => setNewGene(p => ({ ...p, description: json }))}
+              placeholder="Describe what this locus controls…"
+              minHeight="5rem"
+            />
           </div>
           <Button size="sm" className="h-7 px-3 text-xs" onClick={submitNewGene}
             disabled={!newGene.name.trim() || saveLocus.isPending}>

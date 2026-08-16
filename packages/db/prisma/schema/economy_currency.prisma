@@ -14,6 +14,7 @@ enum TransactionType {
   STORE_PURCHASE
   CARE_FEE
   VET_SERVICE_FEE
+  TREATMENT_FEE
   ESCROW_HOLD
   ESCROW_RELEASE
   ESCROW_REFUND
@@ -41,6 +42,7 @@ model CurrencyDef {
   breedingListings             BreedingListing[]
   storeListing                 StoreListing[]
   vetServiceDefs               VetServiceDef[]
+  treatmentDefs                TreatmentDef[]
   bundleCurrencyRewards        BundleCurrencyReward[]
   shopBreedConfigs             GameShopBreedConfig[]
   marketplaceListings          MarketplaceListing[]

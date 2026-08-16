@@ -73,6 +73,8 @@ function GameConfigPage() {
     geneticCollectionCooldownCycles: 0,
     conformationInspectionMinCycle: 0,
     topGradeDoubleBonusChance: 0.1,
+    overworkInjuryThreshold: 0,
+    overworkInjuryChance: 0,
   })
 
   function n(key: keyof typeof cf, float = false) {
@@ -135,6 +137,8 @@ function GameConfigPage() {
           geneticCollectionCooldownCycles: g.geneticCollectionCooldownCycles,
           conformationInspectionMinCycle: g.conformationInspectionMinCycle,
           topGradeDoubleBonusChance: g.topGradeDoubleBonusChance,
+          overworkInjuryThreshold: g.overworkInjuryThreshold,
+          overworkInjuryChance: g.overworkInjuryChance,
         })
       }
     }
@@ -259,6 +263,8 @@ function GameConfigPage() {
                 <div />
                 <F label="Energy Low Threshold"><Input type="number" step="0.01" {...n("energyLowCareThreshold", true)} /></F>
                 <F label="Energy Low Penalty"><Input type="number" step="0.01" {...n("energyLowCarePenalty", true)} /></F>
+                <F label="Overwork Threshold"><Input type="number" step="0.01" {...n("overworkInjuryThreshold", true)} /></F>
+                <F label="Overwork Injury Chance (0–1)"><Input type="number" step="0.01" min="0" max="1" {...n("overworkInjuryChance", true)} /></F>
               </div>
             </Panel>
 

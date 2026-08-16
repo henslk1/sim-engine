@@ -22,6 +22,7 @@ export const breedAdminRouter = router({
       image: z.string().nullish(),
       lore: z.string().nullish(),
       isUnregistered: z.boolean(),
+      isAvailable: z.boolean(),
       convergenceGenerations: z.number().int().min(1).nullish(),
       lifeExpectancyBaseline: z.number().int().nullish(),
       immunityMin: z.number().nullish(),

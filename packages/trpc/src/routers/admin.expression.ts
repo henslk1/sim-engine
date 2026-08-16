@@ -13,9 +13,8 @@ export const expressionAdminRouter = router({
           alleleTwo: { select: { id: true, symbol: true } },
           climateModifiers: true,
           terrainModifiers: true,
-          healthConditionDef: { select: { id: true, name: true } },
         },
-        orderBy: [{ alleleOne: { symbol: "asc" } }, { alleleTwo: { symbol: "asc" } }],
+        orderBy: [{ phenotype: "asc" }, { alleleOne: { symbol: "asc" } }, { alleleTwo: { symbol: "asc" } }],
       })
     ),
 
@@ -27,17 +26,10 @@ export const expressionAdminRouter = router({
       alleleTwoId: z.string(),
       phenotype: z.string().min(1),
       numericModifier: z.number().nullish(),
-      penetrance: z.number().min(0).max(1).nullish(),
-      healthConditionDefId: z.string().nullish(),
     }))
     .mutation(({ input }) => {
-      const { id, locusId, numericModifier, penetrance, healthConditionDefId, ...rest } = input
-      const data = {
-        ...rest,
-        numericModifier: numericModifier ?? null,
-        penetrance: penetrance ?? null,
-        healthConditionDefId: healthConditionDefId ?? null,
-      }
+      const { id, locusId, numericModifier, ...rest } = input
+      const data = { ...rest, numericModifier: numericModifier ?? null }
       if (id) return db.expressionRule.update({ where: { id }, data })
       return db.expressionRule.create({ data: { locusId, ...data } })
     }),
@@ -46,6 +38,7 @@ export const expressionAdminRouter = router({
     .input(z.object({ id: z.string() }))
     .mutation(({ input }) =>
       db.$transaction(async (tx) => {
+        await tx.expressionRuleCondition.deleteMany({ where: { expressionRuleId: input.id } })
         await tx.expressionClimateModifier.deleteMany({ where: { expressionRuleId: input.id } })
         await tx.expressionTerrainModifier.deleteMany({ where: { expressionRuleId: input.id } })
         return tx.expressionRule.delete({ where: { id: input.id } })
@@ -89,22 +82,32 @@ export const expressionAdminRouter = router({
   listByCondition: publicProcedure
     .input(z.object({ conditionDefId: z.string() }))
     .query(({ input }) =>
-      db.expressionRule.findMany({
+      db.expressionRuleCondition.findMany({
         where: { healthConditionDefId: input.conditionDefId },
         include: {
-          locus: { select: { id: true, name: true } },
-          alleleOne: { select: { id: true, symbol: true } },
-          alleleTwo: { select: { id: true, symbol: true } },
+          expressionRule: {
+            include: {
+              locus: { select: { id: true, name: true } },
+              alleleOne: { select: { id: true, symbol: true } },
+              alleleTwo: { select: { id: true, symbol: true } },
+            },
+          },
         },
-        orderBy: [{ locus: { name: "asc" } }, { alleleOne: { symbol: "asc" } }],
+        orderBy: [
+          { expressionRule: { locus: { name: "asc" } } },
+          { expressionRule: { alleleOne: { symbol: "asc" } } },
+        ],
       })
     ),
 
-  listUnlinkedByGame: publicProcedure
-    .input(z.object({ gameId: z.string() }))
+  listAvailableForCondition: publicProcedure
+    .input(z.object({ gameId: z.string(), conditionDefId: z.string() }))
     .query(({ input }) =>
       db.expressionRule.findMany({
-        where: { healthConditionDefId: null, locus: { gameId: input.gameId } },
+        where: {
+          locus: { gameId: input.gameId },
+          ruleConditions: { none: { healthConditionDefId: input.conditionDefId } },
+        },
         include: {
           locus: { select: { id: true, name: true } },
           alleleOne: { select: { id: true, symbol: true } },
@@ -114,12 +117,110 @@ export const expressionAdminRouter = router({
       })
     ),
 
-  setCondition: publicProcedure
-    .input(z.object({ id: z.string(), conditionDefId: z.string().nullable() }))
+  addConditionLink: publicProcedure
+    .input(z.object({
+      expressionRuleId: z.string(),
+      healthConditionDefId: z.string(),
+      penetrance: z.number().min(0).max(1).nullish(),
+      environmentalRiskModifier: z.number().min(0).default(0),
+    }))
     .mutation(({ input }) =>
-      db.expressionRule.update({
+      db.expressionRuleCondition.upsert({
+        where: {
+          expressionRuleId_healthConditionDefId: {
+            expressionRuleId: input.expressionRuleId,
+            healthConditionDefId: input.healthConditionDefId,
+          },
+        },
+        create: {
+          expressionRuleId: input.expressionRuleId,
+          healthConditionDefId: input.healthConditionDefId,
+          penetrance: input.penetrance ?? null,
+          environmentalRiskModifier: input.environmentalRiskModifier,
+        },
+        update: {},
+      })
+    ),
+
+  removeConditionLink: publicProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(({ input }) => db.expressionRuleCondition.delete({ where: { id: input.id } })),
+
+  updateConditionLink: publicProcedure
+    .input(z.object({
+      id: z.string(),
+      penetrance: z.number().min(0).max(1).nullish(),
+      environmentalRiskModifier: z.number().min(0),
+    }))
+    .mutation(({ input }) =>
+      db.expressionRuleCondition.update({
         where: { id: input.id },
-        data: { healthConditionDefId: input.conditionDefId },
+        data: {
+          penetrance: input.penetrance ?? null,
+          environmentalRiskModifier: input.environmentalRiskModifier,
+        },
+      })
+    ),
+
+  listConditionLinksByLocus: publicProcedure
+    .input(z.object({ locusId: z.string() }))
+    .query(({ input }) =>
+      db.expressionRuleCondition.findMany({
+        where: { expressionRule: { locusId: input.locusId } },
+        include: {
+          expressionRule: { select: { phenotype: true } },
+          healthConditionDef: { select: { id: true, name: true, conditionType: true } },
+        },
+        orderBy: [
+          { expressionRule: { phenotype: "asc" } },
+          { healthConditionDef: { name: "asc" } },
+        ],
+      })
+    ),
+
+  addConditionLinkByPhenotype: publicProcedure
+    .input(z.object({
+      locusId: z.string(),
+      phenotype: z.string().min(1),
+      healthConditionDefId: z.string(),
+      penetrance: z.number().min(0).max(1).nullish(),
+      environmentalRiskModifier: z.number().min(0).default(0),
+    }))
+    .mutation(async ({ input }) => {
+      const { locusId, phenotype, healthConditionDefId, penetrance, environmentalRiskModifier } = input
+      const rules = await db.expressionRule.findMany({
+        where: { locusId, phenotype },
+        select: { id: true },
+      })
+      await db.$transaction(
+        rules.map(rule =>
+          db.expressionRuleCondition.upsert({
+            where: {
+              expressionRuleId_healthConditionDefId: {
+                expressionRuleId: rule.id,
+                healthConditionDefId,
+              },
+            },
+            create: { expressionRuleId: rule.id, healthConditionDefId, penetrance: penetrance ?? null, environmentalRiskModifier },
+            update: { penetrance: penetrance ?? null, environmentalRiskModifier },
+          })
+        )
+      )
+      return { count: rules.length }
+    }),
+
+  removeConditionLinkByPhenotype: publicProcedure
+    .input(z.object({
+      locusId: z.string(),
+      phenotype: z.string(),
+      healthConditionDefId: z.string(),
+    }))
+    .mutation(({ input }) =>
+      db.expressionRuleCondition.deleteMany({
+        where: {
+          healthConditionDefId: input.healthConditionDefId,
+          expressionRule: { locusId: input.locusId, phenotype: input.phenotype },
+        },
       })
     ),
 })

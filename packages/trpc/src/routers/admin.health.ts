@@ -20,15 +20,26 @@ export const healthAdminRouter = router({
       name: z.string().min(1),
       conditionType: z.enum(["ILLNESS", "INJURY"]),
       isGenetic: z.boolean(),
+      isEpisodic: z.boolean().default(false),
       isFatal: z.boolean(),
       moodEffect: z.number().nullish(),
       energyEffect: z.number().nullish(),
       onsetMinCycle: z.number().int().nullish(),
       fatalityChance: z.number().min(0).max(1).nullish(),
       fatalMaxCycle: z.number().int().nullish(),
+      flareupCooldownCycles: z.number().int().nullish(),
+      procedureFatalityRisk: z.number().min(0).max(1).nullish(),
+      suppressionItemDefId: z.string().nullish(),
+      baseWeight: z.number().min(0).default(1),
+      description: z.unknown().nullish(),
     }))
     .mutation(({ input }) => {
-      const { id, gameId, moodEffect, energyEffect, onsetMinCycle, fatalityChance, fatalMaxCycle, ...rest } = input
+      const {
+        id, gameId,
+        moodEffect, energyEffect, onsetMinCycle, fatalityChance, fatalMaxCycle,
+        flareupCooldownCycles, procedureFatalityRisk, suppressionItemDefId, baseWeight, description,
+        ...rest
+      } = input
       const data = {
         ...rest,
         moodEffect: moodEffect ?? null,
@@ -36,6 +47,11 @@ export const healthAdminRouter = router({
         onsetMinCycle: onsetMinCycle ?? null,
         fatalityChance: fatalityChance ?? null,
         fatalMaxCycle: fatalMaxCycle ?? null,
+        flareupCooldownCycles: flareupCooldownCycles ?? null,
+        procedureFatalityRisk: procedureFatalityRisk ?? null,
+        suppressionItemDefId: suppressionItemDefId ?? null,
+        baseWeight,
+        description: description ?? null,
       }
       if (id) return db.healthConditionDef.update({ where: { id }, data })
       return db.healthConditionDef.create({ data: { gameId, ...data } })
@@ -54,6 +70,7 @@ export const healthAdminRouter = router({
         })
         await tx.treatmentDef.deleteMany({ where: { conditionDefId: input.id } })
         await tx.healthConditionBehavior.deleteMany({ where: { conditionDefId: input.id } })
+        await tx.conditionTrigger.deleteMany({ where: { conditionDefId: input.id } })
         return tx.healthConditionDef.delete({ where: { id: input.id } })
       })
     ),
@@ -84,4 +101,32 @@ export const healthAdminRouter = router({
   removeBehavior: publicProcedure
     .input(z.object({ id: z.string() }))
     .mutation(({ input }) => db.healthConditionBehavior.delete({ where: { id: input.id } })),
+
+  listTriggers: publicProcedure
+    .input(z.object({ conditionDefId: z.string() }))
+    .query(({ input }) =>
+      db.conditionTrigger.findMany({
+        where: { conditionDefId: input.conditionDefId },
+        orderBy: { triggerType: "asc" },
+      })
+    ),
+
+  saveTrigger: publicProcedure
+    .input(z.object({
+      id: z.string().optional(),
+      conditionDefId: z.string(),
+      triggerType: z.enum(["VET_PROCEDURE", "TRAINING_TIER"]),
+      minTierIndex: z.number().int().nullish(),
+      triggerChance: z.number().min(0).max(1).default(1.0),
+    }))
+    .mutation(({ input }) => {
+      const { id, conditionDefId, minTierIndex, ...rest } = input
+      const data = { ...rest, minTierIndex: minTierIndex ?? null }
+      if (id) return db.conditionTrigger.update({ where: { id }, data })
+      return db.conditionTrigger.create({ data: { conditionDefId, ...data } })
+    }),
+
+  removeTrigger: publicProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(({ input }) => db.conditionTrigger.delete({ where: { id: input.id } })),
 })

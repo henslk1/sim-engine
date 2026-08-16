@@ -415,6 +415,7 @@ model BugReport {
   claimedByUserId  String?
   claimedAt        DateTime?
   adminNote        String?
+  isExploit        Boolean            @default(false)
   upvotes          BugReportUpvote[]
   comments         BugReportComment[]
   claimedBy        User?              @relation("ClaimedBugReports", fields: [claimedByUserId], references: [id])

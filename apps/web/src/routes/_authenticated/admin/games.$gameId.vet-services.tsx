@@ -285,6 +285,39 @@ function VetServicesPage() {
           </div>
         </section>
       )}
+
+      {(() => {
+        const linkedIds = new Set(
+          services?.flatMap((s) => s.conditions.map((c) => c.conditionDefId)) ?? []
+        )
+        const unlinked = allConditions?.filter((c) => !linkedIds.has(c.id)) ?? []
+        return (
+          <section className="rounded-lg border border-border bg-card shadow-sm">
+            <header className="border-b border-border bg-secondary/40 px-4 py-2.5">
+              <h2 className="text-sm font-semibold text-foreground">
+                Conditions not linked to any exam service
+                {unlinked.length > 0 && (
+                  <span className="ml-2 rounded bg-destructive/15 px-1.5 py-0.5 text-xs font-medium text-destructive">
+                    {unlinked.length}
+                  </span>
+                )}
+              </h2>
+            </header>
+            {unlinked.length === 0 ? (
+              <p className="px-4 py-4 text-sm text-muted-foreground">All conditions are covered.</p>
+            ) : (
+              <ul className="divide-y divide-border">
+                {unlinked.map((c) => (
+                  <li key={c.id} className="flex items-center gap-3 px-4 py-2 text-sm">
+                    <span className="font-medium text-foreground">{c.name}</span>
+                    <span className="text-xs uppercase text-muted-foreground">{c.conditionType}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        )
+      })()}
     </div>
   )
 }

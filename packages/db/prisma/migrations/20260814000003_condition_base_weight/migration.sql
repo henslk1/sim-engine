@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "HealthConditionDef" ADD COLUMN "baseWeight" DOUBLE PRECISION NOT NULL DEFAULT 1;

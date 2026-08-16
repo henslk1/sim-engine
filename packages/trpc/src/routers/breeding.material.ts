@@ -1,7 +1,7 @@
 import { db } from "@sim-engine/db"
 import { router, publicProcedure } from "../trpc.js"
 import { z } from "zod"
-import { generateOffspring, computePhenotypeDescription, computeBreedingQuality } from "@sim-engine/engine"
+import { generateOffspring, computePhenotypeDescription, computeBreedingQuality, computeFixedFields } from "@sim-engine/engine"
 
 export const breedingMaterialRouter = router({
   myStorage: publicProcedure
@@ -273,7 +273,7 @@ export const breedingMaterialRouter = router({
           name: animal.name,
           sex: animal.sex,
           breedId: animal.breedId,
-          breedName: animal.breed.name,
+          breedName: animal.breed?.name ?? "",
           fertility: animal.fertility,
           generation: animal.generation,
           breedGeneration: animal.breedGeneration,
@@ -513,6 +513,7 @@ export const breedingMaterialRouter = router({
 
         for (const offspring of result.offspring) {
           const phenotypeDescription = computePhenotypeDescription(offspring.genotypes, expressionRules)
+          const { structuralRisk, preferredTerrain, preferredClimate } = await computeFixedFields(tx, offspring.genotypes)
           const animal = await tx.animal.create({
             data: {
               gameId,
@@ -530,6 +531,9 @@ export const breedingMaterialRouter = router({
               lifeExpectancy,
               status: "EMBRYO_STORED",
               phenotypeDescription,
+              structuralRisk,
+              preferredTerrain: preferredTerrain as any,
+              preferredClimate: preferredClimate as any,
             },
             select: { id: true },
           })
@@ -809,7 +813,7 @@ export const breedingMaterialRouter = router({
 
         const result = generateOffspring({
           sire: sireData,
-          dam: { ...dam, quality: damQuality },
+          dam: { ...dam, quality: damQuality, breedId: dam.breedId! },
           damCareScore: dam.careScore?.score ?? 100,
           gameConfig,
           gameInnateMax: gameInnateMax ?? { maxTotalInnate: 2000, averageTotalInnate: 1000 },
@@ -836,7 +840,7 @@ export const breedingMaterialRouter = router({
             sireId: sperm.animalId,
             damId: input.damId,
             sireSnapshot: { animalId: sperm.animalId, name: spermSnap.name, breedId: spermSnap.breedId, breedName: spermSnap.breedName },
-            damSnapshot: { animalId: input.damId, name: dam.name, breedId: dam.breedId, breedName: dam.breed.name },
+            damSnapshot: { animalId: input.damId, name: dam.name, breedId: dam.breedId!, breedName: dam.breed?.name ?? "" },
           },
           select: { id: true },
         })
@@ -866,6 +870,7 @@ export const breedingMaterialRouter = router({
 
         for (const [i, offspring] of result.offspring.entries()) {
           const phenotypeDescription = computePhenotypeDescription(offspring.genotypes, expressionRules)
+          const { structuralRisk, preferredTerrain, preferredClimate } = await computeFixedFields(tx, offspring.genotypes)
           const animal = await tx.animal.create({
             data: {
               gameId,
@@ -883,6 +888,9 @@ export const breedingMaterialRouter = router({
               lifeExpectancy,
               status: "EMBRYO_STORED",
               phenotypeDescription,
+              structuralRisk,
+              preferredTerrain: preferredTerrain as any,
+              preferredClimate: preferredClimate as any,
             },
             select: { id: true },
           })

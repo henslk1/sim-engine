@@ -184,14 +184,16 @@ export const breedingPregnancyRouter = router({
         const lethalRules = await tx.expressionRule.findMany({
           where: {
             locus: { gameId },
-            healthConditionDef: { isFatal: true, fatalMaxCycle: 0 },
+            ruleConditions: { some: { healthConditionDef: { isFatal: true, fatalMaxCycle: 0 } } },
           },
           select: {
             locusId: true,
             alleleOneId: true,
             alleleTwoId: true,
-            penetrance: true,
-            healthConditionDef: { select: { id: true, name: true } },
+            ruleConditions: {
+              where: { healthConditionDef: { isFatal: true, fatalMaxCycle: 0 } },
+              select: { penetrance: true, healthConditionDef: { select: { id: true, name: true } } },
+            },
           },
         })
 
@@ -277,9 +279,9 @@ export const breedingPregnancyRouter = router({
                        r.alleleOneId === g.alleleOneId &&
                        r.alleleTwoId === g.alleleTwoId
               )
-              if (!match?.healthConditionDef) continue
-              if (Math.random() < (match.penetrance ?? 1.0)) {
-                lethalCondition = match.healthConditionDef
+              if (!match?.ruleConditions.length) continue
+              if (Math.random() < (match.ruleConditions[0]!.penetrance ?? 1.0)) {
+                lethalCondition = match.ruleConditions[0]!.healthConditionDef
                 break
               }
             }

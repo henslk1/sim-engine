@@ -15,6 +15,7 @@ model Locus {
   gameId                 String
   name                   String
   displayGroup           String?
+  description            Json?
   biasTarget             LocusBiasTarget             @default(NONE)
   minTestCycle           Int?
   alleles                Allele[]
@@ -50,22 +51,32 @@ model Allele {
 }
 
 model ExpressionRule {
-  id                   String                      @id @default(cuid())
-  locusId              String
-  alleleOneId          String
-  alleleTwoId          String
-  phenotype            String
-  numericModifier      Float?
-  penetrance           Float?
-  healthConditionDefId String?
-  climateModifiers     ExpressionClimateModifier[]
-  terrainModifiers     ExpressionTerrainModifier[]
-  locus                Locus                       @relation(fields: [locusId], references: [id])
-  alleleOne            Allele                      @relation("AlleleOne", fields: [alleleOneId], references: [id])
-  alleleTwo            Allele                      @relation("AlleleTwo", fields: [alleleTwoId], references: [id])
-  healthConditionDef   HealthConditionDef?         @relation(fields: [healthConditionDefId], references: [id])
+  id               String                      @id @default(cuid())
+  locusId          String
+  alleleOneId      String
+  alleleTwoId      String
+  phenotype        String
+  numericModifier  Float?
+  ruleConditions   ExpressionRuleCondition[]
+  climateModifiers ExpressionClimateModifier[]
+  terrainModifiers ExpressionTerrainModifier[]
+  locus            Locus                       @relation(fields: [locusId], references: [id])
+  alleleOne        Allele                      @relation("AlleleOne", fields: [alleleOneId], references: [id])
+  alleleTwo        Allele                      @relation("AlleleTwo", fields: [alleleTwoId], references: [id])
 
   @@unique([locusId, alleleOneId, alleleTwoId])
+}
+
+model ExpressionRuleCondition {
+  id                        String             @id @default(cuid())
+  expressionRuleId          String
+  healthConditionDefId      String
+  penetrance                Float?
+  environmentalRiskModifier Float              @default(0)
+  expressionRule            ExpressionRule     @relation(fields: [expressionRuleId], references: [id])
+  healthConditionDef        HealthConditionDef @relation(fields: [healthConditionDefId], references: [id])
+
+  @@unique([expressionRuleId, healthConditionDefId])
 }
 
 model GeneAvailabilityState {

@@ -1,4 +1,5 @@
 import { db } from "@sim-engine/db"
+import { computeFixedFields } from "../animal/computeFixedFields.js"
 
 export function weightedSample(items: { id: string; symbol: string; frequency: number }[]): { id: string; symbol: string } {
   const total = items.reduce((s, i) => s + i.frequency, 0)
@@ -95,6 +96,7 @@ export async function restockShop(gameId: string, shopBreedConfigId?: string): P
       }
 
       await db.$transaction(async (tx) => {
+        const { structuralRisk, preferredTerrain, preferredClimate } = await computeFixedFields(tx, genotypes)
         const animal = await tx.animal.create({
           data: {
             gameId,
@@ -108,6 +110,9 @@ export async function restockShop(gameId: string, shopBreedConfigId?: string): P
             status: "ALIVE",
             inbreedingCoefficient: 0,
             breedGeneration: 1,
+            structuralRisk,
+            preferredTerrain: preferredTerrain as any,
+            preferredClimate: preferredClimate as any,
           },
           select: { id: true },
         })

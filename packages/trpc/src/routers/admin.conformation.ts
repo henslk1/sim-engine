@@ -30,6 +30,7 @@ export const conformationAdminRouter = router({
     .input(z.object({ id: z.string() }))
     .mutation(({ input }) =>
       db.$transaction(async (tx) => {
+        await tx.animalConformationSectionScore.deleteMany({ where: { sectionId: input.id } })
         await tx.conformationSectionEntry.deleteMany({ where: { sectionId: input.id } })
         return tx.conformationSection.delete({ where: { id: input.id } })
       })

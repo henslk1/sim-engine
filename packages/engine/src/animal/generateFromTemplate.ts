@@ -1,5 +1,6 @@
 import { Prisma, AnimalSex, AnimalStatMode, PersonalityMode } from "@sim-engine/db"
 import { weightedSample, canonicalize } from "../shop/restock.js"
+import { computeFixedFields } from "./computeFixedFields.js"
 
 type Tx = Prisma.TransactionClient
 
@@ -85,6 +86,8 @@ export async function generateFromTemplate(tx: Tx, opts: GenerateFromTemplateOpt
     return { traitDefId: pp.traitDefId, value }
   })
 
+  const { structuralRisk, preferredTerrain, preferredClimate } = await computeFixedFields(tx, genotypes)
+
   const breedDisplayName = template.breedId
     ? (await tx.breed.findUnique({ where: { id: template.breedId }, select: { name: true } }))?.name ?? "Unknown"
     : (template.breedName ?? "Unknown")
@@ -104,6 +107,9 @@ export async function generateFromTemplate(tx: Tx, opts: GenerateFromTemplateOpt
       inbreedingCoefficient: 0,
       breedGeneration: 1,
       isTutorialAnimal: opts.isTutorialAnimal,
+      structuralRisk,
+      preferredTerrain: preferredTerrain as any,
+      preferredClimate: preferredClimate as any,
     },
     select: { id: true }
   })

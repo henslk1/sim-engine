@@ -1,9 +1,11 @@
+import { useState } from "react"
 import type { AnimalProfile } from "../types"
 import { cn } from "@/lib/utils"
-import { Panel, Badge, ActionButton } from "@/components/game/ui"
-import { Stethoscope, ShieldCheck, ShieldAlert, CalendarClock, Pill, FlaskConical, Footprints, CheckCircle2, HelpCircle } from "lucide-react"
+import { Panel, Badge, ActionButton, Dialog } from "@/components/game/ui"
+import { Stethoscope, ShieldCheck, ShieldAlert, CalendarClock, Pill, FlaskConical, Footprints, CheckCircle2, HelpCircle, AlertTriangle } from "lucide-react"
 import { Link } from "@tanstack/react-router"
 import { trpc } from "@/lib/trpc"
+import { Button } from "@/components/ui/button"
 
 type HealthRecord = AnimalProfile["healthRecords"][number]
 type TreatmentRecord = HealthRecord["treatmentRecords"][number]
@@ -46,6 +48,20 @@ export function HealthPanel({
     onSuccess: () => {
       utils.animalProfile.get.invalidate({ animalId: animal.id })
       if (playerAccountId) utils.inventory.mine.invalidate({ playerAccountId })
+    },
+  })
+
+  const [procedureOutcome, setProcedureOutcome] = useState<{ type: "death" | "episode"; conditionName: string } | null>(null)
+
+  const startTreatment = trpc.vet.startTreatment.useMutation({
+    onSuccess: (result) => {
+      utils.animalProfile.get.invalidate({ animalId: animal.id })
+      if (playerAccountId) utils.inventory.mine.invalidate({ playerAccountId })
+      if (result.diedFromProcedure) {
+        setProcedureOutcome({ type: "death", conditionName: result.conditionName })
+      } else if (result.triggeredCondition) {
+        setProcedureOutcome({ type: "episode", conditionName: result.triggeredCondition })
+      }
     },
   })
 
@@ -106,6 +122,45 @@ export function HealthPanel({
                   </div>
                 ) : null}
 
+                {record.diagnosedAt && activeTreatments.length === 0 && record.conditionDef.treatments.length === 0 && (
+                  <div className="border-t border-border/50 px-3 py-2">
+                    <p className="text-[11px] text-muted-foreground italic">No treatment available.</p>
+                  </div>
+                )}
+
+                {record.diagnosedAt && activeTreatments.length === 0 && !readonly && playerAccountId && record.conditionDef.treatments.length > 0 && (
+                  <div className="border-t border-destructive/15 bg-destructive/5 px-3 py-2 space-y-1.5">
+                    <p className="text-[11px] text-muted-foreground">{record.conditionDef.treatments.length === 1 ? "Start treatment:" : "Choose a treatment:"}</p>
+                    {record.conditionDef.treatments.map((treatment) => (
+                      <div key={treatment.id} className="flex items-center gap-1.5">
+                        <ActionButton
+                          variant="soft"
+                          className="flex-1 justify-between"
+                          disabled={startTreatment.isPending}
+                          onClick={() => startTreatment.mutate({ animalId: animal.id, playerAccountId, healthRecordId: record.id, treatmentDefId: treatment.id })}
+                        >
+                          <span>{treatment.name}</span>
+                          <span className="text-[10px] opacity-60">
+                            {TREATMENT_LABEL[treatment.treatmentType]}
+                            {treatment.durationCycles != null
+                              ? ` · ${treatment.durationCycles} cycles`
+                              : treatment.treatmentType !== "VET_PROCEDURE" ? " · Lifelong" : ""}
+                          </span>
+                        </ActionButton>
+                        {treatment.treatmentType === "VET_PROCEDURE" && (
+                          <span
+                            title="Certain heritable conditions can cause severe or fatal reactions under anesthesia. Your vet strongly recommends screening your animal's genetics before booking any surgical procedure."
+                            className="shrink-0 cursor-help"
+                          >
+                            <AlertTriangle className="size-3.5 text-amber-500" />
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                    {startTreatment.error && <p className="text-[11px] text-destructive">{startTreatment.error.message}</p>}
+                  </div>
+                )}
+
                 {record.diagnosedAt && activeTreatments.map((t: TreatmentRecord) => {
                   const { treatmentType, items } = t.treatmentDef
                   const isPending = administer.isPending && administer.variables?.treatmentRecordId === t.id
@@ -138,7 +193,9 @@ export function HealthPanel({
                             {(rd.maxIntensityTier ?? live?.maxIntensityTier) != null &&
                               ` · max tier ${rd.maxIntensityTier ?? live?.maxIntensityTier}`}
                             {live
-                              ? ` · ${live.remainingCycles} cycle${live.remainingCycles !== 1 ? "s" : ""} remaining`
+                              ? live.isLifelong
+                                ? " · Lifelong"
+                                : ` · ${live.remainingCycles} cycle${live.remainingCycles !== 1 ? "s" : ""} remaining`
                               : rd.durationCycles != null
                               ? ` · ${rd.durationCycles} cycles`
                               : ""}
@@ -146,7 +203,7 @@ export function HealthPanel({
                         )
                       })}
 
-                      {!readonly && playerAccountId && treatmentType !== "ACTIVITY_RESTRICTION" && (() => {
+                      {!readonly && playerAccountId && treatmentType !== "ACTIVITY_RESTRICTION" && treatmentType !== "VET_PROCEDURE" && (() => {
                         const isTimeBased = treatmentType === "OTC" || treatmentType === "PRESCRIPTION" || treatmentType === "PLAYER_ACTION"
                         const administeredToday = isTimeBased && (t as typeof t & { lastAdministeredCycle?: number | null }).lastAdministeredCycle === animal.ageInCycles
                         const cyclesRemaining = t.treatmentDef.durationCycles != null
@@ -265,6 +322,25 @@ export function HealthPanel({
             })}
           </div>
         </>
+      )}
+
+      {procedureOutcome && (
+        <Dialog
+          open
+          onClose={() => setProcedureOutcome(null)}
+          title={procedureOutcome.type === "death" ? "Fatal Procedural Complication" : "Procedural Complication"}
+        >
+          <div className="space-y-3 px-4 py-4">
+            <p className="text-sm text-muted-foreground">
+              {procedureOutcome.type === "death"
+                ? `During the procedure, ${animal.name} experienced a severe genetic reaction to anesthesia caused by ${procedureOutcome.conditionName}. Despite the vet's best efforts, ${animal.name} did not survive.`
+                : `During the procedure, ${animal.name} experienced a ${procedureOutcome.conditionName} episode triggered by the anesthesia. They have been stabilized, but the condition is now active and will require treatment.`}
+            </p>
+            <div className="flex justify-end">
+              <Button onClick={() => setProcedureOutcome(null)}>Close</Button>
+            </div>
+          </div>
+        </Dialog>
       )}
     </Panel>
   )

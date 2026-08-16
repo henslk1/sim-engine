@@ -52,6 +52,7 @@ function ConformationSectionsPage() {
     onSuccess: () => {
       utils.admin.conformation.listEntries.invalidate({ sectionId: editing?.id })
       utils.admin.conformation.listSections.invalidate()
+      utils.admin.locus.list.invalidate({ gameId: gameId! })
       setNewEntry(emptyEntry())
     },
   })
@@ -59,6 +60,7 @@ function ConformationSectionsPage() {
     onSuccess: () => {
       utils.admin.conformation.listEntries.invalidate({ sectionId: editing?.id })
       utils.admin.conformation.listSections.invalidate()
+      utils.admin.locus.list.invalidate({ gameId: gameId! })
     },
   })
 
@@ -181,7 +183,12 @@ function ConformationSectionsPage() {
                         className="h-8 rounded-md border border-input bg-background px-3 text-sm w-full"
                       >
                         <option value="">Select locus…</option>
-                        {loci?.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+                        {loci
+                          ?.filter((l) =>
+                            l.panelEntries.some((e) => e.panelDef.panelType === "CONFORMATION" || e.panelDef.panelType === "COLOR") &&
+                            l._count.sectionEntries === 0
+                          )
+                          .map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
                       </select>
                     </td>
                     <td className="px-3 py-2">

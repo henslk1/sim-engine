@@ -31,6 +31,7 @@ export async function runConformationInspection(client: Client, animalId: string
     }
 
     const breedId = animal.breedId
+    if (!breedId) throw new Error("Purebred animal has no breed assigned")
 
     const [sections, standards] = await Promise.all([
       tx.conformationSection.findMany({

@@ -102,8 +102,8 @@ export const animalTemplateAdminRouter = router({
     }))
     .mutation(({ input }) =>
       db.animalTemplateCompTier.upsert({
-        where: { templateId_disciplineId: { templateId: input.templateId, disciplineId: input.disciplineId } },
-        create: input,
+        where: { templateId_disciplineDefId: { templateId: input.templateId, disciplineDefId: input.disciplineId } },
+        create: { templateId: input.templateId, disciplineDefId: input.disciplineId, tier: input.tier },
         update: { tier: input.tier },
       })
     ),
@@ -112,7 +112,7 @@ export const animalTemplateAdminRouter = router({
     .input(z.object({ templateId: z.string(), disciplineId: z.string() }))
     .mutation(({ input }) =>
       db.animalTemplateCompTier.delete({
-        where: { templateId_disciplineId: { templateId: input.templateId, disciplineId: input.disciplineId } },
+        where: { templateId_disciplineDefId: { templateId: input.templateId, disciplineDefId: input.disciplineId } },
       })
     ),
 

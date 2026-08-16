@@ -352,7 +352,7 @@ function LifeStagePage() {
               <tr key={s.id} className="border-b border-border last:border-0">
                 <td className="px-3 py-2 text-muted-foreground">{s.stageIndex}</td>
                 <td className="px-3 py-2 font-medium text-foreground">{s.name}</td>
-                <td className="px-3 py-2 text-muted-foreground">{s.minCycle}–{s.maxCycle}</td>
+                <td className="px-3 py-2 text-muted-foreground">{s.minCycle}–{s.ageCap}</td>
                 <td className="px-3 py-2 text-center">{s.canCompete ? <span className="text-primary">✓</span> : <span className="text-muted-foreground">—</span>}</td>
                 <td className="px-3 py-2 text-center">{s.canBreed ? <span className="text-primary">✓</span> : <span className="text-muted-foreground">—</span>}</td>
                 <td className="px-3 py-2 text-center">{s.canSurrogate ? <span className="text-primary">✓</span> : <span className="text-muted-foreground">—</span>}</td>

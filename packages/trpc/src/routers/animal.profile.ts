@@ -67,7 +67,14 @@ export const animalProfileRouter = router({
           genotypes: {
             orderBy: { id: "asc" },
             include: {
-              locus: { include: { panelEntries: { include: { panelDef: true } } } },
+              locus: {
+                include: {
+                  panelEntries: { include: { panelDef: true } },
+                  expressionRules: {
+                    select: { alleleOneId: true, alleleTwoId: true, phenotype: true, ruleConditions: { select: { penetrance: true } } },
+                  },
+                },
+              },
               alleleOne: true,
               alleleTwo: true,
             },
@@ -91,7 +98,13 @@ export const animalProfileRouter = router({
           healthRecords: {
             orderBy: [{ isActive: "desc" }, { diagnosedAt: { sort: "desc", nulls: "last" } }],
             include: {
-              conditionDef: true,
+              conditionDef: {
+                include: {
+                  treatments: {
+                    select: { id: true, name: true, treatmentType: true, durationCycles: true },
+                  },
+                },
+              },
               treatmentRecords: {
                 include: {
                   treatmentDef: {
@@ -308,6 +321,10 @@ export const animalProfileRouter = router({
           // game config
           game: {
             select: {
+              conformationSections: {
+                orderBy: { displayOrder: "asc" },
+                select: { name: true, displayOrder: true },
+              },
               gameInnateMax: {
                 select: { averageTotalInnate: true, maxTotalInnate: true },
               },

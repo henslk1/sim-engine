@@ -77,8 +77,6 @@ model PersonalityTraitDef {
   gameId              String
   name                String
   description         String?
-  trainingModifier    Float                         @default(0)
-  moodModifier        Float                         @default(0)
   conceptionModifier  Float                         @default(0)
   labelRanges         PersonalityLabelRange[]
   breedProfiles       BreedPersonalityProfile[]
@@ -91,12 +89,14 @@ model PersonalityTraitDef {
 }
 
 model PersonalityLabelRange {
-  id         String              @id @default(cuid())
-  traitDefId String
-  label      String
-  minValue   Float
-  maxValue   Float
-  traitDef   PersonalityTraitDef @relation(fields: [traitDefId], references: [id])
+  id               String              @id @default(cuid())
+  traitDefId       String
+  label            String
+  minValue         Float
+  maxValue         Float
+  trainingModifier Float               @default(0)
+  moodModifier     Float               @default(0)
+  traitDef         PersonalityTraitDef @relation(fields: [traitDefId], references: [id])
 }
 
 model AnimalPersonality {

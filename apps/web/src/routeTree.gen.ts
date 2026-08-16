@@ -30,6 +30,7 @@ import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedAccountRouteImport } from './routes/_authenticated/account'
 import { Route as AuthenticatedSupportIndexRouteImport } from './routes/_authenticated/support/index'
 import { Route as AuthenticatedSupportTicketsIndexRouteImport } from './routes/_authenticated/support-tickets/index'
+import { Route as AuthenticatedDirectoryIndexRouteImport } from './routes/_authenticated/directory/index'
 import { Route as AuthenticatedBugReportsIndexRouteImport } from './routes/_authenticated/bug-reports/index'
 import { Route as AuthenticatedBreedsIndexRouteImport } from './routes/_authenticated/breeds/index'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
@@ -39,6 +40,9 @@ import { Route as AuthenticatedSupportTicketIdRouteImport } from './routes/_auth
 import { Route as AuthenticatedSupportTicketsNewRouteImport } from './routes/_authenticated/support-tickets/new'
 import { Route as AuthenticatedSupportTicketsTicketIdRouteImport } from './routes/_authenticated/support-tickets/$ticketId'
 import { Route as AuthenticatedPlayerUsernameRouteImport } from './routes/_authenticated/player/$username'
+import { Route as AuthenticatedDirectoryDiseasesRouteImport } from './routes/_authenticated/directory/diseases'
+import { Route as AuthenticatedDirectoryConformationRouteImport } from './routes/_authenticated/directory/conformation'
+import { Route as AuthenticatedDirectoryColorRouteImport } from './routes/_authenticated/directory/color'
 import { Route as AuthenticatedCompetitionCompetitionIdRouteImport } from './routes/_authenticated/competition.$competitionId'
 import { Route as AuthenticatedBugReportsNewRouteImport } from './routes/_authenticated/bug-reports/new'
 import { Route as AuthenticatedBugReportsReportIdRouteImport } from './routes/_authenticated/bug-reports/$reportId'
@@ -208,6 +212,12 @@ const AuthenticatedSupportTicketsIndexRoute =
     path: '/support-tickets/',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedDirectoryIndexRoute =
+  AuthenticatedDirectoryIndexRouteImport.update({
+    id: '/directory/',
+    path: '/directory/',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedBugReportsIndexRoute =
   AuthenticatedBugReportsIndexRouteImport.update({
     id: '/bug-reports/',
@@ -258,6 +268,24 @@ const AuthenticatedPlayerUsernameRoute =
   AuthenticatedPlayerUsernameRouteImport.update({
     id: '/player/$username',
     path: '/player/$username',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedDirectoryDiseasesRoute =
+  AuthenticatedDirectoryDiseasesRouteImport.update({
+    id: '/directory/diseases',
+    path: '/directory/diseases',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedDirectoryConformationRoute =
+  AuthenticatedDirectoryConformationRouteImport.update({
+    id: '/directory/conformation',
+    path: '/directory/conformation',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedDirectoryColorRoute =
+  AuthenticatedDirectoryColorRouteImport.update({
+    id: '/directory/color',
+    path: '/directory/color',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedCompetitionCompetitionIdRoute =
@@ -658,6 +686,9 @@ export interface FileRoutesByFullPath {
   '/bug-reports/$reportId': typeof AuthenticatedBugReportsReportIdRoute
   '/bug-reports/new': typeof AuthenticatedBugReportsNewRoute
   '/competition/$competitionId': typeof AuthenticatedCompetitionCompetitionIdRoute
+  '/directory/color': typeof AuthenticatedDirectoryColorRoute
+  '/directory/conformation': typeof AuthenticatedDirectoryConformationRoute
+  '/directory/diseases': typeof AuthenticatedDirectoryDiseasesRoute
   '/player/$username': typeof AuthenticatedPlayerUsernameRoute
   '/support-tickets/$ticketId': typeof AuthenticatedSupportTicketsTicketIdRoute
   '/support-tickets/new': typeof AuthenticatedSupportTicketsNewRoute
@@ -667,6 +698,7 @@ export interface FileRoutesByFullPath {
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/breeds/': typeof AuthenticatedBreedsIndexRoute
   '/bug-reports/': typeof AuthenticatedBugReportsIndexRoute
+  '/directory/': typeof AuthenticatedDirectoryIndexRoute
   '/support-tickets/': typeof AuthenticatedSupportTicketsIndexRoute
   '/support/': typeof AuthenticatedSupportIndexRoute
   '/admin/bugs/$bugId': typeof AuthenticatedAdminBugsBugIdRoute
@@ -746,6 +778,9 @@ export interface FileRoutesByTo {
   '/bug-reports/$reportId': typeof AuthenticatedBugReportsReportIdRoute
   '/bug-reports/new': typeof AuthenticatedBugReportsNewRoute
   '/competition/$competitionId': typeof AuthenticatedCompetitionCompetitionIdRoute
+  '/directory/color': typeof AuthenticatedDirectoryColorRoute
+  '/directory/conformation': typeof AuthenticatedDirectoryConformationRoute
+  '/directory/diseases': typeof AuthenticatedDirectoryDiseasesRoute
   '/player/$username': typeof AuthenticatedPlayerUsernameRoute
   '/support-tickets/$ticketId': typeof AuthenticatedSupportTicketsTicketIdRoute
   '/support-tickets/new': typeof AuthenticatedSupportTicketsNewRoute
@@ -755,6 +790,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/breeds': typeof AuthenticatedBreedsIndexRoute
   '/bug-reports': typeof AuthenticatedBugReportsIndexRoute
+  '/directory': typeof AuthenticatedDirectoryIndexRoute
   '/support-tickets': typeof AuthenticatedSupportTicketsIndexRoute
   '/support': typeof AuthenticatedSupportIndexRoute
   '/admin/bugs/$bugId': typeof AuthenticatedAdminBugsBugIdRoute
@@ -839,6 +875,9 @@ export interface FileRoutesById {
   '/_authenticated/bug-reports/$reportId': typeof AuthenticatedBugReportsReportIdRoute
   '/_authenticated/bug-reports/new': typeof AuthenticatedBugReportsNewRoute
   '/_authenticated/competition/$competitionId': typeof AuthenticatedCompetitionCompetitionIdRoute
+  '/_authenticated/directory/color': typeof AuthenticatedDirectoryColorRoute
+  '/_authenticated/directory/conformation': typeof AuthenticatedDirectoryConformationRoute
+  '/_authenticated/directory/diseases': typeof AuthenticatedDirectoryDiseasesRoute
   '/_authenticated/player/$username': typeof AuthenticatedPlayerUsernameRoute
   '/_authenticated/support-tickets/$ticketId': typeof AuthenticatedSupportTicketsTicketIdRoute
   '/_authenticated/support-tickets/new': typeof AuthenticatedSupportTicketsNewRoute
@@ -848,6 +887,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/breeds/': typeof AuthenticatedBreedsIndexRoute
   '/_authenticated/bug-reports/': typeof AuthenticatedBugReportsIndexRoute
+  '/_authenticated/directory/': typeof AuthenticatedDirectoryIndexRoute
   '/_authenticated/support-tickets/': typeof AuthenticatedSupportTicketsIndexRoute
   '/_authenticated/support/': typeof AuthenticatedSupportIndexRoute
   '/_authenticated/admin/bugs/$bugId': typeof AuthenticatedAdminBugsBugIdRoute
@@ -933,6 +973,9 @@ export interface FileRouteTypes {
     | '/bug-reports/$reportId'
     | '/bug-reports/new'
     | '/competition/$competitionId'
+    | '/directory/color'
+    | '/directory/conformation'
+    | '/directory/diseases'
     | '/player/$username'
     | '/support-tickets/$ticketId'
     | '/support-tickets/new'
@@ -942,6 +985,7 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/breeds/'
     | '/bug-reports/'
+    | '/directory/'
     | '/support-tickets/'
     | '/support/'
     | '/admin/bugs/$bugId'
@@ -1021,6 +1065,9 @@ export interface FileRouteTypes {
     | '/bug-reports/$reportId'
     | '/bug-reports/new'
     | '/competition/$competitionId'
+    | '/directory/color'
+    | '/directory/conformation'
+    | '/directory/diseases'
     | '/player/$username'
     | '/support-tickets/$ticketId'
     | '/support-tickets/new'
@@ -1030,6 +1077,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/breeds'
     | '/bug-reports'
+    | '/directory'
     | '/support-tickets'
     | '/support'
     | '/admin/bugs/$bugId'
@@ -1113,6 +1161,9 @@ export interface FileRouteTypes {
     | '/_authenticated/bug-reports/$reportId'
     | '/_authenticated/bug-reports/new'
     | '/_authenticated/competition/$competitionId'
+    | '/_authenticated/directory/color'
+    | '/_authenticated/directory/conformation'
+    | '/_authenticated/directory/diseases'
     | '/_authenticated/player/$username'
     | '/_authenticated/support-tickets/$ticketId'
     | '/_authenticated/support-tickets/new'
@@ -1122,6 +1173,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/'
     | '/_authenticated/breeds/'
     | '/_authenticated/bug-reports/'
+    | '/_authenticated/directory/'
     | '/_authenticated/support-tickets/'
     | '/_authenticated/support/'
     | '/_authenticated/admin/bugs/$bugId'
@@ -1331,6 +1383,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSupportTicketsIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/directory/': {
+      id: '/_authenticated/directory/'
+      path: '/directory'
+      fullPath: '/directory/'
+      preLoaderRoute: typeof AuthenticatedDirectoryIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/bug-reports/': {
       id: '/_authenticated/bug-reports/'
       path: '/bug-reports'
@@ -1392,6 +1451,27 @@ declare module '@tanstack/react-router' {
       path: '/player/$username'
       fullPath: '/player/$username'
       preLoaderRoute: typeof AuthenticatedPlayerUsernameRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/directory/diseases': {
+      id: '/_authenticated/directory/diseases'
+      path: '/directory/diseases'
+      fullPath: '/directory/diseases'
+      preLoaderRoute: typeof AuthenticatedDirectoryDiseasesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/directory/conformation': {
+      id: '/_authenticated/directory/conformation'
+      path: '/directory/conformation'
+      fullPath: '/directory/conformation'
+      preLoaderRoute: typeof AuthenticatedDirectoryConformationRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/directory/color': {
+      id: '/_authenticated/directory/color'
+      path: '/directory/color'
+      fullPath: '/directory/color'
+      preLoaderRoute: typeof AuthenticatedDirectoryColorRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/competition/$competitionId': {
@@ -2052,6 +2132,9 @@ interface AuthenticatedRouteChildren {
   AuthenticatedBugReportsReportIdRoute: typeof AuthenticatedBugReportsReportIdRoute
   AuthenticatedBugReportsNewRoute: typeof AuthenticatedBugReportsNewRoute
   AuthenticatedCompetitionCompetitionIdRoute: typeof AuthenticatedCompetitionCompetitionIdRoute
+  AuthenticatedDirectoryColorRoute: typeof AuthenticatedDirectoryColorRoute
+  AuthenticatedDirectoryConformationRoute: typeof AuthenticatedDirectoryConformationRoute
+  AuthenticatedDirectoryDiseasesRoute: typeof AuthenticatedDirectoryDiseasesRoute
   AuthenticatedPlayerUsernameRoute: typeof AuthenticatedPlayerUsernameRoute
   AuthenticatedSupportTicketsTicketIdRoute: typeof AuthenticatedSupportTicketsTicketIdRoute
   AuthenticatedSupportTicketsNewRoute: typeof AuthenticatedSupportTicketsNewRoute
@@ -2060,6 +2143,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedVenueVenueIdRoute: typeof AuthenticatedVenueVenueIdRoute
   AuthenticatedBreedsIndexRoute: typeof AuthenticatedBreedsIndexRoute
   AuthenticatedBugReportsIndexRoute: typeof AuthenticatedBugReportsIndexRoute
+  AuthenticatedDirectoryIndexRoute: typeof AuthenticatedDirectoryIndexRoute
   AuthenticatedSupportTicketsIndexRoute: typeof AuthenticatedSupportTicketsIndexRoute
   AuthenticatedSupportIndexRoute: typeof AuthenticatedSupportIndexRoute
 }
@@ -2085,6 +2169,10 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedBugReportsNewRoute: AuthenticatedBugReportsNewRoute,
   AuthenticatedCompetitionCompetitionIdRoute:
     AuthenticatedCompetitionCompetitionIdRoute,
+  AuthenticatedDirectoryColorRoute: AuthenticatedDirectoryColorRoute,
+  AuthenticatedDirectoryConformationRoute:
+    AuthenticatedDirectoryConformationRoute,
+  AuthenticatedDirectoryDiseasesRoute: AuthenticatedDirectoryDiseasesRoute,
   AuthenticatedPlayerUsernameRoute: AuthenticatedPlayerUsernameRoute,
   AuthenticatedSupportTicketsTicketIdRoute:
     AuthenticatedSupportTicketsTicketIdRoute,
@@ -2094,6 +2182,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedVenueVenueIdRoute: AuthenticatedVenueVenueIdRoute,
   AuthenticatedBreedsIndexRoute: AuthenticatedBreedsIndexRoute,
   AuthenticatedBugReportsIndexRoute: AuthenticatedBugReportsIndexRoute,
+  AuthenticatedDirectoryIndexRoute: AuthenticatedDirectoryIndexRoute,
   AuthenticatedSupportTicketsIndexRoute: AuthenticatedSupportTicketsIndexRoute,
   AuthenticatedSupportIndexRoute: AuthenticatedSupportIndexRoute,
 }
