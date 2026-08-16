@@ -267,7 +267,7 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
 
     // Check if work was done this cycle — suppresses condition decay
     const currentCycle = animal.ageInCycles
-    const [workedThisCycle, allCareDone, energy, mood, condition, activeHealthRecords] = await Promise.all([
+    const [workedThisCycle, allCareDone, energy, mood, condition, activeHealthRecords, personalityRecords] = await Promise.all([
       Promise.all([
         tx.trainingLog.count({ where: { animalId, cycleNumber: currentCycle } }),
         tx.competitionEntry.count({ where: { animalId, cycleNumber: currentCycle } }),
@@ -293,6 +293,14 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
               treatmentDef: { select: { treatmentType: true } },
             },
           },
+        },
+      }),
+      tx.animalPersonality.findMany({
+        where: { animalId },
+        select: {
+          value: true,
+          personalityModifier: true,
+          traitDef: { select: { labelRanges: { select: { minValue: true, maxValue: true, moodModifier: true } } } },
         },
       }),
     ])
@@ -361,7 +369,18 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
       }),
       mood && tx.animalMood.update({
         where: { animalId },
-        data: { value: Math.max(0, Math.min(100, mood.value - gameConfig.moodDecayRate + conditionMoodEffect)) },
+        data: {
+          value: Math.max(0, Math.min(100,
+            mood.value
+            - gameConfig.moodDecayRate
+            + conditionMoodEffect
+            + personalityRecords.reduce((sum, p) => {
+                const effective = p.value + p.personalityModifier
+                const range = p.traitDef.labelRanges.find(r => effective >= r.minValue && effective <= r.maxValue)
+                return sum + (range?.moodModifier ?? 0)
+              }, 0)
+          )),
+        },
       }),
       condition && !workedThisCycle && tx.animalCondition.update({
         where: { animalId },

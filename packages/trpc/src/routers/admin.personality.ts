@@ -19,7 +19,6 @@ export const personalityAdminRouter = router({
       gameId: z.string(),
       name: z.string().min(1),
       description: z.string().nullish(),
-      conceptionModifier: z.number().default(0),
     }))
     .mutation(({ input }) => {
       const { id, gameId, description, ...rest } = input
@@ -56,6 +55,7 @@ export const personalityAdminRouter = router({
       maxValue: z.number(),
       trainingModifier: z.number().default(0),
       moodModifier: z.number().default(0),
+      conceptionModifier: z.number().default(0),
     }))
     .mutation(({ input }) => {
       const { id, traitDefId, ...data } = input

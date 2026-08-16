@@ -48,7 +48,7 @@ const parentSelect = {
     select: {
       traitDefId: true,
       value: true,
-      traitDef: { select: { conceptionModifier: true } },
+      traitDef: { select: { labelRanges: { select: { minValue: true, maxValue: true, conceptionModifier: true } } } },
     },
   },
   careScore: { select: { score: true } },
@@ -125,7 +125,7 @@ const breedingDisplaySelect = {
   playerAccount: { select: { id: true, username: true } },
   lifeStage: { select: { name: true } },
   mood: { select: { value: true } },
-  personality: { select: { value: true, traitDef: { select: { conceptionModifier: true } } } },
+  personality: { select: { value: true, traitDef: { select: { labelRanges: { select: { minValue: true, maxValue: true, conceptionModifier: true } } } } } },
   careScore: { select: { score: true } },
   ancestors: { select: { ancestorId: true, depth: true, ancestor: { select: { inbreedingCoefficient: true } } } },
   compTiers: {
@@ -628,9 +628,13 @@ export const breedingCoverRouter = router({
           }).score
         }
 
+        function flattenPersonality(animal: typeof sire) {
+          return animal.personality.map(p => ({ traitDefId: p.traitDefId, value: p.value, labelRanges: p.traitDef.labelRanges }))
+        }
+
         const result = generateOffspring({
-          sire: { ...sire, breedId: sire.breedId!, quality: parentQuality(sire) },
-          dam: { ...dam, breedId: dam.breedId!, quality: parentQuality(dam) },
+          sire: { ...sire, breedId: sire.breedId!, quality: parentQuality(sire), personality: flattenPersonality(sire) },
+          dam: { ...dam, breedId: dam.breedId!, quality: parentQuality(dam), personality: flattenPersonality(dam) },
           damCareScore: damCareScore?.score ?? 100,
           gameConfig,
           gameInnateMax: gameInnateMax ?? { maxTotalInnate: 2000, averageTotalInnate: 1000 },
@@ -866,9 +870,10 @@ export const breedingCoverRouter = router({
 
       const ctp = gameConfig?.trainingCeilingMultiplier ?? 1
       const base = (sire.fertility * 100 + dam.fertility * 100 + (sire.mood?.value ?? 50) + (dam.mood?.value ?? 50)) / 4
-      const personalityOffset = [...sire.personality, ...dam.personality].reduce(
-        (acc, p) => acc + p.traitDef.conceptionModifier * p.value, 0
-      )
+      const personalityOffset = [...sire.personality, ...dam.personality].reduce((acc, p) => {
+        const range = p.traitDef.labelRanges.find(r => p.value >= r.minValue && p.value <= r.maxValue)
+        return acc + (range?.conceptionModifier ?? 0)
+      }, 0)
 
       return {
         sire,
@@ -923,9 +928,10 @@ export const breedingCoverRouter = router({
       const base =
         (offer.sire.fertility * 100 + offer.dam.fertility * 100 +
           (offer.sire.mood?.value ?? 50) + (offer.dam.mood?.value ?? 50)) / 4
-      const personalityOffset = [...offer.sire.personality, ...offer.dam.personality].reduce(
-        (acc, p) => acc + p.traitDef.conceptionModifier * p.value, 0
-      )
+      const personalityOffset = [...offer.sire.personality, ...offer.dam.personality].reduce((acc, p) => {
+        const range = p.traitDef.labelRanges.find(r => p.value >= r.minValue && p.value <= r.maxValue)
+        return acc + (range?.conceptionModifier ?? 0)
+      }, 0)
       const conceptionChance = Math.max(10, Math.min(100, base + personalityOffset))
       const offspringCOI = computeCOI(offer.sire.id, offer.sire.inbreedingCoefficient, offer.sire.ancestors, offer.dam.id, offer.dam.inbreedingCoefficient, offer.dam.ancestors)
 
@@ -1082,9 +1088,13 @@ export const breedingCoverRouter = router({
         }).score
       }
 
+      function flattenP(a: typeof sire) {
+        return a.personality.map(p => ({ traitDefId: p.traitDefId, value: p.value, labelRanges: p.traitDef.labelRanges }))
+      }
+
       const result = generateOffspring({
-        sire: { ...sire, breedId: sire.breedId!, quality: parentQuality(sire) },
-        dam: { ...dam, breedId: dam.breedId!, quality: parentQuality(dam) },
+        sire: { ...sire, breedId: sire.breedId!, quality: parentQuality(sire), personality: flattenP(sire) },
+        dam: { ...dam, breedId: dam.breedId!, quality: parentQuality(dam), personality: flattenP(dam) },
         damCareScore: dam.careScore?.score ?? 100,
         gameConfig,
         gameInnateMax: gameInnateMax ?? { maxTotalInnate: 2000, averageTotalInnate: 1000 },

@@ -14,7 +14,7 @@ export type ParentData = {
   quality: number
   stats: Array<{ statDefId: string; innateValue: number }>
   mood: { value: number } | null
-  personality: Array<{ traitDefId: string; traitDef: { conceptionModifier: number }; value: number }>
+  personality: Array<{ traitDefId: string; value: number; labelRanges: { minValue: number; maxValue: number; conceptionModifier: number }[] }>
   genotypes: Array<{
     locusId: string
     alleleOneId: string
@@ -101,10 +101,10 @@ export function generateOffspring(input: GenerateOffspringInput): GenerateOffspr
     const base =
       (sire.fertility * 100 + dam.fertility * 100 + (sire.mood?.value ?? 50) + (dam.mood?.value ?? 50)) / 4
 
-    const personalityOffset = [...sire.personality, ...dam.personality].reduce(
-      (acc, p) => acc + p.traitDef.conceptionModifier * p.value,
-      0,
-    )
+    const personalityOffset = [...sire.personality, ...dam.personality].reduce((acc, p) => {
+      const range = p.labelRanges.find(r => p.value >= r.minValue && p.value <= r.maxValue)
+      return acc + (range?.conceptionModifier ?? 0)
+    }, 0)
 
     const conceptionChance = Math.max(CONCEPTION_FLOOR, Math.min(100, base + personalityOffset))
     if (Math.random() * 100 > conceptionChance) return { conceived: false }

@@ -8,12 +8,11 @@ type TraitForm = {
   id?: string
   name: string
   description: string
-  conceptionModifier: string
 }
-const emptyTrait = (): TraitForm => ({ name: "", description: "", conceptionModifier: "0" })
+const emptyTrait = (): TraitForm => ({ name: "", description: "" })
 
-type LabelRangeRow = { label: string; minValue: string; maxValue: string; trainingModifier: string; moodModifier: string }
-const emptyRange = (): LabelRangeRow => ({ label: "", minValue: "", maxValue: "", trainingModifier: "0", moodModifier: "0" })
+type LabelRangeRow = { label: string; minValue: string; maxValue: string; trainingModifier: string; moodModifier: string; conceptionModifier: string }
+const emptyRange = (): LabelRangeRow => ({ label: "", minValue: "", maxValue: "", trainingModifier: "0", moodModifier: "0", conceptionModifier: "0" })
 
 function PersonalityTraitsPage() {
   const { gameId } = Route.useParams()
@@ -62,7 +61,6 @@ function PersonalityTraitsPage() {
       id: trait.id,
       name: trait.name,
       description: trait.description ?? "",
-      conceptionModifier: trait.conceptionModifier.toString(),
     })
     setEditingRangeId(null)
     setEditingRange(emptyRange())
@@ -76,7 +74,6 @@ function PersonalityTraitsPage() {
         ...editing,
         gameId,
         description: editing.description || null,
-        conceptionModifier: editing.conceptionModifier !== "" ? parseFloat(editing.conceptionModifier) : 0,
       },
       {
         onSuccess: (saved) => {
@@ -96,6 +93,7 @@ function PersonalityTraitsPage() {
         maxValue: parseFloat(newRange.maxValue),
         trainingModifier: newRange.trainingModifier !== "" ? parseFloat(newRange.trainingModifier) : 0,
         moodModifier: newRange.moodModifier !== "" ? parseFloat(newRange.moodModifier) : 0,
+        conceptionModifier: newRange.conceptionModifier !== "" ? parseFloat(newRange.conceptionModifier) : 0,
       },
       { onSuccess: () => setNewRange(emptyRange()) }
     )
@@ -112,6 +110,7 @@ function PersonalityTraitsPage() {
         maxValue: parseFloat(editingRange.maxValue),
         trainingModifier: editingRange.trainingModifier !== "" ? parseFloat(editingRange.trainingModifier) : 0,
         moodModifier: editingRange.moodModifier !== "" ? parseFloat(editingRange.moodModifier) : 0,
+        conceptionModifier: editingRange.conceptionModifier !== "" ? parseFloat(editingRange.conceptionModifier) : 0,
       },
       {
         onSuccess: () => {
@@ -124,7 +123,7 @@ function PersonalityTraitsPage() {
 
   if (editing !== null) {
     return (
-      <div className="p-4 space-y-3 max-w-4xl mx-auto">
+      <div className="p-4 space-y-3 max-w-6xl mx-auto">
         <div className="flex items-center gap-1.5 text-sm">
           <button
             onClick={() => setEditing(null)}
@@ -159,16 +158,6 @@ function PersonalityTraitsPage() {
                 <Input
                   value={editing.description}
                   onChange={(e) => setEditing({ ...editing, description: e.target.value })}
-                  className="h-8 text-sm"
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Conception Modifier</label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={editing.conceptionModifier}
-                  onChange={(e) => setEditing({ ...editing, conceptionModifier: e.target.value })}
                   className="h-8 text-sm"
                 />
               </div>
@@ -216,6 +205,7 @@ function PersonalityTraitsPage() {
                     <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Max</th>
                     <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Train Mod</th>
                     <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Mood Mod</th>
+                    <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Conception Mod</th>
                     <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
                   </tr>
                 </thead>
@@ -238,6 +228,9 @@ function PersonalityTraitsPage() {
                         <td className="px-3 py-2">
                           <Input type="number" step="0.01" value={editingRange.moodModifier} onChange={(e) => setEditingRange({ ...editingRange, moodModifier: e.target.value })} className="h-7 text-sm" />
                         </td>
+                        <td className="px-3 py-2">
+                          <Input type="number" step="0.01" value={editingRange.conceptionModifier} onChange={(e) => setEditingRange({ ...editingRange, conceptionModifier: e.target.value })} className="h-7 text-sm" />
+                        </td>
                         <td className="px-3 py-2 text-right space-x-2">
                           <Button size="sm" onClick={() => submitEditRange(r.id)} disabled={saveLabelRange.isPending}>Save</Button>
                           <Button size="sm" variant="ghost" onClick={() => { setEditingRangeId(null); setEditingRange(emptyRange()) }}>Cancel</Button>
@@ -250,6 +243,7 @@ function PersonalityTraitsPage() {
                         <td className="px-3 py-2 text-muted-foreground">{r.maxValue}</td>
                         <td className="px-3 py-2 text-muted-foreground">{r.trainingModifier}</td>
                         <td className="px-3 py-2 text-muted-foreground">{r.moodModifier}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{r.conceptionModifier}</td>
                         <td className="px-3 py-2 text-right space-x-2">
                           <Button
                             size="sm"
@@ -262,6 +256,7 @@ function PersonalityTraitsPage() {
                                 maxValue: r.maxValue.toString(),
                                 trainingModifier: r.trainingModifier.toString(),
                                 moodModifier: r.moodModifier.toString(),
+                                conceptionModifier: r.conceptionModifier.toString(),
                               })
                             }}
                           >
@@ -295,6 +290,9 @@ function PersonalityTraitsPage() {
                     <td className="px-3 py-2">
                       <Input type="number" step="0.01" value={newRange.moodModifier} onChange={(e) => setNewRange({ ...newRange, moodModifier: e.target.value })} placeholder="0" className="h-7 text-sm" />
                     </td>
+                    <td className="px-3 py-2">
+                      <Input type="number" step="0.01" value={newRange.conceptionModifier} onChange={(e) => setNewRange({ ...newRange, conceptionModifier: e.target.value })} placeholder="0" className="h-7 text-sm" />
+                    </td>
                     <td className="px-3 py-2 text-right">
                       <Button size="sm" onClick={submitNewRange} disabled={saveLabelRange.isPending || !newRange.label.trim() || !newRange.minValue || !newRange.maxValue}>
                         Add
@@ -314,7 +312,7 @@ function PersonalityTraitsPage() {
   }
 
   return (
-    <div className="p-4 space-y-3 max-w-4xl mx-auto">
+    <div className="p-4 space-y-3 max-w-6xl mx-auto">
       <div className="flex items-center justify-between">
         <h1 className="font-serif text-xl font-semibold text-foreground">Personality Traits</h1>
         <Button onClick={() => setEditing(emptyTrait())}>+ New Trait</Button>

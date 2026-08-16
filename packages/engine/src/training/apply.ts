@@ -61,17 +61,31 @@ export async function applyTrainingAction(
     if (!energy) throw new Error(`No energy record for animal ${animalId}`)
     if (energy.currentEnergy < energyUsed) throw new Error("Not enough energy")
 
-    const currentStat = await tx.animalStat.findUniqueOrThrow({
-      where: { animalId_statDefId: { animalId, statDefId: action.statDefId } },
-      select: { innateValue: true, trainedValue: true },
-    })
+    const [currentStat, config, personality] = await Promise.all([
+      tx.animalStat.findUniqueOrThrow({
+        where: { animalId_statDefId: { animalId, statDefId: action.statDefId } },
+        select: { innateValue: true, trainedValue: true },
+      }),
+      tx.gameConfig.findUniqueOrThrow({
+        where: { gameId: action.gameId },
+        select: { trainingCeilingMultiplier: true, conditionWorkGain: true },
+      }),
+      tx.animalPersonality.findMany({
+        where: { animalId },
+        select: {
+          value: true,
+          personalityModifier: true,
+          traitDef: { select: { labelRanges: { select: { minValue: true, maxValue: true, trainingModifier: true } } } },
+        },
+      }),
+    ])
 
-    const config = await tx.gameConfig.findUniqueOrThrow({
-      where: { gameId: action.gameId },
-      select: { trainingCeilingMultiplier: true, conditionWorkGain: true },
-    })
-
-    const cap = currentStat.innateValue * config.trainingCeilingMultiplier
+    const personalityCapMod = personality.reduce((sum, p) => {
+      const effective = p.value + p.personalityModifier
+      const range = p.traitDef.labelRanges.find(r => effective >= r.minValue && effective <= r.maxValue)
+      return sum + (range?.trainingModifier ?? 0)
+    }, 0)
+    const cap = currentStat.innateValue * (config.trainingCeilingMultiplier + personalityCapMod)
     if (currentStat.trainedValue >= cap) throw new Error("Stat is already at training cap")
 
     const rawGain = action.baseGain * tier.gainMultiplier

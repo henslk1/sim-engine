@@ -116,7 +116,7 @@ export const breedingMaterialRouter = router({
                 traitDefId: true,
                 value: true,
                 traitLabel: true,
-                traitDef: { select: { name: true, conceptionModifier: true } },
+                traitDef: { select: { name: true } },
               },
             },
             energy: { select: { currentEnergy: true } },
@@ -312,7 +312,6 @@ export const breedingMaterialRouter = router({
           personality: animal.personality.map((p) => ({
             traitDefId: p.traitDefId,
             name: p.traitDef.name,
-            conceptionModifier: p.traitDef.conceptionModifier,
             value: p.value,
             label: p.traitLabel,
           })),
@@ -384,11 +383,10 @@ export const breedingMaterialRouter = router({
             quality: snap.quality ?? 50,
             stats: (snap.stats ?? []).map((s: any) => ({ statDefId: s.statDefId, innateValue: s.innateValue })),
             mood: null,
-            // conceptionModifier not used with skipConceptionRoll; pass 0
             personality: (snap.personality ?? []).map((p: any) => ({
               traitDefId: p.traitDefId,
               value: p.value,
-              traitDef: { conceptionModifier: 0 },
+              labelRanges: [],  // skipConceptionRoll — ranges not needed
             })),
             genotypes: (snap.genotypes ?? []).map((g: any) => ({
               locusId: g.locusId,
@@ -447,7 +445,7 @@ export const breedingMaterialRouter = router({
             }),
             tx.personalityLabelRange.findMany({
               where: { traitDef: { gameId } },
-              select: { traitDefId: true, label: true, minValue: true, maxValue: true },
+              select: { traitDefId: true, minValue: true, maxValue: true, conceptionModifier: true },
             }),
           ])
 
@@ -633,7 +631,7 @@ export const breedingMaterialRouter = router({
               select: {
                 traitDefId: true,
                 value: true,
-                traitDef: { select: { conceptionModifier: true } },
+                traitDef: { select: { labelRanges: { select: { minValue: true, maxValue: true, conceptionModifier: true } } } },
               },
             },
             careScore: { select: { score: true } },
@@ -694,7 +692,7 @@ export const breedingMaterialRouter = router({
         })
         if (activePregnancy > 0) throw new Error("Dam is already pregnant")
 
-        const sireData = {
+        const sireDataBase = {
           id: sperm.animalId,
           fertility: spermSnap.fertility ?? 0.8,
           inbreedingCoefficient: spermSnap.inbreedingCoefficient ?? 0,
@@ -703,11 +701,6 @@ export const breedingMaterialRouter = router({
           quality: spermSnap.quality ?? 50,
           stats: (spermSnap.stats ?? []).map((s: any) => ({ statDefId: s.statDefId, innateValue: s.innateValue })),
           mood: null,
-          personality: (spermSnap.personality ?? []).map((p: any) => ({
-            traitDefId: p.traitDefId,
-            value: p.value,
-            traitDef: { conceptionModifier: p.conceptionModifier ?? 0 },
-          })),
           genotypes: (spermSnap.genotypes ?? []).map((g: any) => ({
             locusId: g.locusId,
             alleleOneId: g.alleleOneId,
@@ -762,11 +755,20 @@ export const breedingMaterialRouter = router({
             }),
             tx.personalityLabelRange.findMany({
               where: { traitDef: { gameId } },
-              select: { traitDefId: true, label: true, minValue: true, maxValue: true },
+              select: { traitDefId: true, minValue: true, maxValue: true, conceptionModifier: true },
             }),
           ])
 
         if (!firstLifeStage) throw new Error("No life stages configured for this game")
+
+        const sireData = {
+          ...sireDataBase,
+          personality: (spermSnap.personality ?? []).map((p: any) => ({
+            traitDefId: p.traitDefId,
+            value: p.value,
+            labelRanges: personalityLabelRanges.filter(r => r.traitDefId === p.traitDefId),
+          })),
+        }
 
         const isCrossBreed = spermSnap.breedId !== dam.breedId
         if (isCrossBreed && !gradeBread) throw new Error("No grade breed configured for this game")
@@ -813,7 +815,12 @@ export const breedingMaterialRouter = router({
 
         const result = generateOffspring({
           sire: sireData,
-          dam: { ...dam, quality: damQuality, breedId: dam.breedId! },
+          dam: {
+            ...dam,
+            quality: damQuality,
+            breedId: dam.breedId!,
+            personality: dam.personality.map(p => ({ traitDefId: p.traitDefId, value: p.value, labelRanges: p.traitDef.labelRanges })),
+          },
           damCareScore: dam.careScore?.score ?? 100,
           gameConfig,
           gameInnateMax: gameInnateMax ?? { maxTotalInnate: 2000, averageTotalInnate: 1000 },
