@@ -252,7 +252,7 @@ export function TrainingPanel({
                         ) : (
                           <>
                             <Zap className="size-3" />
-                            Train{tier ? ` · ${Math.round(tier.energyCost)} energy` : ""}
+                            {trainingDef?.name ?? "Train"}{tier ? ` · ${Math.round(tier.energyCost)} energy` : ""}
                           </>
                         )}
                       </ActionButton>

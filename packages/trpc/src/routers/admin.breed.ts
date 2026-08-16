@@ -83,6 +83,26 @@ export const breedAdminRouter = router({
     .input(z.object({ id: z.string() }))
     .mutation(({ input }) => db.breedStatProfile.delete({ where: { id: input.id } })),
 
+  saveAllStatProfiles: publicProcedure
+    .input(z.object({
+      breedId: z.string(),
+      profiles: z.array(z.object({
+        statDefId: z.string(),
+        weight: z.number(),
+        naturalMin: z.number(),
+        naturalMax: z.number(),
+        baseline: z.number(),
+      }))
+    }))
+    .mutation(({ input }) =>
+      db.$transaction(async tx => {
+        await tx.breedStatProfile.deleteMany({ where: { breedId: input.breedId } })
+        await tx.breedStatProfile.createMany({
+          data: input.profiles.map(p => ({ breedId: input.breedId, ...p }))
+        })
+      })
+    ),
+
   listConformationStandards: publicProcedure
     .input(z.object({ breedId: z.string() }))
     .query(({ input }) =>

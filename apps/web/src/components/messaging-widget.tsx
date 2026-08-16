@@ -57,11 +57,10 @@ export function MessagingWidget() {
   }, [tutorialCompleted]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    socket.connect()
+    // socket.connect() — deferred until socket server is live
     socket.on("notification", () => { void refetchNotifications() })
     return () => {
       socket.off("notification")
-      socket.disconnect()
     }
   }, [refetchNotifications])
 

@@ -169,8 +169,8 @@ model Animal {
   isPinned                            Boolean                          @default(false)
   phenotypeDescription                String?
   structuralRisk                      Float                            @default(0)
-  preferredTerrain                    VenueTerrain?
-  preferredClimate                    VenueClimate?
+  preferredTerrain                    VenueTerrain[]
+  preferredClimate                    VenueClimate[]
   notes                               Json?
   inbreedingCoefficient               Float                            @default(0)
   fertility                           Float

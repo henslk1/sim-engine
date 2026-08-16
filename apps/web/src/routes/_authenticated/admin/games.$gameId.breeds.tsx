@@ -79,39 +79,18 @@ function II({ value, onChange, onBlur, step, min, max, disabled }: {
 
 type StatProfile = { id: string; statDefId: string; weight: number; naturalMin: number; naturalMax: number; baseline: number }
 
-function StatRow({ stat, profile, onSave }: {
+function StatRow({ stat, values, onChange }: {
   stat: { id: string; name: string }
-  profile: StatProfile | undefined
-  onSave: (statDefId: string, id: string | undefined, data: { weight: number; naturalMin: number; naturalMax: number; baseline: number }) => void
+  values: { weight: string; naturalMin: string; naturalMax: string; baseline: string }
+  onChange: (statDefId: string, field: string, value: string) => void
 }) {
-  const [weight, setWeight] = useState(profile?.weight.toString() ?? "1")
-  const [naturalMin, setNaturalMin] = useState(profile?.naturalMin.toString() ?? "0")
-  const [naturalMax, setNaturalMax] = useState(profile?.naturalMax.toString() ?? "100")
-  const [baseline, setBaseline] = useState(profile?.baseline.toString() ?? "50")
-
-  useEffect(() => {
-    setWeight(profile?.weight.toString() ?? "1")
-    setNaturalMin(profile?.naturalMin.toString() ?? "0")
-    setNaturalMax(profile?.naturalMax.toString() ?? "100")
-    setBaseline(profile?.baseline.toString() ?? "50")
-  }, [profile?.id])
-
-  function save() {
-    onSave(stat.id, profile?.id, {
-      weight: parseFloat(weight) || 0,
-      naturalMin: parseFloat(naturalMin) || 0,
-      naturalMax: parseFloat(naturalMax) || 0,
-      baseline: parseFloat(baseline) || 0,
-    })
-  }
-
   return (
     <tr className="border-t border-border">
       <td className="px-3 py-1.5 text-sm font-medium text-foreground">{stat.name}</td>
-      <td className="px-2 py-1.5"><II value={weight} step="0.01" onChange={e => setWeight(e.target.value)} onBlur={save} /></td>
-      <td className="px-2 py-1.5"><II value={naturalMin} step="0.01" onChange={e => setNaturalMin(e.target.value)} onBlur={save} /></td>
-      <td className="px-2 py-1.5"><II value={naturalMax} step="0.01" onChange={e => setNaturalMax(e.target.value)} onBlur={save} /></td>
-      <td className="px-2 py-1.5"><II value={baseline} step="0.01" onChange={e => setBaseline(e.target.value)} onBlur={save} /></td>
+      <td className="px-2 py-1.5"><II value={values.weight} step="0.01" onChange={e => onChange(stat.id, "weight", e.target.value)} /></td>
+      <td className="px-2 py-1.5"><II value={values.naturalMin} step="0.01" onChange={e => onChange(stat.id, "naturalMin", e.target.value)} /></td>
+      <td className="px-2 py-1.5"><II value={values.naturalMax} step="0.01" onChange={e => onChange(stat.id, "naturalMax", e.target.value)} /></td>
+      <td className="px-2 py-1.5"><II value={values.baseline} step="0.01" onChange={e => onChange(stat.id, "baseline", e.target.value)} /></td>
     </tr>
   )
 }
@@ -357,6 +336,7 @@ function BreedsPage() {
   const [editing, setEditing] = useState<BreedForm | null>(null)
   const [wizardStep, setWizardStep] = useState<WizardStep>(null)
   const [activePanel, setActivePanel] = useState<ActivePanel>("stats")
+  const [statValues, setStatValues] = useState<Record<string, { weight: string; naturalMin: string; naturalMax: string; baseline: string }>>({})
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   const { data: breeds } = trpc.admin.breed.list.useQuery({ gameId: gameId! })
@@ -381,6 +361,23 @@ function BreedsPage() {
 
   const utils = trpc.useUtils()
 
+  useEffect(() => {
+    if (!stats) return
+    setStatValues(prev => {
+      const next: typeof prev = {}
+      for (const stat of stats) {
+        const p = statProfiles?.find(sp => sp.statDefId === stat.id)
+        next[stat.id] = prev[stat.id] ?? {
+          weight: p?.weight.toString() ?? "1",
+          naturalMin: p?.naturalMin.toString() ?? "0",
+          naturalMax: p?.naturalMax.toString() ?? "100",
+          baseline: p?.baseline.toString() ?? "50",
+        }
+      }
+      return next
+    })
+  }, [stats, statProfiles])
+
   const saveBreed = trpc.admin.breed.save.useMutation({
     onSuccess: (saved) => {
       utils.admin.breed.list.invalidate()
@@ -391,7 +388,7 @@ function BreedsPage() {
   const removeBreed = trpc.admin.breed.remove.useMutation({
     onSuccess: () => { utils.admin.breed.list.invalidate(); setEditing(null); setWizardStep(null) },
   })
-  const saveStatProfile = trpc.admin.breed.saveStatProfile.useMutation({
+  const saveAllStatProfiles = trpc.admin.breed.saveAllStatProfiles.useMutation({
     onSuccess: () => utils.admin.breed.listStatProfiles.invalidate(),
   })
   const saveConform = trpc.admin.breed.saveConformationStandard.useMutation({
@@ -420,9 +417,25 @@ function BreedsPage() {
     })
   }
 
-  function handleSaveStatProfile(statDefId: string, id: string | undefined, data: { weight: number; naturalMin: number; naturalMax: number; baseline: number }) {
-    if (!editing?.id) return
-    saveStatProfile.mutate({ id, breedId: editing.id, statDefId, ...data })
+  function handleStatChange(statDefId: string, field: string, value: string) {
+    setStatValues(prev => ({ ...prev, [statDefId]: { ...prev[statDefId]!, [field]: value } }))
+  }
+
+  function handleSaveAllStats() {
+    if (!editing?.id || !stats) return
+    saveAllStatProfiles.mutate({
+      breedId: editing.id,
+      profiles: stats.map(stat => {
+        const v = statValues[stat.id] ?? { weight: "1", naturalMin: "0", naturalMax: "100", baseline: "50" }
+        return {
+          statDefId: stat.id,
+          weight: parseFloat(v.weight) || 0,
+          naturalMin: parseFloat(v.naturalMin) || 0,
+          naturalMax: parseFloat(v.naturalMax) || 0,
+          baseline: parseFloat(v.baseline) || 0,
+        }
+      }),
+    })
   }
 
   function handleSaveConform(id: string | undefined, locusId: string, label: string, weight: number) {
@@ -680,18 +693,25 @@ function BreedsPage() {
                   !stats?.length ? (
                     <p className="px-4 py-4 text-sm text-muted-foreground">No stats configured for this game yet.</p>
                   ) : (
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr><TH>Stat</TH><TH>Weight</TH><TH>Natural Min</TH><TH>Natural Max</TH><TH>Baseline</TH></tr>
-                      </thead>
-                      <tbody>
-                        {stats.map(stat => (
-                          <StatRow key={stat.id} stat={stat}
-                            profile={statProfiles?.find(sp => sp.statDefId === stat.id)}
-                            onSave={handleSaveStatProfile} />
-                        ))}
-                      </tbody>
-                    </table>
+                    <div className="space-y-2">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr><TH>Stat</TH><TH>Weight</TH><TH>Natural Min</TH><TH>Natural Max</TH><TH>Baseline</TH></tr>
+                        </thead>
+                        <tbody>
+                          {stats.map(stat => (
+                            <StatRow key={stat.id} stat={stat}
+                              values={statValues[stat.id] ?? { weight: "1", naturalMin: "0", naturalMax: "100", baseline: "50" }}
+                              onChange={handleStatChange} />
+                          ))}
+                        </tbody>
+                      </table>
+                      <div className="flex justify-end px-2 pb-1">
+                        <Button size="sm" onClick={handleSaveAllStats} disabled={saveAllStatProfiles.isPending}>
+                          {saveAllStatProfiles.isPending ? "Saving…" : "Save Stats"}
+                        </Button>
+                      </div>
+                    </div>
                   )
                 )}
                 {wizardStep === 4 && (
@@ -739,18 +759,25 @@ function BreedsPage() {
               !stats?.length ? (
                 <p className="px-4 py-4 text-sm text-muted-foreground">No stats configured for this game yet.</p>
               ) : (
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr><TH>Stat</TH><TH>Weight</TH><TH>Natural Min</TH><TH>Natural Max</TH><TH>Baseline</TH></tr>
-                  </thead>
-                  <tbody>
-                    {stats.map(stat => (
-                      <StatRow key={stat.id} stat={stat}
-                        profile={statProfiles?.find(sp => sp.statDefId === stat.id)}
-                        onSave={handleSaveStatProfile} />
-                    ))}
-                  </tbody>
-                </table>
+                <div className="space-y-2">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr><TH>Stat</TH><TH>Weight</TH><TH>Natural Min</TH><TH>Natural Max</TH><TH>Baseline</TH></tr>
+                    </thead>
+                    <tbody>
+                      {stats.map(stat => (
+                        <StatRow key={stat.id} stat={stat}
+                          values={statValues[stat.id] ?? { weight: "1", naturalMin: "0", naturalMax: "100", baseline: "50" }}
+                          onChange={handleStatChange} />
+                      ))}
+                    </tbody>
+                  </table>
+                  <div className="flex justify-end px-2 pb-1">
+                    <Button size="sm" onClick={handleSaveAllStats} disabled={saveAllStatProfiles.isPending}>
+                      {saveAllStatProfiles.isPending ? "Saving…" : "Save Stats"}
+                    </Button>
+                  </div>
+                </div>
               )
             )}
 
