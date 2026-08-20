@@ -7,13 +7,13 @@ import { Button } from "@/components/ui/button"
 type TierForm = {
   name: string
   tierIndex: string
-  minScore: string
+  minConditionScore: string
   advancementThreshold: string
   energyCost: string
   entryFee: string
   minWeeklyPoints: string
 }
-const emptyForm = (): TierForm => ({ name: "", tierIndex: "", minScore: "", advancementThreshold: "", energyCost: "0", entryFee: "0", minWeeklyPoints: "" })
+const emptyForm = (): TierForm => ({ name: "", tierIndex: "", minConditionScore: "", advancementThreshold: "", energyCost: "0", entryFee: "0", minWeeklyPoints: "" })
 
 function CompetitionTiersPage() {
   const { gameId } = Route.useParams()
@@ -82,7 +82,7 @@ function CompetitionTiersPage() {
       disciplineDefId: selectedDisciplineId,
       name: editing.name.trim(),
       tierIndex: parseInt(editing.tierIndex),
-      minScore: editing.minScore !== "" ? parseFloat(editing.minScore) : null,
+      minConditionScore: editing.minConditionScore !== "" ? parseFloat(editing.minConditionScore) : null,
       advancementThreshold: editing.advancementThreshold !== "" ? parseFloat(editing.advancementThreshold) : null,
       energyCost: parseFloat(editing.energyCost),
       entryFee: editing.entryFee !== "" ? parseInt(editing.entryFee) : 0,
@@ -122,7 +122,7 @@ function CompetitionTiersPage() {
                   <tr className="border-b border-border">
                     <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Name</th>
                     <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Index</th>
-                    <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Min Score</th>
+                    <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Min Condition Score</th>
                     <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Adv. Threshold</th>
                     <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Energy</th>
                     <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Entry Fee</th>
@@ -135,7 +135,7 @@ function CompetitionTiersPage() {
                     <tr key={t.id} className="border-b border-border last:border-0">
                       <td className="px-3 py-2 font-medium text-foreground">{t.name}</td>
                       <td className="px-3 py-2 text-muted-foreground">{t.tierIndex}</td>
-                      <td className="px-3 py-2 text-muted-foreground">{t.minScore ?? "—"}</td>
+                      <td className="px-3 py-2 text-muted-foreground">{t.minConditionScore ?? "—"}</td>
                       <td className="px-3 py-2 text-muted-foreground">{t.advancementThreshold ?? "—"}</td>
                       <td className="px-3 py-2 text-muted-foreground">{t.energyCost}</td>
                       <td className="px-3 py-2 text-muted-foreground">{t.entryFee}</td>
@@ -150,7 +150,7 @@ function CompetitionTiersPage() {
                           setEditing({
                             name: t.name,
                             tierIndex: t.tierIndex.toString(),
-                            minScore: t.minScore?.toString() ?? "",
+                            minConditionScore: t.minConditionScore?.toString() ?? "",
                             advancementThreshold: t.advancementThreshold?.toString() ?? "",
                             energyCost: t.energyCost.toString(),
                             entryFee: t.entryFee.toString(),
@@ -206,12 +206,12 @@ function CompetitionTiersPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="flex flex-col gap-1">
-                      <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Min Score <span className="font-normal">(optional)</span></label>
+                      <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Min Condition Score <span className="font-normal">(optional)</span></label>
                       <Input
                         type="number"
                         step="0.01"
-                        value={editing.minScore}
-                        onChange={(e) => setEditing({ ...editing, minScore: e.target.value })}
+                        value={editing.minConditionScore}
+                        onChange={(e) => setEditing({ ...editing, minConditionScore: e.target.value })}
                         placeholder="e.g. 50"
                         className="h-8 text-sm"
                       />

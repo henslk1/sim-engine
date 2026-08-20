@@ -46,8 +46,18 @@ export function formatBreedLabel(animal: AnimalProfile): string {
   return animal.breed.name
 }
 
-export function getTrainingCap(innateValue: number, config: AnimalProfile["game"]["gameConfig"]): number {
-  return config ? innateValue * config.trainingCeilingMultiplier : innateValue * 1.5
+export function getTrainingCap(
+  innateValue: number,
+  config: AnimalProfile["game"]["gameConfig"],
+  personality?: AnimalProfile["personality"]
+): number {
+  const baseMultiplier = config?.trainingCeilingMultiplier ?? 1.5
+  const personalityCapMod = personality?.reduce((sum, p) => {
+    const effective = p.value + p.personalityModifier
+    const range = p.traitDef.labelRanges.find(r => effective >= r.minValue && effective <= r.maxValue)
+    return sum + (range?.trainingModifier ?? 0)
+  }, 0) ?? 0
+  return innateValue * (baseMultiplier + personalityCapMod)
 }
 
 export function getFertilityDisplay(fertility: number): { hearts: number; label: string } {
@@ -98,7 +108,9 @@ export function computeBreedingGrade(
 ): string {
   const parts: number[] = []
   parts.push((animal.careScore?.score ?? 0) / 100)
-  const topTier = [...animal.compTiers].sort((a, b) => b.tierDef.tierIndex - a.tierDef.tierIndex)[0]
+  const topTier = [...animal.compTiers]
+    .filter(t => t.disciplineDef.maxLifeStageIndex === null)
+    .sort((a, b) => b.tierDef.tierIndex - a.tierDef.tierIndex)[0]
   if (topTier) {
     const maxTierIndex = topTier.disciplineDef.compTierDefs[0]?.tierIndex ?? topTier.tierDef.tierIndex
     parts.push((topTier.tierDef.tierIndex + 1) / (maxTierIndex + 1))
@@ -129,10 +141,10 @@ export function computeBreedingGrade(
   parts.push(Math.max(0, 1 - animal.healthRecords.filter((r) => r.isActive).length * 0.15))
   const pct = (parts.reduce((a, b) => a + b, 0) / parts.length) * 100
   const hasTopSportTier = animal.compTiers
-    .filter((t) => !t.disciplineDef.isConformation)
+    .filter((t) => !t.disciplineDef.isConformation && t.disciplineDef.maxLifeStageIndex === null)
     .some((t) => t.tierDef.tierIndex >= (t.disciplineDef.compTierDefs[0]?.tierIndex ?? t.tierDef.tierIndex))
   const hasTopConformationTier = animal.compTiers
-    .filter((t) => t.disciplineDef.isConformation)
+    .filter((t) => t.disciplineDef.isConformation && t.disciplineDef.maxLifeStageIndex === null)
     .some((t) => t.tierDef.tierIndex >= (t.disciplineDef.compTierDefs[0]?.tierIndex ?? t.tierDef.tierIndex))
   const isS = pct >= 100 && hasTopSportTier && hasTopConformationTier
   return isS ? "S" : pct >= 85 ? "A" : pct >= 70 ? "B" : pct >= 55 ? "C" : pct >= 40 ? "D" : "F"

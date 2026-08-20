@@ -43,6 +43,28 @@ export const nightlyWorker = new Worker (
       return before.lifeStageId !== a.lifeStageId
     }).length
 
+    // Recalculate GameInnateMax from all alive animals
+    const animalStats = await db.animalStat.findMany({
+      where: { animal: { gameId, status: "ALIVE" } },
+      select: { animalId: true, innateValue: true },
+    })
+
+    if (animalStats.length > 0) {
+      const totalsByAnimal = new Map<string, number>()
+      for (const s of animalStats) {
+        totalsByAnimal.set(s.animalId, (totalsByAnimal.get(s.animalId) ?? 0) + s.innateValue)
+      }
+      const totals = Array.from(totalsByAnimal.values())
+      const maxTotalInnate = Math.max(...totals)
+      const averageTotalInnate = totals.reduce((a, b) => a + b, 0) / totals.length
+
+      await db.gameInnateMax.upsert({
+        where: { gameId },
+        create: { gameId, maxTotalInnate, averageTotalInnate },
+        update: { maxTotalInnate, averageTotalInnate },
+      })
+    }
+
     await db.nightlyUpdateLog.update({
       where: { id: log.id },
       data: {

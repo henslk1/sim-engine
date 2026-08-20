@@ -63,6 +63,14 @@ export async function enterCompetition(
       throw new Error(`This competition is for ${compTierName} tier. Your animal competes at ${tier.tierDef.name} tier.`)
     }
 
+    // condition score gate
+    if (tier.tierDef.minConditionScore !== null && tier.tierDef.minConditionScore !== undefined) {
+      const condition = await tx.animalCondition.findUnique({ where: { animalId } })
+      if (!condition || condition.value < tier.tierDef.minConditionScore) {
+        throw new Error(`Animal condition score is too low to enter this tier (required: ${tier.tierDef.minConditionScore})`)
+      }
+    }
+
     // equipment check
     const equipmentRequirements = competition.disciplineDef.equipmentRequirements
     if (equipmentRequirements.length > 0) {

@@ -32,7 +32,7 @@ const emptyBreed: BreedForm = {
   immunityMin: "", immunityMax: "",
 }
 
-type ActivePanel = "stats" | "loci" | "standards" | "personality"
+type ActivePanel = "stats" | "color" | "conformation" | "health" | "standards" | "personality"
 type WizardStep = 1 | 2 | 3 | 4 | null
 
 const WIZARD_LABELS: Record<2 | 3 | 4, string> = {
@@ -97,37 +97,17 @@ function StatRow({ stat, values, onChange }: {
 
 // ── Personality Row ───────────────────────────────────────────────────────────
 
-type PersonalityProfile = { id: string; traitDefId: string; naturalMin: number; naturalMax: number; baseline: number }
-
-function PersonalityRow({ trait, profile, onSave }: {
+function PersonalityRow({ trait, values, onChange }: {
   trait: { id: string; name: string }
-  profile: PersonalityProfile | undefined
-  onSave: (traitDefId: string, id: string | undefined, data: { naturalMin: number; naturalMax: number; baseline: number }) => void
+  values: { naturalMin: string; naturalMax: string; baseline: string }
+  onChange: (traitDefId: string, field: string, value: string) => void
 }) {
-  const [naturalMin, setNaturalMin] = useState(profile?.naturalMin.toString() ?? "0")
-  const [naturalMax, setNaturalMax] = useState(profile?.naturalMax.toString() ?? "1")
-  const [baseline, setBaseline] = useState(profile?.baseline.toString() ?? "0.5")
-
-  useEffect(() => {
-    setNaturalMin(profile?.naturalMin.toString() ?? "0")
-    setNaturalMax(profile?.naturalMax.toString() ?? "1")
-    setBaseline(profile?.baseline.toString() ?? "0.5")
-  }, [profile?.id])
-
-  function save() {
-    onSave(trait.id, profile?.id, {
-      naturalMin: parseFloat(naturalMin) || 0,
-      naturalMax: parseFloat(naturalMax) || 0,
-      baseline: parseFloat(baseline) || 0,
-    })
-  }
-
   return (
     <tr className="border-t border-border">
       <td className="px-3 py-1.5 text-sm font-medium text-foreground">{trait.name}</td>
-      <td className="px-2 py-1.5"><II value={naturalMin} step="0.01" onChange={e => setNaturalMin(e.target.value)} onBlur={save} /></td>
-      <td className="px-2 py-1.5"><II value={naturalMax} step="0.01" onChange={e => setNaturalMax(e.target.value)} onBlur={save} /></td>
-      <td className="px-2 py-1.5"><II value={baseline} step="0.01" onChange={e => setBaseline(e.target.value)} onBlur={save} /></td>
+      <td className="px-2 py-1.5"><II value={values.naturalMin} step="1" min="0" max="100" onChange={e => onChange(trait.id, "naturalMin", e.target.value)} /></td>
+      <td className="px-2 py-1.5"><II value={values.naturalMax} step="1" min="0" max="100" onChange={e => onChange(trait.id, "naturalMax", e.target.value)} /></td>
+      <td className="px-2 py-1.5"><II value={values.baseline} step="1" min="0" max="100" onChange={e => onChange(trait.id, "baseline", e.target.value)} /></td>
     </tr>
   )
 }
@@ -136,31 +116,22 @@ function PersonalityRow({ trait, profile, onSave }: {
 
 type AlleleFreq = { id: string; alleleId: string; frequency: number; isDq: boolean }
 
-function AlleleFreqRow({ allele, freq, onSave }: {
+function AlleleFreqRow({ allele, values, onFreqChange, onDqChange }: {
   allele: { id: string; symbol: string }
-  freq: AlleleFreq | undefined
-  onSave: (alleleId: string, id: string | undefined, frequency: number, isDq: boolean) => void
+  values: { frequency: string; isDq: boolean }
+  onFreqChange: (alleleId: string, value: string) => void
+  onDqChange: (alleleId: string, isDq: boolean) => void
 }) {
-  const [freqVal, setFreqVal] = useState(freq?.frequency.toString() ?? "0")
-
-  useEffect(() => { setFreqVal(freq?.frequency.toString() ?? "0") }, [freq?.id])
-
-  function saveFreq() {
-    const f = parseFloat(freqVal)
-    if (!isNaN(f)) onSave(allele.id, freq?.id, f, freq?.isDq ?? false)
-  }
-
-  function toggleDq() {
-    const f = parseFloat(freqVal) || 0
-    onSave(allele.id, freq?.id, freq?.frequency ?? f, !(freq?.isDq ?? false))
-  }
-
   return (
     <tr className="border-t border-border">
       <td className="px-3 py-1.5 font-mono text-sm font-medium text-foreground">{allele.symbol}</td>
-      <td className="px-2 py-1.5 w-28"><II value={freqVal} step="0.01" min="0" max="1" onChange={e => setFreqVal(e.target.value)} onBlur={saveFreq} /></td>
+      <td className="px-2 py-1.5 w-28">
+        <II value={values.frequency} step="0.01" min="0" max="1"
+          onChange={e => onFreqChange(allele.id, e.target.value)} />
+      </td>
       <td className="px-3 py-1.5 text-center">
-        <input type="checkbox" checked={freq?.isDq ?? false} onChange={toggleDq} className="cursor-pointer" />
+        <input type="checkbox" checked={values.isDq}
+          onChange={e => onDqChange(allele.id, e.target.checked)} className="cursor-pointer" />
       </td>
     </tr>
   )
@@ -168,13 +139,14 @@ function AlleleFreqRow({ allele, freq, onSave }: {
 
 // ── Locus Allele Group ────────────────────────────────────────────────────────
 
-type LocusAllele = { id: string; symbol: string; locus: { id: string; name: string } }
+type LocusAllele = { id: string; symbol: string; locus: { id: string; name: string; panelEntries: { panelDef: { panelType: string } }[] } }
 
-function LocusAlleleGroup({ locus, locusAlleles, alleleFrequencies, onSave }: {
+function LocusAlleleGroup({ locus, locusAlleles, freqValues, onFreqChange, onDqChange }: {
   locus: { id: string; name: string }
   locusAlleles: LocusAllele[]
-  alleleFrequencies: AlleleFreq[]
-  onSave: (alleleId: string, id: string | undefined, frequency: number, isDq: boolean) => void
+  freqValues: Record<string, { frequency: string; isDq: boolean }>
+  onFreqChange: (alleleId: string, value: string) => void
+  onDqChange: (alleleId: string, isDq: boolean) => void
 }) {
   return (
     <div>
@@ -190,8 +162,9 @@ function LocusAlleleGroup({ locus, locusAlleles, alleleFrequencies, onSave }: {
             <AlleleFreqRow
               key={allele.id}
               allele={allele}
-              freq={alleleFrequencies.find(af => af.alleleId === allele.id)}
-              onSave={onSave}
+              values={freqValues[allele.id] ?? { frequency: "0", isDq: false }}
+              onFreqChange={onFreqChange}
+              onDqChange={onDqChange}
             />
           ))}
         </tbody>
@@ -285,20 +258,30 @@ function LocusStandardsGroup({ locus, conformStandards, onSave, onRemove }: {
 
 // ── Loci & Standards panel content (shared between wizard and tabs) ────────────
 
-function LociContent({ locusAlleleGroups, alleleFrequencies, onSave }: {
-  locusAlleleGroups: { locus: { id: string; name: string }; alleles: LocusAllele[] }[]
-  alleleFrequencies: AlleleFreq[]
-  onSave: (alleleId: string, id: string | undefined, frequency: number, isDq: boolean) => void
+function LociContent({ locusAlleleGroups, freqValues, onFreqChange, onDqChange, onSaveAll, isPending }: {
+  locusAlleleGroups: { locus: { id: string; name: string; panelEntries: { panelDef: { panelType: string } }[] }; alleles: LocusAllele[] }[]
+  freqValues: Record<string, { frequency: string; isDq: boolean }>
+  onFreqChange: (alleleId: string, value: string) => void
+  onDqChange: (alleleId: string, isDq: boolean) => void
+  onSaveAll: () => void
+  isPending: boolean
 }) {
   if (!locusAlleleGroups.length) {
-    return <p className="px-4 py-4 text-sm text-muted-foreground">Configure loci in the Genetics section first.</p>
+    return <p className="px-4 py-4 text-sm text-muted-foreground">No loci assigned to this panel. Assign loci to panels in the Loci &amp; Alleles section.</p>
   }
   return (
-    <div className="grid grid-cols-2 divide-x divide-border">
-      {locusAlleleGroups.map(({ locus, alleles: la }) => (
-        <LocusAlleleGroup key={locus.id} locus={locus} locusAlleles={la}
-          alleleFrequencies={alleleFrequencies} onSave={onSave} />
-      ))}
+    <div>
+      <div className="grid grid-cols-2 divide-x divide-border">
+        {locusAlleleGroups.map(({ locus, alleles: la }) => (
+          <LocusAlleleGroup key={locus.id} locus={locus} locusAlleles={la}
+            freqValues={freqValues} onFreqChange={onFreqChange} onDqChange={onDqChange} />
+        ))}
+      </div>
+      <div className="flex justify-end px-2 py-1 border-t border-border">
+        <Button size="sm" onClick={onSaveAll} disabled={isPending}>
+          {isPending ? "Saving…" : "Save All"}
+        </Button>
+      </div>
     </div>
   )
 }
@@ -337,6 +320,8 @@ function BreedsPage() {
   const [wizardStep, setWizardStep] = useState<WizardStep>(null)
   const [activePanel, setActivePanel] = useState<ActivePanel>("stats")
   const [statValues, setStatValues] = useState<Record<string, { weight: string; naturalMin: string; naturalMax: string; baseline: string }>>({})
+  const [personalityValues, setPersonalityValues] = useState<Record<string, { naturalMin: string; naturalMax: string; baseline: string }>>({})
+  const [freqValues, setFreqValues] = useState<Record<string, { frequency: string; isDq: boolean }>>({})
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   const { data: breeds } = trpc.admin.breed.list.useQuery({ gameId: gameId! })
@@ -378,6 +363,37 @@ function BreedsPage() {
     })
   }, [stats, statProfiles])
 
+  useEffect(() => {
+    if (!personalityTraits) return
+    setPersonalityValues(prev => {
+      const next: typeof prev = {}
+      for (const trait of personalityTraits) {
+        const p = personalityProfiles?.find(pp => pp.traitDefId === trait.id)
+        next[trait.id] = prev[trait.id] ?? {
+          naturalMin: p?.naturalMin.toString() ?? "0",
+          naturalMax: p?.naturalMax.toString() ?? "100",
+          baseline: p?.baseline.toString() ?? "50",
+        }
+      }
+      return next
+    })
+  }, [personalityTraits, personalityProfiles])
+
+  useEffect(() => {
+    if (!alleles) return
+    setFreqValues(prev => {
+      const next: typeof prev = {}
+      for (const allele of alleles) {
+        const f = alleleFrequencies?.find(af => af.alleleId === allele.id)
+        next[allele.id] = prev[allele.id] ?? {
+          frequency: f?.frequency.toString() ?? "0",
+          isDq: f?.isDq ?? false,
+        }
+      }
+      return next
+    })
+  }, [alleles, alleleFrequencies])
+
   const saveBreed = trpc.admin.breed.save.useMutation({
     onSuccess: (saved) => {
       utils.admin.breed.list.invalidate()
@@ -400,7 +416,10 @@ function BreedsPage() {
   const savePersonalityProfile = trpc.admin.breed.savePersonalityProfile.useMutation({
     onSuccess: () => utils.admin.breed.listPersonalityProfiles.invalidate(),
   })
-  const saveAlleleFreq = trpc.admin.breed.saveAlleleFrequency.useMutation({
+  const saveAllPersonalityProfiles = trpc.admin.breed.saveAllPersonalityProfiles.useMutation({
+    onSuccess: () => utils.admin.breed.listPersonalityProfiles.invalidate(),
+  })
+  const saveAllAlleleFreqs = trpc.admin.breed.saveAllAlleleFrequencies.useMutation({
     onSuccess: () => utils.admin.breed.listAlleleFrequencies.invalidate({ breedId: editing?.id }),
   })
 
@@ -448,9 +467,43 @@ function BreedsPage() {
     savePersonalityProfile.mutate({ id, breedId: editing.id, traitDefId, ...data })
   }
 
-  function handleSaveAlleleFreq(alleleId: string, id: string | undefined, frequency: number, isDq: boolean) {
-    if (!editing?.id) return
-    saveAlleleFreq.mutate({ id, breedId: editing.id, alleleId, frequency, isDq })
+  function handlePersonalityChange(traitDefId: string, field: string, value: string) {
+    setPersonalityValues(prev => ({ ...prev, [traitDefId]: { ...prev[traitDefId]!, [field]: value } }))
+  }
+
+  function handleSaveAllPersonality() {
+    if (!editing?.id || !personalityTraits) return
+    saveAllPersonalityProfiles.mutate({
+      breedId: editing.id,
+      profiles: personalityTraits.map(trait => {
+        const v = personalityValues[trait.id] ?? { naturalMin: "0", naturalMax: "100", baseline: "50" }
+        return {
+          traitDefId: trait.id,
+          naturalMin: parseFloat(v.naturalMin) || 0,
+          naturalMax: parseFloat(v.naturalMax) || 0,
+          baseline: parseFloat(v.baseline) || 0,
+        }
+      }),
+    })
+  }
+
+  function handleFreqChange(alleleId: string, value: string) {
+    setFreqValues(prev => ({ ...prev, [alleleId]: { ...prev[alleleId]!, frequency: value } }))
+  }
+
+  function handleDqChange(alleleId: string, isDq: boolean) {
+    setFreqValues(prev => ({ ...prev, [alleleId]: { ...prev[alleleId]!, isDq } }))
+  }
+
+  function handleSaveAllAlleleFreqs() {
+    if (!editing?.id || !alleles) return
+    saveAllAlleleFreqs.mutate({
+      breedId: editing.id,
+      frequencies: alleles.map(a => {
+        const v = freqValues[a.id] ?? { frequency: "0", isDq: false }
+        return { alleleId: a.id, frequency: parseFloat(v.frequency) || 0, isDq: v.isDq }
+      }),
+    })
   }
 
   const locusAlleleGroups = useMemo(() => {
@@ -521,7 +574,9 @@ function BreedsPage() {
 
   const TABS: { key: ActivePanel; label: string }[] = [
     { key: "stats", label: "Stats" },
-    { key: "loci", label: "Loci & Genetics" },
+    { key: "color", label: "Color" },
+    { key: "conformation", label: "Conformation" },
+    { key: "health", label: "Health" },
     { key: "standards", label: "Breed Standards" },
     { key: "personality", label: "Personality" },
   ]
@@ -685,8 +740,11 @@ function BreedsPage() {
                 {wizardStep === 2 && (
                   <LociContent
                     locusAlleleGroups={locusAlleleGroups}
-                    alleleFrequencies={alleleFrequencies ?? []}
-                    onSave={handleSaveAlleleFreq}
+                    freqValues={freqValues}
+                    onFreqChange={handleFreqChange}
+                    onDqChange={handleDqChange}
+                    onSaveAll={handleSaveAllAlleleFreqs}
+                    isPending={saveAllAlleleFreqs.isPending}
                   />
                 )}
                 {wizardStep === 3 && (
@@ -781,11 +839,18 @@ function BreedsPage() {
               )
             )}
 
-            {activePanel === "loci" && (
+            {(activePanel === "color" || activePanel === "conformation" || activePanel === "health") && (
               <LociContent
-                locusAlleleGroups={locusAlleleGroups}
-                alleleFrequencies={alleleFrequencies ?? []}
-                onSave={handleSaveAlleleFreq}
+                locusAlleleGroups={locusAlleleGroups.filter(
+                  (g) => g.locus.panelEntries.some(
+                    (e) => e.panelDef.panelType.toLowerCase() === activePanel
+                  )
+                )}
+                freqValues={freqValues}
+                onFreqChange={handleFreqChange}
+                onDqChange={handleDqChange}
+                onSaveAll={handleSaveAllAlleleFreqs}
+                isPending={saveAllAlleleFreqs.isPending}
               />
             )}
 
@@ -802,18 +867,25 @@ function BreedsPage() {
               !personalityTraits?.length ? (
                 <p className="px-4 py-4 text-sm text-muted-foreground">Configure personality traits in the Animals section first.</p>
               ) : (
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr><TH>Trait</TH><TH>Natural Min</TH><TH>Natural Max</TH><TH>Baseline</TH></tr>
-                  </thead>
-                  <tbody>
-                    {personalityTraits.map(trait => (
-                      <PersonalityRow key={trait.id} trait={trait}
-                        profile={personalityProfiles?.find(pp => pp.traitDefId === trait.id)}
-                        onSave={handleSavePersonalityProfile} />
-                    ))}
-                  </tbody>
-                </table>
+                <div className="space-y-2">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr><TH>Trait</TH><TH>Natural Min</TH><TH>Natural Max</TH><TH>Baseline</TH></tr>
+                    </thead>
+                    <tbody>
+                      {personalityTraits.map(trait => (
+                        <PersonalityRow key={trait.id} trait={trait}
+                          values={personalityValues[trait.id] ?? { naturalMin: "0", naturalMax: "100", baseline: "50" }}
+                          onChange={handlePersonalityChange} />
+                      ))}
+                    </tbody>
+                  </table>
+                  <div className="flex justify-end px-2 pb-1">
+                    <Button size="sm" onClick={handleSaveAllPersonality} disabled={saveAllPersonalityProfiles.isPending}>
+                      {saveAllPersonalityProfiles.isPending ? "Saving…" : "Save All"}
+                    </Button>
+                  </div>
+                </div>
               )
             )}
           </div>

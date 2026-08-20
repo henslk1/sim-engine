@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router"
+import { createFileRoute } from "@tanstack/react-router"
 import { trpc } from "@/lib/trpc"
 import { OwnerView } from "./-animal-profile/views/OwnerView"
 import { BuriedView } from "./-animal-profile/views/BuriedView"
@@ -23,17 +23,15 @@ function ShopPurchaseBanner({
   currencyDef: { id: string; name: string; symbol: string | null }
   playerAccountId: string
 }) {
-  const navigate = useNavigate()
   const utils = trpc.useUtils()
   const [bought, setBought] = useState(false)
 
   const buyAnimal = trpc.inventory.buyAnimal.useMutation({
-    onSuccess: (data) => {
+    onSuccess: () => {
       setBought(true)
       utils.animalProfile.get.invalidate()
       utils.animal.list.invalidate()
       utils.player.balances.invalidate({ playerAccountId })
-      setTimeout(() => navigate({ to: "/shop" }), 1200)
     },
   })
 
@@ -42,7 +40,7 @@ function ShopPurchaseBanner({
   if (bought) {
     return (
       <div className="shrink-0 flex items-center justify-center gap-2 border-b border-chart-2/30 bg-chart-2/10 px-4 py-2.5 text-sm font-medium text-chart-2">
-        Purchased — returning to shop…
+        Purchased — added to your stable
       </div>
     )
   }

@@ -7,7 +7,7 @@ type VitalChange = { label: string; value: number }
 
 type LogEntry =
   | { key: string; cycleNumber: number; createdAt: Date; type: "care"; label: string; vitals: VitalChange[] }
-  | { key: string; cycleNumber: number; createdAt: Date; type: "training"; label: string; subLabel: string; statGained: number; statName: string; vitals: VitalChange[] }
+  | { key: string; cycleNumber: number; createdAt: Date; type: "training"; label: string; subLabel: string; statGained: number; reachedCap: boolean; statName: string; vitals: VitalChange[] }
   | { key: string; cycleNumber: number; createdAt: Date; type: "vet"; label: string; notes: string | null; vitals: VitalChange[] }
   | { key: string; cycleNumber: number; createdAt: Date; type: "activity"; label: string; vitals: VitalChange[] }
   | { key: string; cycleNumber: number; createdAt: Date; type: "breeding"; label: string; subLabel?: string; vitals: VitalChange[] }
@@ -87,6 +87,7 @@ export function DailyLogPanel({ animal }: { animal: AnimalProfile }) {
         label: l.trainingActionDef.name,
         subLabel: l.intensityTierDef.name,
         statGained: l.statGained,
+        reachedCap: l.reachedCap,
         statName: l.trainingActionDef.statDef.name,
         vitals: l.energyUsed > 0 ? [{ label: "energy", value: -l.energyUsed }] : [],
       })),
@@ -182,7 +183,10 @@ export function DailyLogPanel({ animal }: { animal: AnimalProfile }) {
           {entries.map((e) => {
             const details: { text: string; color: string }[] = []
             if (e.type === "training") {
-              details.push({ text: `+${e.statGained.toFixed(1)} ${e.statName}`, color: "text-chart-2" })
+              details.push(e.reachedCap
+                ? { text: `${e.statName} training complete`, color: "text-chart-2" }
+                : { text: `+${e.statGained.toFixed(1)} ${e.statName}`, color: "text-chart-2" }
+              )
             }
             e.vitals.forEach((v) =>
               details.push({

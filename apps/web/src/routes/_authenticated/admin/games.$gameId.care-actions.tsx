@@ -29,8 +29,8 @@ const emptyCareAction = (): CareActionForm => ({
 type ItemRow = { itemDefId: string; quantity: string }
 const emptyItem = (): ItemRow => ({ itemDefId: "", quantity: "1" })
 
-type LongTermRow = { name: string; intervalCycles: string; gracePeriodCycles: string }
-const emptyLongTerm = (): LongTermRow => ({ name: "", intervalCycles: "", gracePeriodCycles: "0" })
+type LongTermRow = { name: string; intervalCycles: string; gracePeriodCycles: string; currencyAmount: string }
+const emptyLongTerm = (): LongTermRow => ({ name: "", intervalCycles: "", gracePeriodCycles: "0", currencyAmount: "" })
 
 function CareActionsPage() {
   const { gameId } = Route.useParams()
@@ -155,6 +155,7 @@ function CareActionsPage() {
       name: editingLongTerm.name.trim(),
       intervalCycles: parseInt(editingLongTerm.intervalCycles),
       gracePeriodCycles: parseInt(editingLongTerm.gracePeriodCycles) || 0,
+      currencyAmount: editingLongTerm.currencyAmount ? parseInt(editingLongTerm.currencyAmount) : null,
     })
   }
 
@@ -412,6 +413,7 @@ function CareActionsPage() {
                 <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Name</th>
                 <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Interval (cycles)</th>
                 <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Grace Period (cycles)</th>
+                <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Price</th>
                 <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
               </tr>
             </thead>
@@ -421,10 +423,11 @@ function CareActionsPage() {
                   <td className="px-3 py-2 font-medium text-foreground">{lt.name}</td>
                   <td className="px-3 py-2 text-muted-foreground">{lt.intervalCycles}</td>
                   <td className="px-3 py-2 text-muted-foreground">{lt.gracePeriodCycles}</td>
+                  <td className="px-3 py-2 text-muted-foreground">{lt.currencyAmount ?? "—"}</td>
                   <td className="px-3 py-2 text-right space-x-2">
                     <Button size="sm" variant="ghost" onClick={() => {
                       setEditingLongTermId(lt.id)
-                      setEditingLongTerm({ name: lt.name, intervalCycles: lt.intervalCycles.toString(), gracePeriodCycles: lt.gracePeriodCycles.toString() })
+                      setEditingLongTerm({ name: lt.name, intervalCycles: lt.intervalCycles.toString(), gracePeriodCycles: lt.gracePeriodCycles.toString(), currencyAmount: lt.currencyAmount?.toString() ?? "" })
                     }}>Edit</Button>
                     <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
                       onClick={() => {
@@ -436,7 +439,7 @@ function CareActionsPage() {
               ))}
               {longTermDefs?.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-3 py-6 text-center text-sm text-muted-foreground">No long-term care actions yet.</td>
+                  <td colSpan={5} className="px-3 py-6 text-center text-sm text-muted-foreground">No long-term care actions yet.</td>
                 </tr>
               )}
             </tbody>
@@ -477,6 +480,17 @@ function CareActionsPage() {
                 min="0"
                 value={editingLongTerm.gracePeriodCycles}
                 onChange={(e) => setEditingLongTerm({ ...editingLongTerm, gracePeriodCycles: e.target.value })}
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Price (base currency, optional)</label>
+              <Input
+                className="h-8 text-sm"
+                type="number"
+                min="0"
+                placeholder="Free"
+                value={editingLongTerm.currencyAmount}
+                onChange={(e) => setEditingLongTerm({ ...editingLongTerm, currencyAmount: e.target.value })}
               />
             </div>
             <div className="flex gap-2 pt-1">

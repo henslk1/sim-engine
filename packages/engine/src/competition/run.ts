@@ -2,6 +2,16 @@ import { db } from "@sim-engine/db";
 
 type Client = typeof db
 
+function computePersonalityMultiplier(value: number, idealMin: number, idealMax: number): number {
+  if (value >= idealMin && value <= idealMax) return 1.0
+  if (value < idealMin) {
+    if (idealMin === 0) return 1.0
+    return (value / idealMin) * 2 - 1
+  }
+  if (idealMax === 100) return 1.0
+  return 1 - 2 * (value - idealMax) / (100 - idealMax)
+}
+
 export async function runCompetition(
   client: Client,
   input: {
@@ -54,6 +64,70 @@ export async function runCompetition(
       data: { status: "IN_PROGRESS" },
     })
 
+    // pre-fetch world max trained value per stat for normalization
+    const statWorldMaxes = new Map<string, number>()
+    if (!competition.disciplineDef.isConformation) {
+      await Promise.all(competition.disciplineDef.statWeights.map(async (weight) => {
+        const recordDef = await tx.recordDef.findFirst({
+          where: { statDefId: weight.statDefId, gameId: competition.gameId },
+          select: { id: true },
+        })
+        let worldMax: number | null = null
+        if (recordDef) {
+          const best = await tx.recordEntry.findFirst({
+            where: { recordDefId: recordDef.id },
+            orderBy: { value: "desc" },
+            select: { value: true },
+          })
+          worldMax = best?.value ?? null
+        }
+        if (!worldMax) {
+          const agg = await tx.animalStat.aggregate({
+            _max: { trainedValue: true },
+            where: { statDefId: weight.statDefId },
+          })
+          worldMax = agg._max.trainedValue ?? 1
+        }
+        statWorldMaxes.set(weight.statDefId, Math.max(worldMax, 1))
+      }))
+    }
+
+    // pre-fetch climate/terrain modifiers per animal
+    const animalEnvMods = new Map<string, number>()
+    {
+      const expressionRulesWithMods = await tx.expressionRule.findMany({
+        where: {
+          OR: [
+            { climateModifiers: { some: { climate: competition.venue.climate } } },
+            { terrainModifiers: { some: { terrain: competition.venue.terrain } } },
+          ],
+        },
+        select: {
+          locusId: true,
+          alleleOneId: true,
+          alleleTwoId: true,
+          climateModifiers: { where: { climate: competition.venue.climate }, select: { modifier: true } },
+          terrainModifiers: { where: { terrain: competition.venue.terrain }, select: { modifier: true } },
+        },
+      })
+      const exprModMap = new Map<string, number>()
+      for (const rule of expressionRulesWithMods) {
+        const key = `${rule.locusId}:${rule.alleleOneId}:${rule.alleleTwoId}`
+        const climMod = rule.climateModifiers[0]?.modifier ?? 0
+        const terrMod = rule.terrainModifiers[0]?.modifier ?? 0
+        exprModMap.set(key, climMod + terrMod)
+      }
+      const animalIds = competition.entries.map((e) => e.animalId)
+      const genotypes = await tx.animalGenotype.findMany({
+        where: { animalId: { in: animalIds } },
+        select: { animalId: true, locusId: true, alleleOneId: true, alleleTwoId: true },
+      })
+      for (const g of genotypes) {
+        const mod = exprModMap.get(`${g.locusId}:${g.alleleOneId}:${g.alleleTwoId}`)
+        if (mod) animalEnvMods.set(g.animalId, (animalEnvMods.get(g.animalId) ?? 0) + mod)
+      }
+    }
+
     // score all entries
     const scored = competition.entries.map((entry) => {
       let score = 0
@@ -62,16 +136,32 @@ export async function runCompetition(
         const conformationScore = entry.animal.conformationScores.find(
           s => s.breedId === entry.animal.breedId
         )
-        score = conformationScore?.score ?? 0
-      } else {
-        for (const weight of competition.disciplineDef.statWeights) {
-          const stat = entry.entryStats.find(s => s.statDefId === weight.statDefId)
-          score += weight.weight * (stat?.trainedValue ?? 0)
-        }
+        const baseScore = conformationScore?.score ?? 0
+        let personalityMultiplier = 1.0
         for (const weight of competition.disciplineDef.personalityWeights) {
           const trait = entry.animal.personality.find(p => p.traitDefId === weight.traitDefId)
-          score += weight.weight * (trait?.value ?? 0)
+          const effectiveValue = trait ? Math.min(100, Math.max(0, trait.value + trait.personalityModifier)) : 50
+          const mult = computePersonalityMultiplier(effectiveValue, weight.idealMin, weight.idealMax)
+          personalityMultiplier += (weight.bonusPercent / 100) * mult
         }
+        const envMod = animalEnvMods.get(entry.animalId) ?? 0
+        score = Math.max(0, baseScore * personalityMultiplier * (1 + envMod / 100))
+      } else {
+        let statScore = 0
+        for (const weight of competition.disciplineDef.statWeights) {
+          const stat = entry.entryStats.find(s => s.statDefId === weight.statDefId)
+          const worldMax = statWorldMaxes.get(weight.statDefId) ?? 1
+          statScore += weight.weight * ((stat?.trainedValue ?? 0) / worldMax)
+        }
+        let personalityMultiplier = 1.0
+        for (const weight of competition.disciplineDef.personalityWeights) {
+          const trait = entry.animal.personality.find(p => p.traitDefId === weight.traitDefId)
+          const effectiveValue = trait ? Math.min(100, Math.max(0, trait.value + trait.personalityModifier)) : 50
+          const mult = computePersonalityMultiplier(effectiveValue, weight.idealMin, weight.idealMax)
+          personalityMultiplier += (weight.bonusPercent / 100) * mult
+        }
+        const envMod = animalEnvMods.get(entry.animalId) ?? 0
+        score = Math.max(0, statScore * 100 * personalityMultiplier * (1 + envMod / 100))
       }
 
       const variance = (Math.random() - 0.5) * score * 0.2

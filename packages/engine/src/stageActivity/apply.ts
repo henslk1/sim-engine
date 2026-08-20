@@ -32,6 +32,11 @@ export async function applyStageActivity(
       throw new Error("This activity is not available at the animal's current life stage")
     }
 
+    const alreadyActedThisCycle = await tx.stageActivityLog.findFirst({
+      where: { animalId, cycleNumber },
+    })
+    if (alreadyActedThisCycle) throw new Error("Stage activity already performed this cycle")
+
     const energy = await tx.animalEnergy.findUnique({ where: { animalId } })
     if (!energy) throw new Error(`No energy record for animal ${animalId}`)
     if (energy.currentEnergy < activity.energyCost) throw new Error("Not enough energy")

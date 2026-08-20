@@ -1,9 +1,8 @@
 import type { AnimalProfile } from "../types"
 import { Panel } from "@/components/game/ui"
 import { Ruler } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { trpc } from "@/lib/trpc"
 import { cn } from "@/lib/utils"
+import { formatCycleAge } from "../utils"
 
 function letterGrade(score: number) {
   if (score >= 90) return "A"
@@ -26,14 +25,10 @@ function fmtEnumList(values: string[]): string {
 }
 
 export function ConformationPanel({ animal }: { animal: AnimalProfile }) {
-  const utils = trpc.useUtils()
-  const inspect = trpc.animal.conformationInspect.useMutation({
-    onSuccess: () => utils.animalProfile.get.invalidate({ animalId: animal.id }),
-  })
-
   const isCross = animal.breedComposition.length > 1
   const overallScore = animal.conformationScores[0]
   const minCycle = animal.game.gameConfig?.conformationInspectionMinCycle ?? 0
+  const firstCompetingStage = animal.game.lifeStageDefs?.[0]
   const awaitingAge = !isCross && !overallScore && animal.ageInCycles < minCycle
   const eligibleForInspection = !isCross && !overallScore && animal.ageInCycles >= minCycle
 
@@ -64,20 +59,16 @@ export function ConformationPanel({ animal }: { animal: AnimalProfile }) {
         {isCross ? (
           <p className="text-[11px] text-muted-foreground">Conformation scoring applies to purebreds only</p>
         ) : awaitingAge ? (
-          <p className="text-[11px] text-muted-foreground">Eligible for inspection at cycle {minCycle}</p>
+          <p className="text-[11px] text-muted-foreground">
+            {firstCompetingStage
+              ? `Eligible for inspection at the ${firstCompetingStage.name} stage`
+              : `Eligible for inspection from ${formatCycleAge(minCycle, animal.game.gameConfig)}`
+            }
+          </p>
         ) : eligibleForInspection ? (
-          <div className="flex flex-col gap-2">
-            <p className="text-[11px] text-muted-foreground">This animal has not yet been inspected.</p>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => inspect.mutate({ animalId: animal.id })}
-              disabled={inspect.isPending}
-            >
-              {inspect.isPending ? "Inspecting…" : "Request Inspection"}
-            </Button>
-            {inspect.error && <p className="text-xs text-destructive">{inspect.error.message}</p>}
-          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Visit a venue to enter the inspection show and reveal this animal's conformation score.
+          </p>
         ) : !overallScore ? (
           <p className="text-[11px] text-muted-foreground">No section scores recorded</p>
         ) : sectionScores.length === 0 ? (
@@ -96,20 +87,22 @@ export function ConformationPanel({ animal }: { animal: AnimalProfile }) {
           </div>
         )}
 
-        <div className="grid grid-cols-3 gap-2 border-t border-border/50 pt-3">
-          <div className="rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2">
-            <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Injury Risk</p>
-            <p className={cn("text-sm font-semibold", risk.className)}>{risk.label}</p>
+        {overallScore && (
+          <div className="grid grid-cols-3 gap-2 border-t border-border/50 pt-3">
+            <div className="rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2">
+              <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Structural Risk</p>
+              <p className={cn("text-sm font-semibold", risk.className)}>{risk.label}</p>
+            </div>
+            <div className="rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2">
+              <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Terrain</p>
+              <p className="text-sm font-semibold text-foreground">{fmtEnumList(animal.preferredTerrain)}</p>
+            </div>
+            <div className="rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2">
+              <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Climate</p>
+              <p className="text-sm font-semibold text-foreground">{fmtEnumList(animal.preferredClimate)}</p>
+            </div>
           </div>
-          <div className="rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2">
-            <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Terrain</p>
-            <p className="text-sm font-semibold text-foreground">{fmtEnumList(animal.preferredTerrain)}</p>
-          </div>
-          <div className="rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2">
-            <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Climate</p>
-            <p className="text-sm font-semibold text-foreground">{fmtEnumList(animal.preferredClimate)}</p>
-          </div>
-        </div>
+        )}
       </div>
     </Panel>
   )

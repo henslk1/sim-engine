@@ -119,14 +119,14 @@ export function OwnerView({ animal, animalId, playerAccountId }: { animal: Anima
 
           {/* Col 1 — Breeding / Health */}
           <div className="flex min-h-0 flex-col gap-3 min-[1400px]:grid min-[1400px]:grid-rows-[auto_minmax(0,1fr)]">
-            <BreedingPanel animal={animal} breedingGrade={breedingGrade} />
+            {animal.lifeStage.canBreed && <BreedingPanel animal={animal} breedingGrade={breedingGrade} />}
             <HealthPanel animal={animal} playerAccountId={playerAccountId} />
           </div>
 
           {/* Col 2 — Training / Competition */}
           <div className="flex min-h-0 flex-col gap-3 min-[1400px]:grid min-[1400px]:grid-rows-[auto_minmax(0,1fr)]">
-            <TrainingPanel animal={animal} config={config} />
-            <CompetitionPanel animal={animal} />
+            {(animal.lifeStage.canTrain || animal.lifeStage.hasUniqueActionSet) && <TrainingPanel animal={animal} config={config} />}
+            {animal.lifeStage.canCompete && <CompetitionPanel animal={animal} />}
           </div>
 
           {/* Col 3 — Animal image + WorkspaceTabs */}
@@ -144,7 +144,7 @@ export function OwnerView({ animal, animalId, playerAccountId }: { animal: Anima
 
           {/* Col 4+5 — Care / Owner Actions / Equipped / Conformation / DailyLog / Personality / Notes */}
           <div className="flex min-h-0 flex-col gap-3 min-[1400px]:col-span-2 min-[1400px]:grid min-[1400px]:grid-flow-row-dense min-[1400px]:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] min-[1400px]:grid-rows-[auto_auto_auto_minmax(0,1fr)]">
-            <DailyCarePanel animal={animal} playerAccountId={playerAccountId} />
+            {animal.lifeStage.canReceiveCare && <DailyCarePanel animal={animal} playerAccountId={playerAccountId} />}
 
             {/* Owner Actions */}
             <div className="flex min-h-0 shrink-0 flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm">

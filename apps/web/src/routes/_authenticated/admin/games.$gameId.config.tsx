@@ -261,8 +261,8 @@ function GameConfigPage() {
                 <F label="Care Floor"><Input type="number" step="0.1" {...n("careScoreFloor", true)} /></F>
                 <F label="Care Ceiling"><Input type="number" step="0.1" {...n("careScoreCeiling", true)} /></F>
                 <div />
-                <F label="Energy Low Threshold"><Input type="number" step="0.01" {...n("energyLowCareThreshold", true)} /></F>
-                <F label="Energy Low Penalty"><Input type="number" step="0.01" {...n("energyLowCarePenalty", true)} /></F>
+                <F label="Care Score Neglect Threshold"><Input type="number" step="0.01" {...n("energyLowCareThreshold", true)} /></F>
+                <F label="Neglect Energy Drain"><Input type="number" step="0.01" {...n("energyLowCarePenalty", true)} /></F>
                 <F label="Overwork Threshold"><Input type="number" step="0.01" {...n("overworkInjuryThreshold", true)} /></F>
                 <F label="Overwork Injury Chance (0–1)"><Input type="number" step="0.01" min="0" max="1" {...n("overworkInjuryChance", true)} /></F>
               </div>

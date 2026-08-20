@@ -168,7 +168,7 @@ export function generateOffspring(input: GenerateOffspringInput): GenerateOffspr
   const sirePersonalityMap = new Map(sire.personality.map((p) => [p.traitDefId, p.value]))
   const offspringPersonality = dam.personality.map((dp) => {
     const sireValue = sirePersonalityMap.get(dp.traitDefId) ?? dp.value
-    const raw = (sireValue + dp.value) / 2 + (Math.random() * 2 - 1) * 5
+    const raw = (sireValue + dp.value) / 2 + (Math.random() * 2 - 1) * 3
     return { traitDefId: dp.traitDefId, value: Math.max(0, Math.min(100, raw)) }
   })
 
@@ -180,29 +180,30 @@ export function generateOffspring(input: GenerateOffspringInput): GenerateOffspr
       (sire.quality >= 100 ? gameConfig.topGradeDoubleBonusChance : 0) +
       (dam.quality >= 100 ? gameConfig.topGradeDoubleBonusChance : 0)
 
+    const FALLBACK_HEADROOM = 0.035
     let totalInnate: number
     if (isFirstGenCross) {
       const crossBase = gameConfig.defaultInnateRatio * gameInnateMax.averageTotalInnate
-      const headroom = Math.max(0, (gameInnateMax.maxTotalInnate - crossBase) / gameInnateMax.maxTotalInnate)
-      let gain = Math.max(
+      const headroom = Math.max(FALLBACK_HEADROOM, (gameInnateMax.maxTotalInnate - crossBase) / gameInnateMax.maxTotalInnate)
+      const gain = Math.max(
         gameConfig.breedingMinGain,
         gameConfig.breedingBaseGain * Math.sqrt(headroom) * pairQuality,
       )
-      if (sGradeBonusChance > 0 && Math.random() < sGradeBonusChance) gain *= 2
       const variance = gain * (Math.random() * 2 - 1) * gameConfig.breedingVarianceFactor
-      totalInnate = Math.max(crossBase, crossBase + gain + variance)
+      const bonus = sGradeBonusChance > 0 && Math.random() < sGradeBonusChance ? gameConfig.breedingMinGain : 0
+      totalInnate = Math.max(crossBase, crossBase + gain + variance + bonus)
     } else {
       const headroom = Math.max(
-        0,
+        FALLBACK_HEADROOM,
         (gameInnateMax.maxTotalInnate - parentAvgTotal) / gameInnateMax.maxTotalInnate,
       )
-      let gain = Math.max(
+      const gain = Math.max(
         gameConfig.breedingMinGain,
         gameConfig.breedingBaseGain * Math.sqrt(headroom) * pairQuality,
       )
-      if (sGradeBonusChance > 0 && Math.random() < sGradeBonusChance) gain *= 2
       const variance = gain * (Math.random() * 2 - 1) * gameConfig.breedingVarianceFactor
-      totalInnate = Math.max(parentAvgTotal, parentAvgTotal + gain + variance)
+      const bonus = sGradeBonusChance > 0 && Math.random() < sGradeBonusChance ? gameConfig.breedingMinGain : 0
+      totalInnate = Math.max(parentAvgTotal, parentAvgTotal + gain + variance + bonus)
     }
 
     // Distribute via parent-average ratios, then apply gestation care modifier

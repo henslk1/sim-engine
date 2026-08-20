@@ -41,6 +41,8 @@ model DisciplineDef {
   name                   String
   description            String?
   isConformation         Boolean                          @default(false)
+  minLifeStageIndex      Int?
+  maxLifeStageIndex      Int?
   statWeights            DisciplineStatWeight[]
   personalityWeights     DisciplinePersonalityWeight[]
   compTierDefs           CompetitionTierDef[]
@@ -91,7 +93,7 @@ model CompetitionTierDef {
   disciplineDefId                String
   name                           String
   tierIndex                      Int
-  minScore                       Float?
+  minConditionScore              Float?
   advancementThreshold           Float?
   energyCost                     Float                   @default(0)
   entryFee                       Int
@@ -358,7 +360,9 @@ model DisciplinePersonalityWeight {
   id              String              @id @default(cuid())
   disciplineDefId String
   traitDefId      String
-  weight          Float
+  idealMin        Float
+  idealMax        Float
+  bonusPercent    Float
   disciplineDef   DisciplineDef       @relation(fields: [disciplineDefId], references: [id])
   traitDef        PersonalityTraitDef @relation(fields: [traitDefId], references: [id])
 

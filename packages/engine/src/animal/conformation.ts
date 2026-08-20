@@ -9,8 +9,8 @@ export async function runConformationInspection(client: Client, animalId: string
       select: {
         gameId: true,
         breedId: true,
-        ageInCycles: true,
         status: true,
+        lifeStage: { select: { canCompete: true, name: true } },
         breedComposition: { select: { breedId: true } },
         conformationScores: { select: { id: true }, take: 1 },
         genotypes: { select: { locusId: true, alleleOneId: true, alleleTwoId: true } },
@@ -20,15 +20,7 @@ export async function runConformationInspection(client: Client, animalId: string
     if (animal.status !== "ALIVE") throw new Error("Animal must be alive")
     if (animal.breedComposition.length !== 1) throw new Error("Conformation inspection is only available for purebred animals")
     if (animal.conformationScores.length > 0) throw new Error("Animal has already been inspected")
-
-    const gameConfig = await tx.gameConfig.findUniqueOrThrow({
-      where: { gameId: animal.gameId },
-      select: { conformationInspectionMinCycle: true },
-    })
-
-    if (animal.ageInCycles < gameConfig.conformationInspectionMinCycle) {
-      throw new Error(`Animal must be at least cycle ${gameConfig.conformationInspectionMinCycle} to be inspected`)
-    }
+    if (!animal.lifeStage.canCompete) throw new Error(`Inspection is not available at the ${animal.lifeStage.name} stage`)
 
     const breedId = animal.breedId
     if (!breedId) throw new Error("Purebred animal has no breed assigned")

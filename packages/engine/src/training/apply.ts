@@ -88,8 +88,12 @@ export async function applyTrainingAction(
     const cap = currentStat.innateValue * (config.trainingCeilingMultiplier + personalityCapMod)
     if (currentStat.trainedValue >= cap) throw new Error("Stat is already at training cap")
 
-    const rawGain = action.baseGain * tier.gainMultiplier
-    const statGained = Math.min(rawGain, cap - currentStat.trainedValue)
+    const remaining = cap - currentStat.trainedValue
+    const rawGain = (action.baseGain / 100) * remaining * tier.gainMultiplier
+    const gained = Math.min(rawGain, remaining)
+    const newTrainedValue = currentStat.trainedValue + gained
+    const reachedCap = newTrainedValue >= cap * 0.95
+    const statGained = reachedCap ? remaining : gained
 
     await tx.animalEnergy.update({
       where: { animalId },
@@ -110,6 +114,27 @@ export async function applyTrainingAction(
       where: { animalId_statDefId: { animalId, statDefId: action.statDefId } },
       data: { trainedValue: { increment: statGained } },
     })
+
+    const statRecordDef = await tx.recordDef.findFirst({
+      where: { statDefId: action.statDefId, gameId: action.gameId },
+      select: { id: true },
+    })
+    if (statRecordDef) {
+      const existingEntry = await tx.recordEntry.findFirst({
+        where: { recordDefId: statRecordDef.id, animalId },
+        select: { id: true, value: true },
+      })
+      if (!existingEntry) {
+        await tx.recordEntry.create({
+          data: { recordDefId: statRecordDef.id, animalId, value: stat.trainedValue },
+        })
+      } else if (stat.trainedValue > existingEntry.value) {
+        await tx.recordEntry.update({
+          where: { id: existingEntry.id },
+          data: { value: stat.trainedValue, setAt: new Date() },
+        })
+      }
+    }
 
     await tx.animalStatHistory.upsert({
       where: {
@@ -132,6 +157,7 @@ export async function applyTrainingAction(
         statGained,
         energyUsed,
         performedByPlayerId,
+        reachedCap,
       },
     })
 

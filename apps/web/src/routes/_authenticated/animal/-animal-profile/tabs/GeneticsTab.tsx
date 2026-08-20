@@ -320,7 +320,7 @@ function InnateStats({ animal, config }: { animal: AnimalProfile; config: Animal
       <p className="mb-2 text-[11px] text-muted-foreground">Sets the training cap for each stat.</p>
       <div className="grid grid-cols-3 gap-2">
         {animal.stats.map((s: AnimalProfile["stats"][number]) => {
-          const cap = getTrainingCap(s.innateValue, config)
+          const cap = getTrainingCap(s.innateValue, config, animal.personality)
           return (
             <div
               key={s.statDef.name}

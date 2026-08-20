@@ -155,6 +155,25 @@ export const breedAdminRouter = router({
     .input(z.object({ id: z.string() }))
     .mutation(({ input }) => db.breedPersonalityProfile.delete({ where: { id: input.id } })),
 
+  saveAllPersonalityProfiles: publicProcedure
+    .input(z.object({
+      breedId: z.string(),
+      profiles: z.array(z.object({
+        traitDefId: z.string(),
+        naturalMin: z.number(),
+        naturalMax: z.number(),
+        baseline: z.number(),
+      }))
+    }))
+    .mutation(({ input }) =>
+      db.$transaction(async tx => {
+        await tx.breedPersonalityProfile.deleteMany({ where: { breedId: input.breedId } })
+        await tx.breedPersonalityProfile.createMany({
+          data: input.profiles.map(p => ({ breedId: input.breedId, ...p }))
+        })
+      })
+    ),
+
   listLoci: publicProcedure
     .input(z.object({ gameId: z.string() }))
     .query(({ input }) =>
@@ -171,7 +190,17 @@ export const breedAdminRouter = router({
       db.allele.findMany({
         where: { locus: { gameId: input.gameId } },
         orderBy: [{ locus: { name: "asc" } }, { symbol: "asc" }],
-        select: { id: true, symbol: true, locus: { select: { id: true, name: true } } },
+        select: {
+          id: true,
+          symbol: true,
+          locus: {
+            select: {
+              id: true,
+              name: true,
+              panelEntries: { select: { panelDef: { select: { panelType: true } } } },
+            },
+          },
+        },
       })
     ),
 
@@ -206,4 +235,22 @@ export const breedAdminRouter = router({
   removeAlleleFrequency: publicProcedure
     .input(z.object({ id: z.string() }))
     .mutation(({ input }) => db.breedAlleleFrequency.delete({ where: { id: input.id } })),
+
+  saveAllAlleleFrequencies: publicProcedure
+    .input(z.object({
+      breedId: z.string(),
+      frequencies: z.array(z.object({
+        alleleId: z.string(),
+        frequency: z.number().min(0).max(1),
+        isDq: z.boolean(),
+      }))
+    }))
+    .mutation(({ input }) =>
+      db.$transaction(async tx => {
+        await tx.breedAlleleFrequency.deleteMany({ where: { breedId: input.breedId } })
+        await tx.breedAlleleFrequency.createMany({
+          data: input.frequencies.map(f => ({ breedId: input.breedId, ...f }))
+        })
+      })
+    ),
 })

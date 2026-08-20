@@ -29,7 +29,7 @@ export async function restockShop(gameId: string, shopBreedConfigId?: string): P
       },
     }),
     db.lifeStageDef.findFirst({
-      where: { gameId, canCompete: true },
+      where: { gameId, canTrain: true },
       orderBy: { stageIndex: "asc" },
       select: { id: true, minCycle: true },
     }),

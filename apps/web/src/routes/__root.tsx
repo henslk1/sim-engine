@@ -18,6 +18,15 @@ export const Route = createRootRouteWithContext<RouterContext>()({
       const { data: session } = await authClient.getSession()
       return { session }
     } catch {
+      // In dev the server may be restarting — wait briefly and retry once
+      // before concluding there is no session and redirecting to login.
+      if (import.meta.env.DEV) {
+        await new Promise<void>((r) => setTimeout(r, 1500))
+        try {
+          const { data: session } = await authClient.getSession()
+          return { session }
+        } catch {}
+      }
       return { session: null }
     }
   },

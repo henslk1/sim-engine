@@ -4,8 +4,8 @@ import { useState, useEffect, Fragment } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 
-type DisciplineForm = { id?: string; name: string; description: string; isConformation: boolean }
-const emptyDiscipline = (): DisciplineForm => ({ name: "", description: "", isConformation: false })
+type DisciplineForm = { id?: string; name: string; description: string; isConformation: boolean; minLifeStageIndex: string; maxLifeStageIndex: string }
+const emptyDiscipline = (): DisciplineForm => ({ name: "", description: "", isConformation: false, minLifeStageIndex: "", maxLifeStageIndex: "" })
 
 // ─── StatWeightRow ────────────────────────────────────────────────────────────
 
@@ -67,10 +67,10 @@ function StatWeightRow({
 // ─── TiersTab ────────────────────────────────────────────────────────────────
 
 type TierForm = {
-  name: string; tierIndex: string; minScore: string; advancementThreshold: string
+  name: string; tierIndex: string; minConditionScore: string; advancementThreshold: string
   energyCost: string; entryFee: string; minWeeklyPoints: string
 }
-const emptyTier = (): TierForm => ({ name: "", tierIndex: "", minScore: "", advancementThreshold: "", energyCost: "", entryFee: "", minWeeklyPoints: "" })
+const emptyTier = (): TierForm => ({ name: "", tierIndex: "", minConditionScore: "", advancementThreshold: "", energyCost: "", entryFee: "", minWeeklyPoints: "" })
 
 type PrizeForm = { currencyDefId: string; amount: string; placement: string }
 const emptyPrize = (): PrizeForm => ({ currencyDefId: "", amount: "", placement: "" })
@@ -124,7 +124,7 @@ function TiersTab({ disciplineId, gameId }: { disciplineId: string; gameId: stri
       disciplineDefId: disciplineId,
       name: editingTier.name.trim(),
       tierIndex: parseInt(editingTier.tierIndex) || 0,
-      minScore: editingTier.minScore ? parseFloat(editingTier.minScore) : null,
+      minConditionScore: editingTier.minConditionScore ? parseFloat(editingTier.minConditionScore) : null,
       advancementThreshold: editingTier.advancementThreshold ? parseFloat(editingTier.advancementThreshold) : null,
       energyCost: editingTier.energyCost ? parseInt(editingTier.energyCost) : null,
       entryFee: editingTier.entryFee ? parseFloat(editingTier.entryFee) : null,
@@ -162,8 +162,8 @@ function TiersTab({ disciplineId, gameId }: { disciplineId: string; gameId: stri
               <Input className="h-8 text-sm" type="number" min="0" value={editingTier.tierIndex} onChange={(e) => setEditingTier({ ...editingTier, tierIndex: e.target.value })} />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Min Score</label>
-              <Input className="h-8 text-sm" type="number" step="0.1" value={editingTier.minScore} onChange={(e) => setEditingTier({ ...editingTier, minScore: e.target.value })} placeholder="optional" />
+              <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Min Condition Score</label>
+              <Input className="h-8 text-sm" type="number" step="0.1" value={editingTier.minConditionScore} onChange={(e) => setEditingTier({ ...editingTier, minConditionScore: e.target.value })} placeholder="optional" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2">
@@ -207,7 +207,7 @@ function TiersTab({ disciplineId, gameId }: { disciplineId: string; gameId: stri
             <tr className="border-b border-border">
               <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">#</th>
               <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Name</th>
-              <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Min Score</th>
+              <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Min Cond. Score</th>
               <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Adv.</th>
               <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Energy</th>
               <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Fee</th>
@@ -221,7 +221,7 @@ function TiersTab({ disciplineId, gameId }: { disciplineId: string; gameId: stri
                 <tr className={`border-b border-border ${expandedTierId === t.id ? "bg-muted/30" : ""}`}>
                   <td className="px-3 py-2 text-muted-foreground">{t.tierIndex}</td>
                   <td className="px-3 py-2 font-medium text-foreground">{t.name}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{t.minScore ?? "—"}</td>
+                  <td className="px-3 py-2 text-muted-foreground">{t.minConditionScore ?? "—"}</td>
                   <td className="px-3 py-2 text-muted-foreground">{t.advancementThreshold ?? "—"}</td>
                   <td className="px-3 py-2 text-muted-foreground">{t.energyCost ?? "—"}</td>
                   <td className="px-3 py-2 text-muted-foreground">{t.entryFee ?? "—"}</td>
@@ -237,7 +237,7 @@ function TiersTab({ disciplineId, gameId }: { disciplineId: string; gameId: stri
                   <td className="px-3 py-2 text-right space-x-1">
                     <Button size="sm" variant="ghost" onClick={() => {
                       setEditingTierId(t.id)
-                      setEditingTier({ name: t.name, tierIndex: t.tierIndex.toString(), minScore: t.minScore?.toString() ?? "", advancementThreshold: t.advancementThreshold?.toString() ?? "", energyCost: t.energyCost?.toString() ?? "", entryFee: t.entryFee?.toString() ?? "", minWeeklyPoints: t.minWeeklyPoints?.toString() ?? "" })
+                      setEditingTier({ name: t.name, tierIndex: t.tierIndex.toString(), minConditionScore: t.minConditionScore?.toString() ?? "", advancementThreshold: t.advancementThreshold?.toString() ?? "", energyCost: t.energyCost?.toString() ?? "", entryFee: t.entryFee?.toString() ?? "", minWeeklyPoints: t.minWeeklyPoints?.toString() ?? "" })
                     }}>Edit</Button>
                     <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
                       onClick={() => { if (!confirm("Delete this tier?")) return; removeTier.mutate({ id: t.id }) }}>
@@ -374,9 +374,9 @@ function DisciplinesPage() {
     onSuccess: () => {
       utils.admin.discipline.listPersonalityWeights.invalidate({ disciplineDefId: editing?.id })
       utils.admin.discipline.list.invalidate()
-      setNewPersonalityWeight({ traitDefId: "", weight: "" })
+      setNewPersonalityWeight({ traitDefId: "", idealMin: "", idealMax: "", bonusPercent: "" })
       setEditingPersonalityWeightId(null)
-      setEditingPersonalityWeight({ weight: "" })
+      setEditingPersonalityWeight({ idealMin: "", idealMax: "", bonusPercent: "" })
     },
   })
   const removePersonalityWeight = trpc.admin.discipline.removePersonalityWeight.useMutation({
@@ -396,31 +396,44 @@ function DisciplinesPage() {
   })
 
   const [editingPersonalityWeightId, setEditingPersonalityWeightId] = useState<string | null>(null)
-  const [editingPersonalityWeight, setEditingPersonalityWeight] = useState({ weight: "" })
-  const [newPersonalityWeight, setNewPersonalityWeight] = useState({ traitDefId: "", weight: "" })
+  const [editingPersonalityWeight, setEditingPersonalityWeight] = useState({ idealMin: "", idealMax: "", bonusPercent: "" })
+  const [newPersonalityWeight, setNewPersonalityWeight] = useState({ traitDefId: "", idealMin: "", idealMax: "", bonusPercent: "" })
   const [newEquipReq, setNewEquipReq] = useState({ itemDefId: "", quantity: "1" })
 
   const usedTraitIds = new Set(personalityWeights?.map((w) => w.traitDefId) ?? [])
   const availableTraits = traits?.filter((t) => !usedTraitIds.has(t.id)) ?? []
 
   function openEdit(d: NonNullable<typeof disciplines>[number]) {
-    setEditing({ id: d.id, name: d.name, description: d.description ?? "", isConformation: d.isConformation })
+    setEditing({ id: d.id, name: d.name, description: d.description ?? "", isConformation: d.isConformation, minLifeStageIndex: d.minLifeStageIndex?.toString() ?? "", maxLifeStageIndex: d.maxLifeStageIndex?.toString() ?? "" })
     setActiveTab("stats")
-    setEditingPersonalityWeightId(null); setEditingPersonalityWeight({ weight: "" })
-    setNewPersonalityWeight({ traitDefId: "", weight: "" })
+    setEditingPersonalityWeightId(null); setEditingPersonalityWeight({ idealMin: "", idealMax: "", bonusPercent: "" })
+    setNewPersonalityWeight({ traitDefId: "", idealMin: "", idealMax: "", bonusPercent: "" })
     setNewEquipReq({ itemDefId: "", quantity: "1" })
   }
 
   function submitDiscipline() {
     if (!editing || !gameId || !editing.name.trim()) return
-    saveDiscipline.mutate({ ...editing, gameId, description: editing.description || null })
+    saveDiscipline.mutate({
+      ...editing,
+      gameId,
+      description: editing.description || null,
+      minLifeStageIndex: editing.minLifeStageIndex !== "" ? parseInt(editing.minLifeStageIndex) : null,
+      maxLifeStageIndex: editing.maxLifeStageIndex !== "" ? parseInt(editing.maxLifeStageIndex) : null,
+    })
   }
 
   function submitEditPersonalityWeight(id: string) {
-    if (!editing?.id || !editingPersonalityWeight.weight) return
+    if (!editing?.id || !editingPersonalityWeight.idealMin || !editingPersonalityWeight.idealMax || !editingPersonalityWeight.bonusPercent) return
     const existing = personalityWeights?.find((w) => w.id === id)
     if (!existing) return
-    savePersonalityWeight.mutate({ id, disciplineDefId: editing.id, traitDefId: existing.traitDefId, weight: parseFloat(editingPersonalityWeight.weight) })
+    savePersonalityWeight.mutate({
+      id,
+      disciplineDefId: editing.id,
+      traitDefId: existing.traitDefId,
+      idealMin: parseFloat(editingPersonalityWeight.idealMin),
+      idealMax: parseFloat(editingPersonalityWeight.idealMax),
+      bonusPercent: parseFloat(editingPersonalityWeight.bonusPercent),
+    })
   }
 
   if (editing !== null) {
@@ -454,6 +467,16 @@ function DisciplinesPage() {
                   <input type="checkbox" checked={editing.isConformation} onChange={(e) => setEditing({ ...editing, isConformation: e.target.checked })} className="h-4 w-4 rounded border border-input accent-primary" />
                   Conformation discipline
                 </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Min Life Stage Index <span className="font-normal">(optional)</span></label>
+                    <Input value={editing.minLifeStageIndex} onChange={(e) => setEditing({ ...editing, minLifeStageIndex: e.target.value })} type="number" min="0" step="1" className="h-8 text-sm" placeholder="—" />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Max Life Stage Index <span className="font-normal">(optional)</span></label>
+                    <Input value={editing.maxLifeStageIndex} onChange={(e) => setEditing({ ...editing, maxLifeStageIndex: e.target.value })} type="number" min="0" step="1" className="h-8 text-sm" placeholder="—" />
+                  </div>
+                </div>
                 <div className="flex flex-col gap-2 pt-1">
                   <Button onClick={submitDiscipline} disabled={saveDiscipline.isPending || !editing.name.trim()}>Save</Button>
                   {saveDiscipline.error && <p className="text-sm text-destructive">{saveDiscipline.error.message}</p>}
@@ -488,32 +511,43 @@ function DisciplinesPage() {
                 </div>
 
                 {/* Stats tab — pre-populated rows for every stat */}
-                {activeTab === "stats" && (
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Stat</th>
-                        <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Weight</th>
-                        <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground w-16"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {stats?.map((s) => (
-                        <StatWeightRow
-                          key={s.id}
-                          stat={s}
-                          existing={statWeights?.find((w) => w.statDefId === s.id)}
-                          disciplineId={editing.id!}
-                        />
-                      ))}
-                      {!stats?.length && (
-                        <tr>
-                          <td colSpan={3} className="px-3 py-6 text-center text-sm text-muted-foreground">No stats defined. Add stats in the Stats section first.</td>
-                        </tr>
+                {activeTab === "stats" && (() => {
+                  const weightTotal = statWeights?.reduce((sum, w) => sum + w.weight, 0) ?? 0
+                  const weightSumOff = (statWeights?.length ?? 0) > 0 && Math.abs(weightTotal - 1) > 0.01
+                  return (
+                    <>
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-border">
+                            <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Stat</th>
+                            <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Weight</th>
+                            <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground w-16"></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {stats?.map((s) => (
+                            <StatWeightRow
+                              key={s.id}
+                              stat={s}
+                              existing={statWeights?.find((w) => w.statDefId === s.id)}
+                              disciplineId={editing.id!}
+                            />
+                          ))}
+                          {!stats?.length && (
+                            <tr>
+                              <td colSpan={3} className="px-3 py-6 text-center text-sm text-muted-foreground">No stats defined. Add stats in the Stats section first.</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                      {weightSumOff && (
+                        <p className="px-3 py-2 text-sm text-amber-600 dark:text-amber-400 border-t border-border">
+                          Weights sum to {weightTotal.toFixed(2)} — they should sum to 1.00 for scores to stay within 0–100.
+                        </p>
                       )}
-                    </tbody>
-                  </table>
-                )}
+                    </>
+                  )
+                })()}
 
                 {/* Personality tab */}
                 {activeTab === "personality" && (
@@ -522,7 +556,9 @@ function DisciplinesPage() {
                       <thead>
                         <tr className="border-b border-border">
                           <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Trait</th>
-                          <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Weight</th>
+                          <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Ideal Min</th>
+                          <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Ideal Max</th>
+                          <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Bonus %</th>
                           <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
                         </tr>
                       </thead>
@@ -532,19 +568,27 @@ function DisciplinesPage() {
                             <tr key={w.id} className="border-b border-border last:border-0">
                               <td className="px-3 py-2 text-foreground">{w.traitDef.name}</td>
                               <td className="px-3 py-2">
-                                <Input type="number" step="0.01" value={editingPersonalityWeight.weight} onChange={(e) => setEditingPersonalityWeight({ weight: e.target.value })} className="h-7 text-sm max-w-28" />
+                                <Input type="number" step="1" min="0" max="100" value={editingPersonalityWeight.idealMin} onChange={(e) => setEditingPersonalityWeight({ ...editingPersonalityWeight, idealMin: e.target.value })} className="h-7 text-sm w-20" />
+                              </td>
+                              <td className="px-3 py-2">
+                                <Input type="number" step="1" min="0" max="100" value={editingPersonalityWeight.idealMax} onChange={(e) => setEditingPersonalityWeight({ ...editingPersonalityWeight, idealMax: e.target.value })} className="h-7 text-sm w-20" />
+                              </td>
+                              <td className="px-3 py-2">
+                                <Input type="number" step="0.1" value={editingPersonalityWeight.bonusPercent} onChange={(e) => setEditingPersonalityWeight({ ...editingPersonalityWeight, bonusPercent: e.target.value })} className="h-7 text-sm w-20" />
                               </td>
                               <td className="px-3 py-2 text-right space-x-2">
                                 <Button size="sm" onClick={() => submitEditPersonalityWeight(w.id)} disabled={savePersonalityWeight.isPending}>Save</Button>
-                                <Button size="sm" variant="ghost" onClick={() => { setEditingPersonalityWeightId(null); setEditingPersonalityWeight({ weight: "" }) }}>Cancel</Button>
+                                <Button size="sm" variant="ghost" onClick={() => { setEditingPersonalityWeightId(null); setEditingPersonalityWeight({ idealMin: "", idealMax: "", bonusPercent: "" }) }}>Cancel</Button>
                               </td>
                             </tr>
                           ) : (
                             <tr key={w.id} className="border-b border-border last:border-0">
                               <td className="px-3 py-2 font-medium text-foreground">{w.traitDef.name}</td>
-                              <td className="px-3 py-2 text-muted-foreground">{w.weight}</td>
+                              <td className="px-3 py-2 text-muted-foreground">{w.idealMin}</td>
+                              <td className="px-3 py-2 text-muted-foreground">{w.idealMax}</td>
+                              <td className="px-3 py-2 text-muted-foreground">{w.bonusPercent}%</td>
                               <td className="px-3 py-2 text-right space-x-2">
-                                <Button size="sm" variant="ghost" onClick={() => { setEditingPersonalityWeightId(w.id); setEditingPersonalityWeight({ weight: w.weight.toString() }) }}>Edit</Button>
+                                <Button size="sm" variant="ghost" onClick={() => { setEditingPersonalityWeightId(w.id); setEditingPersonalityWeight({ idealMin: w.idealMin.toString(), idealMax: w.idealMax.toString(), bonusPercent: w.bonusPercent.toString() }) }}>Edit</Button>
                                 <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => removePersonalityWeight.mutate({ id: w.id })}>Remove</Button>
                               </td>
                             </tr>
@@ -558,13 +602,25 @@ function DisciplinesPage() {
                             </select>
                           </td>
                           <td className="px-3 py-2">
-                            <Input type="number" step="0.01" value={newPersonalityWeight.weight} onChange={(e) => setNewPersonalityWeight({ ...newPersonalityWeight, weight: e.target.value })} placeholder="e.g. 0.3" className="h-7 text-sm max-w-28" />
+                            <Input type="number" step="1" min="0" max="100" value={newPersonalityWeight.idealMin} onChange={(e) => setNewPersonalityWeight({ ...newPersonalityWeight, idealMin: e.target.value })} placeholder="0" className="h-7 text-sm w-20" />
+                          </td>
+                          <td className="px-3 py-2">
+                            <Input type="number" step="1" min="0" max="100" value={newPersonalityWeight.idealMax} onChange={(e) => setNewPersonalityWeight({ ...newPersonalityWeight, idealMax: e.target.value })} placeholder="100" className="h-7 text-sm w-20" />
+                          </td>
+                          <td className="px-3 py-2">
+                            <Input type="number" step="0.1" value={newPersonalityWeight.bonusPercent} onChange={(e) => setNewPersonalityWeight({ ...newPersonalityWeight, bonusPercent: e.target.value })} placeholder="e.g. 5" className="h-7 text-sm w-20" />
                           </td>
                           <td className="px-3 py-2 text-right">
                             <Button size="sm" onClick={() => {
-                              if (!newPersonalityWeight.traitDefId || !newPersonalityWeight.weight || !editing?.id) return
-                              savePersonalityWeight.mutate({ disciplineDefId: editing.id, traitDefId: newPersonalityWeight.traitDefId, weight: parseFloat(newPersonalityWeight.weight) })
-                            }} disabled={savePersonalityWeight.isPending || !newPersonalityWeight.traitDefId || !newPersonalityWeight.weight}>
+                              if (!newPersonalityWeight.traitDefId || !newPersonalityWeight.idealMin || !newPersonalityWeight.idealMax || !newPersonalityWeight.bonusPercent || !editing?.id) return
+                              savePersonalityWeight.mutate({
+                                disciplineDefId: editing.id,
+                                traitDefId: newPersonalityWeight.traitDefId,
+                                idealMin: parseFloat(newPersonalityWeight.idealMin),
+                                idealMax: parseFloat(newPersonalityWeight.idealMax),
+                                bonusPercent: parseFloat(newPersonalityWeight.bonusPercent),
+                              })
+                            }} disabled={savePersonalityWeight.isPending || !newPersonalityWeight.traitDefId || !newPersonalityWeight.idealMin || !newPersonalityWeight.idealMax || !newPersonalityWeight.bonusPercent}>
                               Add
                             </Button>
                           </td>
@@ -649,6 +705,7 @@ function DisciplinesPage() {
                 <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Name</th>
                 <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Type</th>
                 <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Description</th>
+                <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Stage Range</th>
                 <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Stat Wts</th>
                 <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Trait Wts</th>
                 <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
@@ -660,6 +717,11 @@ function DisciplinesPage() {
                   <td className="px-3 py-2 font-medium text-foreground">{d.name}</td>
                   <td className="px-3 py-2 text-muted-foreground">{d.isConformation ? "Conformation" : "Sport"}</td>
                   <td className="px-3 py-2 text-muted-foreground">{d.description ?? "—"}</td>
+                  <td className="px-3 py-2 text-center text-muted-foreground">
+                    {d.minLifeStageIndex !== null || d.maxLifeStageIndex !== null
+                      ? `${d.minLifeStageIndex ?? "—"} – ${d.maxLifeStageIndex ?? "—"}`
+                      : "All"}
+                  </td>
                   <td className="px-3 py-2 text-center text-muted-foreground">{d._count.statWeights}</td>
                   <td className="px-3 py-2 text-center text-muted-foreground">{d._count.personalityWeights}</td>
                   <td className="px-3 py-2 text-right">
@@ -669,7 +731,7 @@ function DisciplinesPage() {
               ))}
               {disciplines?.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-3 py-6 text-center text-sm text-muted-foreground">No disciplines yet.</td>
+                  <td colSpan={7} className="px-3 py-6 text-center text-sm text-muted-foreground">No disciplines yet.</td>
                 </tr>
               )}
             </tbody>

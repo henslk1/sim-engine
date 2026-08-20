@@ -58,8 +58,9 @@ export const animalProfileRouter = router({
 
           // personality
           personality: {
+            orderBy: { traitDef: { name: "asc" } },
             include: {
-              traitDef: { include: { labelRanges: { select: { label: true, minValue: true, maxValue: true } } } },
+              traitDef: { include: { labelRanges: { select: { label: true, minValue: true, maxValue: true, trainingModifier: true } } } },
             },
           },
 
@@ -144,7 +145,13 @@ export const animalProfileRouter = router({
           trainingLogs: {
             orderBy: { cycleNumber: "desc" },
             take: 10,
-            include: {
+            select: {
+              id: true,
+              cycleNumber: true,
+              statGained: true,
+              energyUsed: true,
+              reachedCap: true,
+              createdAt: true,
               trainingActionDef: { include: { statDef: true } },
               intensityTierDef: true,
             },
@@ -158,6 +165,8 @@ export const animalProfileRouter = router({
                   id: true,
                   name: true,
                   isConformation: true,
+                  minLifeStageIndex: true,
+                  maxLifeStageIndex: true,
                   equipmentRequirements: {
                     select: {
                       id: true,
@@ -341,6 +350,12 @@ export const animalProfileRouter = router({
                   maxBreedingSlots: true,
                   conformationInspectionMinCycle: true,
                 },
+              },
+              lifeStageDefs: {
+                where: { canCompete: true },
+                orderBy: { stageIndex: "asc" },
+                take: 1,
+                select: { name: true, minCycle: true },
               },
               careActionDefs: {
                 select: {

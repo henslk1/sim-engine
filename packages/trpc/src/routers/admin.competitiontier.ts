@@ -18,18 +18,18 @@ export const competitionTierAdminRouter = router({
       disciplineDefId: z.string(),
       name: z.string().min(1),
       tierIndex: z.number().int(),
-      minScore: z.number().nullish(),
+      minConditionScore: z.number().nullish(),
       advancementThreshold: z.number().nullish(),
       energyCost: z.number().default(0),
       entryFee: z.number().int().min(0).default(0),
       minWeeklyPointsForInvitational: z.number().nullish(),
     }))
     .mutation(({ input }) => {
-      const { id, gameId, disciplineDefId, minScore, advancementThreshold, energyCost, entryFee, minWeeklyPointsForInvitational, ...rest } = input
+      const { id, gameId, disciplineDefId, minConditionScore, advancementThreshold, energyCost, entryFee, minWeeklyPointsForInvitational, ...rest } = input
       const data = {
         ...rest,
         disciplineDefId,
-        minScore: minScore ?? null,
+        minConditionScore: minConditionScore ?? null,
         advancementThreshold: advancementThreshold ?? null,
         energyCost,
         entryFee,

@@ -27,10 +27,17 @@ export const disciplineAdminRouter = router({
       name: z.string().min(1),
       description: z.string().nullish(),
       isConformation: z.boolean().default(false),
+      minLifeStageIndex: z.number().int().nullish(),
+      maxLifeStageIndex: z.number().int().nullish(),
     }))
     .mutation(({ input }) => {
-      const { id, gameId, description, ...rest } = input
-      const data = { ...rest, description: description ?? null }
+      const { id, gameId, description, minLifeStageIndex, maxLifeStageIndex, ...rest } = input
+      const data = {
+        ...rest,
+        description: description ?? null,
+        minLifeStageIndex: minLifeStageIndex ?? null,
+        maxLifeStageIndex: maxLifeStageIndex ?? null,
+      }
       if (id) return db.disciplineDef.update({ where: { id }, data })
       return db.disciplineDef.create({ data: { gameId, ...data } })
     }),
@@ -89,7 +96,9 @@ export const disciplineAdminRouter = router({
       id: z.string().optional(),
       disciplineDefId: z.string(),
       traitDefId: z.string(),
-      weight: z.number(),
+      idealMin: z.number().min(0).max(100),
+      idealMax: z.number().min(0).max(100),
+      bonusPercent: z.number(),
     }))
     .mutation(({ input }) => {
       const { id, disciplineDefId, ...data } = input

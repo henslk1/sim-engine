@@ -2,7 +2,7 @@ import { useState } from "react"
 import type { AnimalProfile } from "../types"
 import { Panel, Badge, Meter, ActionButton } from "@/components/game/ui"
 import { Dumbbell, Ban, Loader2, Zap, HeartHandshake } from "lucide-react"
-import { getTrainingCap, getActiveRestrictions } from "../utils"
+import { getTrainingCap } from "../utils"
 import { cn } from "@/lib/utils"
 import { trpc } from "@/lib/trpc"
 
@@ -48,22 +48,33 @@ export function TrainingPanel({
     },
   })
 
-  const restrictions = getActiveRestrictions(animal)
-  const isRestricted = restrictions.has("TRAINING") || restrictions.has("ALL")
+  // isRestricted = blanket block only (null maxIntensityTier). Tier-capped restrictions use maxAllowedTierIndex instead.
+  const isRestricted = animal.healthRecords.some(record =>
+    record.isActive && record.treatmentRecords.some(t =>
+      t.isActive && t.activityRestriction.some(r =>
+        r.isActive &&
+        (r.restrictionType === "TRAINING" || r.restrictionType === "ALL") &&
+        r.maxIntensityTier == null
+      )
+    )
+  )
 
+  // Take the most restrictive (lowest) maxIntensityTier across all active tier-capped restrictions.
   const maxAllowedTierIndex = (() => {
+    let min: number | null = null
     for (const record of animal.healthRecords) {
       if (!record.isActive) continue
       for (const t of record.treatmentRecords) {
         if (!t.isActive) continue
-        for (const rd of t.treatmentDef.restrictionDefs) {
-          if ((rd.restrictionType === "TRAINING" || rd.restrictionType === "ALL") && rd.maxIntensityTier != null) {
-            return rd.maxIntensityTier
+        for (const r of t.activityRestriction) {
+          if (!r.isActive) continue
+          if ((r.restrictionType === "TRAINING" || r.restrictionType === "ALL") && r.maxIntensityTier != null) {
+            min = min === null ? r.maxIntensityTier : Math.min(min, r.maxIntensityTier)
           }
         }
       }
     }
-    return null
+    return min
   })()
 
   const moodBlocksAll = tiers.length > 0 && tiers.every(
@@ -76,6 +87,7 @@ export function TrainingPanel({
   const canTrainStage = animal.lifeStage.canTrain
   const hasUniqueActionSet = animal.lifeStage.hasUniqueActionSet
   const activities = animal.lifeStage.stageActivityDefs
+  const performedThisCycle = animal.stageActivityLogs.some((l) => l.cycleNumber === animal.ageInCycles)
 
   return (
     <Panel
@@ -91,19 +103,25 @@ export function TrainingPanel({
             </p>
           )}
 
+          {hasUniqueActionSet && performedThisCycle && (
+            <p className="mb-1.5 text-[11px] text-muted-foreground">Bonding activity done for today.</p>
+          )}
+
           {hasUniqueActionSet && animal.personality.map((trait: Personality) => {
             const traitActivities = activities.filter((a: StageActivity) => a.traitDef.id === trait.traitDef.id)
             const effectiveValue = trait.value + trait.personalityModifier
-            const innateLabel = labelForValue(trait.value, trait.traitDef.labelRanges)
-            const currentLabel = labelForValue(effectiveValue, trait.traitDef.labelRanges)
+            const innateLabel = labelForValue(Math.round(trait.value), trait.traitDef.labelRanges)
+            const currentLabel = labelForValue(Math.round(effectiveValue), trait.traitDef.labelRanges)
             const hasShifted = innateLabel !== currentLabel
             return (
               <div key={trait.traitDef.id} className="rounded-md border border-border/70 bg-secondary/30 px-2 py-1.5">
                 <div className="mb-0.5 flex items-center justify-between">
                   <span className="text-xs font-semibold text-foreground">{trait.traitDef.name}</span>
                   <span className="text-[11px] text-muted-foreground">
-                    {trait.traitLabel && (
-                      <span className="mr-1.5 font-medium text-foreground">{trait.traitLabel}</span>
+                    {(trait.traitLabel ?? labelForValue(Math.round(effectiveValue), trait.traitDef.labelRanges)) && (
+                      <span className="mr-1.5 font-medium text-foreground">
+                        {trait.traitLabel ?? labelForValue(Math.round(effectiveValue), trait.traitDef.labelRanges)}
+                      </span>
                     )}
                     <span className="tabular-nums">{Math.round(effectiveValue)}</span>
                   </span>
@@ -115,7 +133,7 @@ export function TrainingPanel({
                     {[...traitActivities].sort((a, b) => a.traitEffect - b.traitEffect).map((activity: StageActivity) => {
                       const isPending = pendingActivityId === activity.id
                       const hasEnergy = (animal.energy?.currentEnergy ?? 0) >= activity.energyCost
-                      const canPerform = !hasShifted && hasEnergy && !isPending
+                      const canPerform = !hasShifted && hasEnergy && !isPending && !performedThisCycle
                       return (
                         <div key={activity.id} className={cn("rounded border border-border/50 bg-background/50 px-2 py-1.5", hasShifted && "opacity-50")}>
                           <div className="mb-0.5 flex items-center justify-between gap-1">
@@ -169,7 +187,7 @@ export function TrainingPanel({
           )}
           <div className="space-y-1.5">
             {animal.stats.map((stat: Stat) => {
-              const cap = getTrainingCap(stat.innateValue, config)
+              const cap = getTrainingCap(stat.innateValue, config, animal.personality)
               const trainingDef = animal.game.trainingActionDefs.find((d) => d.statDefId === stat.statDef.id)
               const tierId = selectedTier[stat.statDef.id] ?? tiers[0]?.id
               const tier = tiers.find((t) => t.id === tierId)

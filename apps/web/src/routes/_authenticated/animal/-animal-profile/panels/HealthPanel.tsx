@@ -228,7 +228,7 @@ export function HealthPanel({
                                 <p className="text-[11px] text-destructive">
                                   Missing: {missing.map((m) => m.itemDef.name).join(", ")}
                                 </p>
-                                <Link to="/vet" search={{ animalId: animal.id }}>
+                                <Link to="/vet" search={{ animalId: animal.id, service: "otc" }}>
                                   <ActionButton variant="soft" className="w-full justify-center">
                                     <FlaskConical className="size-3.5" /> Buy at Vet
                                   </ActionButton>

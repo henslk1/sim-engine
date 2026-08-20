@@ -39,6 +39,7 @@ model TrainingLog {
   cycleNumber         Int
   statGained          Float
   energyUsed          Float
+  reachedCap          Boolean           @default(false)
   performedByPlayerId String?
   createdAt           DateTime          @default(now())
   performedBy         PlayerAccount?    @relation(fields: [performedByPlayerId], references: [id])

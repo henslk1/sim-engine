@@ -86,6 +86,7 @@ export const careAdminRouter = router({
       name: z.string().min(1),
       intervalCycles: z.number().int().min(1),
       gracePeriodCycles: z.number().int().min(0),
+      currencyAmount: z.number().int().min(0).nullable().optional(),
     }))
     .mutation(({ input }) => {
       const { id, gameId, ...data } = input

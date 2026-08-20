@@ -72,7 +72,7 @@ const emptyRestriction = (): RestrictionRow => ({ restrictionType: "TRAINING", m
 type EditRuleForm = { alleleOneId: string; alleleTwoId: string; phenotype: string; penetrance: string; environmentalRiskModifier: string }
 
 type CreateRuleForm = { locusId: string; alleleOneId: string; alleleTwoId: string; phenotype: string; penetrance: string; environmentalRiskModifier: string }
-const emptyCreateRule = (): CreateRuleForm => ({ locusId: "", alleleOneId: "", alleleTwoId: "", phenotype: "", penetrance: "1", environmentalRiskModifier: "0" })
+const emptyCreateRule = (): CreateRuleForm => ({ locusId: "", alleleOneId: "", alleleTwoId: "", phenotype: "", penetrance: "", environmentalRiskModifier: "0" })
 
 type CreateItemForm = { name: string; itemType: ItemType; category: ItemCategory }
 const emptyCreateItem = (): CreateItemForm => ({ name: "", itemType: "OTC_MEDICATION", category: "HEALTH" })
@@ -251,8 +251,8 @@ function HealthConditionsPage() {
         addConditionLink.mutate({
           expressionRuleId: saved.id,
           healthConditionDefId: editing.id,
-          penetrance: editing.isGenetic && createRuleForm.penetrance ? parseFloat(createRuleForm.penetrance) : null,
-          environmentalRiskModifier: !editing.isGenetic && createRuleForm.environmentalRiskModifier ? parseFloat(createRuleForm.environmentalRiskModifier) : 0,
+          penetrance: (editing.isGenetic || editing.conditionType === "ILLNESS") && createRuleForm.penetrance ? parseFloat(createRuleForm.penetrance) : null,
+          environmentalRiskModifier: !editing.isGenetic && editing.conditionType === "INJURY" && createRuleForm.environmentalRiskModifier ? parseFloat(createRuleForm.environmentalRiskModifier) : 0,
         })
       }
       utils.admin.expression.listByCondition.invalidate({ conditionDefId: editing?.id })
@@ -980,10 +980,10 @@ function HealthConditionsPage() {
                           <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Phenotype</label>
                           <Input className="h-8 text-sm" value={editingRuleForm.phenotype} onChange={(e) => setEditingRuleForm({ ...editingRuleForm, phenotype: e.target.value })} />
                         </div>
-                        {editing.isGenetic ? (
+                        {editing.isGenetic || editing.conditionType === "ILLNESS" ? (
                           <div className="flex flex-col gap-1">
-                            <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Penetrance</label>
-                            <Input className="h-8 text-sm" type="number" min="0" max="1" step="0.01" value={editingRuleForm.penetrance} onChange={(e) => setEditingRuleForm({ ...editingRuleForm, penetrance: e.target.value })} />
+                            <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Penetrance {!editing.isGenetic && <span className="font-normal normal-case">(selection weight bonus)</span>}</label>
+                            <Input className="h-8 text-sm" type="number" min="0" step="0.01" value={editingRuleForm.penetrance} onChange={(e) => setEditingRuleForm({ ...editingRuleForm, penetrance: e.target.value })} />
                           </div>
                         ) : (
                           <div className="flex flex-col gap-1">
@@ -1033,10 +1033,10 @@ function HealthConditionsPage() {
                           <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Phenotype</label>
                           <Input className="h-8 text-sm" value={createRuleForm.phenotype} onChange={(e) => setCreateRuleForm({ ...createRuleForm, phenotype: e.target.value })} placeholder="e.g. dominant_white_lethal" />
                         </div>
-                        {editing.isGenetic ? (
+                        {editing.isGenetic || editing.conditionType === "ILLNESS" ? (
                           <div className="flex flex-col gap-1">
-                            <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Penetrance</label>
-                            <Input className="h-8 text-sm" type="number" min="0" max="1" step="0.01" value={createRuleForm.penetrance} onChange={(e) => setCreateRuleForm({ ...createRuleForm, penetrance: e.target.value })} />
+                            <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Penetrance {!editing.isGenetic && <span className="font-normal normal-case">(selection weight bonus)</span>}</label>
+                            <Input className="h-8 text-sm" type="number" min="0" step="0.01" value={createRuleForm.penetrance} onChange={(e) => setCreateRuleForm({ ...createRuleForm, penetrance: e.target.value })} placeholder="e.g. 1.5" />
                           </div>
                         ) : (
                           <div className="flex flex-col gap-1">
@@ -1065,7 +1065,7 @@ function HealthConditionsPage() {
                         <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Locus</th>
                         <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Genotype</th>
                         <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Phenotype</th>
-                        <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{editing.isGenetic ? "Penetrance" : "Env Risk Mod"}</th>
+                        <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{!editing.isGenetic && editing.conditionType === "INJURY" ? "Env Risk Mod" : "Penetrance"}</th>
                         <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
                       </tr>
                     </thead>
@@ -1075,7 +1075,7 @@ function HealthConditionsPage() {
                           <td className="px-3 py-2 text-muted-foreground">{rc.expressionRule.locus.name}</td>
                           <td className="px-3 py-2 font-mono font-medium text-foreground">{rc.expressionRule.alleleOne.symbol}/{rc.expressionRule.alleleTwo.symbol}</td>
                           <td className="px-3 py-2 text-muted-foreground">{rc.expressionRule.phenotype}</td>
-                          <td className="px-3 py-2 text-muted-foreground">{editing.isGenetic ? (rc.penetrance ?? "1.0") : rc.environmentalRiskModifier}</td>
+                          <td className="px-3 py-2 text-muted-foreground">{!editing.isGenetic && editing.conditionType === "INJURY" ? rc.environmentalRiskModifier : (rc.penetrance ?? "—")}</td>
                           <td className="px-3 py-2 text-right space-x-1">
                             <Button size="sm" variant="ghost"
                               onClick={() => {

@@ -1,4 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router"
+
+type Banner = { name: string; suffix: string; animalId: string | null }
 import { trpc } from "@/lib/trpc"
 import { useState } from "react"
 import { Trophy, MapPin, ChevronLeft, Users, Clock, Mountain, Waves, Wind, Star } from "lucide-react"
@@ -30,6 +32,8 @@ type Competition = {
     id: string
     name: string
     isConformation: boolean
+    minLifeStageIndex: number | null
+    maxLifeStageIndex: number | null
     equipmentRequirements: { id: string; quantity: number; itemDef: { id: string; name: string } }[]
     statWeights: { weight: number; statDef: { id: string; name: string } }[]
   }
@@ -51,8 +55,8 @@ type AliveAnimal = {
   name: string
   status: string
   sex: string
-  breed: { id: string; name: string }
-  lifeStage: { name: string }
+  breed: { id: string; name: string; isUnregistered: boolean }
+  lifeStage: { name: string; stageIndex: number }
   disciplineDefId: string | null
   compTiers: { disciplineDefId: string; tierDefId: string }[]
   equipment: { itemDef: { id: string } }[]
@@ -357,8 +361,10 @@ function VenueDetailPage() {
   const [rowSelections, setRowSelections] = useState<Record<string, string>>({})
   const [enteredPairs, setEnteredPairs] = useState<Set<string>>(new Set())
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({})
-  const [banners, setBanners] = useState<string[]>([])
+  const [banners, setBanners] = useState<Banner[]>([])
   const [activeTab, setActiveTab] = useState<"sporting" | "conformation">("sporting")
+  const [inspectSelectedId, setInspectSelectedId] = useState("")
+  const [inspectError, setInspectError] = useState<string | null>(null)
 
   const { data: certDefs } = trpc.vet.listCertDefs.useQuery({ gameId: gameId! }, { enabled: !!gameId })
   const requiredCertDefIds = (certDefs ?? []).filter((c) => c.requiredForCompetition).map((c) => c.id)
@@ -373,6 +379,16 @@ function VenueDetailPage() {
   const venueComps = (competitions?.filter((c) => c.venue.id === venueId) ?? []) as Competition[]
 
   const utils = trpc.useUtils()
+  const inspect = trpc.competition.inspect.useMutation({
+    onSuccess: (_, variables) => {
+      const name = aliveAnimals.find((a) => a.id === variables.animalId)?.name ?? "Animal"
+      setBanners((prev) => [...prev, { name, suffix: "'s conformation score has been revealed", animalId: variables.animalId }])
+      setInspectSelectedId("")
+      setInspectError(null)
+      utils.animal.list.invalidate({ playerAccountId: playerAccountId! })
+    },
+    onError: (err) => setInspectError(err.message),
+  })
   const enter = trpc.competition.enter.useMutation({
     onSuccess: (_, variables) => {
       const pair = `${variables.competitionId}:${variables.animalId}`
@@ -381,7 +397,7 @@ function VenueDetailPage() {
       utils.competition.listOpen.invalidate({ gameId: gameId! })
       if (isAnimalMode) {
         const animalName = aliveAnimals.find((a) => a.id === variables.animalId)?.name ?? "Animal"
-        setBanners((prev) => [...prev, `${animalName} has been entered`])
+        setBanners((prev) => [...prev, { name: animalName, suffix: " has been entered", animalId: variables.animalId }])
       } else {
         setRowSelections((prev) => { const n = { ...prev }; delete n[variables.competitionId]; return n })
       }
@@ -409,6 +425,8 @@ function VenueDetailPage() {
     return aliveAnimals.filter((a) => {
       if (comp.breedId && a.breed.id !== comp.breedId) return false
       if (!comp.disciplineDef.isConformation && a.disciplineDefId !== comp.disciplineDef.id) return false
+      if (comp.disciplineDef.minLifeStageIndex !== null && a.lifeStage.stageIndex < comp.disciplineDef.minLifeStageIndex) return false
+      if (comp.disciplineDef.maxLifeStageIndex !== null && a.lifeStage.stageIndex > comp.disciplineDef.maxLifeStageIndex) return false
       if (!meetsEquipmentReqs(a, comp)) return false
       if (comp.disciplineDef.isConformation) {
         const hasScore = comp.breedId
@@ -433,9 +451,18 @@ function VenueDetailPage() {
 
   const animalForFilter = isAnimalMode ? aliveAnimals.find((a) => a.id === initialAnimalId) : undefined
 
+  const uninspectedPurebreds = aliveAnimals.filter(
+    (a) => !a.breed.isUnregistered && (a.conformationScores ?? []).length === 0
+  )
+  const showInspection = isAnimalMode
+    ? !!(animalForFilter && !animalForFilter.breed.isUnregistered && (animalForFilter.conformationScores ?? []).length === 0)
+    : uninspectedPurebreds.length > 0
+
   function isEligibleForAnimal(comp: Competition, animal: AliveAnimal): boolean {
     if (comp.breedId && animal.breed.id !== comp.breedId) return false
     if (!comp.disciplineDef.isConformation && animal.disciplineDefId !== comp.disciplineDef.id) return false
+    if (comp.disciplineDef.minLifeStageIndex !== null && animal.lifeStage.stageIndex < comp.disciplineDef.minLifeStageIndex) return false
+    if (comp.disciplineDef.maxLifeStageIndex !== null && animal.lifeStage.stageIndex > comp.disciplineDef.maxLifeStageIndex) return false
     if (!meetsEquipmentReqs(animal, comp)) return false
     if (comp.disciplineDef.isConformation) {
       const hasScore = comp.breedId
@@ -538,14 +565,90 @@ function VenueDetailPage() {
             {/* Entry banners */}
             {banners.length > 0 && (
               <div className="mb-6 space-y-2">
-                {banners.map((msg, i) => (
+                {banners.map((banner, i) => (
                   <div key={i} className="flex items-center gap-2 rounded-xl border border-chart-2/30 bg-chart-2/10 px-4 py-3 text-sm font-semibold text-chart-2">
                     <Trophy size={14} />
-                    {msg}
+                    {banner.animalId ? (
+                      <>
+                        <Link
+                          to="/animal/$animalId"
+                          params={{ animalId: banner.animalId }}
+                          className="underline underline-offset-2 hover:opacity-80"
+                        >
+                          {banner.name}
+                        </Link>
+                        {banner.suffix}
+                      </>
+                    ) : `${banner.name}${banner.suffix}`}
                   </div>
                 ))}
               </div>
             )}
+
+        {/* Inspection section */}
+        {showInspection && (
+          <div className="mb-6">
+            <div className="mb-3 flex items-center gap-2 border-b border-border/50 pb-2.5">
+              <h3 className="text-base font-semibold text-foreground">Conformation Inspection</h3>
+              <span className="rounded bg-chart-3/12 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-chart-3">One-time</span>
+            </div>
+            <div className="overflow-hidden rounded-lg border border-border bg-card">
+              <div className="flex items-center gap-2 border-b border-border bg-secondary px-4 py-2.5">
+                <span className="text-sm font-semibold text-foreground">Inspection Show</span>
+                <span className="ml-auto text-xs text-muted-foreground">Free · Reveals conformation score</span>
+              </div>
+              <div className={cn(isAnimalMode ? TABLE_COLS_ANIMAL : TABLE_COLS_FREE, "border-b border-border bg-secondary/70 px-4 py-2")}>
+                <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Animal</span>
+                <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Fee</span>
+                <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Result</span>
+                {!isAnimalMode && <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Select</span>}
+                <span />
+              </div>
+              <div className={cn(isAnimalMode ? TABLE_COLS_ANIMAL : TABLE_COLS_FREE, "items-center border-t border-border px-4 py-2.5")}>
+                <span className="text-xs text-muted-foreground">
+                  {isAnimalMode ? (animalForFilter?.name ?? "—") : `${uninspectedPurebreds.length} eligible`}
+                </span>
+                <span className="font-mono text-xs text-muted-foreground">Free</span>
+                <span className="text-xs text-muted-foreground">Conformation score</span>
+                {!isAnimalMode && (
+                  <div className="flex flex-col gap-0.5">
+                    <select
+                      value={inspectSelectedId}
+                      onChange={(e) => { setInspectSelectedId(e.target.value); setInspectError(null) }}
+                      className="w-full rounded border border-border bg-background px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                    >
+                      <option value="">— Select —</option>
+                      {uninspectedPurebreds.map((a) => (
+                        <option key={a.id} value={a.id}>{a.name} ({a.sex === "MALE" ? "M" : "F"})</option>
+                      ))}
+                    </select>
+                    {inspectError && <span className="text-[10px] text-destructive">{inspectError}</span>}
+                  </div>
+                )}
+                <div className="flex flex-col items-end gap-0.5">
+                  <button
+                    type="button"
+                    disabled={!playerAccountId || inspect.isPending || inspect.isSuccess || (!isAnimalMode && !inspectSelectedId)}
+                    onClick={() => {
+                      const animalId = isAnimalMode ? initialAnimalId : inspectSelectedId
+                      if (!animalId) return
+                      inspect.mutate({ animalId })
+                    }}
+                    className={cn(
+                      "rounded-md px-3.5 py-1.5 text-xs font-semibold transition-colors disabled:opacity-40",
+                      inspect.isSuccess
+                        ? "bg-chart-2/15 text-chart-2"
+                        : "bg-primary text-primary-foreground hover:bg-primary/90",
+                    )}
+                  >
+                    {inspect.isPending ? "Inspecting…" : inspect.isSuccess ? "Inspected ✓" : "Enter"}
+                  </button>
+                  {isAnimalMode && inspectError && <span className="text-[10px] text-destructive">{inspectError}</span>}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Competition sections */}
         {compsLoading ? (
@@ -554,13 +657,7 @@ function VenueDetailPage() {
               <div key={i} className="h-44 animate-pulse rounded-2xl border border-border bg-muted/20" />
             ))}
           </div>
-        ) : displayComps.length === 0 ? (
-          <div className="py-16 text-center">
-            <Trophy size={36} className="mx-auto mb-4 text-muted-foreground/20" />
-            <p className="text-xl font-semibold text-foreground">No open competitions</p>
-            <p className="mt-1.5 text-sm text-muted-foreground">Check back soon — new events are added regularly.</p>
-          </div>
-        ) : (
+        ) : displayComps.length > 0 ? (
           <div>
             {/* Tabs */}
             {hasSporting && hasConformation && (
@@ -694,7 +791,13 @@ function VenueDetailPage() {
               </div>
             )}
           </div>
-        )}
+        ) : !showInspection ? (
+          <div className="py-16 text-center">
+            <Trophy size={36} className="mx-auto mb-4 text-muted-foreground/20" />
+            <p className="text-xl font-semibold text-foreground">No open competitions</p>
+            <p className="mt-1.5 text-sm text-muted-foreground">Check back soon — new events are added regularly.</p>
+          </div>
+        ) : null}
           </div>{/* /competition content */}
         </div>{/* /unified card */}
       </div>

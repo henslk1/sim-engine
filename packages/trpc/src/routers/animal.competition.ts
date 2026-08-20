@@ -1,4 +1,4 @@
-import { enterCompetition, runCompetition } from "@sim-engine/engine";
+import { enterCompetition, runCompetition, runConformationInspection } from "@sim-engine/engine";
 import { db } from "@sim-engine/db";
 import { router, publicProcedure } from "../trpc.js";
 import { z } from "zod";
@@ -34,6 +34,8 @@ export const animalCompetitionRouter = router({
               id: true,
               name: true,
               isConformation: true,
+              minLifeStageIndex: true,
+              maxLifeStageIndex: true,
               equipmentRequirements: {
                 select: {
                   id: true,
@@ -142,6 +144,10 @@ export const animalCompetitionRouter = router({
       }
       return entry
     }),
+  inspect: publicProcedure
+    .input(z.object({ animalId: z.string() }))
+    .mutation(({ input }) => runConformationInspection(db, input.animalId)),
+
   run: publicProcedure
     .input(z.object({
       competitionId: z.string(),

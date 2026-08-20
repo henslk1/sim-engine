@@ -87,9 +87,10 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
       tx.animalCareScore.findUnique({ where: { animalId } }),
     ])
     if (immunity && immunity.innateMax > 0) {
-      const immunityRatio = immunity.value / immunity.innateMax
+      const immunityRatio = immunity.value / 100
       const careRatio = careScore ? careScore.score / 100 : 1
-      if (Math.random() > immunityRatio * careRatio) {
+      const illnessChance = (1 - immunityRatio * careRatio) / 25
+      if (Math.random() < illnessChance) {
         const eligible = await tx.healthConditionDef.findMany({
           where: {
             gameId: animal.gameId,
@@ -105,9 +106,9 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
               select: { resolvedCycle: true },
             },
             ruleConditions: {
-              where: { environmentalRiskModifier: { gt: 0 } },
+              where: { penetrance: { not: null } },
               select: {
-                environmentalRiskModifier: true,
+                penetrance: true,
                 expressionRule: { select: { locusId: true, alleleOneId: true, alleleTwoId: true } },
               },
             },
@@ -128,7 +129,7 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
           const weights = eligibleFiltered.map(cond => {
             const bonus = cond.ruleConditions
               .filter(rc => genotypeSet.has(`${rc.expressionRule.locusId}:${rc.expressionRule.alleleOneId}:${rc.expressionRule.alleleTwoId}`))
-              .reduce((sum, rc) => sum + rc.environmentalRiskModifier, 0)
+              .reduce((sum, rc) => sum + (rc.penetrance ?? 0), 0)
             return cond.baseWeight + bonus
           })
           const totalWeight = weights.reduce((s, w) => s + w, 0)
@@ -163,6 +164,7 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
 
       for (const rc of rule.ruleConditions) {
         const condDef = rc.healthConditionDef
+        if (!condDef.isGenetic) continue
         if (condDef.onsetMinCycle !== null && newAge < condDef.onsetMinCycle) continue
 
         const alreadyExists = await tx.animalHealthRecord.findFirst({
@@ -267,7 +269,7 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
 
     // Check if work was done this cycle — suppresses condition decay
     const currentCycle = animal.ageInCycles
-    const [workedThisCycle, allCareDone, energy, mood, condition, activeHealthRecords, personalityRecords] = await Promise.all([
+    const [workedThisCycle, allCareDone, energy, mood, condition, activeHealthRecords, personalityRecords, ltcRecords] = await Promise.all([
       Promise.all([
         tx.trainingLog.count({ where: { animalId, cycleNumber: currentCycle } }),
         tx.competitionEntry.count({ where: { animalId, cycleNumber: currentCycle } }),
@@ -303,11 +305,21 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
           traitDef: { select: { labelRanges: { select: { minValue: true, maxValue: true, moodModifier: true } } } },
         },
       }),
+      tx.animalLongTermCareRecord.findMany({
+        where: { animalId },
+        select: {
+          nextDueCycle: true,
+          longTermCareActionDef: { select: { gracePeriodCycles: true } },
+        },
+      }),
     ])
 
-    const conditionEnergyEffect = activeHealthRecords.reduce(
-      (sum, r) => sum + (r.conditionDef.energyEffect ?? 0), 0
-    )
+    const conditionEnergyEffect = activeHealthRecords.reduce((sum, r) => {
+      const treatedThisCycle = r.treatmentRecords.some(
+        (t) => t.lastAdministeredCycle === currentCycle
+      )
+      return treatedThisCycle ? sum : sum + (r.conditionDef.energyEffect ?? 0)
+    }, 0)
     const conditionMoodEffect = activeHealthRecords.reduce((sum, r) => {
       const treatedThisCycle = r.treatmentRecords.some(
         (t) => t.lastAdministeredCycle === currentCycle
@@ -315,6 +327,8 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
       return treatedThisCycle ? sum : sum + (r.conditionDef.moodEffect ?? 0)
     }, 0)
     const neglected = careScore != null && careScore.score < gameConfig.energyLowCareThreshold
+    const exhausted = !!(energy && energy.currentEnergy === 0 && mood && mood.value === 0)
+    const ltcOverdue = ltcRecords.some(r => newAge > r.nextDueCycle + r.longTermCareActionDef.gracePeriodCycles)
     const carePenalty = neglected ? gameConfig.energyLowCarePenalty : 0
 
     const TIME_BASED = new Set(["OTC", "PRESCRIPTION", "PLAYER_ACTION"])
@@ -325,10 +339,12 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
       if (!hasTimeBasedActive) return false
       return !r.treatmentRecords.some(t => TIME_BASED.has(t.treatmentDef.treatmentType) && t.lastAdministeredCycle === currentCycle)
     })
-    const effectivelyNeglected = neglected || untreatedCondition
+    const effectivelyNeglected = neglected || untreatedCondition || exhausted || ltcOverdue
+
+    const isOverworked = !!(energy && gameConfig.overworkInjuryThreshold > 0 && energy.currentEnergy < gameConfig.overworkInjuryThreshold)
 
     // Overwork injury: fires if animal ends the cycle with critically low energy
-    if (energy && gameConfig.overworkInjuryThreshold > 0 && energy.currentEnergy < gameConfig.overworkInjuryThreshold) {
+    if (isOverworked) {
       if (Math.random() < gameConfig.overworkInjuryChance + animal.structuralRisk) {
         const injuryPool = await tx.healthConditionDef.findMany({
           where: {
@@ -347,7 +363,7 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
     }
 
     const newEnergy = energy
-      ? Math.max(0, (effectivelyNeglected ? energy.currentEnergy : energy.maxEnergy) + conditionEnergyEffect - carePenalty)
+      ? Math.max(0, (effectivelyNeglected ? energy.currentEnergy : isOverworked ? energy.maxEnergy * 0.5 : energy.maxEnergy) + conditionEnergyEffect - carePenalty)
       : null
 
     // Neglect death: energy drained to 0 → rolling death chance each cycle
@@ -356,7 +372,7 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
       if (Math.random() < neglectDeathChance) {
         await tx.animal.update({
           where: { id: animalId },
-          data: { ageInCycles: newAge, status: "DECEASED", diedAt: new Date(), causeOfDeath: "neglect" },
+          data: { ageInCycles: newAge, status: "DECEASED", diedAt: new Date(), causeOfDeath: exhausted ? "Exhaustion" : "Neglect" },
         })
         return {}
       }
@@ -372,7 +388,7 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
         data: {
           value: Math.max(0, Math.min(100,
             mood.value
-            - gameConfig.moodDecayRate
+            - gameConfig.moodDecayRate * (isOverworked ? 3 : 1)
             + conditionMoodEffect
             + personalityRecords.reduce((sum, p) => {
                 const effective = p.value + p.personalityModifier
