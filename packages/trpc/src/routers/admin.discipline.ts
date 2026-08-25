@@ -115,7 +115,7 @@ export const disciplineAdminRouter = router({
     .query(({ input }) =>
       db.disciplineEquipmentRequirement.findMany({
         where: { disciplineDefId: input.disciplineDefId },
-        orderBy: { itemDef: { name: "asc" } },
+        orderBy: [{ requirementGroup: { sort: "asc", nulls: "last" } }, { itemDef: { name: "asc" } }],
         include: { itemDef: { select: { id: true, name: true } } },
       })
     ),
@@ -126,11 +126,13 @@ export const disciplineAdminRouter = router({
       disciplineDefId: z.string(),
       itemDefId: z.string(),
       quantity: z.number().int().min(1).default(1),
+      requirementGroup: z.string().nullish(),
     }))
     .mutation(({ input }) => {
       const { id, disciplineDefId, ...data } = input
-      if (id) return db.disciplineEquipmentRequirement.update({ where: { id }, data: { quantity: data.quantity } })
-      return db.disciplineEquipmentRequirement.create({ data: { disciplineDefId, ...data } })
+      const requirementGroup = data.requirementGroup ?? null
+      if (id) return db.disciplineEquipmentRequirement.update({ where: { id }, data: { quantity: data.quantity, requirementGroup } })
+      return db.disciplineEquipmentRequirement.create({ data: { disciplineDefId, ...data, requirementGroup } })
     }),
 
   removeEquipmentRequirement: publicProcedure

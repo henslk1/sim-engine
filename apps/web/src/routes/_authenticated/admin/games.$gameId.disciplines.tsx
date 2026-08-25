@@ -388,7 +388,7 @@ function DisciplinesPage() {
   const saveEquipReq = trpc.admin.discipline.saveEquipmentRequirement.useMutation({
     onSuccess: () => {
       utils.admin.discipline.listEquipmentRequirements.invalidate({ disciplineDefId: editing?.id })
-      setNewEquipReq({ itemDefId: "", quantity: "1" })
+      setNewEquipReq({ itemDefId: "", quantity: "1", requirementGroup: "" })
     },
   })
   const removeEquipReq = trpc.admin.discipline.removeEquipmentRequirement.useMutation({
@@ -398,7 +398,7 @@ function DisciplinesPage() {
   const [editingPersonalityWeightId, setEditingPersonalityWeightId] = useState<string | null>(null)
   const [editingPersonalityWeight, setEditingPersonalityWeight] = useState({ idealMin: "", idealMax: "", bonusPercent: "" })
   const [newPersonalityWeight, setNewPersonalityWeight] = useState({ traitDefId: "", idealMin: "", idealMax: "", bonusPercent: "" })
-  const [newEquipReq, setNewEquipReq] = useState({ itemDefId: "", quantity: "1" })
+  const [newEquipReq, setNewEquipReq] = useState({ itemDefId: "", quantity: "1", requirementGroup: "" })
 
   const usedTraitIds = new Set(personalityWeights?.map((w) => w.traitDefId) ?? [])
   const availableTraits = traits?.filter((t) => !usedTraitIds.has(t.id)) ?? []
@@ -408,7 +408,7 @@ function DisciplinesPage() {
     setActiveTab("stats")
     setEditingPersonalityWeightId(null); setEditingPersonalityWeight({ idealMin: "", idealMax: "", bonusPercent: "" })
     setNewPersonalityWeight({ traitDefId: "", idealMin: "", idealMax: "", bonusPercent: "" })
-    setNewEquipReq({ itemDefId: "", quantity: "1" })
+    setNewEquipReq({ itemDefId: "", quantity: "1", requirementGroup: "" })
   }
 
   function submitDiscipline() {
@@ -638,7 +638,8 @@ function DisciplinesPage() {
                       <thead>
                         <tr className="border-b border-border">
                           <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Item</th>
-                          <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Quantity</th>
+                          <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Qty</th>
+                          <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Group <span className="font-normal normal-case opacity-60">— items sharing a group satisfy each other (OR)</span></th>
                           <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
                         </tr>
                       </thead>
@@ -647,6 +648,11 @@ function DisciplinesPage() {
                           <tr key={r.id} className="border-b border-border last:border-0">
                             <td className="px-3 py-2 font-medium text-foreground">{r.itemDef.name}</td>
                             <td className="px-3 py-2 text-muted-foreground">{r.quantity}</td>
+                            <td className="px-3 py-2 text-muted-foreground">
+                              {r.requirementGroup
+                                ? <span className="inline-flex items-center rounded-full bg-accent/20 px-2 py-0.5 text-[11px] font-medium text-accent-foreground">{r.requirementGroup}</span>
+                                : <span className="text-muted-foreground/40">—</span>}
+                            </td>
                             <td className="px-3 py-2 text-right">
                               <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => removeEquipReq.mutate({ id: r.id })}>Remove</Button>
                             </td>
@@ -662,10 +668,18 @@ function DisciplinesPage() {
                           <td className="px-3 py-2">
                             <Input type="number" step="1" min="1" value={newEquipReq.quantity} onChange={(e) => setNewEquipReq(r => ({ ...r, quantity: e.target.value }))} placeholder="1" className="h-7 text-sm max-w-20" />
                           </td>
+                          <td className="px-3 py-2">
+                            <Input value={newEquipReq.requirementGroup} onChange={(e) => setNewEquipReq(r => ({ ...r, requirementGroup: e.target.value }))} placeholder="e.g. saddle (optional)" className="h-7 text-sm" />
+                          </td>
                           <td className="px-3 py-2 text-right">
                             <Button size="sm" onClick={() => {
                               if (!editing?.id || !newEquipReq.itemDefId) return
-                              saveEquipReq.mutate({ disciplineDefId: editing.id, itemDefId: newEquipReq.itemDefId, quantity: parseInt(newEquipReq.quantity) || 1 })
+                              saveEquipReq.mutate({
+                                disciplineDefId: editing.id,
+                                itemDefId: newEquipReq.itemDefId,
+                                quantity: parseInt(newEquipReq.quantity) || 1,
+                                requirementGroup: newEquipReq.requirementGroup || null,
+                              })
                             }} disabled={saveEquipReq.isPending || !newEquipReq.itemDefId}>
                               Add
                             </Button>

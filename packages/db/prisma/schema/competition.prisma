@@ -383,12 +383,13 @@ model CompetitionTierPrize {
 }
 
 model DisciplineEquipmentRequirement {
-  id              String        @id @default(cuid())
-  disciplineDefId String
-  itemDefId       String
-  quantity        Int           @default(1)
-  disciplineDef   DisciplineDef @relation(fields: [disciplineDefId], references: [id])
-  itemDef         ItemDef       @relation(fields: [itemDefId], references: [id])
+  id               String        @id @default(cuid())
+  disciplineDefId  String
+  itemDefId        String
+  quantity         Int           @default(1)
+  requirementGroup String?
+  disciplineDef    DisciplineDef @relation(fields: [disciplineDefId], references: [id])
+  itemDef          ItemDef       @relation(fields: [itemDefId], references: [id])
 
   @@unique([disciplineDefId, itemDefId])
 }

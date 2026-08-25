@@ -75,11 +75,30 @@ export async function enterCompetition(
     const equipmentRequirements = competition.disciplineDef.equipmentRequirements
     if (equipmentRequirements.length > 0) {
       const equippedItems = await tx.animalEquipment.findMany({ where: { animalId } })
+
+      const grouped = new Map<string, typeof equipmentRequirements>()
+      const individual: typeof equipmentRequirements = []
       for (const req of equipmentRequirements) {
-        const count = equippedItems.filter(e => e.itemDefId === req.itemDefId).length
-        if (count < req.quantity) {
-          throw new Error("Animal is missing required equipment for this discipline")
+        if (req.requirementGroup) {
+          const g = grouped.get(req.requirementGroup) ?? []
+          g.push(req)
+          grouped.set(req.requirementGroup, g)
+        } else {
+          individual.push(req)
         }
+      }
+
+      for (const req of individual) {
+        if (equippedItems.filter(e => e.itemDefId === req.itemDefId).length < req.quantity)
+          throw new Error("Animal is missing required equipment for this discipline")
+      }
+
+      for (const reqs of grouped.values()) {
+        const satisfied = reqs.some(req =>
+          equippedItems.filter(e => e.itemDefId === req.itemDefId).length >= req.quantity
+        )
+        if (!satisfied)
+          throw new Error("Animal is missing required equipment for this discipline")
       }
     }
 
