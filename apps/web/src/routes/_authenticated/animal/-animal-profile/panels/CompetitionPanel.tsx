@@ -81,7 +81,7 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
 
   // Show a tab if: query not yet loaded (optimistic), disciplines exist for this stage, or animal already has data for it
   const hasSportsDisciplines = !allDisciplines || (sportsDisciplines?.length ?? 0) > 0 || (!!animal.disciplineDef && !animal.disciplineDef.isConformation)
-  const hasConformationDisciplines = !allDisciplines || (confDisciplinesForStage?.length ?? 0) > 0 || isInspected || !!confTier
+  const hasConformationDisciplines = !allDisciplines || (confDisciplinesForStage?.length ?? 0) > 0 || isInspected || !!confTier || canCompete
   const availableTabs = (["sports", "conformation"] as const).filter(
     (t) => t === "sports" ? hasSportsDisciplines : hasConformationDisciplines
   )

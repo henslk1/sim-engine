@@ -316,25 +316,38 @@ export async function runCompetition(
       })
     }
 
-    // Award titles based on placement matching rankOrder
+    // Award titles based on placement matching rankOrder — max tier only
     for (const entry of allRanked) {
+      if (entry.tierDef.advancementThreshold !== null) continue
       const titleDef = await tx.titleDef.findFirst({
         where: {
           disciplineDefId: competition.disciplineDefId,
           rankOrder: entry.placement,
           animalTitles: { none: { animalId: entry.animalId } },
         },
-        select: { id: true },
+        select: { id: true, requiredPlacements: true },
       })
       if (titleDef) {
-        const entryRecord = competition.entries.find((e) => e.animalId === entry.animalId)
-        await tx.animalTitle.create({
-          data: {
-            animalId: entry.animalId,
-            titleDefId: titleDef.id,
-            cycleNumber: (entryRecord as { cycleNumber?: number } | null)?.cycleNumber ?? 0,
+        const placingCount = await tx.competitionResult.count({
+          where: {
+            placement: entry.placement,
+            entry: {
+              animalId: entry.animalId,
+              tierDef: { advancementThreshold: null },
+              competition: { disciplineDefId: competition.disciplineDefId },
+            },
           },
         })
+        if (placingCount >= titleDef.requiredPlacements) {
+          const entryRecord = competition.entries.find((e) => e.animalId === entry.animalId)
+          await tx.animalTitle.create({
+            data: {
+              animalId: entry.animalId,
+              titleDefId: titleDef.id,
+              cycleNumber: (entryRecord as { cycleNumber?: number } | null)?.cycleNumber ?? 0,
+            },
+          })
+        }
       }
     }
 

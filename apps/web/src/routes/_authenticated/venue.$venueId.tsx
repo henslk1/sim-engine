@@ -2,8 +2,8 @@ import { createFileRoute, Link } from "@tanstack/react-router"
 
 type Banner = { name: string; suffix: string; animalId: string | null }
 import { trpc } from "@/lib/trpc"
-import { useState } from "react"
-import { Trophy, MapPin, ChevronLeft, Users, Clock, Mountain, Waves, Wind, Star } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Trophy, MapPin, ChevronLeft, ChevronDown, Users, Clock, Mountain, Waves, Wind, Star } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export const Route = createFileRoute("/_authenticated/venue/$venueId")({
@@ -365,8 +365,25 @@ function VenueDetailPage() {
   const [activeTab, setActiveTab] = useState<"sporting" | "conformation">("sporting")
   const [inspectSelectedId, setInspectSelectedId] = useState("")
   const [inspectError, setInspectError] = useState<string | null>(null)
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
+  function toggleSection(key: string) {
+    setExpandedSections((prev) => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n })
+  }
+
+  const [sportsFilterDisciplineId, setSportsFilterDisciplineIdRaw] = useState(() => sessionStorage.getItem("vf-sports-discipline") ?? "")
+  const [sportsFilterTierId, setSportsFilterTierIdRaw] = useState(() => sessionStorage.getItem("vf-sports-tier") ?? "")
+  const [confFilterBreedId, setConfFilterBreedIdRaw] = useState(() => sessionStorage.getItem("vf-conf-breed") ?? "")
+  const [confFilterStageKey, setConfFilterStageKeyRaw] = useState(() => sessionStorage.getItem("vf-conf-stage") ?? "")
+
+  function setSportsFilterDisciplineId(v: string) { setSportsFilterDisciplineIdRaw(v); sessionStorage.setItem("vf-sports-discipline", v) }
+  function setSportsFilterTierId(v: string) { setSportsFilterTierIdRaw(v); sessionStorage.setItem("vf-sports-tier", v) }
+  function setConfFilterBreedId(v: string) { setConfFilterBreedIdRaw(v); sessionStorage.setItem("vf-conf-breed", v) }
+  function setConfFilterStageKey(v: string) { setConfFilterStageKeyRaw(v); sessionStorage.setItem("vf-conf-stage", v) }
+
+  useEffect(() => { setSportsFilterTierId("") }, [sportsFilterDisciplineId])
 
   const { data: certDefs } = trpc.vet.listCertDefs.useQuery({ gameId: gameId! }, { enabled: !!gameId })
+  const { data: lifeStages } = trpc.admin.lifestage.list.useQuery({ gameId: gameId! }, { enabled: !!gameId })
   const requiredCertDefIds = (certDefs ?? []).filter((c) => c.requiredForCompetition).map((c) => c.id)
 
   const { data: allVenues } = trpc.competition.listVenues.useQuery({ gameId: gameId! }, { enabled: !!gameId })
@@ -488,20 +505,90 @@ function VenueDetailPage() {
     : venueComps
 
   // Split competitions into sporting vs conformation
+  const stageByIndex = Object.fromEntries((lifeStages ?? []).map((s) => [s.stageIndex, s.name]))
+
+  function conformationGroupLabel(disciplineName: string, min: number | null, max: number | null, breedName: string | null): string {
+    const minName = min !== null ? (stageByIndex[min] ?? `Stage ${min}`) : null
+    const maxName = max !== null ? (stageByIndex[max] ?? `Stage ${max}`) : null
+    const ageLabel =
+      minName && maxName && min === max ? minName
+      : minName && maxName ? `${minName} – ${maxName}`
+      : minName ? `${minName}+`
+      : maxName ? `Up to ${maxName}`
+      : null
+    const parts = [disciplineName, breedName, ageLabel].filter(Boolean)
+    return parts.join(" — ")
+  }
+
+  type ConformationGroup = { label: string; comps: Competition[] }
   const sportingByDiscipline: Record<string, Competition[]> = {}
-  const conformationByBreed: Record<string, Competition[]> = {}
+  const conformationGroupMap = new Map<string, ConformationGroup>()
+  const conformationGroups: ConformationGroup[] = []
+
   for (const comp of displayComps) {
     if (comp.disciplineDef.isConformation) {
-      const key = comp.breedId ?? comp.disciplineDef.id
-      if (!conformationByBreed[key]) conformationByBreed[key] = []
-      conformationByBreed[key].push(comp)
+      const key = `${comp.disciplineDef.id}:${comp.disciplineDef.minLifeStageIndex}:${comp.disciplineDef.maxLifeStageIndex}:${comp.breedId ?? ""}`
+      let group = conformationGroupMap.get(key)
+      if (!group) {
+        group = {
+          label: conformationGroupLabel(comp.disciplineDef.name, comp.disciplineDef.minLifeStageIndex, comp.disciplineDef.maxLifeStageIndex, comp.breed?.name ?? null),
+          comps: [],
+        }
+        conformationGroupMap.set(key, group)
+        conformationGroups.push(group)
+      }
+      group.comps.push(comp)
     } else {
       if (!sportingByDiscipline[comp.disciplineDef.id]) sportingByDiscipline[comp.disciplineDef.id] = []
       sportingByDiscipline[comp.disciplineDef.id].push(comp)
     }
   }
   const hasSporting = Object.keys(sportingByDiscipline).length > 0
-  const hasConformation = Object.keys(conformationByBreed).length > 0
+  const hasConformation = conformationGroups.length > 0
+
+  // Sports filter options
+  const sportsDisciplineOptions = Object.entries(sportingByDiscipline).map(([id, comps]) => ({ id, name: comps[0].disciplineDef.name }))
+  const sportsSourceComps = sportsFilterDisciplineId ? (sportingByDiscipline[sportsFilterDisciplineId] ?? []) : Object.values(sportingByDiscipline).flat()
+  const sportsTierOptions = sportsSourceComps.reduce((acc, comp) => {
+    if (comp.tierDef && !acc.find((t) => t.id === comp.tierDef!.id)) acc.push(comp.tierDef)
+    return acc
+  }, [] as { id: string; name: string; tierIndex: number }[]).sort((a, b) => a.tierIndex - b.tierIndex)
+
+  const filteredSportingEntries = Object.entries(sportingByDiscipline)
+    .filter(([id]) => !sportsFilterDisciplineId || id === sportsFilterDisciplineId)
+    .map(([id, comps]) => [id, sportsFilterTierId ? comps.filter((c) => c.tierDef?.id === sportsFilterTierId) : comps] as [string, Competition[]])
+    .filter(([, comps]) => comps.length > 0)
+
+  // Conformation filter options
+  const confBreedOptions = [...new Map(
+    conformationGroups.filter((g) => g.comps[0]?.breedId && g.comps[0]?.breed).map((g) => [g.comps[0].breedId!, g.comps[0].breed!])
+  ).values()]
+  const confStageOptions = [...new Map(
+    conformationGroups.map((g) => {
+      const comp = g.comps[0]
+      const min = comp.disciplineDef.minLifeStageIndex
+      const max = comp.disciplineDef.maxLifeStageIndex
+      const minName = min !== null ? (stageByIndex[min] ?? `Stage ${min}`) : null
+      const maxName = max !== null ? (stageByIndex[max] ?? `Stage ${max}`) : null
+      const label = minName && maxName && min === max ? minName
+        : minName && maxName ? `${minName} – ${maxName}`
+        : minName ? `${minName}+`
+        : maxName ? `Up to ${maxName}`
+        : null
+      const key = `${min}:${max}`
+      return [key, label] as [string, string | null]
+    }).filter((e): e is [string, string] => e[1] !== null)
+  ).entries()].map(([key, label]) => ({ key, label }))
+
+  const filteredConformationGroups = conformationGroups.filter((group) => {
+    const comp = group.comps[0]
+    if (confFilterBreedId && comp?.breedId !== confFilterBreedId) return false
+    if (confFilterStageKey) {
+      const key = `${comp.disciplineDef.minLifeStageIndex}:${comp.disciplineDef.maxLifeStageIndex}`
+      if (key !== confFilterStageKey) return false
+    }
+    return true
+  })
 
   const conditions = venue?.climate && venue?.terrain ? CONDITIONS[venue.climate]?.[venue.terrain] : null
   const headerGradient = venue?.climate ? HEADER_GRADIENT[venue.climate] : ""
@@ -700,40 +787,74 @@ function VenueDetailPage() {
                     <h2 className="text-xl font-semibold text-foreground">Sporting Disciplines</h2>
                   </div>
                 )}
-                <div className="space-y-6">
-                  {Object.entries(sportingByDiscipline).map(([disciplineId, comps]) => {
+                {(sportsDisciplineOptions.length > 1 || sportsTierOptions.length > 1) && (
+                  <div className="mb-5 flex flex-wrap gap-2">
+                    {sportsDisciplineOptions.length > 1 && (
+                      <select
+                        value={sportsFilterDisciplineId}
+                        onChange={(e) => setSportsFilterDisciplineId(e.target.value)}
+                        className="rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                      >
+                        <option value="">All Disciplines</option>
+                        {sportsDisciplineOptions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                      </select>
+                    )}
+                    {sportsTierOptions.length > 1 && (
+                      <select
+                        value={sportsFilterTierId}
+                        onChange={(e) => setSportsFilterTierId(e.target.value)}
+                        className="rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                      >
+                        <option value="">All Tiers</option>
+                        {sportsTierOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                      </select>
+                    )}
+                  </div>
+                )}
+                <div className="space-y-3">
+                  {filteredSportingEntries.map(([disciplineId, comps]) => {
                     const discipline = comps[0].disciplineDef
+                    const isExpanded = expandedSections.has(disciplineId)
                     return (
-                      <div key={disciplineId}>
-                        <div className="mb-3 flex items-center justify-between border-b border-border/50 pb-2.5">
-                          <h3 className="text-base font-semibold text-foreground">{discipline.name}</h3>
-                          <span className="text-xs text-muted-foreground">{comps.length} open</span>
-                        </div>
-                        <div className="space-y-3">
-                          {comps.map((comp) => (
-                            <CompTable key={comp.id} animalMode={isAnimalMode} title={comp.tierDef?.name ?? "Open"} invitational={comp.isInvitational}>
-                              <CompRow
-                                comp={comp}
-                                animalMode={isAnimalMode}
-                                animalOptions={isAnimalMode ? [] : eligibleAnimalsFor(comp)}
-                                selectedAnimalId={isAnimalMode ? "" : (rowSelections[comp.id] ?? "")}
-                                onSelectAnimal={(id) => setRowSelections((p) => ({ ...p, [comp.id]: id }))}
-                                playerAccountId={playerAccountId}
-                                isEntering={enter.isPending && enter.variables?.competitionId === comp.id}
-                                justEntered={isAnimalMode
-                                  ? enteredPairs.has(`${comp.id}:${initialAnimalId ?? ""}`) || comp.entries.some((e) => e.animal.id === initialAnimalId)
-                                  : enteredPairs.has(`${comp.id}:${rowSelections[comp.id] ?? ""}`)}
-                                errorMsg={rowErrors[comp.id] ?? null}
-                                onEnter={() => {
-                                  const animalId = isAnimalMode ? initialAnimalId : rowSelections[comp.id]
-                                  if (!animalId || !playerAccountId) return
-                                  enter.mutate({ animalId, competitionId: comp.id, playerAccountId })
-                                }}
-                              />
-                              <EntryTable comp={comp} />
-                            </CompTable>
-                          ))}
-                        </div>
+                      <div key={disciplineId} className="overflow-hidden rounded-lg border border-border bg-card">
+                        <button
+                          type="button"
+                          onClick={() => toggleSection(disciplineId)}
+                          className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-secondary/30 transition-colors"
+                        >
+                          <span className="text-base font-semibold text-foreground">{discipline.name}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground">{comps.length} open</span>
+                            <ChevronDown size={15} className={cn("text-muted-foreground transition-transform", isExpanded && "rotate-180")} />
+                          </div>
+                        </button>
+                        {isExpanded && (
+                          <div className="space-y-3 border-t border-border p-3">
+                            {comps.map((comp) => (
+                              <CompTable key={comp.id} animalMode={isAnimalMode} title={comp.tierDef?.name ?? "Open"} invitational={comp.isInvitational}>
+                                <CompRow
+                                  comp={comp}
+                                  animalMode={isAnimalMode}
+                                  animalOptions={isAnimalMode ? [] : eligibleAnimalsFor(comp)}
+                                  selectedAnimalId={isAnimalMode ? "" : (rowSelections[comp.id] ?? "")}
+                                  onSelectAnimal={(id) => setRowSelections((p) => ({ ...p, [comp.id]: id }))}
+                                  playerAccountId={playerAccountId}
+                                  isEntering={enter.isPending && enter.variables?.competitionId === comp.id}
+                                  justEntered={isAnimalMode
+                                    ? enteredPairs.has(`${comp.id}:${initialAnimalId ?? ""}`) || comp.entries.some((e) => e.animal.id === initialAnimalId)
+                                    : enteredPairs.has(`${comp.id}:${rowSelections[comp.id] ?? ""}`)}
+                                  errorMsg={rowErrors[comp.id] ?? null}
+                                  onEnter={() => {
+                                    const animalId = isAnimalMode ? initialAnimalId : rowSelections[comp.id]
+                                    if (!animalId || !playerAccountId) return
+                                    enter.mutate({ animalId, competitionId: comp.id, playerAccountId })
+                                  }}
+                                />
+                                <EntryTable comp={comp} />
+                              </CompTable>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )
                   })}
@@ -750,40 +871,73 @@ function VenueDetailPage() {
                     <h2 className="text-xl font-semibold text-foreground">Conformation Registry</h2>
                   </div>
                 )}
-                <div className="space-y-6">
-                  {Object.entries(conformationByBreed).map(([breedKey, comps]) => {
-                    const breedName = comps[0].breed?.name ?? comps[0].disciplineDef.name
+                {(confBreedOptions.length > 1 || confStageOptions.length > 1) && (
+                  <div className="mb-5 flex flex-wrap gap-2">
+                    {confBreedOptions.length > 1 && (
+                      <select
+                        value={confFilterBreedId}
+                        onChange={(e) => setConfFilterBreedId(e.target.value)}
+                        className="rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                      >
+                        <option value="">All Breeds</option>
+                        {confBreedOptions.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                      </select>
+                    )}
+                    {confStageOptions.length > 1 && (
+                      <select
+                        value={confFilterStageKey}
+                        onChange={(e) => setConfFilterStageKey(e.target.value)}
+                        className="rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                      >
+                        <option value="">All Ages</option>
+                        {confStageOptions.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+                      </select>
+                    )}
+                  </div>
+                )}
+                <div className="space-y-3">
+                  {filteredConformationGroups.map((group) => {
+                    const isExpanded = expandedSections.has(group.label)
                     return (
-                      <div key={breedKey}>
-                        <div className="mb-3 flex items-center justify-between border-b border-border/50 pb-2.5">
-                          <h3 className="text-base font-semibold text-foreground">{breedName}</h3>
-                          <span className="text-xs text-muted-foreground">{comps.length} open</span>
-                        </div>
-                        <div className="space-y-3">
-                          {comps.map((comp) => (
-                            <CompTable key={comp.id} animalMode={isAnimalMode} title={comp.tierDef?.name ?? "Open"} invitational={comp.isInvitational}>
-                              <CompRow
-                                comp={comp}
-                                animalMode={isAnimalMode}
-                                animalOptions={isAnimalMode ? [] : eligibleAnimalsFor(comp)}
-                                selectedAnimalId={isAnimalMode ? "" : (rowSelections[comp.id] ?? "")}
-                                onSelectAnimal={(id) => setRowSelections((p) => ({ ...p, [comp.id]: id }))}
-                                playerAccountId={playerAccountId}
-                                isEntering={enter.isPending && enter.variables?.competitionId === comp.id}
-                                justEntered={isAnimalMode
-                                  ? enteredPairs.has(`${comp.id}:${initialAnimalId ?? ""}`) || comp.entries.some((e) => e.animal.id === initialAnimalId)
-                                  : enteredPairs.has(`${comp.id}:${rowSelections[comp.id] ?? ""}`)}
-                                errorMsg={rowErrors[comp.id] ?? null}
-                                onEnter={() => {
-                                  const animalId = isAnimalMode ? initialAnimalId : rowSelections[comp.id]
-                                  if (!animalId || !playerAccountId) return
-                                  enter.mutate({ animalId, competitionId: comp.id, playerAccountId })
-                                }}
-                              />
-                              <EntryTable comp={comp} />
-                            </CompTable>
-                          ))}
-                        </div>
+                      <div key={group.label} className="overflow-hidden rounded-lg border border-border bg-card">
+                        <button
+                          type="button"
+                          onClick={() => toggleSection(group.label)}
+                          className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-secondary/30 transition-colors"
+                        >
+                          <span className="text-base font-semibold text-foreground">{group.label}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground">{group.comps.length} open</span>
+                            <ChevronDown size={15} className={cn("text-muted-foreground transition-transform", isExpanded && "rotate-180")} />
+                          </div>
+                        </button>
+                        {isExpanded && (
+                          <div className="space-y-3 border-t border-border p-3">
+                            {group.comps.map((comp) => (
+                              <CompTable key={comp.id} animalMode={isAnimalMode} title={comp.tierDef?.name ?? "Open"} invitational={comp.isInvitational}>
+                                <CompRow
+                                  comp={comp}
+                                  animalMode={isAnimalMode}
+                                  animalOptions={isAnimalMode ? [] : eligibleAnimalsFor(comp)}
+                                  selectedAnimalId={isAnimalMode ? "" : (rowSelections[comp.id] ?? "")}
+                                  onSelectAnimal={(id) => setRowSelections((p) => ({ ...p, [comp.id]: id }))}
+                                  playerAccountId={playerAccountId}
+                                  isEntering={enter.isPending && enter.variables?.competitionId === comp.id}
+                                  justEntered={isAnimalMode
+                                    ? enteredPairs.has(`${comp.id}:${initialAnimalId ?? ""}`) || comp.entries.some((e) => e.animal.id === initialAnimalId)
+                                    : enteredPairs.has(`${comp.id}:${rowSelections[comp.id] ?? ""}`)}
+                                  errorMsg={rowErrors[comp.id] ?? null}
+                                  onEnter={() => {
+                                    const animalId = isAnimalMode ? initialAnimalId : rowSelections[comp.id]
+                                    if (!animalId || !playerAccountId) return
+                                    enter.mutate({ animalId, competitionId: comp.id, playerAccountId })
+                                  }}
+                                />
+                                <EntryTable comp={comp} />
+                              </CompTable>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )
                   })}

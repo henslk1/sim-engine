@@ -21,6 +21,7 @@ export const titleAdminRouter = router({
       description: z.string().nullish(),
       disciplineDefId: z.string().nullish(),
       rankOrder: z.number().int(),
+      requiredPlacements: z.number().int().min(1).default(1),
     }))
     .mutation(({ input }) => {
       const { id, gameId, description, disciplineDefId, ...rest } = input

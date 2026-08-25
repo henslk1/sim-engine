@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { trpc } from "@/lib/trpc"
+import { useState } from "react"
 import { ChevronLeft, Mountain, Waves, Wind, ArrowRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -71,12 +72,23 @@ function VenuesPage() {
     { enabled: !!gameId },
   )
 
-  const infoByVenue = competitions?.reduce<Record<string, { count: number; disciplines: Set<string> }>>((acc, comp) => {
-    if (!acc[comp.venue.id]) acc[comp.venue.id] = { count: 0, disciplines: new Set() }
+  const [filterDisciplineId, setFilterDisciplineId] = useState("")
+
+  const infoByVenue = competitions?.reduce<Record<string, { count: number; disciplines: Set<string>; disciplineIds: Set<string> }>>((acc, comp) => {
+    if (!acc[comp.venue.id]) acc[comp.venue.id] = { count: 0, disciplines: new Set(), disciplineIds: new Set() }
     acc[comp.venue.id].count++
     acc[comp.venue.id].disciplines.add(comp.disciplineDef.name)
+    acc[comp.venue.id].disciplineIds.add(comp.disciplineDef.id)
     return acc
   }, {}) ?? {}
+
+  const disciplineOptions = competitions
+    ? [...new Map(competitions.map((c) => [c.disciplineDef.id, c.disciplineDef.name])).entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name))
+    : []
+
+  const filteredVenues = venues?.filter((v) =>
+    !filterDisciplineId || infoByVenue[v.id]?.disciplineIds.has(filterDisciplineId)
+  )
 
   return (
     <div className="min-h-screen bg-background">
@@ -101,6 +113,18 @@ function VenuesPage() {
             Explore the competition grounds. Each region presents unique
             environmental conditions that affect performance. Prepare your stable accordingly.
           </p>
+          {disciplineOptions.length > 1 && (
+            <div className="mt-5">
+              <select
+                value={filterDisciplineId}
+                onChange={(e) => setFilterDisciplineId(e.target.value)}
+                className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              >
+                <option value="">All Disciplines</option>
+                {disciplineOptions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+              </select>
+            </div>
+          )}
         </div>
 
         {/* Grid */}
@@ -110,11 +134,11 @@ function VenuesPage() {
               <div key={i} className="h-80 animate-pulse rounded-2xl border border-border bg-muted/20" />
             ))}
           </div>
-        ) : !venues?.length ? (
-          <p className="text-sm text-muted-foreground">No venues configured.</p>
+        ) : !filteredVenues?.length ? (
+          <p className="text-sm text-muted-foreground">{filterDisciplineId ? "No venues host this discipline." : "No venues configured."}</p>
         ) : (
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {venues.map((venue) => {
+            {filteredVenues.map((venue) => {
               const info = infoByVenue[venue.id]
               const count = info?.count ?? 0
               const disciplines = info ? Array.from(info.disciplines) : []

@@ -174,16 +174,17 @@ model ClinicEntry {
 }
 
 model TitleDef {
-  id               String            @id @default(cuid())
-  gameId           String
-  name             String
-  description      String?
-  disciplineDefId  String?
-  rankOrder        Int
-  animalTitles     AnimalTitle[]
-  breedingListings BreedingListing[]
-  game             Game              @relation(fields: [gameId], references: [id])
-  disciplineDef    DisciplineDef?    @relation(fields: [disciplineDefId], references: [id])
+  id                 String            @id @default(cuid())
+  gameId             String
+  name               String
+  description        String?
+  disciplineDefId    String?
+  rankOrder          Int
+  requiredPlacements Int               @default(1)
+  animalTitles       AnimalTitle[]
+  breedingListings   BreedingListing[]
+  game               Game              @relation(fields: [gameId], references: [id])
+  disciplineDef      DisciplineDef?    @relation(fields: [disciplineDefId], references: [id])
 }
 
 model AnimalTitle {

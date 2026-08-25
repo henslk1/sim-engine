@@ -9,8 +9,9 @@ type TitleForm = {
   description: string
   disciplineDefId: string
   rankOrder: string
+  requiredPlacements: string
 }
-const emptyForm = (): TitleForm => ({ name: "", description: "", disciplineDefId: "", rankOrder: "" })
+const emptyForm = (): TitleForm => ({ name: "", description: "", disciplineDefId: "", rankOrder: "", requiredPlacements: "1" })
 
 function TitlesPage() {
   const { gameId } = Route.useParams()
@@ -44,11 +45,12 @@ function TitlesPage() {
       description: t.description ?? "",
       disciplineDefId: t.disciplineDefId ?? "",
       rankOrder: t.rankOrder.toString(),
+      requiredPlacements: t.requiredPlacements.toString(),
     })
   }
 
   function submit() {
-    if (!gameId || !editing.name.trim() || editing.rankOrder === "") return
+    if (!gameId || !editing.name.trim() || editing.rankOrder === "" || editing.requiredPlacements === "") return
     save.mutate({
       id: editingId ?? undefined,
       gameId,
@@ -56,6 +58,7 @@ function TitlesPage() {
       description: editing.description.trim() || null,
       disciplineDefId: editing.disciplineDefId || null,
       rankOrder: parseInt(editing.rankOrder),
+      requiredPlacements: parseInt(editing.requiredPlacements),
     })
   }
 
@@ -90,6 +93,17 @@ function TitlesPage() {
                 value={editing.rankOrder}
                 onChange={(e) => setEditing({ ...editing, rankOrder: e.target.value })}
                 placeholder="0"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Required Placements</label>
+              <Input
+                className="h-8 text-sm"
+                type="number"
+                min="1"
+                value={editing.requiredPlacements}
+                onChange={(e) => setEditing({ ...editing, requiredPlacements: e.target.value })}
+                placeholder="1"
               />
             </div>
             <div className="flex flex-col gap-1">
@@ -132,6 +146,7 @@ function TitlesPage() {
                 <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Name</th>
                 <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Discipline</th>
                 <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Rank Order</th>
+                <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Req. Placements</th>
                 <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Description</th>
                 <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
               </tr>
@@ -142,6 +157,7 @@ function TitlesPage() {
                   <td className="px-3 py-2 font-medium text-foreground">{t.name}</td>
                   <td className="px-3 py-2 text-muted-foreground">{t.disciplineDef?.name ?? "—"}</td>
                   <td className="px-3 py-2 text-muted-foreground">{t.rankOrder}</td>
+                  <td className="px-3 py-2 text-muted-foreground">{t.requiredPlacements}</td>
                   <td className="px-3 py-2 text-muted-foreground">{t.description ?? "—"}</td>
                   <td className="px-3 py-2 text-right space-x-1">
                     <Button size="sm" variant="ghost" onClick={() => openEdit(t)}>Edit</Button>
@@ -154,7 +170,7 @@ function TitlesPage() {
               ))}
               {titles?.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-3 py-6 text-center text-sm text-muted-foreground">No titles yet.</td>
+                  <td colSpan={6} className="px-3 py-6 text-center text-sm text-muted-foreground">No titles yet.</td>
                 </tr>
               )}
             </tbody>

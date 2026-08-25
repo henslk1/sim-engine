@@ -117,10 +117,11 @@ export function OwnerView({ animal, animalId, playerAccountId }: { animal: Anima
       <main className="min-h-0 flex-1 overflow-auto p-3">
         <div className="grid min-h-0 gap-3 grid-cols-1 min-[1400px]:h-full min-[1400px]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,2.6fr)_minmax(0,1.15fr)_minmax(0,0.85fr)]">
 
-          {/* Col 1 — Breeding / Health */}
+          {/* Col 1 — Breeding / Health / Notes */}
           <div className="flex min-h-0 flex-col gap-3 min-[1400px]:grid min-[1400px]:grid-rows-[auto_minmax(0,1fr)]">
             {animal.lifeStage.canBreed && <BreedingPanel animal={animal} breedingGrade={breedingGrade} />}
             <HealthPanel animal={animal} playerAccountId={playerAccountId} />
+            <NotesPanel animal={animal} animalId={animalId} />
           </div>
 
           {/* Col 2 — Training / Competition */}
@@ -169,7 +170,6 @@ export function OwnerView({ animal, animalId, playerAccountId }: { animal: Anima
             {(animal.lifeStage.canTrain || !animal.lifeStage.hasUniqueActionSet) && (
               <PersonalityPanel animal={animal} />
             )}
-            <NotesPanel animal={animal} animalId={animalId} />
           </div>
 
         </div>

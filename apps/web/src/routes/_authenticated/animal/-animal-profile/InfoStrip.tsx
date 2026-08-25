@@ -39,7 +39,13 @@ export function InfoStrip({
           <Trophy className="size-3 text-chart-1" /> {animal.disciplineDef.name}
         </span>
       )}
-      {animal.titles.map((t: AnimalProfile["titles"][number]) => (
+      {Object.values(
+        animal.titles.reduce((acc, t: AnimalProfile["titles"][number]) => {
+          const key = t.titleDef.disciplineDefId ?? "none"
+          if (!acc[key] || t.titleDef.rankOrder < acc[key].titleDef.rankOrder) acc[key] = t
+          return acc
+        }, {} as Record<string, AnimalProfile["titles"][number]>)
+      ).map((t) => (
         <span
           key={t.id}
           className="inline-flex items-center gap-1 rounded-full bg-accent/20 px-2 py-0.5 text-[11px] font-semibold text-accent-foreground"

@@ -3,8 +3,8 @@ import { runCompetition } from "./run.js";
 
 type Client = typeof db
 
-function nextHour(): Date {
-  return new Date(Math.floor(Date.now() / 3_600_000 + 1) * 3_600_000)
+function expiresAfterHours(hours: number): Date {
+  return new Date(Date.now() + hours * 3_600_000)
 }
 
 export async function checkCompetitions(client: Client, gameId: string) {
@@ -62,7 +62,7 @@ export async function checkCompetitions(client: Client, gameId: string) {
                 maxEntries: vd.defaultMaxEntries,
                 maxWaitHours: vd.defaultMaxWaitHours,
                 status: "OPEN",
-                expiresAt: nextHour(),
+                expiresAt: expiresAfterHours(vd.defaultMaxWaitHours),
               },
             })
           }
@@ -92,7 +92,7 @@ export async function checkCompetitions(client: Client, gameId: string) {
               maxEntries: vd.defaultMaxEntries,
               maxWaitHours: vd.defaultMaxWaitHours,
               status: "OPEN",
-              expiresAt: nextHour(),
+              expiresAt: expiresAfterHours(vd.defaultMaxWaitHours),
             },
           })
         }
