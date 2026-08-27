@@ -128,6 +128,30 @@ export const breedAdminRouter = router({
     .input(z.object({ id: z.string() }))
     .mutation(({ input }) => db.breedConformationStandard.delete({ where: { id: input.id } })),
 
+  listDqTraits: publicProcedure
+    .input(z.object({ breedId: z.string() }))
+    .query(({ input }) =>
+      db.breedDqTrait.findMany({
+        where: { breedId: input.breedId },
+        include: { locus: { select: { id: true, name: true } } },
+      })
+    ),
+  saveDqTrait: publicProcedure
+    .input(z.object({
+      id: z.string().optional(),
+      breedId: z.string(),
+      locusId: z.string(),
+      expression: z.string().min(1),
+    }))
+    .mutation(({ input }) => {
+      const { id, breedId, ...data } = input
+      if (id) return db.breedDqTrait.update({ where: { id }, data })
+      return db.breedDqTrait.create({ data: { breedId, ...data } })
+    }),
+  removeDqTrait: publicProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(({ input }) => db.breedDqTrait.delete({ where: { id: input.id } })),
+
   listPersonalityProfiles: publicProcedure
     .input(z.object({ breedId: z.string() }))
     .query(({ input }) =>
@@ -212,7 +236,24 @@ export const breedAdminRouter = router({
         orderBy: { allele: { symbol: "asc" } },
         include: {
           allele: {
-            select: { id: true, symbol: true, locus: { select: { id: true, name: true } } },
+            select: {
+              id: true,
+              locusId: true,
+              symbol: true,
+              locus: {
+                select: {
+                  id: true,
+                  name: true,
+                  panelEntries: { select: { panelDef: { select: { panelType: true } } } },
+                  sectionEntries: {
+                    select: { section: { select: { id: true, name: true, displayOrder: true } } },
+                    orderBy: { displayOrder: "asc" },
+                  },
+                },
+              },
+              expressionRulesAsAlleleOne: { select: { alleleTwoId: true, phenotype: true } },
+              expressionRulesAsAlleleTwo: { select: { alleleOneId: true, phenotype: true } },
+            },
           },
         },
       })

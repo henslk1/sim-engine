@@ -108,10 +108,10 @@ export const breedRouter = router({
                       },
                     },
                     expressionRulesAsAlleleOne: {
-                      include: { ruleConditions: { include: { healthConditionDef: { select: { id: true, name: true } } } } },
+                      include: { ruleConditions: { include: { healthConditionDef: { select: { id: true, name: true, isGenetic: true } } } } },
                     },
                     expressionRulesAsAlleleTwo: {
-                      include: { ruleConditions: { include: { healthConditionDef: { select: { id: true, name: true } } } } },
+                      include: { ruleConditions: { include: { healthConditionDef: { select: { id: true, name: true, isGenetic: true } } } } },
                     },
                   },
                 },
@@ -131,12 +131,29 @@ export const breedRouter = router({
         }),
       ])
 
+      // ── Allele pool per locus (shared by health + coat color logic) ───────────
+      const allelePoolByLocus = new Map<string, Set<string>>()
+      for (const af of breed.alleleFrequencies) {
+        if (!allelePoolByLocus.has(af.allele.locusId)) allelePoolByLocus.set(af.allele.locusId, new Set())
+        allelePoolByLocus.get(af.allele.locusId)!.add(af.allele.id)
+      }
+
       // ── Health conditions ──────────────────────────────────────────────────
+      // Only surface genetic conditions reachable from the breed's actual allele pool.
       const healthConditions = new Map<string, string>()
       for (const af of breed.alleleFrequencies) {
+        const pool = allelePoolByLocus.get(af.allele.locusId)
+        if (!pool) continue
         for (const rule of af.allele.expressionRulesAsAlleleOne) {
+          if (!pool.has(rule.alleleTwoId)) continue
           for (const rc of rule.ruleConditions) {
-            healthConditions.set(rc.healthConditionDef.id, rc.healthConditionDef.name)
+            if (rc.healthConditionDef.isGenetic) healthConditions.set(rc.healthConditionDef.id, rc.healthConditionDef.name)
+          }
+        }
+        for (const rule of af.allele.expressionRulesAsAlleleTwo) {
+          if (!pool.has(rule.alleleOneId)) continue
+          for (const rc of rule.ruleConditions) {
+            if (rc.healthConditionDef.isGenetic) healthConditions.set(rc.healthConditionDef.id, rc.healthConditionDef.name)
           }
         }
       }

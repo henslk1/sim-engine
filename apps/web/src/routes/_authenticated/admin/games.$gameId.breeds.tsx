@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { computePossiblePhenotypes, type PossibleLocusPhenotypes } from "@/lib/breedUtils"
 
 export const Route = createFileRoute("/_authenticated/admin/games/$gameId/breeds")({
   component: BreedsPage,
@@ -178,6 +179,7 @@ function LocusAlleleGroup({ locus, locusAlleles, freqValues, onFreqChange }: {
 // ── Expression Row (Standards) ────────────────────────────────────────────────
 
 type ConformStandard = { id: string; locusId: string; idealExpressionLabel: string; weight: number }
+type DqTrait = { id: string; locusId: string; expression: string }
 
 function ExpressionRow({ phenotype, existing, locusId, onSave, onRemove }: {
   phenotype: string
@@ -215,41 +217,94 @@ function ExpressionRow({ phenotype, existing, locusId, onSave, onRemove }: {
 
 // ── Locus Standards Group ─────────────────────────────────────────────────────
 
-function LocusStandardsGroup({ locus, conformStandards, onSave, onRemove }: {
+function LocusStandardsGroup({ locus, phenotypes, conformStandards, onSave, onRemove }: {
   locus: { id: string; name: string }
+  phenotypes: string[]
   conformStandards: ConformStandard[]
   onSave: (id: string | undefined, locusId: string, label: string, weight: number) => void
   onRemove: (id: string) => void
 }) {
-  const { data: rules } = trpc.admin.expression.listByLocus.useQuery({ locusId: locus.id })
-  const phenotypes = useMemo(() => [...new Set(rules?.map(r => r.phenotype) ?? [])], [rules])
-
   return (
     <div className="border-b border-border last:border-0">
       <div className="bg-secondary/40 px-3 py-2 border-b border-border">
         <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{locus.name}</span>
       </div>
-      {phenotypes.length === 0 ? (
-        <p className="px-4 py-2 text-xs text-muted-foreground/60">No expression rules defined yet.</p>
-      ) : (
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border bg-muted/20"><TH>In Standard</TH><TH>Expression</TH><TH>Weight</TH></tr>
-          </thead>
-          <tbody>
-            {phenotypes.map(phenotype => (
-              <ExpressionRow
-                key={phenotype}
-                phenotype={phenotype}
-                existing={conformStandards.find(cs => cs.locusId === locus.id && cs.idealExpressionLabel === phenotype)}
-                locusId={locus.id}
-                onSave={onSave}
-                onRemove={onRemove}
-              />
-            ))}
-          </tbody>
-        </table>
-      )}
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-border bg-muted/20"><TH>In Standard</TH><TH>Expression</TH><TH>Weight</TH></tr>
+        </thead>
+        <tbody>
+          {phenotypes.map(phenotype => (
+            <ExpressionRow
+              key={phenotype}
+              phenotype={phenotype}
+              existing={conformStandards.find(cs => cs.locusId === locus.id && cs.idealExpressionLabel === phenotype)}
+              locusId={locus.id}
+              onSave={onSave}
+              onRemove={onRemove}
+            />
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+// ── DQ Trait Row ──────────────────────────────────────────────────────────────
+
+function DqTraitRow({ phenotype, existing, locusId, onSave, onRemove }: {
+  phenotype: string
+  existing: DqTrait | undefined
+  locusId: string
+  onSave: (id: string | undefined, locusId: string, expression: string) => void
+  onRemove: (id: string) => void
+}) {
+  function handleToggle(checked: boolean) {
+    if (checked) onSave(undefined, locusId, phenotype)
+    else if (existing) onRemove(existing.id)
+  }
+
+  return (
+    <tr className="border-b border-border last:border-0">
+      <td className="px-3 py-1.5 w-8">
+        <input type="checkbox" checked={!!existing} onChange={e => handleToggle(e.target.checked)} className="cursor-pointer" />
+      </td>
+      <td className="px-3 py-1.5 text-sm text-foreground">{phenotype}</td>
+    </tr>
+  )
+}
+
+// ── Locus DQ Traits Group ─────────────────────────────────────────────────────
+
+function LocusDqTraitsGroup({ locus, phenotypes, dqTraits = [], onSave, onRemove }: {
+  locus: { id: string; name: string }
+  phenotypes: string[]
+  dqTraits?: DqTrait[]
+  onSave: (id: string | undefined, locusId: string, expression: string) => void
+  onRemove: (id: string) => void
+}) {
+  return (
+    <div className="border-b border-border last:border-0">
+      <div className="bg-secondary/40 px-3 py-2 border-b border-border">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{locus.name}</span>
+      </div>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-border bg-muted/20"><TH>DQ</TH><TH>Expression</TH></tr>
+        </thead>
+        <tbody>
+          {phenotypes.map(phenotype => (
+            <DqTraitRow
+              key={phenotype}
+              phenotype={phenotype}
+              existing={dqTraits.find(d => d.locusId === locus.id && d.expression === phenotype)}
+              locusId={locus.id}
+              onSave={onSave}
+              onRemove={onRemove}
+            />
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }
@@ -291,28 +346,76 @@ function LociContent({ locusAlleleGroups, freqValues, onFreqChange, onSaveAll, i
   )
 }
 
-function StandardsContent({ loci, conformStandards, onSave, onRemove }: {
-  loci: { id: string; name: string }[]
+function StandardsContent({ possibleLoci, conformStandards, dqTraits, onSaveConform, onRemoveConform, onSaveDq, onRemoveDq }: {
+  possibleLoci: PossibleLocusPhenotypes[]
   conformStandards: ConformStandard[]
-  onSave: (id: string | undefined, locusId: string, label: string, weight: number) => void
-  onRemove: (id: string) => void
+  dqTraits: DqTrait[]
+  onSaveConform: (id: string | undefined, locusId: string, label: string, weight: number) => void
+  onRemoveConform: (id: string) => void
+  onSaveDq: (id: string | undefined, locusId: string, expression: string) => void
+  onRemoveDq: (id: string) => void
 }) {
-  if (!loci.length) {
-    return <p className="px-4 py-4 text-sm text-muted-foreground">Configure loci in the Genetics section first.</p>
+  const [subTab, setSubTab] = useState<"ideal" | "dq">("ideal")
+
+  if (!possibleLoci.length) {
+    return <p className="px-4 py-4 text-sm text-muted-foreground">Configure allele frequencies first — breed standards are derived from the breed's allele pool.</p>
   }
   return (
     <div>
-      <p className="px-3 py-2 text-xs text-muted-foreground/60 border-b border-border">
-        Check an expression to include it in this breed's conformation standard.
-      </p>
-      <div className="grid grid-cols-2 divide-x divide-border">
-        {loci.map(locus => (
-          <LocusStandardsGroup key={locus.id} locus={locus}
-            conformStandards={conformStandards}
-            onSave={onSave}
-            onRemove={onRemove} />
+      <div className="flex border-b border-border bg-secondary/20">
+        {(["ideal", "dq"] as const).map(t => (
+          <button
+            key={t}
+            onClick={() => setSubTab(t)}
+            className={cn(
+              "px-4 py-2 text-xs font-semibold uppercase tracking-wide transition-colors",
+              subTab === t ? "border-b-2 border-primary text-foreground" : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {t === "ideal" ? "Ideal Traits" : "Disqualifying Traits"}
+          </button>
         ))}
       </div>
+
+      {subTab === "ideal" && (
+        <div>
+          <p className="px-3 py-1.5 text-xs text-muted-foreground/60 border-b border-border">
+            Check an expression to include it in this breed's conformation standard.
+          </p>
+          <div className="grid grid-cols-2 divide-x divide-border">
+            {possibleLoci.map(l => (
+              <LocusStandardsGroup
+                key={l.locusId}
+                locus={{ id: l.locusId, name: l.locusName }}
+                phenotypes={l.phenotypes}
+                conformStandards={conformStandards}
+                onSave={onSaveConform}
+                onRemove={onRemoveConform}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {subTab === "dq" && (
+        <div>
+          <p className="px-3 py-1.5 text-xs text-muted-foreground/60 border-b border-border">
+            Check an expression to mark it as a disqualifying trait for this breed.
+          </p>
+          <div className="grid grid-cols-2 divide-x divide-border">
+            {possibleLoci.map(l => (
+              <LocusDqTraitsGroup
+                key={l.locusId}
+                locus={{ id: l.locusId, name: l.locusName }}
+                phenotypes={l.phenotypes}
+                dqTraits={dqTraits}
+                onSave={onSaveDq}
+                onRemove={onRemoveDq}
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -332,7 +435,6 @@ function BreedsPage() {
   const { data: breeds } = trpc.admin.breed.list.useQuery({ gameId: gameId! })
   const { data: species } = trpc.admin.species.list.useQuery({ gameId: gameId! })
   const { data: stats } = trpc.admin.stat.list.useQuery({ gameId: gameId! })
-  const { data: loci } = trpc.admin.breed.listLoci.useQuery({ gameId: gameId! })
   const { data: personalityTraits } = trpc.admin.personality.list.useQuery({ gameId: gameId! })
   const { data: alleles } = trpc.admin.breed.listAlleles.useQuery({ gameId: gameId! })
 
@@ -340,6 +442,9 @@ function BreedsPage() {
     { breedId: editing?.id! }, { enabled: !!editing?.id }
   )
   const { data: conformStandards } = trpc.admin.breed.listConformationStandards.useQuery(
+    { breedId: editing?.id! }, { enabled: !!editing?.id }
+  )
+  const { data: dqTraits } = trpc.admin.breed.listDqTraits.useQuery(
     { breedId: editing?.id! }, { enabled: !!editing?.id }
   )
   const { data: personalityProfiles } = trpc.admin.breed.listPersonalityProfiles.useQuery(
@@ -418,6 +523,12 @@ function BreedsPage() {
   const removeConform = trpc.admin.breed.removeConformationStandard.useMutation({
     onSuccess: () => utils.admin.breed.listConformationStandards.invalidate(),
   })
+  const saveDqTrait = trpc.admin.breed.saveDqTrait.useMutation({
+    onSuccess: () => utils.admin.breed.listDqTraits.invalidate(),
+  })
+  const removeDqTrait = trpc.admin.breed.removeDqTrait.useMutation({
+    onSuccess: () => utils.admin.breed.listDqTraits.invalidate(),
+  })
   const savePersonalityProfile = trpc.admin.breed.savePersonalityProfile.useMutation({
     onSuccess: () => utils.admin.breed.listPersonalityProfiles.invalidate(),
   })
@@ -465,6 +576,11 @@ function BreedsPage() {
   function handleSaveConform(id: string | undefined, locusId: string, label: string, weight: number) {
     if (!editing?.id) return
     saveConform.mutate({ id, breedId: editing.id, locusId, idealExpressionLabel: label, weight })
+  }
+
+  function handleSaveDqTrait(id: string | undefined, locusId: string, expression: string) {
+    if (!editing?.id) return
+    saveDqTrait.mutate({ id, breedId: editing.id, locusId, expression })
   }
 
   function handleSavePersonalityProfile(traitDefId: string, id: string | undefined, data: { naturalMin: number; naturalMax: number; baseline: number }) {
@@ -519,6 +635,11 @@ function BreedsPage() {
     }
     return Array.from(map.values())
   }, [alleles])
+
+  const possibleLoci = useMemo(
+    () => computePossiblePhenotypes(alleleFrequencies ?? []),
+    [alleleFrequencies]
+  )
 
   function advanceWizard() {
     setWizardStep(s => s === 2 ? 3 : s === 3 ? 4 : null)
@@ -778,10 +899,13 @@ function BreedsPage() {
                 )}
                 {wizardStep === 4 && (
                   <StandardsContent
-                    loci={loci ?? []}
+                    possibleLoci={possibleLoci}
                     conformStandards={conformStandards ?? []}
-                    onSave={handleSaveConform}
-                    onRemove={id => removeConform.mutate({ id })}
+                    dqTraits={dqTraits ?? []}
+                    onSaveConform={handleSaveConform}
+                    onRemoveConform={id => removeConform.mutate({ id })}
+                    onSaveDq={handleSaveDqTrait}
+                    onRemoveDq={id => removeDqTrait.mutate({ id })}
                   />
                 )}
 
@@ -859,7 +983,7 @@ function BreedsPage() {
 
             {activePanel === "standards" && (
               <StandardsContent
-                loci={loci ?? []}
+                possibleLoci={possibleLoci}
                 conformStandards={conformStandards ?? []}
                 onSave={handleSaveConform}
                 onRemove={id => removeConform.mutate({ id })}

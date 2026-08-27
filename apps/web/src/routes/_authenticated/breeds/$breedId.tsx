@@ -4,6 +4,7 @@ import { trpc } from "@/lib/trpc"
 import type { RouterOutputs } from "@/lib/trpc"
 import { Badge, Panel } from "@/components/game/ui"
 import { cn } from "@/lib/utils"
+import { computePossiblePhenotypes, type PossibleLocusPhenotypes } from "@/lib/breedUtils"
 
 export const Route = createFileRoute("/_authenticated/breeds/$breedId")({
   component: BreedDetailPage,
@@ -250,67 +251,30 @@ function FoundationTab({ breed }: { breed: Breed }) {
 }
 
 function PossibleTraitsTab({ alleleFrequencies }: { alleleFrequencies: AlleleFrequency[] }) {
+  const loci = computePossiblePhenotypes(alleleFrequencies, { excludeColorLoci: true })
+
   if (alleleFrequencies.length === 0) {
     return <p className="text-[11px] text-muted-foreground/60">No allele frequencies configured for this breed.</p>
   }
-
-  const breedAllelesPerLocus = new Map<string, Set<string>>()
-  for (const af of alleleFrequencies) {
-    const lid = af.allele.locusId
-    if (!breedAllelesPerLocus.has(lid)) breedAllelesPerLocus.set(lid, new Set())
-    breedAllelesPerLocus.get(lid)!.add(af.allele.id)
-  }
-
-  type LocusData = {
-    name: string
-    section: { id: string; name: string; displayOrder: number } | null
-    phenotypes: Set<string>
-  }
-  const locusMap = new Map<string, LocusData>()
-
-  for (const af of alleleFrequencies) {
-    // Coat color loci are handled by the Coat Colors panel — skip them here
-    if (af.allele.locus.panelEntries.some(e => e.panelDef.panelType === "COLOR")) continue
-    const lid = af.allele.locusId
-    const pool = breedAllelesPerLocus.get(lid) ?? new Set()
-    if (!locusMap.has(lid)) {
-      const se = af.allele.locus.sectionEntries[0]
-      locusMap.set(lid, { name: af.allele.locus.name, section: se?.section ?? null, phenotypes: new Set() })
-    }
-    const entry = locusMap.get(lid)!
-    for (const rule of af.allele.expressionRulesAsAlleleOne) {
-      if (pool.has(rule.alleleTwoId)) entry.phenotypes.add(rule.phenotype)
-    }
-    for (const rule of af.allele.expressionRulesAsAlleleTwo) {
-      if (pool.has(rule.alleleOneId)) entry.phenotypes.add(rule.phenotype)
-    }
-  }
-
-  type SecEntry = {
-    section: { id: string; name: string; displayOrder: number } | null
-    loci: { id: string; name: string; phenotypes: string[] }[]
-  }
-  const secMap = new Map<string, SecEntry>()
-  for (const [locusId, data] of locusMap) {
-    if (data.phenotypes.size === 0) continue
-    const key = data.section?.id ?? "__other"
-    if (!secMap.has(key)) secMap.set(key, { section: data.section, loci: [] })
-    secMap.get(key)!.loci.push({ id: locusId, name: data.name, phenotypes: [...data.phenotypes].sort() })
-  }
-
-  const sections = [...secMap.values()].sort((a, b) => (a.section?.displayOrder ?? 999) - (b.section?.displayOrder ?? 999))
-
-  if (sections.length === 0) {
+  if (loci.length === 0) {
     return <p className="text-[11px] text-muted-foreground/60">No phenotypes could be resolved for this breed.</p>
   }
 
+  const secMap = new Map<string, { section: PossibleLocusPhenotypes["section"]; loci: typeof loci }>()
+  for (const l of loci) {
+    const key = l.section?.id ?? "__other"
+    if (!secMap.has(key)) secMap.set(key, { section: l.section, loci: [] })
+    secMap.get(key)!.loci.push(l)
+  }
+  const sections = [...secMap.values()]
+
   return (
     <div className="space-y-4">
-      {sections.map(({ section, loci }) => (
+      {sections.map(({ section, loci: sLoci }) => (
         <SectionGroup key={section?.id ?? "__other"} name={section?.name ?? "Other"}>
-          {loci.map(l => (
-            <div key={l.id} className="min-w-28 rounded-md border border-border/70 bg-secondary/30 px-3 py-2.5">
-              <p className="mb-0.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{l.name}</p>
+          {sLoci.map(l => (
+            <div key={l.locusId} className="min-w-28 rounded-md border border-border/70 bg-secondary/30 px-3 py-2.5">
+              <p className="mb-0.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{l.locusName}</p>
               <p className="text-sm text-foreground">{l.phenotypes.join(", ")}</p>
             </div>
           ))}
