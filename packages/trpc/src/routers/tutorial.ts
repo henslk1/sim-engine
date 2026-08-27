@@ -110,9 +110,11 @@ export const tutorialRouter = router({
       const breedId = starterOption.breedId
 
       // Batch 3
-      const [breedStatProfile, breedPersonalityProfiles, breedAlleleFreqs, colorExpressionRules] = await Promise.all([
+      const [breedStatProfile, breedPersonalityProfiles, breedImmunity, gameConfigForGen, breedAlleleFreqs, colorExpressionRules] = await Promise.all([
         db.breedStatProfile.findMany({ where: { breedId }, select: { statDefId: true, naturalMin: true, naturalMax: true } }),
         db.breedPersonalityProfile.findMany({ where: { breedId }, select: { traitDefId: true, naturalMin: true, naturalMax: true } }),
+        db.breed.findUnique({ where: { id: breedId }, select: { immunityMin: true, immunityMax: true, lifeExpectancyBaseline: true } }),
+        db.gameConfig.findUnique({ where: { gameId }, select: { lifeExpectancyBaseline: true } }),
         db.breedAlleleFrequency.findMany({
           where: { breedId },
           select: { alleleId: true, frequency: true, allele: { select: { locusId: true } } },
@@ -158,6 +160,10 @@ export const tutorialRouter = router({
         byLocus,
         breedStatProfile,
         breedPersonalityProfiles,
+        immunityMin: breedImmunity?.immunityMin ?? null,
+        immunityMax: breedImmunity?.immunityMax ?? null,
+        lifeExpectancyBaseline: breedImmunity?.lifeExpectancyBaseline ?? null,
+        gameConfigLifeExpectancyBaseline: gameConfigForGen?.lifeExpectancyBaseline ?? null,
         ltcDefs,
         lifeStages,
         compTierLookup,

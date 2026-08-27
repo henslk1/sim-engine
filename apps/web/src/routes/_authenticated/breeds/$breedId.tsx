@@ -13,13 +13,15 @@ type BreedDetail = RouterOutputs["breed"]["get"]
 type Breed = BreedDetail["breed"]
 type ConformStandard = Breed["conformationStandards"][number]
 type DqTrait = Breed["dqTraits"][number]
-type WorkspaceTab = "history" | "characteristics" | "health" | "standard" | "foundation"
+type AlleleFrequency = Breed["alleleFrequencies"][number]
+type WorkspaceTab = "history" | "characteristics" | "health" | "standard" | "foundation" | "traits"
 
 const WORKSPACE_TABS: { id: WorkspaceTab; label: string }[] = [
   { id: "history", label: "History" },
   { id: "characteristics", label: "Characteristics" },
   { id: "health", label: "Health" },
   { id: "standard", label: "Breed Standard" },
+  { id: "traits", label: "Possible Traits" },
   { id: "foundation", label: "Foundation Animals" },
 ]
 
@@ -247,6 +249,77 @@ function FoundationTab({ breed }: { breed: Breed }) {
   )
 }
 
+function PossibleTraitsTab({ alleleFrequencies }: { alleleFrequencies: AlleleFrequency[] }) {
+  if (alleleFrequencies.length === 0) {
+    return <p className="text-[11px] text-muted-foreground/60">No allele frequencies configured for this breed.</p>
+  }
+
+  const breedAllelesPerLocus = new Map<string, Set<string>>()
+  for (const af of alleleFrequencies) {
+    const lid = af.allele.locusId
+    if (!breedAllelesPerLocus.has(lid)) breedAllelesPerLocus.set(lid, new Set())
+    breedAllelesPerLocus.get(lid)!.add(af.allele.id)
+  }
+
+  type LocusData = {
+    name: string
+    section: { id: string; name: string; displayOrder: number } | null
+    phenotypes: Set<string>
+  }
+  const locusMap = new Map<string, LocusData>()
+
+  for (const af of alleleFrequencies) {
+    // Coat color loci are handled by the Coat Colors panel — skip them here
+    if (af.allele.locus.panelEntries.some(e => e.panelDef.panelType === "COLOR")) continue
+    const lid = af.allele.locusId
+    const pool = breedAllelesPerLocus.get(lid) ?? new Set()
+    if (!locusMap.has(lid)) {
+      const se = af.allele.locus.sectionEntries[0]
+      locusMap.set(lid, { name: af.allele.locus.name, section: se?.section ?? null, phenotypes: new Set() })
+    }
+    const entry = locusMap.get(lid)!
+    for (const rule of af.allele.expressionRulesAsAlleleOne) {
+      if (pool.has(rule.alleleTwoId)) entry.phenotypes.add(rule.phenotype)
+    }
+    for (const rule of af.allele.expressionRulesAsAlleleTwo) {
+      if (pool.has(rule.alleleOneId)) entry.phenotypes.add(rule.phenotype)
+    }
+  }
+
+  type SecEntry = {
+    section: { id: string; name: string; displayOrder: number } | null
+    loci: { id: string; name: string; phenotypes: string[] }[]
+  }
+  const secMap = new Map<string, SecEntry>()
+  for (const [locusId, data] of locusMap) {
+    if (data.phenotypes.size === 0) continue
+    const key = data.section?.id ?? "__other"
+    if (!secMap.has(key)) secMap.set(key, { section: data.section, loci: [] })
+    secMap.get(key)!.loci.push({ id: locusId, name: data.name, phenotypes: [...data.phenotypes].sort() })
+  }
+
+  const sections = [...secMap.values()].sort((a, b) => (a.section?.displayOrder ?? 999) - (b.section?.displayOrder ?? 999))
+
+  if (sections.length === 0) {
+    return <p className="text-[11px] text-muted-foreground/60">No phenotypes could be resolved for this breed.</p>
+  }
+
+  return (
+    <div className="space-y-4">
+      {sections.map(({ section, loci }) => (
+        <SectionGroup key={section?.id ?? "__other"} name={section?.name ?? "Other"}>
+          {loci.map(l => (
+            <div key={l.id} className="min-w-28 rounded-md border border-border/70 bg-secondary/30 px-3 py-2.5">
+              <p className="mb-0.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{l.name}</p>
+              <p className="text-sm text-foreground">{l.phenotypes.join(", ")}</p>
+            </div>
+          ))}
+        </SectionGroup>
+      ))}
+    </div>
+  )
+}
+
 function BreedDetailPage() {
   const { breedId } = Route.useParams()
   const { data: gameData } = trpc.admin.game.get.useQuery()
@@ -290,7 +363,7 @@ function BreedDetailPage() {
       {/* Body */}
       <main className="min-h-0 flex-1 overflow-auto p-3">
         <div className="mx-auto max-w-6xl">
-        <div className="grid min-h-0 gap-3 grid-cols-1 min-[1100px]:grid-cols-[minmax(0,1fr)_minmax(0,2.6fr)_minmax(0,1fr)]">
+        <div className="grid min-h-0 gap-3 grid-cols-1 min-[1100px]:grid-cols-[200px_minmax(0,1fr)_200px]">
 
           {/* Left column — leaderboards + disciplines */}
           <div className="flex flex-col gap-3">
@@ -366,6 +439,7 @@ function BreedDetailPage() {
                 {tab === "characteristics" && <CharacteristicsTab breed={breed} />}
                 {tab === "health" && <HealthTab healthConditions={healthConditions} />}
                 {tab === "standard" && <StandardTab breed={breed} />}
+                {tab === "traits" && <PossibleTraitsTab alleleFrequencies={breed.alleleFrequencies} />}
                 {tab === "foundation" && <FoundationTab breed={breed} />}
               </div>
             </div>

@@ -85,7 +85,7 @@ function StatRow({ stat, values, onChange }: {
   onChange: (statDefId: string, field: string, value: string) => void
 }) {
   return (
-    <tr className="border-t border-border">
+    <tr className="border-b border-border last:border-0">
       <td className="px-3 py-1.5 text-sm font-medium text-foreground">{stat.name}</td>
       <td className="px-2 py-1.5"><II value={values.weight} step="0.01" onChange={e => onChange(stat.id, "weight", e.target.value)} /></td>
       <td className="px-2 py-1.5"><II value={values.naturalMin} step="0.01" onChange={e => onChange(stat.id, "naturalMin", e.target.value)} /></td>
@@ -103,7 +103,7 @@ function PersonalityRow({ trait, values, onChange }: {
   onChange: (traitDefId: string, field: string, value: string) => void
 }) {
   return (
-    <tr className="border-t border-border">
+    <tr className="border-b border-border last:border-0">
       <td className="px-3 py-1.5 text-sm font-medium text-foreground">{trait.name}</td>
       <td className="px-2 py-1.5"><II value={values.naturalMin} step="1" min="0" max="100" onChange={e => onChange(trait.id, "naturalMin", e.target.value)} /></td>
       <td className="px-2 py-1.5"><II value={values.naturalMax} step="1" min="0" max="100" onChange={e => onChange(trait.id, "naturalMax", e.target.value)} /></td>
@@ -116,22 +116,17 @@ function PersonalityRow({ trait, values, onChange }: {
 
 type AlleleFreq = { id: string; alleleId: string; frequency: number; isDq: boolean }
 
-function AlleleFreqRow({ allele, values, onFreqChange, onDqChange }: {
+function AlleleFreqRow({ allele, values, onFreqChange }: {
   allele: { id: string; symbol: string }
   values: { frequency: string; isDq: boolean }
   onFreqChange: (alleleId: string, value: string) => void
-  onDqChange: (alleleId: string, isDq: boolean) => void
 }) {
   return (
-    <tr className="border-t border-border">
+    <tr className="border-b border-border last:border-0">
       <td className="px-3 py-1.5 font-mono text-sm font-medium text-foreground">{allele.symbol}</td>
-      <td className="px-2 py-1.5 w-28">
+      <td className="px-2 py-1.5">
         <II value={values.frequency} step="0.01" min="0" max="1"
           onChange={e => onFreqChange(allele.id, e.target.value)} />
-      </td>
-      <td className="px-3 py-1.5 text-center">
-        <input type="checkbox" checked={values.isDq}
-          onChange={e => onDqChange(allele.id, e.target.checked)} className="cursor-pointer" />
       </td>
     </tr>
   )
@@ -141,30 +136,37 @@ function AlleleFreqRow({ allele, values, onFreqChange, onDqChange }: {
 
 type LocusAllele = { id: string; symbol: string; locus: { id: string; name: string; panelEntries: { panelDef: { panelType: string } }[] } }
 
-function LocusAlleleGroup({ locus, locusAlleles, freqValues, onFreqChange, onDqChange }: {
+function LocusAlleleGroup({ locus, locusAlleles, freqValues, onFreqChange }: {
   locus: { id: string; name: string }
   locusAlleles: LocusAllele[]
   freqValues: Record<string, { frequency: string; isDq: boolean }>
   onFreqChange: (alleleId: string, value: string) => void
-  onDqChange: (alleleId: string, isDq: boolean) => void
 }) {
+  const total = locusAlleles.reduce((s, a) => s + (parseFloat(freqValues[a.id]?.frequency ?? "") || 0), 0)
+  const hasAnyValue = locusAlleles.some(a => (freqValues[a.id]?.frequency ?? "") !== "")
+  const isValid = Math.abs(total - 1) < 0.001
+
   return (
-    <div>
-      <div className="border-t border-border bg-muted/30 px-3 py-1">
+    <div className="border-b border-border last:border-0">
+      <div className="bg-secondary/40 px-3 py-2 border-b border-border flex items-center justify-between">
         <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{locus.name}</span>
+        {hasAnyValue && (
+          <span className={cn("font-mono text-[10px] tabular-nums", isValid ? "text-primary" : "text-destructive font-semibold")}>
+            {total.toFixed(3)} / 1.000
+          </span>
+        )}
       </div>
       <table className="w-full text-sm">
         <thead>
-          <tr><TH>Allele</TH><TH>Frequency</TH><TH center>DQ</TH></tr>
+          <tr className="border-b border-border bg-muted/20"><TH>Allele</TH><TH>Frequency</TH></tr>
         </thead>
         <tbody>
           {locusAlleles.map(allele => (
             <AlleleFreqRow
               key={allele.id}
               allele={allele}
-              values={freqValues[allele.id] ?? { frequency: "0", isDq: false }}
+              values={freqValues[allele.id] ?? { frequency: "", isDq: false }}
               onFreqChange={onFreqChange}
-              onDqChange={onDqChange}
             />
           ))}
         </tbody>
@@ -199,17 +201,13 @@ function ExpressionRow({ phenotype, existing, locusId, onSave, onRemove }: {
   }
 
   return (
-    <tr className="border-t border-border">
+    <tr className="border-b border-border last:border-0">
       <td className="px-3 py-1.5 w-8">
         <input type="checkbox" checked={inStandard} onChange={e => handleToggle(e.target.checked)} className="cursor-pointer" />
       </td>
       <td className="px-3 py-1.5 text-sm text-foreground">{phenotype}</td>
       <td className="px-2 py-1.5 w-28">
         <II value={weight} step="0.01" min="0" onChange={e => setWeight(e.target.value)} onBlur={saveWeight} disabled={!inStandard} />
-      </td>
-      {/* DQ: needs isDq Boolean @default(false) on BreedConformationStandard + mutation */}
-      <td className="px-3 py-1.5 text-center">
-        <input type="checkbox" disabled title="Needs isDq on BreedConformationStandard schema" />
       </td>
     </tr>
   )
@@ -227,8 +225,8 @@ function LocusStandardsGroup({ locus, conformStandards, onSave, onRemove }: {
   const phenotypes = useMemo(() => [...new Set(rules?.map(r => r.phenotype) ?? [])], [rules])
 
   return (
-    <div>
-      <div className="border-t border-border bg-muted/30 px-3 py-1">
+    <div className="border-b border-border last:border-0">
+      <div className="bg-secondary/40 px-3 py-2 border-b border-border">
         <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{locus.name}</span>
       </div>
       {phenotypes.length === 0 ? (
@@ -236,7 +234,7 @@ function LocusStandardsGroup({ locus, conformStandards, onSave, onRemove }: {
       ) : (
         <table className="w-full text-sm">
           <thead>
-            <tr><TH>In Standard</TH><TH>Expression</TH><TH>Weight</TH><TH center>DQ</TH></tr>
+            <tr className="border-b border-border bg-muted/20"><TH>In Standard</TH><TH>Expression</TH><TH>Weight</TH></tr>
           </thead>
           <tbody>
             {phenotypes.map(phenotype => (
@@ -258,27 +256,34 @@ function LocusStandardsGroup({ locus, conformStandards, onSave, onRemove }: {
 
 // ── Loci & Standards panel content (shared between wizard and tabs) ────────────
 
-function LociContent({ locusAlleleGroups, freqValues, onFreqChange, onDqChange, onSaveAll, isPending }: {
+function LociContent({ locusAlleleGroups, freqValues, onFreqChange, onSaveAll, isPending }: {
   locusAlleleGroups: { locus: { id: string; name: string; panelEntries: { panelDef: { panelType: string } }[] }; alleles: LocusAllele[] }[]
   freqValues: Record<string, { frequency: string; isDq: boolean }>
   onFreqChange: (alleleId: string, value: string) => void
-  onDqChange: (alleleId: string, isDq: boolean) => void
   onSaveAll: () => void
   isPending: boolean
 }) {
   if (!locusAlleleGroups.length) {
     return <p className="px-4 py-4 text-sm text-muted-foreground">No loci assigned to this panel. Assign loci to panels in the Loci &amp; Alleles section.</p>
   }
+  const allValid = locusAlleleGroups.every(({ alleles: la }) => {
+    const total = la.reduce((s, a) => s + (parseFloat(freqValues[a.id]?.frequency ?? "") || 0), 0)
+    return Math.abs(total - 1) < 0.001
+  })
+
   return (
     <div>
       <div className="grid grid-cols-2 divide-x divide-border">
         {locusAlleleGroups.map(({ locus, alleles: la }) => (
           <LocusAlleleGroup key={locus.id} locus={locus} locusAlleles={la}
-            freqValues={freqValues} onFreqChange={onFreqChange} onDqChange={onDqChange} />
+            freqValues={freqValues} onFreqChange={onFreqChange} />
         ))}
       </div>
-      <div className="flex justify-end px-2 py-1 border-t border-border">
-        <Button size="sm" onClick={onSaveAll} disabled={isPending}>
+      <div className="flex items-center justify-end gap-3 px-3 py-2 border-t border-border bg-secondary/20">
+        {!allValid && (
+          <span className="text-xs text-destructive">All loci must sum to 1.000 before saving</span>
+        )}
+        <Button size="sm" onClick={onSaveAll} disabled={isPending || !allValid}>
           {isPending ? "Saving…" : "Save All"}
         </Button>
       </div>
@@ -298,7 +303,7 @@ function StandardsContent({ loci, conformStandards, onSave, onRemove }: {
   return (
     <div>
       <p className="px-3 py-2 text-xs text-muted-foreground/60 border-b border-border">
-        Check an expression to include it in this breed's conformation standard. DQ column pending schema update.
+        Check an expression to include it in this breed's conformation standard.
       </p>
       <div className="grid grid-cols-2 divide-x divide-border">
         {loci.map(locus => (
@@ -385,9 +390,9 @@ function BreedsPage() {
       const next: typeof prev = {}
       for (const allele of alleles) {
         const f = alleleFrequencies?.find(af => af.alleleId === allele.id)
-        next[allele.id] = prev[allele.id] ?? {
-          frequency: f?.frequency.toString() ?? "0",
-          isDq: f?.isDq ?? false,
+        next[allele.id] = {
+          frequency: f?.frequency.toString() ?? (prev[allele.id]?.frequency ?? ""),
+          isDq: f?.isDq ?? (prev[allele.id]?.isDq ?? false),
         }
       }
       return next
@@ -595,7 +600,7 @@ function BreedsPage() {
       </div>
 
       <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-      <div className="grid grid-cols-[300px_1fr] divide-x divide-border items-start">
+      <div className="grid grid-cols-[300px_1fr] divide-x divide-border">
 
         {/* Left: Breed Details */}
         <div>
@@ -634,17 +639,17 @@ function BreedsPage() {
             <div className="grid grid-cols-3 gap-2">
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Life Exp.</label>
-                <Input className="h-8 text-sm" type="number" min="1" placeholder="144" value={editing.lifeExpectancyBaseline}
+                <Input className="h-8 text-sm" type="number" min="1" placeholder="e.g. 360" value={editing.lifeExpectancyBaseline}
                   onChange={e => setEditing(p => p && { ...p, lifeExpectancyBaseline: e.target.value })} />
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Imm. Min</label>
-                <Input className="h-8 text-sm" type="number" step="0.1" placeholder="10" value={editing.immunityMin}
+                <Input className="h-8 text-sm" type="number" step="0.1" placeholder="e.g. 40" value={editing.immunityMin}
                   onChange={e => setEditing(p => p && { ...p, immunityMin: e.target.value })} />
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Imm. Max</label>
-                <Input className="h-8 text-sm" type="number" step="0.1" placeholder="90" value={editing.immunityMax}
+                <Input className="h-8 text-sm" type="number" step="0.1" placeholder="e.g. 85" value={editing.immunityMax}
                   onChange={e => setEditing(p => p && { ...p, immunityMax: e.target.value })} />
               </div>
             </div>
@@ -742,7 +747,6 @@ function BreedsPage() {
                     locusAlleleGroups={locusAlleleGroups}
                     freqValues={freqValues}
                     onFreqChange={handleFreqChange}
-                    onDqChange={handleDqChange}
                     onSaveAll={handleSaveAllAlleleFreqs}
                     isPending={saveAllAlleleFreqs.isPending}
                   />
@@ -795,7 +799,7 @@ function BreedsPage() {
           </div>
         ) : editing.id ? (
           // Normal tab mode
-          <div className="overflow-hidden">
+          <div className="min-w-0">
             <div className="flex border-b border-border bg-secondary/40">
               {TABS.map(tab => (
                 <button
@@ -820,7 +824,7 @@ function BreedsPage() {
                 <div className="space-y-2">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr><TH>Stat</TH><TH>Weight</TH><TH>Natural Min</TH><TH>Natural Max</TH><TH>Baseline</TH></tr>
+                      <tr className="border-b border-border bg-secondary/40"><TH>Stat</TH><TH>Weight</TH><TH>Natural Min</TH><TH>Natural Max</TH><TH>Baseline</TH></tr>
                     </thead>
                     <tbody>
                       {stats.map(stat => (
@@ -848,7 +852,6 @@ function BreedsPage() {
                 )}
                 freqValues={freqValues}
                 onFreqChange={handleFreqChange}
-                onDqChange={handleDqChange}
                 onSaveAll={handleSaveAllAlleleFreqs}
                 isPending={saveAllAlleleFreqs.isPending}
               />
@@ -870,7 +873,7 @@ function BreedsPage() {
                 <div className="space-y-2">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr><TH>Trait</TH><TH>Natural Min</TH><TH>Natural Max</TH><TH>Baseline</TH></tr>
+                      <tr className="border-b border-border bg-secondary/40"><TH>Trait</TH><TH>Natural Min</TH><TH>Natural Max</TH><TH>Baseline</TH></tr>
                     </thead>
                     <tbody>
                       {personalityTraits.map(trait => (

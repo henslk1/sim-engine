@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router"
 import { trpc } from "@/lib/trpc"
-import { useState } from "react"
+import { useState, Fragment } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 
@@ -109,11 +109,12 @@ function ItemsPage() {
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Description</label>
-              <Input
+              <textarea
                 value={editing.description}
                 onChange={(e) => setEditing({ ...editing, description: e.target.value })}
-                placeholder="Brief description"
-                className="h-8 text-sm"
+                placeholder="Shown to players in the store and inventory"
+                rows={2}
+                className="block w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none"
               />
             </div>
             <div className="flex flex-col gap-1">
@@ -203,7 +204,6 @@ function ItemsPage() {
             <thead>
               <tr className="border-b border-border">
                 <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Name</th>
-                <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Type</th>
                 <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Category</th>
                 <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Effect</th>
                 <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Flags</th>
@@ -211,43 +211,57 @@ function ItemsPage() {
               </tr>
             </thead>
             <tbody>
-              {items?.map((item) => (
-                <tr key={item.id} className="border-b border-border last:border-0">
-                  <td className="px-3 py-2 font-medium text-foreground">{item.name}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{item.itemType}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{item.category}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{item.effectType ?? "—"}</td>
-                  <td className="px-3 py-2 text-muted-foreground space-x-1">
-                    {item.prizeEligible && <span className="rounded bg-muted px-1 py-0.5 text-xs">prize</span>}
-                    {item.isSellable && <span className="rounded bg-muted px-1 py-0.5 text-xs">sellable</span>}
-                  </td>
-                  <td className="px-3 py-2 text-right space-x-1">
-                    <Button size="sm" variant="ghost" onClick={() => {
-                      setEditingId(item.id)
-                      setEditing({
-                        name: item.name,
-                        description: item.description ?? "",
-                        itemType: item.itemType as ItemType,
-                        category: item.category as ItemCategory,
-                        effectType: item.effectType ?? "",
-                        effects: item.effects ? JSON.stringify(item.effects, null, 2) : "",
-                        prizeEligible: item.prizeEligible,
-                        isSellable: item.isSellable,
-                      })
-                      setJsonError("")
-                    }}>Edit</Button>
-                    <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
-                      onClick={() => { if (!confirm("Delete this item? This will fail if it exists in any inventories or listings.")) return; remove.mutate({ id: item.id }) }}>
-                      Delete
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-              {items?.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-3 py-6 text-center text-sm text-muted-foreground">No items defined yet.</td>
-                </tr>
-              )}
+              {(() => {
+                if (!items?.length) return (
+                  <tr><td colSpan={5} className="px-3 py-6 text-center text-sm text-muted-foreground">No items defined yet.</td></tr>
+                )
+                const grouped = ITEM_TYPES.map((type) => ({
+                  type,
+                  label: type.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+                  items: items.filter((i) => i.itemType === type),
+                })).filter((g) => g.items.length > 0)
+                return grouped.map((group) => (
+                  <Fragment key={group.type}>
+                    <tr className="border-b border-border bg-secondary/40">
+                      <td colSpan={5} className="px-3 py-1.5">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{group.label}</span>
+                        <span className="ml-2 text-[10px] text-muted-foreground/50">{group.items.length}</span>
+                      </td>
+                    </tr>
+                    {group.items.map((item) => (
+                      <tr key={item.id} className="border-b border-border last:border-0">
+                        <td className="px-3 py-2 font-medium text-foreground">{item.name}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{item.category}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{item.effectType ?? "—"}</td>
+                        <td className="px-3 py-2 text-muted-foreground space-x-1">
+                          {item.prizeEligible && <span className="rounded bg-muted px-1 py-0.5 text-xs">prize</span>}
+                          {item.isSellable && <span className="rounded bg-muted px-1 py-0.5 text-xs">sellable</span>}
+                        </td>
+                        <td className="px-3 py-2 text-right space-x-1">
+                          <Button size="sm" variant="ghost" onClick={() => {
+                            setEditingId(item.id)
+                            setEditing({
+                              name: item.name,
+                              description: item.description ?? "",
+                              itemType: item.itemType as ItemType,
+                              category: item.category as ItemCategory,
+                              effectType: item.effectType ?? "",
+                              effects: item.effects ? JSON.stringify(item.effects, null, 2) : "",
+                              prizeEligible: item.prizeEligible,
+                              isSellable: item.isSellable,
+                            })
+                            setJsonError("")
+                          }}>Edit</Button>
+                          <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
+                            onClick={() => { if (!confirm("Delete this item? This will fail if it exists in any inventories or listings.")) return; remove.mutate({ id: item.id }) }}>
+                            Delete
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </Fragment>
+                ))
+              })()}
             </tbody>
           </table>
           {remove.error && <p className="px-3 pb-3 text-sm text-destructive">{remove.error.message}</p>}

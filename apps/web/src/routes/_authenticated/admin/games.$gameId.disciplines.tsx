@@ -388,11 +388,15 @@ function DisciplinesPage() {
   const saveEquipReq = trpc.admin.discipline.saveEquipmentRequirement.useMutation({
     onSuccess: () => {
       utils.admin.discipline.listEquipmentRequirements.invalidate({ disciplineDefId: editing?.id })
+      utils.admin.discipline.list.invalidate()
       setNewEquipReq({ itemDefId: "", quantity: "1", requirementGroup: "" })
     },
   })
   const removeEquipReq = trpc.admin.discipline.removeEquipmentRequirement.useMutation({
-    onSuccess: () => utils.admin.discipline.listEquipmentRequirements.invalidate({ disciplineDefId: editing?.id }),
+    onSuccess: () => {
+      utils.admin.discipline.listEquipmentRequirements.invalidate({ disciplineDefId: editing?.id })
+      utils.admin.discipline.list.invalidate()
+    },
   })
 
   const [editingPersonalityWeightId, setEditingPersonalityWeightId] = useState<string | null>(null)
@@ -722,6 +726,7 @@ function DisciplinesPage() {
                 <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Stage Range</th>
                 <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Stat Wts</th>
                 <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Trait Wts</th>
+                <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Equipment</th>
                 <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
               </tr>
             </thead>
@@ -738,6 +743,7 @@ function DisciplinesPage() {
                   </td>
                   <td className="px-3 py-2 text-center text-muted-foreground">{d._count.statWeights}</td>
                   <td className="px-3 py-2 text-center text-muted-foreground">{d._count.personalityWeights}</td>
+                  <td className="px-3 py-2 text-center text-muted-foreground">{d._count.equipmentRequirements > 0 ? <span className="text-primary">✓</span> : <span className="opacity-30">—</span>}</td>
                   <td className="px-3 py-2 text-right">
                     <Button size="sm" variant="ghost" onClick={() => openEdit(d)}>Edit</Button>
                   </td>

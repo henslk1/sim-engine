@@ -29,6 +29,10 @@ interface GenerateFromTemplateOpts {
   byLocus: Map<string, { id: string; symbol: string; frequency: number }[]>
   breedStatProfile: { statDefId: string; naturalMin: number; naturalMax: number }[]
   breedPersonalityProfiles: { traitDefId: string; naturalMin: number; naturalMax: number }[]
+  immunityMin: number | null
+  immunityMax: number | null
+  lifeExpectancyBaseline: number | null
+  gameConfigLifeExpectancyBaseline: number | null
   ltcDefs: { id: string; intervalCycles: number }[]
   lifeStages: { id: string; minCycle: number; stageIndex: number }[]
   // key: `${disciplineId}:${tierIndex}` → CompetitionTierDef.id
@@ -88,6 +92,18 @@ export async function generateFromTemplate(tx: Tx, opts: GenerateFromTemplateOpt
 
   const { structuralRisk, preferredTerrain, preferredClimate } = await computeFixedFields(tx, genotypes)
 
+  // Apply numeric gene modifiers to life expectancy (e.g. longevity locus)
+  const lifeModifierRules = genotypes.length > 0 ? await tx.expressionRule.findMany({
+    where: {
+      OR: genotypes.map(g => ({ locusId: g.locusId, alleleOneId: g.alleleOneId, alleleTwoId: g.alleleTwoId })),
+      numericModifier: { not: null },
+    },
+    select: { numericModifier: true },
+  }) : []
+  const totalModifier = lifeModifierRules.reduce((s, r) => s + (r.numericModifier ?? 0), 0)
+  const lifeExpectancyBase = opts.lifeExpectancyBaseline ?? opts.gameConfigLifeExpectancyBaseline ?? null
+  const lifeExpectancy = lifeExpectancyBase !== null ? Math.round(lifeExpectancyBase * (1 + totalModifier)) : null
+
   const breedDisplayName = template.breedId
     ? (await tx.breed.findUnique({ where: { id: template.breedId }, select: { name: true } }))?.name ?? "Unknown"
     : (template.breedName ?? "Unknown")
@@ -106,6 +122,7 @@ export async function generateFromTemplate(tx: Tx, opts: GenerateFromTemplateOpt
       status: "ALIVE",
       inbreedingCoefficient: 0,
       breedGeneration: 1,
+      lifeExpectancy,
       isTutorialAnimal: opts.isTutorialAnimal,
       structuralRisk,
       preferredTerrain: preferredTerrain as any,
@@ -118,7 +135,7 @@ export async function generateFromTemplate(tx: Tx, opts: GenerateFromTemplateOpt
     tx.animalEnergy.create({ data: { animalId: animal.id, currentEnergy: 100, maxEnergy: 100 } }),
     tx.animalMood.create({ data: { animalId: animal.id, value: 75 } }),
     tx.animalCondition.create({ data: { animalId: animal.id, value: 75 } }),
-    tx.animalImmunity.create({ data: { animalId: animal.id, value: 60, innateMax: 100 } }),
+    tx.animalImmunity.create({ data: { animalId: animal.id, innateMax: opts.immunityMax ?? 100, value: (opts.immunityMin ?? 60) + Math.random() * ((opts.immunityMax ?? 100) - (opts.immunityMin ?? 60)) } }),
     tx.animalCareScore.create({ data: { animalId: animal.id, score: 75 } }),
     ...(template.breedId ? [
       tx.animalBreedComposition.create({ data: { animalId: animal.id, breedId: template.breedId, percentage: 1.0 } }),

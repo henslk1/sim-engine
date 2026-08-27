@@ -20,7 +20,7 @@ export function canonicalize(a: { id: string; symbol: string }, b: { id: string;
 }
 
 export async function restockShop(gameId: string, shopBreedConfigId?: string): Promise<number> {
-  const [configs, firstLifeStage, shopAccount, ltcDefs] = await Promise.all([
+  const [configs, firstLifeStage, shopAccount, ltcDefs, gameConfig] = await Promise.all([
     db.gameShopBreedConfig.findMany({
       where: { gameId, isActive: true, ...(shopBreedConfigId ? { id: shopBreedConfigId } : {}) },
       include: {
@@ -40,6 +40,10 @@ export async function restockShop(gameId: string, shopBreedConfigId?: string): P
     db.longTermCareActionDef.findMany({
       where: { gameId },
       select: { id: true, intervalCycles: true },
+    }),
+    db.gameConfig.findUnique({
+      where: { gameId },
+      select: { lifeExpectancyBaseline: true },
     }),
   ])
 
@@ -95,6 +99,18 @@ export async function restockShop(gameId: string, shopBreedConfigId?: string): P
         genotypes.push({ locusId, alleleOneId, alleleTwoId })
       }
 
+      // Apply numeric gene modifiers to life expectancy
+      const lifeModifierRules = genotypes.length > 0 ? await db.expressionRule.findMany({
+        where: {
+          OR: genotypes.map(g => ({ locusId: g.locusId, alleleOneId: g.alleleOneId, alleleTwoId: g.alleleTwoId })),
+          numericModifier: { not: null },
+        },
+        select: { numericModifier: true },
+      }) : []
+      const totalModifier = lifeModifierRules.reduce((s, r) => s + (r.numericModifier ?? 0), 0)
+      const lifeExpectancyBase = config.breed.lifeExpectancyBaseline ?? gameConfig?.lifeExpectancyBaseline ?? null
+      const lifeExpectancy = lifeExpectancyBase !== null ? Math.round(lifeExpectancyBase * (1 + totalModifier)) : null
+
       await db.$transaction(async (tx) => {
         const { structuralRisk, preferredTerrain, preferredClimate } = await computeFixedFields(tx, genotypes)
         const animal = await tx.animal.create({
@@ -110,6 +126,7 @@ export async function restockShop(gameId: string, shopBreedConfigId?: string): P
             status: "ALIVE",
             inbreedingCoefficient: 0,
             breedGeneration: 1,
+            lifeExpectancy,
             structuralRisk,
             preferredTerrain: preferredTerrain as any,
             preferredClimate: preferredClimate as any,
@@ -121,7 +138,7 @@ export async function restockShop(gameId: string, shopBreedConfigId?: string): P
           tx.animalEnergy.create({ data: { animalId: animal.id, currentEnergy: 100, maxEnergy: 100 } }),
           tx.animalMood.create({ data: { animalId: animal.id, value: 75 } }),
           tx.animalCondition.create({ data: { animalId: animal.id, value: 75 } }),
-          tx.animalImmunity.create({ data: { animalId: animal.id, value: 60, innateMax: 100 } }),
+          tx.animalImmunity.create({ data: { animalId: animal.id, innateMax: config.breed.immunityMax ?? 100, value: (config.breed.immunityMin ?? 60) + Math.random() * ((config.breed.immunityMax ?? 100) - (config.breed.immunityMin ?? 60)) } }),
           tx.animalCareScore.create({ data: { animalId: animal.id, score: 75 } }),
           tx.animalBreedComposition.create({ data: { animalId: animal.id, breedId: config.breedId, percentage: 1.0 } }),
           ...config.breed.statProfile.map((sp) => {

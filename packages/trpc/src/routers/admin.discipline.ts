@@ -10,7 +10,7 @@ export const disciplineAdminRouter = router({
         where: { gameId: input.gameId },
         orderBy: { name: "asc" },
         include: {
-          _count: { select: { statWeights: true, personalityWeights: true } },
+          _count: { select: { statWeights: true, personalityWeights: true, equipmentRequirements: true } },
           compTierDefs: {
             select: { id: true, name: true, tierIndex: true, advancementThreshold: true },
             orderBy: { tierIndex: "asc" },

@@ -38,6 +38,18 @@ export const itemAdminRouter = router({
   remove: publicProcedure
     .input(z.object({ id: z.string() }))
     .mutation(({ input }) =>
-      db.itemDef.delete({ where: { id: input.id } })
+      db.$transaction(async (tx) => {
+        const id = input.id
+        // clear transient/config records that are safe to cascade
+        await tx.playerInventory.deleteMany({ where: { itemDefId: id } })
+        await tx.animalEquipment.deleteMany({ where: { itemDefId: id } })
+        await tx.animalAppliedItem.deleteMany({ where: { itemDefId: id } })
+        await tx.storeListing.deleteMany({ where: { itemDefId: id } })
+        await tx.disciplineEquipmentRequirement.deleteMany({ where: { itemDefId: id } })
+        await tx.careActionItem.deleteMany({ where: { itemDefId: id } })
+        await tx.treatmentItem.deleteMany({ where: { itemDefId: id } })
+        // let the DB throw if prizes, marketplace bundles/offers, or campaign rewards still reference it
+        return tx.itemDef.delete({ where: { id } })
+      })
     ),
 })

@@ -1,6 +1,7 @@
 import { z } from "zod"
 import { router, protectedProcedure } from "../trpc.js"
 import { db } from "@sim-engine/db"
+import { computeCoatFromCodes } from "@sim-engine/engine"
 
 export const breedRouter = router({
   list: protectedProcedure
@@ -100,6 +101,10 @@ export const breedRouter = router({
                         panelEntries: {
                           include: { panelDef: { select: { panelType: true } } },
                         },
+                        sectionEntries: {
+                          include: { section: { select: { id: true, name: true, displayOrder: true } } },
+                          orderBy: { displayOrder: "asc" },
+                        },
                       },
                     },
                     expressionRulesAsAlleleOne: {
@@ -126,30 +131,77 @@ export const breedRouter = router({
         }),
       ])
 
-      const healthLocusIds = new Set<string>()
-      for (const af of breed.alleleFrequencies) {
-        if (af.allele.locus.panelEntries.some(e => e.panelDef.panelType === "HEALTH")) {
-          healthLocusIds.add(af.allele.locusId)
-        }
-      }
-
-      const coatColors = new Set<string>()
+      // ── Health conditions ──────────────────────────────────────────────────
       const healthConditions = new Map<string, string>()
       for (const af of breed.alleleFrequencies) {
-        const rules = [
-          ...af.allele.expressionRulesAsAlleleOne,
-          ...af.allele.expressionRulesAsAlleleTwo,
-        ]
-        for (const rule of rules) {
-          if (rule.ruleConditions.length > 0) {
-            for (const rc of rule.ruleConditions) {
-              healthConditions.set(rc.healthConditionDef.id, rc.healthConditionDef.name)
-            }
-          } else if (!healthLocusIds.has(af.allele.locusId)) {
-            coatColors.add(rule.phenotype)
+        for (const rule of af.allele.expressionRulesAsAlleleOne) {
+          for (const rc of rule.ruleConditions) {
+            healthConditions.set(rc.healthConditionDef.id, rc.healthConditionDef.name)
           }
         }
       }
+
+      // ── Possible coat colors ───────────────────────────────────────────────
+      // For each COLOR-panel locus, enumerate all phenotype codes reachable from
+      // breed alleles. Then compute the Cartesian product across loci and resolve
+      // each combination to a coat color string.
+
+      const colorLocusIds = new Set<string>()
+      for (const af of breed.alleleFrequencies) {
+        if (af.allele.locus.panelEntries.some(e => e.panelDef.panelType === "COLOR")) {
+          colorLocusIds.add(af.allele.locusId)
+        }
+      }
+
+      // Build a lookup: `${alleleOneId}:${alleleTwoId}` → phenotype code
+      // expressionRulesAsAlleleOne covers all canonical pairs
+      const pairPhenotype = new Map<string, string>()
+      for (const af of breed.alleleFrequencies) {
+        if (!colorLocusIds.has(af.allele.locusId)) continue
+        for (const rule of af.allele.expressionRulesAsAlleleOne) {
+          if (rule.phenotype.length > 0) {
+            pairPhenotype.set(`${af.allele.id}:${rule.alleleTwoId}`, rule.phenotype)
+          }
+        }
+      }
+
+      // Group alleles by color locus
+      const colorAllelesByLocus = new Map<string, string[]>()
+      for (const af of breed.alleleFrequencies) {
+        if (!colorLocusIds.has(af.allele.locusId)) continue
+        if (!colorAllelesByLocus.has(af.allele.locusId)) colorAllelesByLocus.set(af.allele.locusId, [])
+        colorAllelesByLocus.get(af.allele.locusId)!.push(af.allele.id)
+      }
+
+      // For each locus, collect the distinct phenotype code options (null = no code)
+      const perLocusOptions: (string | null)[][] = []
+      for (const alleleIds of colorAllelesByLocus.values()) {
+        const options = new Set<string | null>()
+        for (const a of alleleIds) {
+          for (const b of alleleIds) {
+            const code = pairPhenotype.get(`${a}:${b}`) ?? pairPhenotype.get(`${b}:${a}`) ?? null
+            options.add(code)
+          }
+        }
+        // Only add loci that actually have at least one non-null option
+        if ([...options].some(o => o !== null)) {
+          perLocusOptions.push([...options])
+        }
+      }
+
+      // Cartesian product across loci
+      const combinations = perLocusOptions.reduce<(string | null)[][]>(
+        (acc, opts) => acc.flatMap(combo => opts.map(opt => [...combo, opt])),
+        [[]]
+      )
+
+      const coatColorSet = new Set<string>()
+      for (const combo of combinations) {
+        const codes = new Set(combo.filter((c): c is string => c !== null))
+        const color = computeCoatFromCodes(codes)
+        if (color) coatColorSet.add(color)
+      }
+      const coatColors = [...coatColorSet].sort()
 
       const breedWeightMap = new Map(breed.statProfile.map(s => [s.statDefId, s.weight]))
       const disciplineScores = new Map<string, { id: string; name: string; score: number }>()
@@ -173,7 +225,7 @@ export const breedRouter = router({
 
       return {
         breed,
-        coatColors: [...coatColors].sort(),
+        coatColors,
         healthConditions: [...healthConditions.values()].sort(),
         compatibleDisciplines,
         lifeExpectancyYears,

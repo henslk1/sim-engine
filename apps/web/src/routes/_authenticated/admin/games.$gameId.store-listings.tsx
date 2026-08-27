@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router"
 import { trpc } from "@/lib/trpc"
-import { useState } from "react"
+import { useState, Fragment } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 
@@ -41,6 +41,13 @@ function StoreListingsPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<ListingForm>(emptyForm())
 
+  const allListedItemIds = new Set(listings?.map((l) => l.itemDef.id) ?? [])
+
+  const availableItems = items?.filter((i) => {
+    if (editingId && form.itemDefId === i.id) return true
+    return !allListedItemIds.has(i.id)
+  }) ?? []
+
   function submit() {
     if (!gameId || !form.itemDefId || !form.currencyDefId || form.price === "") return
     save.mutate({
@@ -73,7 +80,7 @@ function StoreListingsPage() {
                 className="h-8 w-full rounded-md border border-input bg-background px-3 text-sm"
               >
                 <option value="">— Select item —</option>
-                {items?.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
+                {availableItems.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
               </select>
             </div>
             <div className="flex flex-col gap-1">
@@ -130,7 +137,6 @@ function StoreListingsPage() {
             <thead>
               <tr className="border-b border-border">
                 <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Item</th>
-                <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Shop</th>
                 <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Price</th>
                 <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Currency</th>
                 <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Active</th>
@@ -139,38 +145,51 @@ function StoreListingsPage() {
               </tr>
             </thead>
             <tbody>
-              {listings?.map((l) => (
-                <tr key={l.id} className="border-b border-border last:border-0">
-                  <td className="px-3 py-2 font-medium text-foreground">{l.itemDef.name}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{l.shopType}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{l.price}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{l.currencyDef.symbol ?? l.currencyDef.name}</td>
-                  <td className="px-3 py-2 text-center">{l.isActive ? <span className="text-primary">✓</span> : <span className="text-muted-foreground">—</span>}</td>
-                  <td className="px-3 py-2 text-center">{l.isRotating ? <span className="text-primary">✓</span> : <span className="text-muted-foreground">—</span>}</td>
-                  <td className="px-3 py-2 text-right space-x-1">
-                    <Button size="sm" variant="ghost" onClick={() => {
-                      setEditingId(l.id)
-                      setForm({
-                        itemDefId: l.itemDef.id,
-                        shopType: l.shopType as ShopType,
-                        price: l.price.toString(),
-                        currencyDefId: l.currencyDef.id,
-                        isActive: l.isActive,
-                        isRotating: l.isRotating,
-                      })
-                    }}>Edit</Button>
-                    <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
-                      onClick={() => { if (!confirm("Delete this listing?")) return; remove.mutate({ id: l.id }) }}>
-                      Delete
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-              {listings?.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="px-3 py-6 text-center text-sm text-muted-foreground">No listings defined yet.</td>
-                </tr>
-              )}
+              {(() => {
+                if (!listings?.length) return (
+                  <tr><td colSpan={6} className="px-3 py-6 text-center text-sm text-muted-foreground">No listings defined yet.</td></tr>
+                )
+                return SHOP_TYPES.map((type) => {
+                  const group = listings.filter((l) => l.shopType === type)
+                  if (!group.length) return null
+                  return (
+                    <Fragment key={type}>
+                      <tr className="border-b border-border bg-secondary/40">
+                        <td colSpan={6} className="px-3 py-1.5">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{type}</span>
+                          <span className="ml-2 text-[10px] text-muted-foreground/50">{group.length}</span>
+                        </td>
+                      </tr>
+                      {group.map((l) => (
+                        <tr key={l.id} className="border-b border-border last:border-0">
+                          <td className="px-3 py-2 font-medium text-foreground">{l.itemDef.name}</td>
+                          <td className="px-3 py-2 text-muted-foreground">{l.price}</td>
+                          <td className="px-3 py-2 text-muted-foreground">{l.currencyDef.symbol ?? l.currencyDef.name}</td>
+                          <td className="px-3 py-2 text-center">{l.isActive ? <span className="text-primary">✓</span> : <span className="text-muted-foreground">—</span>}</td>
+                          <td className="px-3 py-2 text-center">{l.isRotating ? <span className="text-primary">✓</span> : <span className="text-muted-foreground">—</span>}</td>
+                          <td className="px-3 py-2 text-right space-x-1">
+                            <Button size="sm" variant="ghost" onClick={() => {
+                              setEditingId(l.id)
+                              setForm({
+                                itemDefId: l.itemDef.id,
+                                shopType: l.shopType as ShopType,
+                                price: l.price.toString(),
+                                currencyDefId: l.currencyDef.id,
+                                isActive: l.isActive,
+                                isRotating: l.isRotating,
+                              })
+                            }}>Edit</Button>
+                            <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
+                              onClick={() => { if (!confirm("Delete this listing?")) return; remove.mutate({ id: l.id }) }}>
+                              Delete
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </Fragment>
+                  )
+                })
+              })()}
             </tbody>
           </table>
         </section>
