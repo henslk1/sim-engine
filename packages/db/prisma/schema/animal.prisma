@@ -87,6 +87,7 @@ model Breed {
   lifeExpectancyBaseline      Int?
   immunityMin                 Float?
   immunityMax                 Float?
+  coatWeight                  Float?
   preferredClimate            VenueClimate?
   preferredTerrain            VenueTerrain?
   createdAt                   DateTime                          @default(now())
@@ -111,6 +112,7 @@ model Breed {
   campaign                    BreedCampaign?
   foundationAnimals           FoundationAnimal[]
   dqTraits                    BreedDqTrait[]
+  coatSelections              BreedCoatSelection[]
   animalTemplates             AnimalTemplate[]
   starterBreedOptions         StarterBreedOption[]
   game                        Game                              @relation(fields: [gameId], references: [id])
@@ -124,10 +126,7 @@ model BreedStatProfile {
   id         String  @id @default(cuid())
   breedId    String
   statDefId  String
-  weight     Float
-  naturalMin Float
-  naturalMax Float
-  baseline   Float
+  weight    Float
   breed      Breed   @relation(fields: [breedId], references: [id])
   statDef    StatDef @relation(fields: [statDefId], references: [id])
 

@@ -4,7 +4,10 @@ import { useState, useEffect, useMemo } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { computePossiblePhenotypes, type PossibleLocusPhenotypes } from "@/lib/breedUtils"
+import {
+  computePossiblePhenotypes, type PossibleLocusPhenotypes,
+  computeColorGroupPhenotypes, type ColorGroupPhenotypes,
+} from "@/lib/breedUtils"
 
 export const Route = createFileRoute("/_authenticated/admin/games/$gameId/breeds")({
   component: BreedsPage,
@@ -78,20 +81,17 @@ function II({ value, onChange, onBlur, step, min, max, disabled }: {
 
 // ── Stat Row ──────────────────────────────────────────────────────────────────
 
-type StatProfile = { id: string; statDefId: string; weight: number; naturalMin: number; naturalMax: number; baseline: number }
+type StatProfile = { id: string; statDefId: string; weight: number }
 
 function StatRow({ stat, values, onChange }: {
   stat: { id: string; name: string }
-  values: { weight: string; naturalMin: string; naturalMax: string; baseline: string }
+  values: { weight: string }
   onChange: (statDefId: string, field: string, value: string) => void
 }) {
   return (
     <tr className="border-b border-border last:border-0">
       <td className="px-3 py-1.5 text-sm font-medium text-foreground">{stat.name}</td>
-      <td className="px-2 py-1.5"><II value={values.weight} step="0.01" onChange={e => onChange(stat.id, "weight", e.target.value)} /></td>
-      <td className="px-2 py-1.5"><II value={values.naturalMin} step="0.01" onChange={e => onChange(stat.id, "naturalMin", e.target.value)} /></td>
-      <td className="px-2 py-1.5"><II value={values.naturalMax} step="0.01" onChange={e => onChange(stat.id, "naturalMax", e.target.value)} /></td>
-      <td className="px-2 py-1.5"><II value={values.baseline} step="0.01" onChange={e => onChange(stat.id, "baseline", e.target.value)} /></td>
+      <td className="px-2 py-1.5"><II value={values.weight} step="0.01" min="0" max="1" onChange={e => onChange(stat.id, "weight", e.target.value)} /></td>
     </tr>
   )
 }
@@ -180,6 +180,14 @@ function LocusAlleleGroup({ locus, locusAlleles, freqValues, onFreqChange }: {
 
 type ConformStandard = { id: string; locusId: string; idealExpressionLabel: string; weight: number }
 type DqTrait = { id: string; locusId: string; expression: string }
+type CoatSelection = { id: string; expression: string; colorRole: string }
+
+const COAT_ROLE_LABELS: Record<string, string> = {
+  BASE: "Base Color",
+  DILUTION: "Dilution",
+  MODIFIER: "Modifier",
+  WHITE_PATTERN: "White Pattern",
+}
 
 function ExpressionRow({ phenotype, existing, locusId, onSave, onRemove }: {
   phenotype: string
@@ -309,6 +317,81 @@ function LocusDqTraitsGroup({ locus, phenotypes, dqTraits = [], onSave, onRemove
   )
 }
 
+// ── Coat Color Standards ──────────────────────────────────────────────────────
+
+function CoatColorContent({
+  colorGroups, coatSelections, coatWeight, onSaveSelection, onRemoveSelection, onSaveWeight,
+}: {
+  colorGroups: ColorGroupPhenotypes[]
+  coatSelections: CoatSelection[]
+  coatWeight: number | null
+  onSaveSelection: (expression: string, colorRole: string) => void
+  onRemoveSelection: (id: string) => void
+  onSaveWeight: (weight: number | null) => void
+}) {
+  const [weightInput, setWeightInput] = useState(coatWeight?.toString() ?? "")
+  useEffect(() => { setWeightInput(coatWeight?.toString() ?? "") }, [coatWeight])
+
+  if (!colorGroups.length) {
+    return (
+      <p className="px-4 py-4 text-sm text-muted-foreground">
+        No color loci with roles configured. Set a color role on panels in the Genetic Panels section.
+      </p>
+    )
+  }
+  return (
+    <div>
+      <div className="flex items-center gap-3 px-3 py-2 border-b border-border bg-secondary/20">
+        <span className="text-xs text-muted-foreground">Coat match weight</span>
+        <div className="w-24"><II value={weightInput} step="0.01" min="0" onChange={e => setWeightInput(e.target.value)} /></div>
+        <Button size="sm" onClick={() => { const v = parseFloat(weightInput); onSaveWeight(isNaN(v) ? null : v) }}>
+          Save
+        </Button>
+        {coatWeight == null && (
+          <span className="text-[10px] text-muted-foreground/60">Not scored — set a weight to enable</span>
+        )}
+      </div>
+      <p className="px-3 py-1.5 text-xs text-muted-foreground/60 border-b border-border">
+        Check acceptable expressions per category. All valid combinations are scored as a single coat match.
+      </p>
+      <div className="grid grid-cols-2 divide-x divide-border">
+        {colorGroups.map(group => (
+          <div key={group.role} className="border-b border-border last:border-0">
+            <div className="bg-secondary/40 px-3 py-2 border-b border-border">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                {COAT_ROLE_LABELS[group.role] ?? group.role}
+              </span>
+            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/20"><TH>Accept</TH><TH>Expression</TH></tr>
+              </thead>
+              <tbody>
+                {group.phenotypes.map(phenotype => {
+                  const existing = coatSelections.find(s => s.expression === phenotype && s.colorRole === group.role)
+                  return (
+                    <tr key={phenotype} className="border-b border-border last:border-0">
+                      <td className="px-3 py-1.5 w-8">
+                        <input type="checkbox" checked={!!existing}
+                          onChange={e => {
+                            if (e.target.checked) onSaveSelection(phenotype, group.role)
+                            else if (existing) onRemoveSelection(existing.id)
+                          }}
+                          className="cursor-pointer" />
+                      </td>
+                      <td className="px-3 py-1.5 text-sm text-foreground">{phenotype}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ── Loci & Standards panel content (shared between wizard and tabs) ────────────
 
 function LociContent({ locusAlleleGroups, freqValues, onFreqChange, onSaveAll, isPending }: {
@@ -346,16 +429,27 @@ function LociContent({ locusAlleleGroups, freqValues, onFreqChange, onSaveAll, i
   )
 }
 
-function StandardsContent({ possibleLoci, conformStandards, dqTraits, onSaveConform, onRemoveConform, onSaveDq, onRemoveDq }: {
+function StandardsContent({
+  possibleLoci, conformStandards, dqTraits,
+  colorGroups, coatSelections, coatWeight,
+  onSaveConform, onRemoveConform, onSaveDq, onRemoveDq,
+  onSaveCoatSelection, onRemoveCoatSelection, onSaveCoatWeight,
+}: {
   possibleLoci: PossibleLocusPhenotypes[]
   conformStandards: ConformStandard[]
   dqTraits: DqTrait[]
+  colorGroups: ColorGroupPhenotypes[]
+  coatSelections: CoatSelection[]
+  coatWeight: number | null
   onSaveConform: (id: string | undefined, locusId: string, label: string, weight: number) => void
   onRemoveConform: (id: string) => void
   onSaveDq: (id: string | undefined, locusId: string, expression: string) => void
   onRemoveDq: (id: string) => void
+  onSaveCoatSelection: (expression: string, colorRole: string) => void
+  onRemoveCoatSelection: (id: string) => void
+  onSaveCoatWeight: (weight: number | null) => void
 }) {
-  const [subTab, setSubTab] = useState<"ideal" | "dq">("ideal")
+  const [subTab, setSubTab] = useState<"ideal" | "dq" | "coat">("ideal")
 
   if (!possibleLoci.length) {
     return <p className="px-4 py-4 text-sm text-muted-foreground">Configure allele frequencies first — breed standards are derived from the breed's allele pool.</p>
@@ -363,7 +457,7 @@ function StandardsContent({ possibleLoci, conformStandards, dqTraits, onSaveConf
   return (
     <div>
       <div className="flex border-b border-border bg-secondary/20">
-        {(["ideal", "dq"] as const).map(t => (
+        {(["ideal", "dq", "coat"] as const).map(t => (
           <button
             key={t}
             onClick={() => setSubTab(t)}
@@ -372,7 +466,7 @@ function StandardsContent({ possibleLoci, conformStandards, dqTraits, onSaveConf
               subTab === t ? "border-b-2 border-primary text-foreground" : "text-muted-foreground hover:text-foreground"
             )}
           >
-            {t === "ideal" ? "Ideal Traits" : "Disqualifying Traits"}
+            {t === "ideal" ? "Ideal Traits" : t === "dq" ? "Disqualifying Traits" : "Coat Color"}
           </button>
         ))}
       </div>
@@ -416,6 +510,17 @@ function StandardsContent({ possibleLoci, conformStandards, dqTraits, onSaveConf
           </div>
         </div>
       )}
+
+      {subTab === "coat" && (
+        <CoatColorContent
+          colorGroups={colorGroups ?? []}
+          coatSelections={coatSelections ?? []}
+          coatWeight={coatWeight}
+          onSaveSelection={onSaveCoatSelection}
+          onRemoveSelection={onRemoveCoatSelection}
+          onSaveWeight={onSaveCoatWeight}
+        />
+      )}
     </div>
   )
 }
@@ -427,7 +532,7 @@ function BreedsPage() {
   const [editing, setEditing] = useState<BreedForm | null>(null)
   const [wizardStep, setWizardStep] = useState<WizardStep>(null)
   const [activePanel, setActivePanel] = useState<ActivePanel>("stats")
-  const [statValues, setStatValues] = useState<Record<string, { weight: string; naturalMin: string; naturalMax: string; baseline: string }>>({})
+  const [statValues, setStatValues] = useState<Record<string, { weight: string }>>({})
   const [personalityValues, setPersonalityValues] = useState<Record<string, { naturalMin: string; naturalMax: string; baseline: string }>>({})
   const [freqValues, setFreqValues] = useState<Record<string, { frequency: string; isDq: boolean }>>({})
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -447,6 +552,9 @@ function BreedsPage() {
   const { data: dqTraits } = trpc.admin.breed.listDqTraits.useQuery(
     { breedId: editing?.id! }, { enabled: !!editing?.id }
   )
+  const { data: coatSelections } = trpc.admin.breed.listCoatSelections.useQuery(
+    { breedId: editing?.id! }, { enabled: !!editing?.id }
+  )
   const { data: personalityProfiles } = trpc.admin.breed.listPersonalityProfiles.useQuery(
     { breedId: editing?.id! }, { enabled: !!editing?.id }
   )
@@ -462,12 +570,7 @@ function BreedsPage() {
       const next: typeof prev = {}
       for (const stat of stats) {
         const p = statProfiles?.find(sp => sp.statDefId === stat.id)
-        next[stat.id] = prev[stat.id] ?? {
-          weight: p?.weight.toString() ?? "1",
-          naturalMin: p?.naturalMin.toString() ?? "0",
-          naturalMax: p?.naturalMax.toString() ?? "100",
-          baseline: p?.baseline.toString() ?? "50",
-        }
+        next[stat.id] = prev[stat.id] ?? { weight: p?.weight.toString() ?? "1" }
       }
       return next
     })
@@ -529,6 +632,15 @@ function BreedsPage() {
   const removeDqTrait = trpc.admin.breed.removeDqTrait.useMutation({
     onSuccess: () => utils.admin.breed.listDqTraits.invalidate(),
   })
+  const saveCoatSelectionMut = trpc.admin.breed.saveCoatSelection.useMutation({
+    onSuccess: () => utils.admin.breed.listCoatSelections.invalidate(),
+  })
+  const removeCoatSelectionMut = trpc.admin.breed.removeCoatSelection.useMutation({
+    onSuccess: () => utils.admin.breed.listCoatSelections.invalidate(),
+  })
+  const saveCoatWeightMut = trpc.admin.breed.saveCoatWeight.useMutation({
+    onSuccess: () => utils.admin.breed.list.invalidate(),
+  })
   const savePersonalityProfile = trpc.admin.breed.savePersonalityProfile.useMutation({
     onSuccess: () => utils.admin.breed.listPersonalityProfiles.invalidate(),
   })
@@ -560,16 +672,10 @@ function BreedsPage() {
     if (!editing?.id || !stats) return
     saveAllStatProfiles.mutate({
       breedId: editing.id,
-      profiles: stats.map(stat => {
-        const v = statValues[stat.id] ?? { weight: "1", naturalMin: "0", naturalMax: "100", baseline: "50" }
-        return {
-          statDefId: stat.id,
-          weight: parseFloat(v.weight) || 0,
-          naturalMin: parseFloat(v.naturalMin) || 0,
-          naturalMax: parseFloat(v.naturalMax) || 0,
-          baseline: parseFloat(v.baseline) || 0,
-        }
-      }),
+      profiles: stats.map(stat => ({
+        statDefId: stat.id,
+        weight: parseFloat(statValues[stat.id]?.weight ?? "") || 0,
+      })),
     })
   }
 
@@ -581,6 +687,16 @@ function BreedsPage() {
   function handleSaveDqTrait(id: string | undefined, locusId: string, expression: string) {
     if (!editing?.id) return
     saveDqTrait.mutate({ id, breedId: editing.id, locusId, expression })
+  }
+
+  function handleSaveCoatSelection(expression: string, colorRole: string) {
+    if (!editing?.id) return
+    saveCoatSelectionMut.mutate({ breedId: editing.id, expression, colorRole })
+  }
+
+  function handleSaveCoatWeight(weight: number | null) {
+    if (!editing?.id) return
+    saveCoatWeightMut.mutate({ breedId: editing.id, coatWeight: weight })
   }
 
   function handleSavePersonalityProfile(traitDefId: string, id: string | undefined, data: { naturalMin: number; naturalMax: number; baseline: number }) {
@@ -640,6 +756,18 @@ function BreedsPage() {
     () => computePossiblePhenotypes(alleleFrequencies ?? []),
     [alleleFrequencies]
   )
+
+  const statWeightTotal = useMemo(
+    () => (stats ?? []).reduce((s, stat) => s + (parseFloat(statValues[stat.id]?.weight ?? "") || 0), 0),
+    [stats, statValues]
+  )
+
+  const colorGroups = useMemo(
+    () => computeColorGroupPhenotypes(alleleFrequencies ?? []),
+    [alleleFrequencies]
+  )
+
+  const currentCoatWeight = breeds?.find(b => b.id === editing?.id)?.coatWeight ?? null
 
   function advanceWizard() {
     setWizardStep(s => s === 2 ? 3 : s === 3 ? 4 : null)
@@ -879,12 +1007,12 @@ function BreedsPage() {
                     <div className="space-y-2">
                       <table className="w-full text-sm">
                         <thead>
-                          <tr><TH>Stat</TH><TH>Weight</TH><TH>Natural Min</TH><TH>Natural Max</TH><TH>Baseline</TH></tr>
+                          <tr><TH>Stat</TH><TH>Weight (sum = 1.0)</TH></tr>
                         </thead>
                         <tbody>
                           {stats.map(stat => (
                             <StatRow key={stat.id} stat={stat}
-                              values={statValues[stat.id] ?? { weight: "1", naturalMin: "0", naturalMax: "100", baseline: "50" }}
+                              values={statValues[stat.id] ?? { weight: "1" }}
                               onChange={handleStatChange} />
                           ))}
                         </tbody>
@@ -902,10 +1030,16 @@ function BreedsPage() {
                     possibleLoci={possibleLoci}
                     conformStandards={conformStandards ?? []}
                     dqTraits={dqTraits ?? []}
+                    colorGroups={colorGroups}
+                    coatSelections={coatSelections ?? []}
+                    coatWeight={currentCoatWeight}
                     onSaveConform={handleSaveConform}
                     onRemoveConform={id => removeConform.mutate({ id })}
                     onSaveDq={handleSaveDqTrait}
                     onRemoveDq={id => removeDqTrait.mutate({ id })}
+                    onSaveCoatSelection={handleSaveCoatSelection}
+                    onRemoveCoatSelection={id => removeCoatSelectionMut.mutate({ id })}
+                    onSaveCoatWeight={handleSaveCoatWeight}
                   />
                 )}
 
@@ -948,17 +1082,20 @@ function BreedsPage() {
                 <div className="space-y-2">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-border bg-secondary/40"><TH>Stat</TH><TH>Weight</TH><TH>Natural Min</TH><TH>Natural Max</TH><TH>Baseline</TH></tr>
+                      <tr className="border-b border-border bg-secondary/40"><TH>Stat</TH><TH>Weight (sum = 1.0)</TH></tr>
                     </thead>
                     <tbody>
                       {stats.map(stat => (
                         <StatRow key={stat.id} stat={stat}
-                          values={statValues[stat.id] ?? { weight: "1", naturalMin: "0", naturalMax: "100", baseline: "50" }}
+                          values={statValues[stat.id] ?? { weight: "1" }}
                           onChange={handleStatChange} />
                       ))}
                     </tbody>
                   </table>
-                  <div className="flex justify-end px-2 pb-1">
+                  <div className="flex items-center justify-end gap-3 px-2 pb-1">
+                    <span className={cn("font-mono text-[10px] tabular-nums", Math.abs(statWeightTotal - 1) < 0.001 ? "text-primary" : "text-destructive font-semibold")}>
+                      {statWeightTotal.toFixed(3)} / 1.000
+                    </span>
                     <Button size="sm" onClick={handleSaveAllStats} disabled={saveAllStatProfiles.isPending}>
                       {saveAllStatProfiles.isPending ? "Saving…" : "Save Stats"}
                     </Button>
@@ -985,8 +1122,11 @@ function BreedsPage() {
               <StandardsContent
                 possibleLoci={possibleLoci}
                 conformStandards={conformStandards ?? []}
-                onSave={handleSaveConform}
-                onRemove={id => removeConform.mutate({ id })}
+                dqTraits={dqTraits ?? []}
+                onSaveConform={handleSaveConform}
+                onRemoveConform={id => removeConform.mutate({ id })}
+                onSaveDq={handleSaveDqTrait}
+                onRemoveDq={id => removeDqTrait.mutate({ id })}
               />
             )}
 

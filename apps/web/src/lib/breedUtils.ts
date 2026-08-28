@@ -5,7 +5,7 @@ export type AlleleFreqForPhenotypes = {
     locusId: string
     locus: {
       name: string
-      panelEntries: { panelDef: { panelType: string } }[]
+      panelEntries: { panelDef: { panelType: string; colorRole: string | null } }[]
       sectionEntries: { section: { id: string; name: string; displayOrder: number } }[]
     }
     expressionRulesAsAlleleOne: { alleleTwoId: string; phenotype: string }[]
@@ -18,6 +18,59 @@ export type PossibleLocusPhenotypes = {
   locusName: string
   section: { id: string; name: string; displayOrder: number } | null
   phenotypes: string[]
+}
+
+export type ColorGroupPhenotypes = {
+  role: string
+  phenotypes: string[]
+}
+
+const COLOR_ROLE_ORDER = ["BASE", "DILUTION", "MODIFIER", "WHITE_PATTERN"]
+
+export function computeColorGroupPhenotypes(
+  alleleFrequencies: AlleleFreqForPhenotypes[]
+): ColorGroupPhenotypes[] {
+  const active = alleleFrequencies.filter(af => af.frequency > 0)
+
+  const poolByLocus = new Map<string, Set<string>>()
+  const locusRole = new Map<string, string>()
+  for (const af of active) {
+    const entry = af.allele.locus.panelEntries.find(e => e.panelDef.panelType === "COLOR" && e.panelDef.colorRole != null)
+    if (!entry) continue
+    if (!poolByLocus.has(af.allele.locusId)) {
+      poolByLocus.set(af.allele.locusId, new Set())
+      locusRole.set(af.allele.locusId, entry.panelDef.colorRole!)
+    }
+    poolByLocus.get(af.allele.locusId)!.add(af.allele.id)
+  }
+
+  const byRole = new Map<string, Set<string>>()
+  for (const af of active) {
+    const lid = af.allele.locusId
+    const pool = poolByLocus.get(lid)
+    if (!pool) continue
+    const role = locusRole.get(lid)!
+    if (!byRole.has(role)) byRole.set(role, new Set())
+    const set = byRole.get(role)!
+    for (const rule of af.allele.expressionRulesAsAlleleOne) {
+      if (rule.phenotype && pool.has(rule.alleleTwoId)) set.add(rule.phenotype)
+    }
+    for (const rule of af.allele.expressionRulesAsAlleleTwo) {
+      if (rule.phenotype && pool.has(rule.alleleOneId)) set.add(rule.phenotype)
+    }
+  }
+
+  const result: ColorGroupPhenotypes[] = []
+  for (const role of COLOR_ROLE_ORDER) {
+    const phenotypes = byRole.get(role)
+    if (phenotypes && phenotypes.size > 0) result.push({ role, phenotypes: [...phenotypes].sort() })
+  }
+  for (const [role, phenotypes] of byRole) {
+    if (!COLOR_ROLE_ORDER.includes(role) && phenotypes.size > 0) {
+      result.push({ role, phenotypes: [...phenotypes].sort() })
+    }
+  }
+  return result
 }
 
 export function computePossiblePhenotypes(

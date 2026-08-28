@@ -19,6 +19,7 @@ export const panelAdminRouter = router({
       gameId: z.string(),
       name: z.string().min(1),
       panelType: z.enum(["HEALTH", "CONFORMATION", "COLOR"]),
+      colorRole: z.string().nullish(),
     }))
     .mutation(({ input }) => {
       const { id, gameId, ...data } = input

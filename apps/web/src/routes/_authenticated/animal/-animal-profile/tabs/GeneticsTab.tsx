@@ -175,6 +175,66 @@ function PanelGroup({
   )
 }
 
+function ColorPanelMerged({
+  panels,
+  ageInCycles,
+  cycleToAge,
+  testsRemaining,
+  testingLocusId,
+  isPending,
+  onTestLocus,
+  onTestPanels,
+}: {
+  panels: { panelDef: PanelDef; genotypes: Genotype[] }[]
+  ageInCycles: number
+  cycleToAge: (n: number) => string
+  testsRemaining: number
+  testingLocusId: string | null
+  isPending: boolean
+  onTestLocus: (locusId: string) => void
+  onTestPanels: () => void
+}) {
+  const allGenotypes = panels.flatMap((p) => p.genotypes)
+  const totalCost = panels.reduce((sum, p) => {
+    const eligible = p.genotypes.filter(
+      (g) => !g.isTestedByOwner && (g.locus.minTestCycle == null || ageInCycles >= g.locus.minTestCycle)
+    )
+    return sum + eligible.length * p.panelDef.testCost
+  }, 0)
+  const hasEligible = panels.some((p) =>
+    p.genotypes.some((g) => !g.isTestedByOwner && (g.locus.minTestCycle == null || ageInCycles >= g.locus.minTestCycle))
+  )
+
+  return (
+    <div className="rounded-md border border-border bg-card">
+      <div className="flex items-center justify-between border-b border-border/60 px-3 py-2">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Color Panel</span>
+        {hasEligible && (
+          <ActionButton variant="soft" className="h-6 px-2 text-[11px]" disabled={isPending} onClick={onTestPanels}>
+            {isPending ? <Loader2 className="size-3 animate-spin" /> : <FlaskConical className="size-3" />}
+            {totalCost === 0 ? "Test Panel · Free" : `Test Panel · ${totalCost}g`}
+          </ActionButton>
+        )}
+      </div>
+      <div className="p-2">
+        <GenotypeGrid>
+          {allGenotypes.map((g) => (
+            <GenotypeCard
+              key={g.locusId}
+              genotype={g}
+              testsRemaining={testsRemaining}
+              isTestingThis={testingLocusId === g.locusId}
+              isAgeGated={g.locus.minTestCycle != null && ageInCycles < g.locus.minTestCycle}
+              cycleToAge={cycleToAge}
+              onTest={() => onTestLocus(g.locusId)}
+            />
+          ))}
+        </GenotypeGrid>
+      </div>
+    </div>
+  )
+}
+
 function ConformationGenotypeCard({
   genotype,
   testsRemaining,
@@ -363,6 +423,14 @@ export function GeneticsTab({
   const testsRemaining = Math.max(0, testsPerCycle - testedThisCycle)
 
   const colorPanels = groupByPanel(animal.genotypes, "COLOR")
+  const handleTestColorPanels = () => {
+    for (const { panelDef, genotypes } of colorPanels) {
+      const hasEligible = genotypes.some(
+        (g) => !g.isTestedByOwner && (g.locus.minTestCycle == null || animal.ageInCycles >= g.locus.minTestCycle)
+      )
+      if (hasEligible) testPanel({ animalId: animal.id, panelDefId: panelDef.id })
+    }
+  }
   const healthPanels = groupByPanel(animal.genotypes, "HEALTH")
   const sectionOrder = new Map((animal.game?.conformationSections ?? []).map((s, i) => [s.name, s.displayOrder ?? i]))
   const conformationPanels = groupByPanel(animal.genotypes, "CONFORMATION")
@@ -397,23 +465,16 @@ export function GeneticsTab({
         colorPanels.length === 0 ? (
           <p className="text-[11px] text-muted-foreground/60">No color panels</p>
         ) : (
-          <div className="flex flex-wrap gap-3">
-            {colorPanels.map(({ panelDef, genotypes }) => (
-              <div key={panelDef.id} className="min-w-50 flex-1">
-                <PanelGroup
-                  panelDef={panelDef}
-                  genotypes={genotypes}
-                  ageInCycles={animal.ageInCycles}
-                  cycleToAge={cycleToAge}
-                  testsRemaining={testsRemaining}
-                  testingLocusId={testingLocusId}
-                  testingPanelId={testingPanelId}
-                  onTestLocus={(locusId) => testLocus({ animalId: animal.id, locusId })}
-                  onTestPanel={(panelDefId) => testPanel({ animalId: animal.id, panelDefId })}
-                />
-              </div>
-            ))}
-          </div>
+          <ColorPanelMerged
+            panels={colorPanels}
+            ageInCycles={animal.ageInCycles}
+            cycleToAge={cycleToAge}
+            testsRemaining={testsRemaining}
+            testingLocusId={testingLocusId}
+            isPending={testPanelPending}
+            onTestLocus={(locusId) => testLocus({ animalId: animal.id, locusId })}
+            onTestPanels={handleTestColorPanels}
+          />
         )
       )}
 

@@ -93,6 +93,7 @@ model GeneticPanelDef {
   name                   String
   panelType              GeneticPanelType
   testCost               Int                     @default(0)
+  colorRole              String?
   loci                   GeneticPanelLocus[]
   vetServiceDefs         VetServiceDef[]
   groupEntryRequirements GroupEntryRequirement[]

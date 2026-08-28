@@ -51,6 +51,7 @@ export const breedAdminRouter = router({
         await tx.breedStatProfile.deleteMany({ where: { breedId: input.id } })
         await tx.breedConformationStandard.deleteMany({ where: { breedId: input.id } })
         await tx.breedDqTrait.deleteMany({ where: { breedId: input.id } })
+        await tx.breedCoatSelection.deleteMany({ where: { breedId: input.id } })
         return tx.breed.delete({ where: { id: input.id } })
       })
     ),
@@ -70,9 +71,6 @@ export const breedAdminRouter = router({
       breedId: z.string(),
       statDefId: z.string(),
       weight: z.number(),
-      naturalMin: z.number(),
-      naturalMax: z.number(),
-      baseline: z.number(),
     }))
     .mutation(({ input }) => {
       const { id, breedId, ...data } = input
@@ -89,9 +87,6 @@ export const breedAdminRouter = router({
       profiles: z.array(z.object({
         statDefId: z.string(),
         weight: z.number(),
-        naturalMin: z.number(),
-        naturalMax: z.number(),
-        baseline: z.number(),
       }))
     }))
     .mutation(({ input }) =>
@@ -151,6 +146,29 @@ export const breedAdminRouter = router({
   removeDqTrait: publicProcedure
     .input(z.object({ id: z.string() }))
     .mutation(({ input }) => db.breedDqTrait.delete({ where: { id: input.id } })),
+
+  listCoatSelections: publicProcedure
+    .input(z.object({ breedId: z.string() }))
+    .query(({ input }) =>
+      db.breedCoatSelection.findMany({ where: { breedId: input.breedId } })
+    ),
+  saveCoatSelection: publicProcedure
+    .input(z.object({ breedId: z.string(), expression: z.string().min(1), colorRole: z.string().min(1) }))
+    .mutation(({ input }) =>
+      db.breedCoatSelection.upsert({
+        where: { breedId_expression: { breedId: input.breedId, expression: input.expression } },
+        create: input,
+        update: { colorRole: input.colorRole },
+      })
+    ),
+  removeCoatSelection: publicProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(({ input }) => db.breedCoatSelection.delete({ where: { id: input.id } })),
+  saveCoatWeight: publicProcedure
+    .input(z.object({ breedId: z.string(), coatWeight: z.number().nullable() }))
+    .mutation(({ input }) =>
+      db.breed.update({ where: { id: input.breedId }, data: { coatWeight: input.coatWeight } })
+    ),
 
   listPersonalityProfiles: publicProcedure
     .input(z.object({ breedId: z.string() }))
@@ -244,7 +262,7 @@ export const breedAdminRouter = router({
                 select: {
                   id: true,
                   name: true,
-                  panelEntries: { select: { panelDef: { select: { panelType: true } } } },
+                  panelEntries: { select: { panelDef: { select: { panelType: true, colorRole: true } } } },
                   sectionEntries: {
                     select: { section: { select: { id: true, name: true, displayOrder: true } } },
                     orderBy: { displayOrder: "asc" },
