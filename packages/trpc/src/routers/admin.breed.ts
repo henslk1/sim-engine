@@ -52,6 +52,7 @@ export const breedAdminRouter = router({
         await tx.breedConformationStandard.deleteMany({ where: { breedId: input.id } })
         await tx.breedDqTrait.deleteMany({ where: { breedId: input.id } })
         await tx.breedCoatSelection.deleteMany({ where: { breedId: input.id } })
+        await tx.breedCoatDqSelection.deleteMany({ where: { breedId: input.id } })
         return tx.breed.delete({ where: { id: input.id } })
       })
     ),
@@ -170,6 +171,24 @@ export const breedAdminRouter = router({
       db.breed.update({ where: { id: input.breedId }, data: { coatWeight: input.coatWeight } })
     ),
 
+  listCoatDqSelections: publicProcedure
+    .input(z.object({ breedId: z.string() }))
+    .query(({ input }) =>
+      db.breedCoatDqSelection.findMany({ where: { breedId: input.breedId } })
+    ),
+  saveCoatDqSelection: publicProcedure
+    .input(z.object({ breedId: z.string(), expression: z.string().min(1), colorRole: z.string().min(1) }))
+    .mutation(({ input }) =>
+      db.breedCoatDqSelection.upsert({
+        where: { breedId_expression: { breedId: input.breedId, expression: input.expression } },
+        create: input,
+        update: { colorRole: input.colorRole },
+      })
+    ),
+  removeCoatDqSelection: publicProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(({ input }) => db.breedCoatDqSelection.delete({ where: { id: input.id } })),
+
   listPersonalityProfiles: publicProcedure
     .input(z.object({ breedId: z.string() }))
     .query(({ input }) =>
@@ -239,6 +258,7 @@ export const breedAdminRouter = router({
             select: {
               id: true,
               name: true,
+              isHiddenModifier: true,
               panelEntries: { select: { panelDef: { select: { panelType: true } } } },
             },
           },
@@ -262,6 +282,7 @@ export const breedAdminRouter = router({
                 select: {
                   id: true,
                   name: true,
+                  isHiddenModifier: true,
                   panelEntries: { select: { panelDef: { select: { panelType: true, colorRole: true } } } },
                   sectionEntries: {
                     select: { section: { select: { id: true, name: true, displayOrder: true } } },

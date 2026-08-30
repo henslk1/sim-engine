@@ -1,5 +1,5 @@
 import { router, publicProcedure } from "../trpc.js"
-import { db } from "@sim-engine/db"
+import { db, Prisma } from "@sim-engine/db"
 import { z } from "zod"
 
 export const healthAdminRouter = router({
@@ -51,7 +51,7 @@ export const healthAdminRouter = router({
         procedureFatalityRisk: procedureFatalityRisk ?? null,
         suppressionItemDefId: suppressionItemDefId ?? null,
         baseWeight,
-        description: description ?? null,
+        description: description != null ? (description as Prisma.InputJsonValue) : Prisma.DbNull,
       }
       if (id) return db.healthConditionDef.update({ where: { id }, data })
       return db.healthConditionDef.create({ data: { gameId, ...data } })

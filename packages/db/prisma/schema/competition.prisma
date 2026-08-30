@@ -97,6 +97,16 @@ model BreedCoatSelection {
   @@unique([breedId, expression])
 }
 
+model BreedCoatDqSelection {
+  id         String @id @default(cuid())
+  breedId    String
+  expression String
+  colorRole  String
+  breed      Breed  @relation(fields: [breedId], references: [id])
+
+  @@unique([breedId, expression])
+}
+
 model CompetitionTierDef {
   id                             String                  @id @default(cuid())
   gameId                         String

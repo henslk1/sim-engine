@@ -1,6 +1,6 @@
 import type { AnimalProfile } from "../types"
 import { Panel } from "@/components/game/ui"
-import { Ruler } from "lucide-react"
+import { Ruler, TriangleAlert } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { formatCycleAge } from "../utils"
 
@@ -35,6 +35,22 @@ export function ConformationPanel({ animal }: { animal: AnimalProfile }) {
   const sectionScores = (animal.conformationSectionScores ?? [])
     .filter((s) => s.breedId === overallScore?.breedId)
     .sort((a, b) => a.section.displayOrder - b.section.displayOrder)
+
+  // Build locus → phenotypeCode map for DQ checks
+  const genotypeCodeByLocus = new Map<string, string>()
+  for (const g of animal.genotypes ?? []) {
+    if (g.phenotypeCode) genotypeCodeByLocus.set(g.locusId, g.phenotypeCode)
+  }
+  // Which loci have a matching DQ trait for this breed
+  const dqLocusNames = new Map<string, string>() // locusId → locus name (for tooltip)
+  for (const dq of animal.breed?.dqTraits ?? []) {
+    const code = genotypeCodeByLocus.get(dq.locusId)
+    if (code && code === dq.expression) {
+      const locusDef = animal.genotypes?.find(g => g.locusId === dq.locusId)
+      if (locusDef) dqLocusNames.set(dq.locusId, locusDef.locus.name)
+    }
+  }
+  const hasCoatDq = !!(overallScore as { isCoatDq?: boolean } | undefined)?.isCoatDq
 
   const title = (
     <>
@@ -77,13 +93,34 @@ export function ConformationPanel({ animal }: { animal: AnimalProfile }) {
           <div className="grid grid-cols-3 gap-2">
             {sectionScores.map((ss) => {
               const grade = letterGrade(ss.score)
+              const dqInSection = ss.section.entries
+                .filter(e => dqLocusNames.has(e.locus.id))
+                .map(e => dqLocusNames.get(e.locus.id)!)
               return (
                 <div key={ss.id} className="rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2">
-                  <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{ss.section.name}</p>
+                  <div className="mb-0.5 flex items-center gap-1">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{ss.section.name}</p>
+                    {dqInSection.length > 0 && (
+                      <span title={dqInSection.map(n => `${n} has a disqualifying trait`).join("\n")}>
+                        <TriangleAlert className="size-3 text-amber-500 shrink-0" />
+                      </span>
+                    )}
+                  </div>
                   <p className="text-sm font-semibold text-foreground">{grade}</p>
                 </div>
               )
             })}
+            {hasCoatDq && (
+              <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2.5 py-2">
+                <div className="mb-0.5 flex items-center gap-1">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">Coat Color</p>
+                  <span title="This animal has a disqualifying coat color — it will score 0 in conformation shows">
+                    <TriangleAlert className="size-3 text-amber-500 shrink-0" />
+                  </span>
+                </div>
+                <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">DQ</p>
+              </div>
+            )}
           </div>
         )}
 

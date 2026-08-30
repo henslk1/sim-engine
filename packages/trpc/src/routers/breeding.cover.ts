@@ -1,7 +1,38 @@
 import { db } from "@sim-engine/db"
 import { router, publicProcedure } from "../trpc.js"
 import { z } from "zod"
-import { generateOffspring, computePhenotypeDescription, computeBreedingQuality, computeCOI, computeFixedFields, type ParentData } from "@sim-engine/engine"
+import { generateOffspring, computePhenotypeDescription, computePhenotypeCodes, computeBreedingQuality, computeCOI, computeFixedFields, type ParentData } from "@sim-engine/engine"
+
+async function buildBreedFreqMap(
+  sireComp: Array<{ breedId: string; percentage: number }>,
+  damComp: Array<{ breedId: string; percentage: number }>,
+) {
+  const breedIds = [...new Set([...sireComp.map(c => c.breedId), ...damComp.map(c => c.breedId)])]
+  const sireMap = new Map(sireComp.map(c => [c.breedId, c.percentage]))
+  const damMap = new Map(damComp.map(c => [c.breedId, c.percentage]))
+
+  const rawFreqs = await db.breedAlleleFrequency.findMany({
+    where: { breedId: { in: breedIds }, allele: { locus: { isHiddenModifier: true } } },
+    select: { breedId: true, frequency: true, allele: { select: { id: true, symbol: true, locusId: true } } },
+  })
+
+  const blendMap = new Map<string, Map<string, { symbol: string; frequency: number }>>()
+  for (const rf of rawFreqs) {
+    const pct = ((sireMap.get(rf.breedId) ?? 0) + (damMap.get(rf.breedId) ?? 0)) / 2
+    const locusId = rf.allele.locusId
+    if (!blendMap.has(locusId)) blendMap.set(locusId, new Map())
+    const alMap = blendMap.get(locusId)!
+    const prev = alMap.get(rf.allele.id)
+    alMap.set(rf.allele.id, { symbol: rf.allele.symbol, frequency: (prev?.frequency ?? 0) + rf.frequency * pct })
+  }
+
+  return new Map(
+    Array.from(blendMap.entries()).map(([locusId, alMap]) => [
+      locusId,
+      Array.from(alMap.entries()).map(([alleleId, v]) => ({ alleleId, symbol: v.symbol, frequency: v.frequency })),
+    ])
+  )
+}
 
 const eligibleFemaleSelect = {
   id: true,
@@ -79,6 +110,7 @@ const parentSelect = {
       isTestedByOwner: true,
       locus: {
         select: {
+          inheritanceWeight: true,
           panelEntries: { select: { panelDef: { select: { panelType: true } } } },
         },
       },
@@ -632,6 +664,8 @@ export const breedingCoverRouter = router({
           return animal.personality.map(p => ({ traitDefId: p.traitDefId, value: p.value, labelRanges: p.traitDef.labelRanges }))
         }
 
+        const breedAlleleFrequencies = await buildBreedFreqMap(sire.breedComposition, dam.breedComposition)
+
         const result = generateOffspring({
           sire: { ...sire, breedId: sire.breedId!, quality: parentQuality(sire), personality: flattenPersonality(sire) },
           dam: { ...dam, breedId: dam.breedId!, quality: parentQuality(dam), personality: flattenPersonality(dam) },
@@ -639,6 +673,7 @@ export const breedingCoverRouter = router({
           gameConfig,
           gameInnateMax: gameInnateMax ?? { maxTotalInnate: 2000, averageTotalInnate: 1000 },
           gradeBreedId: gradeBread?.id ?? sire.breedId!,
+          breedAlleleFrequencies,
         })
 
         if (!result.conceived) {
@@ -691,6 +726,7 @@ export const breedingCoverRouter = router({
 
         for (const [i, offspring] of result.offspring.entries()) {
           const phenotypeDescription = computePhenotypeDescription(offspring.genotypes, expressionRules)
+          const genotypeCodes = computePhenotypeCodes(offspring.genotypes, expressionRules)
           const { structuralRisk, preferredTerrain, preferredClimate } = await computeFixedFields(tx, offspring.genotypes)
           const animal = await tx.animal.create({
             data: {
@@ -744,11 +780,12 @@ export const breedingCoverRouter = router({
               })),
             }),
             tx.animalGenotype.createMany({
-              data: offspring.genotypes.map((g) => ({
+              data: offspring.genotypes.map((g, idx) => ({
                 animalId: animal.id,
                 locusId: g.locusId,
                 alleleOneId: g.alleleOneId,
                 alleleTwoId: g.alleleTwoId,
+                phenotypeCode: genotypeCodes[idx]?.phenotypeCode ?? null,
               })),
             }),
             tx.animalBreedComposition.createMany({
@@ -1092,6 +1129,8 @@ export const breedingCoverRouter = router({
         return a.personality.map(p => ({ traitDefId: p.traitDefId, value: p.value, labelRanges: p.traitDef.labelRanges }))
       }
 
+      const breedAlleleFrequencies = await buildBreedFreqMap(sire.breedComposition, dam.breedComposition)
+
       const result = generateOffspring({
         sire: { ...sire, breedId: sire.breedId!, quality: parentQuality(sire), personality: flattenP(sire) },
         dam: { ...dam, breedId: dam.breedId!, quality: parentQuality(dam), personality: flattenP(dam) },
@@ -1100,6 +1139,7 @@ export const breedingCoverRouter = router({
         gameInnateMax: gameInnateMax ?? { maxTotalInnate: 2000, averageTotalInnate: 1000 },
         gradeBreedId: gradeBreed?.id ?? sire.breedId!,
         skipConceptionRoll: true,
+        breedAlleleFrequencies,
       })
 
       if (!result.conceived) throw new Error("Predictor failed unexpectedly")

@@ -1,5 +1,5 @@
 import { router, publicProcedure } from "../trpc.js"
-import { db } from "@sim-engine/db"
+import { db, Prisma } from "@sim-engine/db"
 import { z } from "zod"
 
 export const locusAdminRouter = router({
@@ -27,7 +27,7 @@ export const locusAdminRouter = router({
     }))
     .mutation(({ input }) => {
       const { id, gameId, minTestCycle, description, ...rest } = input
-      const data = { ...rest, minTestCycle: minTestCycle ?? null, description: description ?? null }
+      const data = { ...rest, minTestCycle: minTestCycle ?? null, description: description != null ? (description as Prisma.InputJsonValue) : Prisma.DbNull }
       if (id) return db.locus.update({ where: { id }, data })
       return db.locus.upsert({
         where: { gameId_name: { gameId, name: data.name } },

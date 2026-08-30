@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import {
   computePossiblePhenotypes, type PossibleLocusPhenotypes,
-  computeColorGroupPhenotypes, type ColorGroupPhenotypes,
+  computeColorGroupPhenotypes, formatCoatPhenotype, type ColorGroupPhenotypes,
 } from "@/lib/breedUtils"
 
 export const Route = createFileRoute("/_authenticated/admin/games/$gameId/breeds")({
@@ -36,7 +36,7 @@ const emptyBreed: BreedForm = {
   immunityMin: "", immunityMax: "",
 }
 
-type ActivePanel = "stats" | "color" | "conformation" | "health" | "standards" | "personality"
+type ActivePanel = "stats" | "color" | "conformation" | "health" | "variance" | "standards" | "personality"
 type WizardStep = 1 | 2 | 3 | 4 | null
 
 const WIZARD_LABELS: Record<2 | 3 | 4, string> = {
@@ -135,7 +135,7 @@ function AlleleFreqRow({ allele, values, onFreqChange }: {
 
 // ── Locus Allele Group ────────────────────────────────────────────────────────
 
-type LocusAllele = { id: string; symbol: string; locus: { id: string; name: string; panelEntries: { panelDef: { panelType: string } }[] } }
+type LocusAllele = { id: string; symbol: string; locus: { id: string; name: string; isHiddenModifier: boolean; panelEntries: { panelDef: { panelType: string } }[] } }
 
 function LocusAlleleGroup({ locus, locusAlleles, freqValues, onFreqChange }: {
   locus: { id: string; name: string }
@@ -181,6 +181,7 @@ function LocusAlleleGroup({ locus, locusAlleles, freqValues, onFreqChange }: {
 type ConformStandard = { id: string; locusId: string; idealExpressionLabel: string; weight: number }
 type DqTrait = { id: string; locusId: string; expression: string }
 type CoatSelection = { id: string; expression: string; colorRole: string }
+type CoatDqSelection = { id: string; expression: string; colorRole: string }
 
 const COAT_ROLE_LABELS: Record<string, string> = {
   BASE: "Base Color",
@@ -354,9 +355,15 @@ function CoatColorContent({
       <p className="px-3 py-1.5 text-xs text-muted-foreground/60 border-b border-border">
         Check acceptable expressions per category. All valid combinations are scored as a single coat match.
       </p>
-      <div className="grid grid-cols-2 divide-x divide-border">
-        {colorGroups.map(group => (
-          <div key={group.role} className="border-b border-border last:border-0">
+      <div className="grid grid-cols-2">
+        {colorGroups.map((group, i) => (
+          <div
+            key={group.role}
+            className={[
+              i % 2 === 0 ? "border-r border-border" : "",
+              i < colorGroups.length - 2 ? "border-b border-border" : "",
+            ].filter(Boolean).join(" ")}
+          >
             <div className="bg-secondary/40 px-3 py-2 border-b border-border">
               <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                 {COAT_ROLE_LABELS[group.role] ?? group.role}
@@ -379,7 +386,73 @@ function CoatColorContent({
                           }}
                           className="cursor-pointer" />
                       </td>
-                      <td className="px-3 py-1.5 text-sm text-foreground">{phenotype}</td>
+                      <td className="px-3 py-1.5 text-sm text-foreground">{formatCoatPhenotype(phenotype)}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── Coat Color DQ ─────────────────────────────────────────────────────────────
+
+function CoatDqContent({
+  colorGroups, coatDqSelections, onSaveSelection, onRemoveSelection,
+}: {
+  colorGroups: ColorGroupPhenotypes[]
+  coatDqSelections: CoatDqSelection[]
+  onSaveSelection: (expression: string, colorRole: string) => void
+  onRemoveSelection: (id: string) => void
+}) {
+  if (!colorGroups.length) {
+    return (
+      <p className="px-4 py-4 text-sm text-muted-foreground">
+        No color loci with roles configured. Set a color role on panels in the Genetic Panels section.
+      </p>
+    )
+  }
+  return (
+    <div>
+      <p className="px-3 py-1.5 text-xs text-muted-foreground/60 border-b border-border">
+        Check expressions to disqualify animals with that coat component from conformation shows.
+      </p>
+      <div className="grid grid-cols-2">
+        {colorGroups.map((group, i) => (
+          <div
+            key={group.role}
+            className={[
+              i % 2 === 0 ? "border-r border-border" : "",
+              i < colorGroups.length - 2 ? "border-b border-border" : "",
+            ].filter(Boolean).join(" ")}
+          >
+            <div className="bg-secondary/40 px-3 py-2 border-b border-border">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                {COAT_ROLE_LABELS[group.role] ?? group.role}
+              </span>
+            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/20"><TH>DQ</TH><TH>Expression</TH></tr>
+              </thead>
+              <tbody>
+                {group.phenotypes.map(phenotype => {
+                  const existing = coatDqSelections.find(s => s.expression === phenotype && s.colorRole === group.role)
+                  return (
+                    <tr key={phenotype} className="border-b border-border last:border-0">
+                      <td className="px-3 py-1.5 w-8">
+                        <input type="checkbox" checked={!!existing}
+                          onChange={e => {
+                            if (e.target.checked) onSaveSelection(phenotype, group.role)
+                            else if (existing) onRemoveSelection(existing.id)
+                          }}
+                          className="cursor-pointer" />
+                      </td>
+                      <td className="px-3 py-1.5 text-sm text-foreground">{formatCoatPhenotype(phenotype)}</td>
                     </tr>
                   )
                 })}
@@ -430,16 +503,19 @@ function LociContent({ locusAlleleGroups, freqValues, onFreqChange, onSaveAll, i
 }
 
 function StandardsContent({
-  possibleLoci, conformStandards, dqTraits,
-  colorGroups, coatSelections, coatWeight,
+  possibleLoci, possibleVarianceLoci, conformStandards, dqTraits,
+  colorGroups, coatSelections, coatDqSelections, coatWeight,
   onSaveConform, onRemoveConform, onSaveDq, onRemoveDq,
   onSaveCoatSelection, onRemoveCoatSelection, onSaveCoatWeight,
+  onSaveCoatDqSelection, onRemoveCoatDqSelection,
 }: {
   possibleLoci: PossibleLocusPhenotypes[]
+  possibleVarianceLoci: PossibleLocusPhenotypes[]
   conformStandards: ConformStandard[]
   dqTraits: DqTrait[]
   colorGroups: ColorGroupPhenotypes[]
   coatSelections: CoatSelection[]
+  coatDqSelections: CoatDqSelection[]
   coatWeight: number | null
   onSaveConform: (id: string | undefined, locusId: string, label: string, weight: number) => void
   onRemoveConform: (id: string) => void
@@ -448,16 +524,18 @@ function StandardsContent({
   onSaveCoatSelection: (expression: string, colorRole: string) => void
   onRemoveCoatSelection: (id: string) => void
   onSaveCoatWeight: (weight: number | null) => void
+  onSaveCoatDqSelection: (expression: string, colorRole: string) => void
+  onRemoveCoatDqSelection: (id: string) => void
 }) {
-  const [subTab, setSubTab] = useState<"ideal" | "dq" | "coat">("ideal")
+  const [subTab, setSubTab] = useState<"ideal" | "dq" | "coat" | "coat-dq" | "variance" | "variance-dq">("ideal")
 
-  if (!possibleLoci.length) {
+  if (!possibleLoci.length && !possibleVarianceLoci.length) {
     return <p className="px-4 py-4 text-sm text-muted-foreground">Configure allele frequencies first — breed standards are derived from the breed's allele pool.</p>
   }
   return (
     <div>
       <div className="flex border-b border-border bg-secondary/20">
-        {(["ideal", "dq", "coat"] as const).map(t => (
+        {(["ideal", "dq", "coat", "coat-dq", "variance", "variance-dq"] as const).map(t => (
           <button
             key={t}
             onClick={() => setSubTab(t)}
@@ -466,7 +544,7 @@ function StandardsContent({
               subTab === t ? "border-b-2 border-primary text-foreground" : "text-muted-foreground hover:text-foreground"
             )}
           >
-            {t === "ideal" ? "Ideal Traits" : t === "dq" ? "Disqualifying Traits" : "Coat Color"}
+            {t === "ideal" ? "Ideal Traits" : t === "dq" ? "Disqualifying Traits" : t === "coat" ? "Coat Color" : t === "coat-dq" ? "Coat DQ" : t === "variance" ? "Variance" : "Variance DQ"}
           </button>
         ))}
       </div>
@@ -521,6 +599,63 @@ function StandardsContent({
           onSaveWeight={onSaveCoatWeight}
         />
       )}
+
+      {subTab === "coat-dq" && (
+        <CoatDqContent
+          colorGroups={colorGroups ?? []}
+          coatDqSelections={coatDqSelections ?? []}
+          onSaveSelection={onSaveCoatDqSelection}
+          onRemoveSelection={onRemoveCoatDqSelection}
+        />
+      )}
+
+      {subTab === "variance" && (
+        <div>
+          <p className="px-3 py-1.5 text-xs text-muted-foreground/60 border-b border-border">
+            Check a variance expression to include it in this breed's conformation standard.
+          </p>
+          {!possibleVarianceLoci.length ? (
+            <p className="px-4 py-4 text-sm text-muted-foreground">No variance loci configured. Add allele frequencies for hidden modifier loci in the Variance tab.</p>
+          ) : (
+            <div className="grid grid-cols-2 divide-x divide-border">
+              {possibleVarianceLoci.map(l => (
+                <LocusStandardsGroup
+                  key={l.locusId}
+                  locus={{ id: l.locusId, name: l.locusName }}
+                  phenotypes={l.phenotypes}
+                  conformStandards={conformStandards}
+                  onSave={onSaveConform}
+                  onRemove={onRemoveConform}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {subTab === "variance-dq" && (
+        <div>
+          <p className="px-3 py-1.5 text-xs text-muted-foreground/60 border-b border-border">
+            Check a variance expression to mark it as a disqualifying trait for this breed.
+          </p>
+          {!possibleVarianceLoci.length ? (
+            <p className="px-4 py-4 text-sm text-muted-foreground">No variance loci configured. Add allele frequencies for hidden modifier loci in the Variance tab.</p>
+          ) : (
+            <div className="grid grid-cols-2 divide-x divide-border">
+              {possibleVarianceLoci.map(l => (
+                <LocusDqTraitsGroup
+                  key={l.locusId}
+                  locus={{ id: l.locusId, name: l.locusName }}
+                  phenotypes={l.phenotypes}
+                  dqTraits={dqTraits}
+                  onSave={onSaveDq}
+                  onRemove={onRemoveDq}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -570,7 +705,7 @@ function BreedsPage() {
       const next: typeof prev = {}
       for (const stat of stats) {
         const p = statProfiles?.find(sp => sp.statDefId === stat.id)
-        next[stat.id] = prev[stat.id] ?? { weight: p?.weight.toString() ?? "1" }
+        next[stat.id] = { weight: p?.weight.toString() ?? prev[stat.id]?.weight ?? "1" }
       }
       return next
     })
@@ -641,6 +776,15 @@ function BreedsPage() {
   const saveCoatWeightMut = trpc.admin.breed.saveCoatWeight.useMutation({
     onSuccess: () => utils.admin.breed.list.invalidate(),
   })
+  const { data: coatDqSelections } = trpc.admin.breed.listCoatDqSelections.useQuery(
+    { breedId: editing?.id! }, { enabled: !!editing?.id }
+  )
+  const saveCoatDqSelectionMut = trpc.admin.breed.saveCoatDqSelection.useMutation({
+    onSuccess: () => utils.admin.breed.listCoatDqSelections.invalidate(),
+  })
+  const removeCoatDqSelectionMut = trpc.admin.breed.removeCoatDqSelection.useMutation({
+    onSuccess: () => utils.admin.breed.listCoatDqSelections.invalidate(),
+  })
   const savePersonalityProfile = trpc.admin.breed.savePersonalityProfile.useMutation({
     onSuccess: () => utils.admin.breed.listPersonalityProfiles.invalidate(),
   })
@@ -699,6 +843,11 @@ function BreedsPage() {
     saveCoatWeightMut.mutate({ breedId: editing.id, coatWeight: weight })
   }
 
+  function handleSaveCoatDqSelection(expression: string, colorRole: string) {
+    if (!editing?.id) return
+    saveCoatDqSelectionMut.mutate({ breedId: editing.id, expression, colorRole })
+  }
+
   function handleSavePersonalityProfile(traitDefId: string, id: string | undefined, data: { naturalMin: number; naturalMax: number; baseline: number }) {
     if (!editing?.id) return
     savePersonalityProfile.mutate({ id, breedId: editing.id, traitDefId, ...data })
@@ -744,7 +893,7 @@ function BreedsPage() {
   }
 
   const locusAlleleGroups = useMemo(() => {
-    const map = new Map<string, { locus: { id: string; name: string }; alleles: LocusAllele[] }>()
+    const map = new Map<string, { locus: { id: string; name: string; panelEntries: { panelDef: { panelType: string } }[] }; alleles: LocusAllele[] }>()
     for (const a of alleles ?? []) {
       if (!map.has(a.locus.id)) map.set(a.locus.id, { locus: a.locus, alleles: [] })
       map.get(a.locus.id)!.alleles.push(a)
@@ -752,8 +901,18 @@ function BreedsPage() {
     return Array.from(map.values())
   }, [alleles])
 
+  const nonHiddenFreqs = useMemo(
+    () => (alleleFrequencies ?? []).filter(af => !af.allele.locus.isHiddenModifier),
+    [alleleFrequencies]
+  )
+
   const possibleLoci = useMemo(
-    () => computePossiblePhenotypes(alleleFrequencies ?? []),
+    () => computePossiblePhenotypes(nonHiddenFreqs),
+    [nonHiddenFreqs]
+  )
+
+  const possibleVarianceLoci = useMemo(
+    () => computePossiblePhenotypes((alleleFrequencies ?? []).filter(af => af.allele.locus.isHiddenModifier)),
     [alleleFrequencies]
   )
 
@@ -763,8 +922,8 @@ function BreedsPage() {
   )
 
   const colorGroups = useMemo(
-    () => computeColorGroupPhenotypes(alleleFrequencies ?? []),
-    [alleleFrequencies]
+    () => computeColorGroupPhenotypes(nonHiddenFreqs),
+    [nonHiddenFreqs]
   )
 
   const currentCoatWeight = breeds?.find(b => b.id === editing?.id)?.coatWeight ?? null
@@ -831,6 +990,7 @@ function BreedsPage() {
     { key: "color", label: "Color" },
     { key: "conformation", label: "Conformation" },
     { key: "health", label: "Health" },
+    { key: "variance", label: "Variance" },
     { key: "standards", label: "Breed Standards" },
     { key: "personality", label: "Personality" },
   ]
@@ -1028,10 +1188,12 @@ function BreedsPage() {
                 {wizardStep === 4 && (
                   <StandardsContent
                     possibleLoci={possibleLoci}
+                    possibleVarianceLoci={possibleVarianceLoci}
                     conformStandards={conformStandards ?? []}
                     dqTraits={dqTraits ?? []}
                     colorGroups={colorGroups}
                     coatSelections={coatSelections ?? []}
+                    coatDqSelections={coatDqSelections ?? []}
                     coatWeight={currentCoatWeight}
                     onSaveConform={handleSaveConform}
                     onRemoveConform={id => removeConform.mutate({ id })}
@@ -1040,6 +1202,8 @@ function BreedsPage() {
                     onSaveCoatSelection={handleSaveCoatSelection}
                     onRemoveCoatSelection={id => removeCoatSelectionMut.mutate({ id })}
                     onSaveCoatWeight={handleSaveCoatWeight}
+                    onSaveCoatDqSelection={handleSaveCoatDqSelection}
+                    onRemoveCoatDqSelection={id => removeCoatDqSelectionMut.mutate({ id })}
                   />
                 )}
 
@@ -1104,7 +1268,7 @@ function BreedsPage() {
               )
             )}
 
-            {(activePanel === "color" || activePanel === "conformation" || activePanel === "health") && (
+            {(activePanel === "color" || activePanel === "conformation" || activePanel === "health" || activePanel === "variance") && (
               <LociContent
                 locusAlleleGroups={locusAlleleGroups.filter(
                   (g) => g.locus.panelEntries.some(
@@ -1121,12 +1285,22 @@ function BreedsPage() {
             {activePanel === "standards" && (
               <StandardsContent
                 possibleLoci={possibleLoci}
+                possibleVarianceLoci={possibleVarianceLoci}
                 conformStandards={conformStandards ?? []}
                 dqTraits={dqTraits ?? []}
+                colorGroups={colorGroups ?? []}
+                coatSelections={coatSelections ?? []}
+                coatDqSelections={coatDqSelections ?? []}
+                coatWeight={currentCoatWeight}
                 onSaveConform={handleSaveConform}
                 onRemoveConform={id => removeConform.mutate({ id })}
                 onSaveDq={handleSaveDqTrait}
                 onRemoveDq={id => removeDqTrait.mutate({ id })}
+                onSaveCoatSelection={handleSaveCoatSelection}
+                onRemoveCoatSelection={id => removeCoatSelectionMut.mutate({ id })}
+                onSaveCoatWeight={handleSaveCoatWeight}
+                onSaveCoatDqSelection={handleSaveCoatDqSelection}
+                onRemoveCoatDqSelection={id => removeCoatDqSelectionMut.mutate({ id })}
               />
             )}
 

@@ -2,6 +2,7 @@ enum GeneticPanelType {
   HEALTH
   CONFORMATION
   COLOR
+  VARIANCE
 }
 
 enum LocusBiasTarget {
@@ -18,6 +19,8 @@ model Locus {
   description            Json?
   biasTarget             LocusBiasTarget             @default(NONE)
   minTestCycle           Int?
+  isHiddenModifier       Boolean                     @default(false)
+  inheritanceWeight      Float                       @default(1.0)
   alleles                Allele[]
   expressionRules        ExpressionRule[]
   panelEntries           GeneticPanelLocus[]
@@ -130,6 +133,7 @@ model AnimalGenotype {
   locusId         String
   alleleOneId     String
   alleleTwoId     String
+  phenotypeCode   String?
   isTestedByOwner Boolean   @default(false)
   testedAt        DateTime?
   testedCycle     Int?
@@ -146,6 +150,7 @@ model AnimalConformationScore {
   animalId     String
   breedId      String
   score        Float
+  isCoatDq     Boolean  @default(false)
   calculatedAt DateTime @default(now())
   animal       Animal   @relation(fields: [animalId], references: [id])
   breed        Breed    @relation(fields: [breedId], references: [id])

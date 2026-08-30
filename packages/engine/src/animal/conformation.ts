@@ -14,7 +14,7 @@ export async function runConformationInspection(client: Client, animalId: string
         lifeStage: { select: { canCompete: true, name: true } },
         breedComposition: { select: { breedId: true } },
         conformationScores: { select: { id: true }, take: 1 },
-        genotypes: { select: { locusId: true, alleleOneId: true, alleleTwoId: true } },
+        genotypes: { select: { locusId: true, alleleOneId: true, alleleTwoId: true, phenotypeCode: true } },
       phenotypeDescription: true,
       },
     })
@@ -38,7 +38,11 @@ export async function runConformationInspection(client: Client, animalId: string
       }),
       tx.breed.findUnique({
         where: { id: breedId },
-        select: { coatWeight: true, coatSelections: { select: { expression: true, colorRole: true } } },
+        select: {
+          coatWeight: true,
+          coatSelections: { select: { expression: true, colorRole: true } },
+          coatDqSelections: { select: { expression: true } },
+        },
       }),
     ])
 
@@ -76,6 +80,13 @@ export async function runConformationInspection(client: Client, animalId: string
     }
     const overallScore = totalSumWeights > 0 ? (totalSumMatched / totalSumWeights) * 100 : 0
 
+    // Coat color DQ check — runs regardless of whether coat scoring is configured
+    const animalPhenotypeCodes = new Set(
+      animal.genotypes.map(g => g.phenotypeCode).filter((c): c is string => c !== null)
+    )
+    const dqCodes = new Set(breedCoat?.coatDqSelections.map(s => s.expression) ?? [])
+    const isCoatDq = dqCodes.size > 0 && [...animalPhenotypeCodes].some(c => dqCodes.has(c))
+
     // Coat color scoring
     if (breedCoat?.coatWeight != null && breedCoat.coatSelections.length > 0) {
       totalSumWeights += breedCoat.coatWeight
@@ -85,7 +96,9 @@ export async function runConformationInspection(client: Client, animalId: string
           if (!byRole.has(sel.colorRole)) byRole.set(sel.colorRole, [])
           byRole.get(sel.colorRole)!.push(sel.expression)
         }
-        const groups = [...byRole.values()].map(codes => [...codes, null] as (string | null)[])
+        const groups = [...byRole.entries()].map(([role, codes]) =>
+          role === "BASE" ? codes as (string | null)[] : [...codes, null] as (string | null)[]
+        )
         const combinations = groups.reduce<(string | null)[][]>(
           (acc, opts) => acc.flatMap(combo => opts.map(opt => [...combo, opt])),
           [[]]
@@ -121,7 +134,7 @@ export async function runConformationInspection(client: Client, animalId: string
     }
 
     await Promise.all([
-      tx.animalConformationScore.create({ data: { animalId, breedId, score: overallScore } }),
+      tx.animalConformationScore.create({ data: { animalId, breedId, score: overallScore, isCoatDq } }),
       ...sectionScores.map((s) =>
         tx.animalConformationSectionScore.create({
           data: { animalId, breedId, sectionId: s.sectionId, score: s.score },

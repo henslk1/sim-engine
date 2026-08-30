@@ -28,7 +28,7 @@ export const breedRouter = router({
   get: protectedProcedure
     .input(z.object({ gameId: z.string(), breedId: z.string() }))
     .query(async ({ input }) => {
-      const [breed, gameConfig, disciplineWeights] = await Promise.all([
+      const [breed, gameConfig, disciplineWeights, gameInnateMax] = await Promise.all([
         db.breed.findUniqueOrThrow({
           where: { id: input.breedId },
           include: {
@@ -92,7 +92,7 @@ export const breedRouter = router({
               take: 12,
             },
             alleleFrequencies: {
-              where: { frequency: { gt: 0 } },
+              where: { frequency: { gt: 0 }, allele: { locus: { isHiddenModifier: false } } },
               include: {
                 allele: {
                   include: {
@@ -121,13 +121,17 @@ export const breedRouter = router({
         }),
         db.gameConfig.findUniqueOrThrow({
           where: { gameId: input.gameId },
-          select: { cyclesPerYear: true },
+          select: { cyclesPerYear: true, defaultInnateRatio: true },
         }),
         db.disciplineStatWeight.findMany({
           where: {
             disciplineDef: { gameId: input.gameId, isConformation: false },
           },
           include: { disciplineDef: { select: { id: true, name: true } } },
+        }),
+        db.gameInnateMax.findFirst({
+          where: { gameId: input.gameId },
+          select: { averageTotalInnate: true },
         }),
       ])
 
@@ -246,6 +250,8 @@ export const breedRouter = router({
         healthConditions: [...healthConditions.values()].sort(),
         compatibleDisciplines,
         lifeExpectancyYears,
+        defaultInnateRatio: gameConfig.defaultInnateRatio,
+        averageTotalInnate: gameInnateMax?.averageTotalInnate ?? null,
       }
     }),
 })

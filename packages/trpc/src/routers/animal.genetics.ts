@@ -14,9 +14,10 @@ export const animalGeneticsRouter = router({
 
         const locus = await tx.locus.findUniqueOrThrow({
           where: { id: input.locusId },
-          select: { minTestCycle: true },
+          select: { minTestCycle: true, isHiddenModifier: true },
         })
 
+        if (locus.isHiddenModifier) throw new Error("This locus cannot be tested")
         if (locus.minTestCycle !== null && animal.ageInCycles < locus.minTestCycle) {
           throw new Error(`This locus cannot be tested until cycle ${locus.minTestCycle}`)
         }
@@ -62,6 +63,7 @@ export const animalGeneticsRouter = router({
             animalId: input.animalId,
             locusId: { in: panelLocusIds },
             isTestedByOwner: false,
+            locus: { isHiddenModifier: false },
           },
           select: { locusId: true, locus: { select: { minTestCycle: true } } },
         })

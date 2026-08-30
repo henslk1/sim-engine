@@ -47,7 +47,7 @@ export async function runCompetition(
             animal: {
               include: {
                 personality: true,
-                conformationScores: true,
+                conformationScores: { select: { score: true, breedId: true, isCoatDq: true } },
               }
             }
           }
@@ -136,7 +136,7 @@ export async function runCompetition(
         const conformationScore = entry.animal.conformationScores.find(
           s => s.breedId === entry.animal.breedId
         )
-        const baseScore = conformationScore?.score ?? 0
+        const baseScore = (conformationScore?.isCoatDq) ? 0 : (conformationScore?.score ?? 0)
         let personalityMultiplier = 1.0
         for (const weight of competition.disciplineDef.personalityWeights) {
           const trait = entry.animal.personality.find(p => p.traitDefId === weight.traitDefId)

@@ -5,6 +5,7 @@ export type AlleleFreqForPhenotypes = {
     locusId: string
     locus: {
       name: string
+      isHiddenModifier: boolean
       panelEntries: { panelDef: { panelType: string; colorRole: string | null } }[]
       sectionEntries: { section: { id: string; name: string; displayOrder: number } }[]
     }
@@ -23,6 +24,37 @@ export type PossibleLocusPhenotypes = {
 export type ColorGroupPhenotypes = {
   role: string
   phenotypes: string[]
+}
+
+const COAT_CODE_LABELS: Record<string, string> = {
+  black_base: "Black",
+  chestnut_base: "Chestnut",
+  bay_modifier: "Bay (Agouti)",
+  one_cream: "Cream (Cc)",
+  two_cream: "Double Cream (CC)",
+  one_pearl: "Pearl (Pp)",
+  two_pearl: "Double Pearl (PP)",
+  dun: "Dun",
+  one_silver: "Silver (Zz)",
+  two_silver: "Silver (ZZ)",
+  one_mushroom: "Mushroom (Mm)",
+  two_mushroom: "Mushroom (MM)",
+  roan_modifier: "Roan",
+  gray_modifier: "Gray",
+  dominant_white_full: "Dominant White",
+  tobiano_pattern: "Tobiano",
+  frame_overo: "Frame Overo",
+  lethal_overo: "Lethal White Overo",
+  one_sabino: "Sabino (Sn1)",
+  two_sabino: "Double Sabino",
+  one_leopard: "Leopard Complex (Lp)",
+  two_leopard: "Leopard Complex (LL)",
+  one_patn1: "PATN1 (Pp)",
+  two_patn1: "PATN1 (PP)",
+}
+
+export function formatCoatPhenotype(code: string): string {
+  return COAT_CODE_LABELS[code] ?? code.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())
 }
 
 const COLOR_ROLE_ORDER = ["BASE", "DILUTION", "MODIFIER", "WHITE_PATTERN"]
@@ -115,5 +147,5 @@ export function computePossiblePhenotypes(
     if (data.phenotypes.size === 0) continue
     result.push({ locusId, locusName: data.name, section: data.section, phenotypes: [...data.phenotypes].sort() })
   }
-  return result.sort((a, b) => (a.section?.displayOrder ?? 999) - (b.section?.displayOrder ?? 999))
+  return result.sort((a, b) => a.locusName.localeCompare(b.locusName))
 }

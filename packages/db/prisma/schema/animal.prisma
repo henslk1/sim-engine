@@ -113,6 +113,7 @@ model Breed {
   foundationAnimals           FoundationAnimal[]
   dqTraits                    BreedDqTrait[]
   coatSelections              BreedCoatSelection[]
+  coatDqSelections            BreedCoatDqSelection[]
   animalTemplates             AnimalTemplate[]
   starterBreedOptions         StarterBreedOption[]
   game                        Game                              @relation(fields: [gameId], references: [id])

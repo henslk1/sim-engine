@@ -3,6 +3,7 @@ import { useState } from "react"
 import { trpc } from "@/lib/trpc"
 import type { RouterOutputs } from "@/lib/trpc"
 import { RichTextRenderer } from "@/components/game/editor/RichTextRenderer"
+import { formatCoatPhenotype } from "@/lib/breedUtils"
 
 export const Route = createFileRoute("/_authenticated/directory/color")({
   component: ColorDirectoryPage,
@@ -57,7 +58,7 @@ function ColorCard({ locus }: { locus: LocusEntry }) {
                     {rule.alleleOne.symbol}/{rule.alleleTwo.symbol}
                   </td>
                   <td className="py-2">
-                    <span className="text-foreground">{rule.phenotype}</span>
+                    <span className="text-foreground">{formatCoatPhenotype(rule.phenotype)}</span>
                     <LinkedConditions conditions={rule.ruleConditions} />
                   </td>
                 </tr>

@@ -13,6 +13,8 @@ export const animalProfileRouter = router({
             include: {
               statProfile: { include: { statDef: true } },
               personalityProfiles: { include: { traitDef: true } },
+              dqTraits: { select: { locusId: true, expression: true } },
+              coatDqSelections: { select: { expression: true } },
             },
           },
           playerAccount: { select: { id: true, username: true, avatar: true } },
@@ -64,8 +66,9 @@ export const animalProfileRouter = router({
             },
           },
 
-          // genetics
+          // genetics — hidden modifier loci are excluded; players must not see those alleles
           genotypes: {
+            where: { locus: { isHiddenModifier: false } },
             orderBy: { id: "asc" },
             include: {
               locus: {

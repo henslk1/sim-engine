@@ -28,6 +28,7 @@ export const directoryRouter = router({
       db.locus.findMany({
         where: {
           gameId: input.gameId,
+          isHiddenModifier: false,
           panelEntries: { some: { panelDef: { panelType: "CONFORMATION" } } },
         },
         select: {
@@ -50,6 +51,7 @@ export const directoryRouter = router({
       db.locus.findMany({
         where: {
           gameId: input.gameId,
+          isHiddenModifier: false,
           panelEntries: { some: { panelDef: { panelType: "COLOR" } } },
         },
         select: {

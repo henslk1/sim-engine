@@ -215,12 +215,13 @@ export const expressionAdminRouter = router({
       phenotype: z.string(),
       healthConditionDefId: z.string(),
     }))
-    .mutation(({ input }) =>
-      db.expressionRuleCondition.deleteMany({
+    .mutation(async ({ input }) => {
+      const result = await db.expressionRuleCondition.deleteMany({
         where: {
           healthConditionDefId: input.healthConditionDefId,
           expressionRule: { locusId: input.locusId, phenotype: input.phenotype },
         },
       })
-    ),
+      return { count: result.count }
+    }),
 })

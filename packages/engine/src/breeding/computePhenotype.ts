@@ -101,6 +101,22 @@ export function computeCoatFromCodes(codes: Set<string>): string | null {
   return parts.join(" ")
 }
 
+export function computePhenotypeCodes(
+  genotypes: Array<{ locusId: string; alleleOneId: string; alleleTwoId: string }>,
+  rules: ExpressionRuleForPhenotype[],
+): Array<{ locusId: string; phenotypeCode: string | null }> {
+  return genotypes.map(gt => {
+    const rule = rules.find(
+      r =>
+        r.locusId === gt.locusId &&
+        r.phenotype.length > 0 &&
+        ((r.alleleOneId === gt.alleleOneId && r.alleleTwoId === gt.alleleTwoId) ||
+          (r.alleleOneId === gt.alleleTwoId && r.alleleTwoId === gt.alleleOneId)),
+    )
+    return { locusId: gt.locusId, phenotypeCode: rule?.phenotype ?? null }
+  })
+}
+
 export function computePhenotypeDescription(
   genotypes: Array<{ locusId: string; alleleOneId: string; alleleTwoId: string }>,
   rules: ExpressionRuleForPhenotype[],

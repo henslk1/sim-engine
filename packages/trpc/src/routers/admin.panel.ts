@@ -18,11 +18,12 @@ export const panelAdminRouter = router({
       id: z.string().optional(),
       gameId: z.string(),
       name: z.string().min(1),
-      panelType: z.enum(["HEALTH", "CONFORMATION", "COLOR"]),
+      panelType: z.enum(["HEALTH", "CONFORMATION", "COLOR", "VARIANCE"]),
       colorRole: z.string().nullish(),
     }))
     .mutation(({ input }) => {
-      const { id, gameId, ...data } = input
+      const { id, gameId, colorRole, ...rest } = input
+      const data = { ...rest, colorRole: colorRole ?? null }
       if (id) return db.geneticPanelDef.update({ where: { id }, data })
       return db.geneticPanelDef.create({ data: { gameId, ...data } })
     }),

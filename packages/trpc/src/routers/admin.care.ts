@@ -89,7 +89,8 @@ export const careAdminRouter = router({
       currencyAmount: z.number().int().min(0).nullable().optional(),
     }))
     .mutation(({ input }) => {
-      const { id, gameId, ...data } = input
+      const { id, gameId, currencyAmount, ...rest } = input
+      const data = { ...rest, currencyAmount: currencyAmount ?? null }
       if (id) return db.longTermCareActionDef.update({ where: { id }, data })
       return db.longTermCareActionDef.create({ data: { gameId, ...data } })
     }),

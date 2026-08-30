@@ -5,6 +5,8 @@ import { computeCOI } from "./computeCOI.js"
 
 const CONCEPTION_FLOOR = 10
 
+export type BlendedAlleleFrequency = { alleleId: string; symbol: string; frequency: number }
+
 export type ParentData = {
   id: string
   fertility: number
@@ -21,6 +23,7 @@ export type ParentData = {
     alleleTwoId: string
     alleleOne: { id: string; symbol: string }
     alleleTwo: { id: string; symbol: string }
+    locus: { inheritanceWeight: number }
   }>
   breedComposition: Array<{ breedId: string; percentage: number }>
   immunity: { innateMax: number } | null
@@ -48,6 +51,8 @@ export type GenerateOffspringInput = {
   gradeBreedId: string
   targetBreedId?: string
   skipConceptionRoll?: boolean
+  // locusId → blended allele frequencies for hidden modifier loci
+  breedAlleleFrequencies?: Map<string, BlendedAlleleFrequency[]>
 }
 
 export type OffspringData = {
@@ -93,8 +98,27 @@ function isSameComposition(
   return true
 }
 
+function blendDraw(
+  parent: { alleleOneId: string; alleleTwoId: string },
+  entries: BlendedAlleleFrequency[],
+  iw: number,
+): { id: string; symbol: string } {
+  const weights = entries.map(e => {
+    const copies = (e.alleleId === parent.alleleOneId ? 1 : 0) + (e.alleleId === parent.alleleTwoId ? 1 : 0)
+    return { id: e.alleleId, symbol: e.symbol, w: iw * (copies * 0.5) + (1 - iw) * e.frequency }
+  })
+  const total = weights.reduce((s, w) => s + w.w, 0)
+  if (total <= 0) return { id: weights[0]!.id, symbol: weights[0]!.symbol }
+  let r = Math.random() * total
+  for (const w of weights) {
+    r -= w.w
+    if (r <= 0) return { id: w.id, symbol: w.symbol }
+  }
+  return { id: weights[weights.length - 1]!.id, symbol: weights[weights.length - 1]!.symbol }
+}
+
 export function generateOffspring(input: GenerateOffspringInput): GenerateOffspringResult {
-  const { sire, dam, damCareScore, gameConfig, gameInnateMax, gradeBreedId, targetBreedId } = input
+  const { sire, dam, damCareScore, gameConfig, gameInnateMax, gradeBreedId, targetBreedId, breedAlleleFrequencies } = input
 
   // ── Conception roll ───────────────────────────────────────────────────────────
   if (!input.skipConceptionRoll) {
@@ -218,16 +242,27 @@ export function generateOffspring(input: GenerateOffspringInput): GenerateOffspr
             innateValue: 0,
           }))
 
-    // Mendelian allele inheritance
+    // Allele inheritance — Mendelian by default, blended for hidden modifier loci (inheritanceWeight < 1)
     const damGenotypeMap = new Map(dam.genotypes.map((g) => [g.locusId, g]))
     const genotypes = sire.genotypes.flatMap((sireGt) => {
       const damGt = damGenotypeMap.get(sireGt.locusId)
       if (!damGt) return []
 
-      const sireAllele = Math.random() < 0.5 ? sireGt.alleleOne : sireGt.alleleTwo
-      const damAllele = Math.random() < 0.5 ? damGt.alleleOne : damGt.alleleTwo
-      const [alleleOneId, alleleTwoId] = canonicalizeAlleles(sireAllele, damAllele)
+      const iw = sireGt.locus.inheritanceWeight
+      const entries = iw < 1.0 ? breedAlleleFrequencies?.get(sireGt.locusId) : undefined
 
+      let sireAllele: { id: string; symbol: string }
+      let damAllele: { id: string; symbol: string }
+
+      if (entries && entries.length > 0) {
+        sireAllele = blendDraw(sireGt, entries, iw)
+        damAllele = blendDraw(damGt, entries, iw)
+      } else {
+        sireAllele = Math.random() < 0.5 ? sireGt.alleleOne : sireGt.alleleTwo
+        damAllele = Math.random() < 0.5 ? damGt.alleleOne : damGt.alleleTwo
+      }
+
+      const [alleleOneId, alleleTwoId] = canonicalizeAlleles(sireAllele, damAllele)
       return [{ locusId: sireGt.locusId, alleleOneId, alleleTwoId }]
     })
 
