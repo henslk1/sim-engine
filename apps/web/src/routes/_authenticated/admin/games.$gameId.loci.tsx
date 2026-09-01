@@ -11,8 +11,10 @@ type LocusForm = {
   biasTarget: "FAVORABILITY" | "RARITY" | "NONE"
   minTestCycle: number | null
   description: object | null
+  isHiddenModifier: boolean
+  inheritanceWeight: number
 }
-const emptyLocus = (): LocusForm => ({ name: "", biasTarget: "NONE", minTestCycle: null, description: null })
+const emptyLocus = (): LocusForm => ({ name: "", biasTarget: "NONE", minTestCycle: null, description: null, isHiddenModifier: false, inheritanceWeight: 1 })
 
 type AlleleRow = { symbol: string; isAvailable: boolean }
 const emptyAllele = (): AlleleRow => ({ symbol: "", isAvailable: false })
@@ -73,7 +75,7 @@ function LociPage() {
   const [selectedPanelId, setSelectedPanelId] = useState("")
 
   function openEdit(locus: NonNullable<typeof loci>[number]) {
-    setEditing({ id: locus.id, name: locus.name, biasTarget: locus.biasTarget, minTestCycle: locus.minTestCycle ?? null, description: (locus.description as object | null) ?? null })
+    setEditing({ id: locus.id, name: locus.name, biasTarget: locus.biasTarget, minTestCycle: locus.minTestCycle ?? null, description: (locus.description as object | null) ?? null, isHiddenModifier: locus.isHiddenModifier, inheritanceWeight: locus.inheritanceWeight })
     setRightTab("alleles")
     setEditingAlleleId(null)
     setEditingAllele(emptyAllele())
@@ -163,6 +165,14 @@ function LociPage() {
                 <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Min Test Cycle <span className="font-normal normal-case">(optional)</span></label>
                 <Input type="number" step="1" min="0" value={editing.minTestCycle ?? ""} onChange={(e) => setEditing({ ...editing, minTestCycle: e.target.value === "" ? null : parseInt(e.target.value) })} placeholder="e.g. 6" className="h-8 text-sm" />
               </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Inheritance Weight</label>
+                <Input type="number" step="0.05" min="0" max="1" value={editing.inheritanceWeight} onChange={(e) => setEditing({ ...editing, inheritanceWeight: parseFloat(e.target.value) || 1 })} placeholder="1" className="h-8 text-sm" />
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={editing.isHiddenModifier} onChange={(e) => setEditing({ ...editing, isHiddenModifier: e.target.checked })} className="accent-primary" />
+                <span className="text-xs text-muted-foreground">Hidden modifier (not visible to players)</span>
+              </label>
               {saveLocus.error && <p className="text-sm text-destructive">{saveLocus.error.message}</p>}
               <Button className="w-full h-8 text-sm" onClick={submitLocus} disabled={saveLocus.isPending || !editing.name.trim()}>Save</Button>
               {editing.id && (

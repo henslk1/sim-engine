@@ -24,6 +24,8 @@ export const locusAdminRouter = router({
       biasTarget: z.enum(["FAVORABILITY", "RARITY", "NONE"]),
       minTestCycle: z.number().int().min(0).nullish(),
       description: z.unknown().nullish(),
+      isHiddenModifier: z.boolean().optional(),
+      inheritanceWeight: z.number().min(0).max(1).optional(),
     }))
     .mutation(({ input }) => {
       const { id, gameId, minTestCycle, description, ...rest } = input

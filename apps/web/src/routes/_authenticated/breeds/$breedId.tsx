@@ -66,9 +66,6 @@ function AutoGrid({ minWidth = 110, children }: { minWidth?: number; children: R
   )
 }
 
-function resolveLabel(value: number, ranges: { label: string; minValue: number; maxValue: number }[]) {
-  return ranges.find(r => value >= r.minValue && value <= r.maxValue)?.label ?? value.toFixed(0)
-}
 
 function SectionGroup({ name, children }: { name: string; children: React.ReactNode }) {
   return (
@@ -135,20 +132,22 @@ function PersonalityRangeBar({
   labelRanges: { minValue: number; maxValue: number }[]
 }) {
   const clamp = (v: number) => Math.min(100, Math.max(0, v))
-  const bucket = labelRanges.find(r => baseline >= r.minValue && baseline <= r.maxValue)
-  const bucketLeft = bucket ? clamp(bucket.minValue) : 0
-  const bucketRight = bucket ? clamp(bucket.maxValue) : 0
   const rangeLeft = clamp(min)
   const rangeRight = clamp(max)
+  const markerX = clamp(baseline)
   return (
-    <div className="relative h-2.5 flex-1 overflow-hidden rounded-full bg-muted">
+    <div className="relative flex-1" style={{ height: 22 }}>
+      {/* Track + range fill (clipped to bar bounds) */}
+      <div className="absolute inset-x-0 overflow-hidden rounded-full bg-muted" style={{ top: 7, height: 8 }}>
+        <div
+          className="absolute h-full bg-rose-400/40"
+          style={{ left: `${rangeLeft}%`, width: `${rangeRight - rangeLeft}%` }}
+        />
+      </div>
+      {/* Baseline marker */}
       <div
-        className="absolute h-full bg-rose-400/30"
-        style={{ left: `${rangeLeft}%`, width: `${rangeRight - rangeLeft}%` }}
-      />
-      <div
-        className="absolute h-full bg-rose-400"
-        style={{ left: `${bucketLeft}%`, width: `${bucketRight - bucketLeft}%` }}
+        className="absolute rounded-full bg-rose-500 ring-2 ring-background"
+        style={{ left: `${markerX}%`, top: "50%", transform: "translate(-50%, -50%)", width: 12, height: 12 }}
       />
     </div>
   )
@@ -207,17 +206,42 @@ function CharacteristicsTab({ breed, defaultInnateRatio, averageTotalInnate }: {
       })()}
       {breed.personalityProfiles.length > 0 && (
         <div>
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Personality</p>
+          <div className="mb-2 flex items-center gap-4">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Personality</p>
+            <div className="flex items-center gap-3 text-[11px] text-muted-foreground/70">
+              <span className="flex items-center gap-1">
+                <span className="inline-block h-2 w-6 rounded-full bg-rose-400/40" />
+                natural range
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="inline-block h-2.5 w-2.5 rounded-full bg-rose-500" />
+                baseline
+              </span>
+            </div>
+          </div>
           <div className="divide-y divide-border/50">
             {breed.personalityProfiles.map(p => {
-              const minLabel = resolveLabel(p.naturalMin, p.traitDef.labelRanges)
-              const maxLabel = resolveLabel(p.naturalMax, p.traitDef.labelRanges)
-              const rangeLabel = minLabel === maxLabel ? minLabel : `${minLabel} – ${maxLabel}`
+              const lowLabel = p.traitDef.labelRanges[0]?.label ?? ""
+              const highLabel = p.traitDef.labelRanges[p.traitDef.labelRanges.length - 1]?.label ?? ""
               return (
-                <div key={p.id} className="flex items-center gap-3 py-2">
-                  <span className="w-20 shrink-0 text-xs font-medium text-foreground">{p.traitDef.name}</span>
-                  <PersonalityRangeBar min={p.naturalMin} max={p.naturalMax} baseline={p.baseline} labelRanges={p.traitDef.labelRanges} />
-                  <span className="w-28 shrink-0 text-right text-xs text-muted-foreground">{rangeLabel}</span>
+                <div key={p.id} className="py-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-24 shrink-0 text-xs font-semibold text-foreground">{p.traitDef.name}</span>
+                    <span className="w-4 shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">0</span>
+                    <PersonalityRangeBar min={p.naturalMin} max={p.naturalMax} baseline={p.baseline} labelRanges={p.traitDef.labelRanges} />
+                    <span className="w-8 shrink-0 text-[11px] tabular-nums text-muted-foreground">100</span>
+                  </div>
+                  {(lowLabel || highLabel) && (
+                    <div className="mt-0.5 flex gap-2">
+                      <span className="w-24 shrink-0" />
+                      <span className="w-4 shrink-0" />
+                      <div className="flex flex-1 justify-between text-[11px] text-muted-foreground/70">
+                        <span>{lowLabel}</span>
+                        <span>{highLabel}</span>
+                      </div>
+                      <span className="w-8 shrink-0" />
+                    </div>
+                  )}
                 </div>
               )
             })}

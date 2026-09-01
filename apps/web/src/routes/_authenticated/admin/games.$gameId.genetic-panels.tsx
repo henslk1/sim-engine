@@ -60,6 +60,8 @@ type LocusRecord = {
   biasTarget: "FAVORABILITY" | "RARITY" | "NONE"
   minTestCycle: number | null
   description: unknown
+  isHiddenModifier: boolean
+  inheritanceWeight: number
 }
 
 function LocusEditor({ locus, gameId }: { locus: LocusRecord; gameId: string }) {
@@ -107,6 +109,8 @@ function LocusEditor({ locus, gameId }: { locus: LocusRecord; gameId: string }) 
   const [editIsAvailable, setEditIsAvailable] = useState(false)
   const [editingRule, setEditingRule] = useState<RuleForm | null>(null)
   const [locusDesc, setLocusDesc] = useState<object | null>((locus.description as object | null) ?? null)
+  const [isHidden, setIsHidden] = useState(locus.isHiddenModifier)
+  const [inheritanceWeight, setInheritanceWeight] = useState(locus.inheritanceWeight.toString())
   const [newLink, setNewLink] = useState<PLinkForm>(emptyPLinkForm())
 
   const distinctPhenotypes = [...new Set(rules?.map(r => r.phenotype) ?? [])]
@@ -135,24 +139,60 @@ function LocusEditor({ locus, gameId }: { locus: LocusRecord; gameId: string }) 
 
   return (
     <div className="border-t border-border">
-      {/* Description */}
-      <div className="border-b border-border px-4 py-3 space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Description</span>
-          <Button size="sm" className="h-6 px-2 text-xs" onClick={() => saveLocus.mutate({ id: locusId, gameId, name: locus.name, biasTarget: locus.biasTarget, minTestCycle: locus.minTestCycle ?? null, description: locusDesc })}
-            disabled={saveLocus.isPending}>
-            {saveLocus.isPending ? "Saving…" : "Save"}
-          </Button>
-        </div>
-        <RichTextEditor
-          key={locusId}
-          defaultContent={locusDesc}
-          onChange={setLocusDesc}
-          placeholder="Describe what this locus controls, how it affects phenotype, notes for players…"
-          minHeight="5rem"
-        />
-        {saveLocus.error && <p className="text-xs text-destructive">{saveLocus.error.message}</p>}
+      {/* Hidden / Inheritance settings */}
+      <div className="border-b border-border px-4 py-2 flex items-center gap-6">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={isHidden}
+            onChange={e => {
+              setIsHidden(e.target.checked)
+              saveLocus.mutate({ id: locusId, gameId, name: locus.name, biasTarget: locus.biasTarget, minTestCycle: locus.minTestCycle ?? null, description: locusDesc, isHiddenModifier: e.target.checked, inheritanceWeight: parseFloat(inheritanceWeight) || 1 })
+            }}
+            className="accent-primary"
+          />
+          <span className="text-xs text-muted-foreground">Hidden modifier</span>
+        </label>
+        <label className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">Inheritance weight</span>
+          <input
+            type="number"
+            min={0}
+            max={1}
+            step={0.05}
+            value={inheritanceWeight}
+            onChange={e => setInheritanceWeight(e.target.value)}
+            onBlur={() => saveLocus.mutate({ id: locusId, gameId, name: locus.name, biasTarget: locus.biasTarget, minTestCycle: locus.minTestCycle ?? null, description: locusDesc, isHiddenModifier: isHidden, inheritanceWeight: parseFloat(inheritanceWeight) || 1 })}
+            className="h-7 w-20 rounded-md border border-input bg-background px-2 text-xs"
+          />
+        </label>
       </div>
+      {/* Description */}
+      <details className="border-b border-border group">
+        <summary className="flex cursor-pointer items-center justify-between bg-muted/20 px-4 py-1.5 list-none">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Description</span>
+          <span className="text-[10px] text-muted-foreground group-open:hidden">▶</span>
+          <span className="text-[10px] text-muted-foreground hidden group-open:inline">▼</span>
+        </summary>
+        <div className="px-4 py-3 space-y-2">
+          <RichTextEditor
+            key={locusId}
+            defaultContent={locusDesc}
+            onChange={setLocusDesc}
+            placeholder="Describe what this locus controls, how it affects phenotype, notes for players…"
+            minHeight="5rem"
+          />
+          <div className="flex items-center justify-between">
+            {saveLocus.error
+              ? <p className="text-xs text-destructive">{saveLocus.error.message}</p>
+              : <span />}
+            <Button size="sm" className="h-6 px-2 text-xs" onClick={() => saveLocus.mutate({ id: locusId, gameId, name: locus.name, biasTarget: locus.biasTarget, minTestCycle: locus.minTestCycle ?? null, description: locusDesc, isHiddenModifier: isHidden, inheritanceWeight: parseFloat(inheritanceWeight) || 1 })}
+              disabled={saveLocus.isPending}>
+              {saveLocus.isPending ? "Saving…" : "Save"}
+            </Button>
+          </div>
+        </div>
+      </details>
 
       {/* Alleles */}
       <div className="border-b border-border">
@@ -480,6 +520,9 @@ function GenesTab({ panelId, gameId }: { panelId: string; gameId: string }) {
                 <span className="rounded-full bg-secondary px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
                   {locus._count.alleles} allele{locus._count.alleles !== 1 ? "s" : ""}
                 </span>
+                {locus.isHiddenModifier && (
+                  <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] text-amber-600 dark:text-amber-400">hidden</span>
+                )}
                 {locus.biasTarget !== "NONE" && (
                   <span className="text-[10px] text-muted-foreground/50">{locus.biasTarget}</span>
                 )}
@@ -675,15 +718,17 @@ function GeneticPanelsPage() {
                 <select value={editing.panelType}
                   onChange={e => {
                     const panelType = e.target.value as PanelForm["panelType"]
-                    setEditing(p => p ? { ...p, panelType, colorRole: panelType === "COLOR" ? p.colorRole : null } : p)
+                    const hasColorRole = panelType === "COLOR" || panelType === "VARIANCE"
+                    setEditing(p => p ? { ...p, panelType, colorRole: hasColorRole ? p.colorRole : null } : p)
                   }}
                   className="h-8 rounded-md border border-input bg-background px-3 text-sm">
                   <option value="HEALTH">Health</option>
                   <option value="CONFORMATION">Conformation</option>
                   <option value="COLOR">Color</option>
+                  <option value="VARIANCE">Variance</option>
                 </select>
               </div>
-              {editing.panelType === "COLOR" && (
+              {(editing.panelType === "COLOR" || editing.panelType === "VARIANCE") && (
                 <div className="flex flex-col gap-1">
                   <FL>Color Role</FL>
                   <select

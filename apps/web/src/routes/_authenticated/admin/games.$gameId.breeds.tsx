@@ -36,7 +36,7 @@ const emptyBreed: BreedForm = {
   immunityMin: "", immunityMax: "",
 }
 
-type ActivePanel = "stats" | "color" | "conformation" | "health" | "variance" | "standards" | "personality"
+type ActivePanel = "stats" | "color" | "conformation" | "health" | "standards" | "personality"
 type WizardStep = 1 | 2 | 3 | 4 | null
 
 const WIZARD_LABELS: Record<2 | 3 | 4, string> = {
@@ -461,6 +461,48 @@ function CoatDqContent({
           </div>
         ))}
       </div>
+    </div>
+  )
+}
+
+// ── Color tab with Color / Variance subtabs ───────────────────────────────────
+
+function ColorLociContent({ locusAlleleGroups, freqValues, onFreqChange, onSaveAll, isPending }: {
+  locusAlleleGroups: { locus: { id: string; name: string; isHiddenModifier: boolean; panelEntries: { panelDef: { panelType: string } }[] }; alleles: LocusAllele[] }[]
+  freqValues: Record<string, { frequency: string; isDq: boolean }>
+  onFreqChange: (alleleId: string, value: string) => void
+  onSaveAll: () => void
+  isPending: boolean
+}) {
+  const [colorSubTab, setColorSubTab] = useState<"color" | "variance">("color")
+  const filtered = locusAlleleGroups.filter(g =>
+    colorSubTab === "variance"
+      ? g.locus.isHiddenModifier
+      : g.locus.panelEntries.some(e => e.panelDef.panelType === "COLOR")
+  )
+  return (
+    <div>
+      <div className="flex border-b border-border bg-secondary/10">
+        {(["color", "variance"] as const).map(t => (
+          <button
+            key={t}
+            onClick={() => setColorSubTab(t)}
+            className={cn(
+              "px-4 py-1.5 text-xs font-semibold uppercase tracking-wide transition-colors",
+              colorSubTab === t ? "border-b-2 border-primary text-foreground" : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {t === "color" ? "Color" : "Variance"}
+          </button>
+        ))}
+      </div>
+      <LociContent
+        locusAlleleGroups={filtered}
+        freqValues={freqValues}
+        onFreqChange={onFreqChange}
+        onSaveAll={onSaveAll}
+        isPending={isPending}
+      />
     </div>
   )
 }
@@ -990,7 +1032,6 @@ function BreedsPage() {
     { key: "color", label: "Color" },
     { key: "conformation", label: "Conformation" },
     { key: "health", label: "Health" },
-    { key: "variance", label: "Variance" },
     { key: "standards", label: "Breed Standards" },
     { key: "personality", label: "Personality" },
   ]
@@ -1268,7 +1309,17 @@ function BreedsPage() {
               )
             )}
 
-            {(activePanel === "color" || activePanel === "conformation" || activePanel === "health" || activePanel === "variance") && (
+            {activePanel === "color" && (
+              <ColorLociContent
+                locusAlleleGroups={locusAlleleGroups}
+                freqValues={freqValues}
+                onFreqChange={handleFreqChange}
+                onSaveAll={handleSaveAllAlleleFreqs}
+                isPending={saveAllAlleleFreqs.isPending}
+              />
+            )}
+
+            {(activePanel === "conformation" || activePanel === "health") && (
               <LociContent
                 locusAlleleGroups={locusAlleleGroups.filter(
                   (g) => g.locus.panelEntries.some(

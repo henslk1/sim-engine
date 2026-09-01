@@ -67,7 +67,7 @@ export function computeColorGroupPhenotypes(
   const poolByLocus = new Map<string, Set<string>>()
   const locusRole = new Map<string, string>()
   for (const af of active) {
-    const entry = af.allele.locus.panelEntries.find(e => e.panelDef.panelType === "COLOR" && e.panelDef.colorRole != null)
+    const entry = af.allele.locus.panelEntries.find(e => (e.panelDef.panelType === "COLOR" || e.panelDef.panelType === "VARIANCE") && e.panelDef.colorRole != null)
     if (!entry) continue
     if (!poolByLocus.has(af.allele.locusId)) {
       poolByLocus.set(af.allele.locusId, new Set())
