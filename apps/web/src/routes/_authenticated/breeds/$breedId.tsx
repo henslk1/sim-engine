@@ -268,7 +268,13 @@ function HealthTab({ healthConditions }: { healthConditions: string[] }) {
   )
 }
 
-function StandardTab({ breed }: { breed: Breed }) {
+const COAT_ROLE_LABELS: Record<string, string> = {
+  BASE: "Base Color", DILUTION: "Dilution", MODIFIER: "Modifier", WHITE_PATTERN: "White Pattern",
+}
+
+type CoatStandardDisplay = { role: string; names: string[] }[]
+
+function StandardTab({ breed, coatStandardDisplay }: { breed: Breed; coatStandardDisplay: CoatStandardDisplay }) {
   const dqSections = groupBySection(breed.dqTraits)
 
   type LocusEntry = {
@@ -297,6 +303,8 @@ function StandardTab({ breed }: { breed: Breed }) {
     .sort((a, b) => a.section.displayOrder - b.section.displayOrder)
     .map(s => ({ ...s, loci: s.loci.sort((a, b) => a.locusName.localeCompare(b.locusName)) }))
 
+  const hasHairSection = idealSections.some(s => s.section.name.toLowerCase().includes("hair"))
+
   return (
     <div className="space-y-4">
       {breed.conformationStandards.length > 0 ? (
@@ -316,6 +324,12 @@ function StandardTab({ breed }: { breed: Breed }) {
           </div>
           {idealSections.map(({ section, loci }) => (
             <SectionGroup key={section.id} name={section.name}>
+              {section.name.toLowerCase().includes("hair") && coatStandardDisplay.map(({ role, names }) => (
+                <div key={role} className="min-w-28 rounded-md border border-border/70 bg-secondary/30 px-3 py-2.5">
+                  <p className="mb-0.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{COAT_ROLE_LABELS[role] ?? role}</p>
+                  <p className="text-sm text-foreground">{names.join(", ")}</p>
+                </div>
+              ))}
               {loci.map(({ locusId, locusName, standards }) => {
                 const maxWeight = Math.max(...standards.map(s => s.weight))
                 return (
@@ -341,24 +355,54 @@ function StandardTab({ breed }: { breed: Breed }) {
               })}
             </SectionGroup>
           ))}
+          {!hasHairSection && coatStandardDisplay.length > 0 && (
+            <SectionGroup name="Hair & Coat">
+              {coatStandardDisplay.map(({ role, names }) => (
+                <div key={role} className="min-w-28 rounded-md border border-border/70 bg-secondary/30 px-3 py-2.5">
+                  <p className="mb-0.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{COAT_ROLE_LABELS[role] ?? role}</p>
+                  <p className="text-sm text-foreground">{names.join(", ")}</p>
+                </div>
+              ))}
+            </SectionGroup>
+          )}
+        </div>
+      ) : coatStandardDisplay.length > 0 ? (
+        <div className="space-y-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Ideal Traits</p>
+          <SectionGroup name="Hair & Coat">
+            {coatStandardDisplay.map(({ role, names }) => (
+              <div key={role} className="min-w-28 rounded-md border border-border/70 bg-secondary/30 px-3 py-2.5">
+                <p className="mb-0.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{COAT_ROLE_LABELS[role] ?? role}</p>
+                <p className="text-sm text-foreground">{names.join(", ")}</p>
+              </div>
+            ))}
+          </SectionGroup>
         </div>
       ) : (
         <p className="text-[11px] text-muted-foreground/60">No breed standard defined.</p>
       )}
 
-      {breed.dqTraits.length > 0 && (
-        <div className="space-y-3">
+      {(breed.dqTraits.length > 0 || breed.coatDqSelections.length > 0) && (
+        <div className="space-y-2">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Disqualifying Traits</p>
-          {dqSections.map(({ section, items }) => (
-            <SectionGroup key={section.id} name={section.name}>
-              {(items as DqTrait[]).map(d => (
-                <div key={d.id} className="min-w-24 rounded-md border border-destructive/30 bg-destructive/10 px-2.5 py-2">
+          <div className="flex flex-wrap gap-1.5">
+            {(breed.dqTraits as DqTrait[]).map(d => {
+              const isColor = d.locus.panelEntries.some(e => e.panelDef.panelType === "COLOR" || e.panelDef.panelType === "VARIANCE")
+              const label = isColor ? formatCoatPhenotype(d.expression) : d.expression
+              return (
+                <div key={d.id} className="rounded-md border border-destructive/30 bg-destructive/10 px-2.5 py-2">
                   <p className="mb-0.5 text-xs font-semibold uppercase tracking-wide text-destructive/70">{d.locus.name}</p>
-                  <p className="text-xs text-destructive">{d.expression}</p>
+                  <p className="text-xs text-destructive">{label}</p>
                 </div>
-              ))}
-            </SectionGroup>
-          ))}
+              )
+            })}
+            {breed.coatDqSelections.map(s => (
+              <div key={s.id} className="rounded-md border border-destructive/30 bg-destructive/10 px-2.5 py-2">
+                <p className="mb-0.5 text-xs font-semibold uppercase tracking-wide text-destructive/70">{COAT_ROLE_LABELS[s.colorRole] ?? s.colorRole}</p>
+                <p className="text-xs text-destructive">{formatCoatPhenotype(s.expression)}</p>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -398,7 +442,7 @@ function FoundationTab({ breed }: { breed: Breed }) {
 }
 
 function PossibleTraitsTab({ alleleFrequencies }: { alleleFrequencies: AlleleFrequency[] }) {
-  const loci = computePossiblePhenotypes(alleleFrequencies, { excludeColorLoci: true })
+  const loci = computePossiblePhenotypes(alleleFrequencies, { excludeColorLoci: true, excludeHealthLoci: true })
 
   if (alleleFrequencies.length === 0) {
     return <p className="text-[11px] text-muted-foreground/60">No allele frequencies configured for this breed.</p>
@@ -446,7 +490,7 @@ function BreedDetailPage() {
   if (isLoading) return <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Loading...</div>
   if (error || !data) return <div className="flex h-full items-center justify-center text-sm text-destructive">Breed not found.</div>
 
-  const { breed, coatColors, healthConditions, compatibleDisciplines, lifeExpectancyYears, defaultInnateRatio, averageTotalInnate } = data
+  const { breed, coatColors, coatColorOverflow, coatStandardDisplay, healthConditions, compatibleDisciplines, lifeExpectancyYears, defaultInnateRatio, averageTotalInnate } = data
   const dateAdded = new Date(breed.createdAt).toLocaleDateString(undefined, { year: "numeric", month: "short" })
 
   return (
@@ -550,7 +594,7 @@ function BreedDetailPage() {
                 {tab === "history" && <HistoryTab breed={breed} lifeExpectancyYears={lifeExpectancyYears} />}
                 {tab === "characteristics" && <CharacteristicsTab breed={breed} defaultInnateRatio={defaultInnateRatio} averageTotalInnate={averageTotalInnate} />}
                 {tab === "health" && <HealthTab healthConditions={healthConditions} />}
-                {tab === "standard" && <StandardTab breed={breed} />}
+                {tab === "standard" && <StandardTab breed={breed} coatStandardDisplay={coatStandardDisplay} />}
                 {tab === "traits" && <PossibleTraitsTab alleleFrequencies={breed.alleleFrequencies} />}
                 {tab === "foundation" && <FoundationTab breed={breed} />}
               </div>
@@ -567,6 +611,9 @@ function BreedDetailPage() {
                     <span key={c} className="rounded-md border border-border/70 bg-secondary/30 px-2 py-1 text-xs text-foreground">{c}</span>
                   ))}
                 </div>
+                {coatColorOverflow > 0 && (
+                  <p className="mt-2 text-xs text-muted-foreground">+{coatColorOverflow} other combinations</p>
+                )}
               </Panel>
             )}
           </div>

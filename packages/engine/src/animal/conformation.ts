@@ -3,6 +3,39 @@ import { computeCoatFromCodes } from "../breeding/computePhenotype.js"
 
 type Client = typeof db
 
+// Codes that are visibly present in artwork but do not surface in phenotypeDescription.
+// Evaluated via raw phenotype code check rather than coat name matching.
+const VISIBLE_SILENT_CODES = new Set([
+  "splash_minimal", "splash_medium", "splash_extensive",
+  "dominant_white_markings", "dominant_white_spotted", "dominant_white_irregular",
+])
+
+const BASE_COMBOS: Array<Set<string>> = [
+  new Set(["chestnut_base"]),
+  new Set(["bay_modifier"]),
+  new Set(["black_base"]),
+  new Set(["bay_modifier", "seal_brown"]),
+]
+
+// Returns the individual words that an expression visibly adds to coat names.
+// Tested against each base combo — only the words that appear in the "with expression"
+// name but not the "without" name are collected. Used for DQ word-level matching so
+// selecting "tobiano_pattern" DQs any coat containing "Tobiano", "bay_modifier" DQs
+// any coat containing "Bay", etc., while unexpressed genes never incorrectly fire.
+function dqKeyTerms(expression: string): Set<string> {
+  const terms = new Set<string>()
+  for (const base of BASE_COMBOS) {
+    const without = computeCoatFromCodes(new Set([...base]))
+    const withExpr = computeCoatFromCodes(new Set([...base, expression]))
+    if (!withExpr || withExpr === without) continue
+    const withoutWords = new Set((without ?? "").split(" "))
+    for (const word of withExpr.split(" ")) {
+      if (!withoutWords.has(word)) terms.add(word)
+    }
+  }
+  return terms
+}
+
 export async function runConformationInspection(client: Client, animalId: string): Promise<void> {
   await client.$transaction(async (tx) => {
     const animal = await tx.animal.findUniqueOrThrow({
@@ -80,12 +113,26 @@ export async function runConformationInspection(client: Client, animalId: string
     }
     const overallScore = totalSumWeights > 0 ? (totalSumMatched / totalSumWeights) * 100 : 0
 
-    // Coat color DQ check — runs regardless of whether coat scoring is configured
+    // Coat color DQ — two paths:
+    // 1. Splash / DW variants: visible in artwork, absent from coat name → raw code check
+    // 2. All other codes: coat name matching so unexpressed genes never incorrectly fire
     const animalPhenotypeCodes = new Set(
       animal.genotypes.map(g => g.phenotypeCode).filter((c): c is string => c !== null)
     )
-    const dqCodes = new Set(breedCoat?.coatDqSelections.map(s => s.expression) ?? [])
-    const isCoatDq = dqCodes.size > 0 && [...animalPhenotypeCodes].some(c => dqCodes.has(c))
+    const dqSelections = breedCoat?.coatDqSelections ?? []
+    const visibleSilentDqCodes = new Set(
+      dqSelections.filter(s => VISIBLE_SILENT_CODES.has(s.expression)).map(s => s.expression)
+    )
+    const nameBasedDq = dqSelections.filter(s => !VISIBLE_SILENT_CODES.has(s.expression))
+    const isCoatDq =
+      (visibleSilentDqCodes.size > 0 && [...animalPhenotypeCodes].some(c => visibleSilentDqCodes.has(c))) ||
+      (nameBasedDq.length > 0 && animal.phenotypeDescription != null && (() => {
+        const descWords = new Set(animal.phenotypeDescription!.split(" "))
+        return nameBasedDq.some(s => {
+          const terms = dqKeyTerms(s.expression)
+          return terms.size > 0 && [...terms].some(t => descWords.has(t))
+        })
+      })())
 
     // Coat color scoring
     if (breedCoat?.coatWeight != null && breedCoat.coatSelections.length > 0) {
@@ -110,7 +157,15 @@ export async function runConformationInspection(client: Client, animalId: string
           const coat = computeCoatFromCodes(codes)
           if (coat) acceptable.add(coat)
         }
-        if (acceptable.has(animal.phenotypeDescription)) totalSumMatched += breedCoat.coatWeight
+        // Splash / DW markings: if any are configured in the standard, all of the animal's
+    // visible-silent codes must be in the accepted set. If none are configured, neutral — no check.
+    const visibleSilentAccepted = new Set(
+      breedCoat.coatSelections.filter(s => VISIBLE_SILENT_CODES.has(s.expression)).map(s => s.expression)
+    )
+    const animalVisibleSilent = [...animalPhenotypeCodes].filter(c => VISIBLE_SILENT_CODES.has(c))
+    const passesMarkings = visibleSilentAccepted.size === 0 ||
+      animalVisibleSilent.every(c => visibleSilentAccepted.has(c))
+    if (acceptable.has(animal.phenotypeDescription) && passesMarkings) totalSumMatched += breedCoat.coatWeight
       }
     }
 

@@ -69,20 +69,18 @@ function resolveAppaloosaPattern(codes: Set<string>): string | null {
   // N/N PATN2       → Varnish Roan
   // PATN2/N         → Snowflake
   // PATN2/PATN2     → Blanket
-
   if (twoPatn2) {
-    // Appaloosa modifier changes the surfaced Blanket subtype.
     if (twoModifier) return "Laced Blanket"
     if (oneModifier) return "Minimal White Blanket"
     return "Blanket"
   }
 
   if (onePatn2) {
-    // Light / Moderate / Heavy Snowflake remain "Snowflake".
-    return "Snowflake"
+    if (twoModifier) return "Blanket"
+    if (oneModifier) return "Snowflake"
+    return "Varnish Roan"
   }
 
-  // Light / Normal / Heavy Varnish remain "Varnish Roan".
   return "Varnish Roan"
 }
 
@@ -144,7 +142,8 @@ export function computeCoatFromCodes(codes: Set<string>): string | null {
 
   const hasChampagne = codes.has("champagne")
   const hasDun = codes.has("dun")
-  const hasMushroom = codes.has("mushroom")
+  // Mushroom only affects pheomelanin; silent on black base (no red pigment).
+  const hasMushroom = codes.has("mushroom") && base !== "black"
 
   const hasSilver =
     codes.has("one_silver") ||

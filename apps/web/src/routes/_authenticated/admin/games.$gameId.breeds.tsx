@@ -545,14 +545,13 @@ function LociContent({ locusAlleleGroups, freqValues, onFreqChange, onSaveAll, i
 }
 
 function StandardsContent({
-  possibleLoci, possibleVarianceLoci, conformStandards, dqTraits,
+  possibleLoci, conformStandards, dqTraits,
   colorGroups, coatSelections, coatDqSelections, coatWeight,
   onSaveConform, onRemoveConform, onSaveDq, onRemoveDq,
   onSaveCoatSelection, onRemoveCoatSelection, onSaveCoatWeight,
   onSaveCoatDqSelection, onRemoveCoatDqSelection,
 }: {
   possibleLoci: PossibleLocusPhenotypes[]
-  possibleVarianceLoci: PossibleLocusPhenotypes[]
   conformStandards: ConformStandard[]
   dqTraits: DqTrait[]
   colorGroups: ColorGroupPhenotypes[]
@@ -569,15 +568,15 @@ function StandardsContent({
   onSaveCoatDqSelection: (expression: string, colorRole: string) => void
   onRemoveCoatDqSelection: (id: string) => void
 }) {
-  const [subTab, setSubTab] = useState<"ideal" | "dq" | "coat" | "coat-dq" | "variance" | "variance-dq">("ideal")
+  const [subTab, setSubTab] = useState<"ideal" | "dq" | "coat" | "coat-dq">("ideal")
 
-  if (!possibleLoci.length && !possibleVarianceLoci.length) {
+  if (!possibleLoci.length && !colorGroups.length) {
     return <p className="px-4 py-4 text-sm text-muted-foreground">Configure allele frequencies first — breed standards are derived from the breed's allele pool.</p>
   }
   return (
     <div>
       <div className="flex border-b border-border bg-secondary/20">
-        {(["ideal", "dq", "coat", "coat-dq", "variance", "variance-dq"] as const).map(t => (
+        {(["ideal", "dq", "coat", "coat-dq"] as const).map(t => (
           <button
             key={t}
             onClick={() => setSubTab(t)}
@@ -586,7 +585,7 @@ function StandardsContent({
               subTab === t ? "border-b-2 border-primary text-foreground" : "text-muted-foreground hover:text-foreground"
             )}
           >
-            {t === "ideal" ? "Ideal Traits" : t === "dq" ? "Disqualifying Traits" : t === "coat" ? "Coat Color" : t === "coat-dq" ? "Coat DQ" : t === "variance" ? "Variance" : "Variance DQ"}
+            {t === "ideal" ? "Ideal Traits" : t === "dq" ? "Disqualifying Traits" : t === "coat" ? "Coat Color" : "Coat DQ"}
           </button>
         ))}
       </div>
@@ -651,53 +650,6 @@ function StandardsContent({
         />
       )}
 
-      {subTab === "variance" && (
-        <div>
-          <p className="px-3 py-1.5 text-xs text-muted-foreground/60 border-b border-border">
-            Check a variance expression to include it in this breed's conformation standard.
-          </p>
-          {!possibleVarianceLoci.length ? (
-            <p className="px-4 py-4 text-sm text-muted-foreground">No variance loci configured. Add allele frequencies for hidden modifier loci in the Variance tab.</p>
-          ) : (
-            <div className="grid grid-cols-2 divide-x divide-border">
-              {possibleVarianceLoci.map(l => (
-                <LocusStandardsGroup
-                  key={l.locusId}
-                  locus={{ id: l.locusId, name: l.locusName }}
-                  phenotypes={l.phenotypes}
-                  conformStandards={conformStandards}
-                  onSave={onSaveConform}
-                  onRemove={onRemoveConform}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {subTab === "variance-dq" && (
-        <div>
-          <p className="px-3 py-1.5 text-xs text-muted-foreground/60 border-b border-border">
-            Check a variance expression to mark it as a disqualifying trait for this breed.
-          </p>
-          {!possibleVarianceLoci.length ? (
-            <p className="px-4 py-4 text-sm text-muted-foreground">No variance loci configured. Add allele frequencies for hidden modifier loci in the Variance tab.</p>
-          ) : (
-            <div className="grid grid-cols-2 divide-x divide-border">
-              {possibleVarianceLoci.map(l => (
-                <LocusDqTraitsGroup
-                  key={l.locusId}
-                  locus={{ id: l.locusId, name: l.locusName }}
-                  phenotypes={l.phenotypes}
-                  dqTraits={dqTraits}
-                  onSave={onSaveDq}
-                  onRemove={onRemoveDq}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      )}
     </div>
   )
 }
@@ -953,19 +905,14 @@ function BreedsPage() {
     [nonHiddenFreqs]
   )
 
-  const possibleVarianceLoci = useMemo(
-    () => computePossiblePhenotypes((alleleFrequencies ?? []).filter(af => af.allele.locus.isHiddenModifier)),
-    [alleleFrequencies]
-  )
-
   const statWeightTotal = useMemo(
     () => (stats ?? []).reduce((s, stat) => s + (parseFloat(statValues[stat.id]?.weight ?? "") || 0), 0),
     [stats, statValues]
   )
 
   const colorGroups = useMemo(
-    () => computeColorGroupPhenotypes(nonHiddenFreqs),
-    [nonHiddenFreqs]
+    () => computeColorGroupPhenotypes(alleleFrequencies ?? []),
+    [alleleFrequencies]
   )
 
   const currentCoatWeight = breeds?.find(b => b.id === editing?.id)?.coatWeight ?? null
@@ -1229,7 +1176,6 @@ function BreedsPage() {
                 {wizardStep === 4 && (
                   <StandardsContent
                     possibleLoci={possibleLoci}
-                    possibleVarianceLoci={possibleVarianceLoci}
                     conformStandards={conformStandards ?? []}
                     dqTraits={dqTraits ?? []}
                     colorGroups={colorGroups}
@@ -1336,7 +1282,6 @@ function BreedsPage() {
             {activePanel === "standards" && (
               <StandardsContent
                 possibleLoci={possibleLoci}
-                possibleVarianceLoci={possibleVarianceLoci}
                 conformStandards={conformStandards ?? []}
                 dqTraits={dqTraits ?? []}
                 colorGroups={colorGroups ?? []}
