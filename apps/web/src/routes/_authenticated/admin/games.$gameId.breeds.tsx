@@ -218,7 +218,7 @@ function ExpressionRow({ phenotype, existing, locusId, onSave, onRemove }: {
       </td>
       <td className="px-3 py-1.5 text-sm text-foreground">{phenotype}</td>
       <td className="px-2 py-1.5 w-28">
-        <II value={weight} step="0.01" min="0" onChange={e => setWeight(e.target.value)} onBlur={saveWeight} disabled={!inStandard} />
+        <II value={weight} step="1" min="0" onChange={e => setWeight(e.target.value)} onBlur={saveWeight} disabled={!inStandard} />
       </td>
     </tr>
   )
@@ -344,7 +344,7 @@ function CoatColorContent({
     <div>
       <div className="flex items-center gap-3 px-3 py-2 border-b border-border bg-secondary/20">
         <span className="text-xs text-muted-foreground">Coat match weight</span>
-        <div className="w-24"><II value={weightInput} step="0.01" min="0" onChange={e => setWeightInput(e.target.value)} /></div>
+        <div className="w-24"><II value={weightInput} step="1" min="0" onChange={e => setWeightInput(e.target.value)} /></div>
         <Button size="sm" onClick={() => { const v = parseFloat(weightInput); onSaveWeight(isNaN(v) ? null : v) }}>
           Save
         </Button>
@@ -901,7 +901,7 @@ function BreedsPage() {
   )
 
   const possibleLoci = useMemo(
-    () => computePossiblePhenotypes(nonHiddenFreqs),
+    () => computePossiblePhenotypes(nonHiddenFreqs, { excludeColorLoci: true, excludeHealthLoci: true }),
     [nonHiddenFreqs]
   )
 
@@ -935,7 +935,7 @@ function BreedsPage() {
             <div className="flex flex-col">
               <div className="flex items-center justify-between border-b border-border bg-secondary/40 px-3 py-2">
                 <h2 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">All Breeds</h2>
-                <Button size="sm" variant="ghost" onClick={() => { setEditing({ ...emptyBreed }); setWizardStep(1) }}>+ New</Button>
+                <Button size="sm" variant="ghost" onClick={() => { setEditing({ ...emptyBreed }); setWizardStep(1); setStatValues({}); setPersonalityValues({}); setFreqValues({}) }}>+ New</Button>
               </div>
               <div className="divide-y divide-border overflow-y-auto">
                 {breeds?.map((b) => (
@@ -964,7 +964,7 @@ function BreedsPage() {
             </div>
             <div className="flex flex-col items-center justify-center gap-3 py-16 px-8 text-center">
               <p className="text-sm text-muted-foreground">Select a breed to view and edit its details, genetics, and standards.</p>
-              <Button size="sm" variant="outline" onClick={() => { setEditing({ ...emptyBreed }); setWizardStep(1) }}>Add New Breed</Button>
+              <Button size="sm" variant="outline" onClick={() => { setEditing({ ...emptyBreed }); setWizardStep(1); setStatValues({}); setPersonalityValues({}); setFreqValues({}) }}>Add New Breed</Button>
             </div>
           </div>
         </div>
