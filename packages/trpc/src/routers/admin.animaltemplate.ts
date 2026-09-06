@@ -5,7 +5,7 @@ import { z } from "zod"
 export const animalTemplateAdminRouter = router({
   list: publicProcedure
     .input(z.object({ gameId: z.string() }))
-    .query(({ input }) => 
+    .query(({ input }) =>
     db.animalTemplate.findMany({
       where: { gameId: input.gameId },
       include: {
@@ -19,6 +19,8 @@ export const animalTemplateAdminRouter = router({
             alleleTwo: { select: { id: true, symbol: true } },
           },
         },
+        personalityValues: { include: { traitDef: { select: { id: true, name: true } } } },
+        baseTutorialTemplate: { select: { id: true, name: true } },
       },
       orderBy: { name: "asc" },
     })
@@ -36,11 +38,13 @@ export const animalTemplateAdminRouter = router({
       startingAgeInCycles: z.number().int().nullish(),
       statMode: z.enum(["BREED_MAX", "FLOOR", "EXACT"]),
       statFloor: z.number().nullish(),
-      healthClear: z.boolean(),
       personalityMode: z.enum(["RANDOM", "RANGE"]),
       personalityMin: z.number().nullish(),
       personalityMax: z.number().nullish(),
       alleleQualityBias: z.number().nullish(),
+      lore: z.string().nullish(),
+      isTutorialBase: z.boolean().default(false),
+      baseTutorialTemplateId: z.string().nullish(),
     }))
     .mutation(({ input }) => {
       const { id, gameId, ...rest } = input
@@ -55,6 +59,8 @@ export const animalTemplateAdminRouter = router({
         personalityMin: rest.personalityMin ?? null,
         personalityMax: rest.personalityMax ?? null,
         alleleQualityBias: rest.alleleQualityBias ?? null,
+        lore: rest.lore ?? null,
+        baseTutorialTemplateId: rest.baseTutorialTemplateId ?? null,
       }
       if (id) return db.animalTemplate.update({ where: { id }, data })
       return db.animalTemplate.create({ data: { gameId, ...data } })
@@ -67,6 +73,7 @@ export const animalTemplateAdminRouter = router({
         await tx.animalTemplateStat.deleteMany({ where: { templateId: input.id } })
         await tx.animalTemplateCompTier.deleteMany({ where: { templateId: input.id } })
         await tx.animalTemplateGenotype.deleteMany({ where: { templateId: input.id } })
+        await tx.animalTemplatePersonality.deleteMany({ where: { templateId: input.id } })
         return tx.animalTemplate.delete({ where: { id: input.id } })
       })
     ),
@@ -122,12 +129,13 @@ export const animalTemplateAdminRouter = router({
       locusId: z.string(),
       alleleOneId: z.string(),
       alleleTwoId: z.string(),
+      isTestedByOwner: z.boolean().default(false),
     }))
     .mutation(({ input }) =>
       db.animalTemplateGenotype.upsert({
         where: { templateId_locusId: { templateId: input.templateId, locusId: input.locusId } },
         create: input,
-        update: { alleleOneId: input.alleleOneId, alleleTwoId: input.alleleTwoId },
+        update: { alleleOneId: input.alleleOneId, alleleTwoId: input.alleleTwoId, isTestedByOwner: input.isTestedByOwner },
       })
     ),
 
@@ -136,6 +144,28 @@ export const animalTemplateAdminRouter = router({
     .mutation(({ input }) =>
       db.animalTemplateGenotype.delete({
         where: { templateId_locusId: { templateId: input.templateId, locusId: input.locusId } },
+      })
+    ),
+
+  savePersonality: publicProcedure
+    .input(z.object({
+      templateId: z.string(),
+      traitDefId: z.string(),
+      value: z.number(),
+    }))
+    .mutation(({ input }) =>
+      db.animalTemplatePersonality.upsert({
+        where: { templateId_traitDefId: { templateId: input.templateId, traitDefId: input.traitDefId } },
+        create: input,
+        update: { value: input.value },
+      })
+    ),
+
+  removePersonality: publicProcedure
+    .input(z.object({ templateId: z.string(), traitDefId: z.string() }))
+    .mutation(({ input }) =>
+      db.animalTemplatePersonality.delete({
+        where: { templateId_traitDefId: { templateId: input.templateId, traitDefId: input.traitDefId } },
       })
     ),
 })

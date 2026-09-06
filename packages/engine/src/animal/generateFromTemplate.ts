@@ -16,9 +16,11 @@ interface TemplateInput {
   personalityMode: PersonalityMode
   personalityMin: number | null
   personalityMax: number | null
-  stats: { statDefId: string; innateValue: number | null; trainedValue: number| null }[]
+  stats: { statDefId: string; innateValue: number | null; trainedValue: number | null }[]
   compTiers: { disciplineDefId: string; tier: number }[]
-  genotype: { locusId: string; alleleOneId: string; alleleTwoId: string }[]
+  genotype: { locusId: string; alleleOneId: string; alleleTwoId: string; isTestedByOwner?: boolean }[]
+  personalityValues?: { traitDefId: string; value: number }[]
+  lore?: string | null
 }
 
 interface GenerateFromTemplateOpts {
@@ -80,9 +82,13 @@ export async function generateFromTemplate(tx: Tx, opts: GenerateFromTemplateOpt
   })
 
   // Resolve personality
+  const templatePersonalityMap = new Map((template.personalityValues ?? []).map(p => [p.traitDefId, p]))
   const personality = opts.breedPersonalityProfiles.map((pp) => {
+    const tPersonality = templatePersonalityMap.get(pp.traitDefId)
     let value: number
-    if (template.personalityMode === "RANGE" && template.personalityMin != null && template.personalityMax != null) {
+    if (tPersonality != null) {
+      value = tPersonality.value
+    } else if (template.personalityMode === "RANGE" && template.personalityMin != null && template.personalityMax != null) {
       value = template.personalityMin + Math.random() * (template.personalityMax - template.personalityMin)
     } else {
       value = pp.naturalMin + Math.random() * (pp.naturalMax - pp.naturalMin)
@@ -124,6 +130,7 @@ export async function generateFromTemplate(tx: Tx, opts: GenerateFromTemplateOpt
       breedGeneration: 1,
       lifeExpectancy,
       isTutorialAnimal: opts.isTutorialAnimal,
+      lore: template.lore ?? null,
       structuralRisk,
       preferredTerrain: preferredTerrain as any,
       preferredClimate: preferredClimate as any,
@@ -152,7 +159,7 @@ export async function generateFromTemplate(tx: Tx, opts: GenerateFromTemplateOpt
     ),
     ...genotypes.map((g) =>
       tx.animalGenotype.create({
-        data: { animalId: animal.id, locusId: g.locusId, alleleOneId: g.alleleOneId, alleleTwoId: g.alleleTwoId },
+        data: { animalId: animal.id, locusId: g.locusId, alleleOneId: g.alleleOneId, alleleTwoId: g.alleleTwoId, isTestedByOwner: g.isTestedByOwner ?? false },
       })
     ),
     ...opts.ltcDefs.map((def) =>

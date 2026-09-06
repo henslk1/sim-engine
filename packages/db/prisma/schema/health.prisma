@@ -98,12 +98,12 @@ model TreatmentRestrictionDef {
 }
 
 model ConditionTrigger {
-  id               String                @id @default(cuid())
-  conditionDefId   String
-  triggerType      ConditionTriggerType
-  minTierIndex     Int?
-  triggerChance    Float                 @default(1.0)
-  conditionDef     HealthConditionDef    @relation(fields: [conditionDefId], references: [id])
+  id             String               @id @default(cuid())
+  conditionDefId String
+  triggerType    ConditionTriggerType
+  minTierIndex   Int?
+  triggerChance  Float                @default(1.0)
+  conditionDef   HealthConditionDef   @relation(fields: [conditionDefId], references: [id])
 }
 
 model TreatmentItem {

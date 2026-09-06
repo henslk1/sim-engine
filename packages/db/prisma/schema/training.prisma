@@ -74,30 +74,31 @@ model AnimalMood {
 }
 
 model PersonalityTraitDef {
-  id                  String                        @id @default(cuid())
-  gameId              String
-  name                String
-  description         String?
-  labelRanges         PersonalityLabelRange[]
-  breedProfiles       BreedPersonalityProfile[]
-  animalPersonalities AnimalPersonality[]
-  stageActivities     StageActivityDef[]
-  disciplineWeights   DisciplinePersonalityWeight[]
-  game                Game                          @relation(fields: [gameId], references: [id])
+  id                          String                        @id @default(cuid())
+  gameId                      String
+  name                        String
+  description                 String?
+  labelRanges                 PersonalityLabelRange[]
+  breedProfiles               BreedPersonalityProfile[]
+  animalPersonalities         AnimalPersonality[]
+  stageActivities             StageActivityDef[]
+  disciplineWeights           DisciplinePersonalityWeight[]
+  game                        Game                          @relation(fields: [gameId], references: [id])
+  animalTemplatePersonalities AnimalTemplatePersonality[]
 
   @@unique([gameId, name])
 }
 
 model PersonalityLabelRange {
-  id               String              @id @default(cuid())
-  traitDefId       String
-  label            String
-  minValue         Float
-  maxValue         Float
-  trainingModifier    Float               @default(0)
-  moodModifier        Float               @default(0)
-  conceptionModifier  Float               @default(0)
-  traitDef            PersonalityTraitDef @relation(fields: [traitDefId], references: [id])
+  id                 String              @id @default(cuid())
+  traitDefId         String
+  label              String
+  minValue           Float
+  maxValue           Float
+  trainingModifier   Float               @default(0)
+  moodModifier       Float               @default(0)
+  conceptionModifier Float               @default(0)
+  traitDef           PersonalityTraitDef @relation(fields: [traitDefId], references: [id])
 }
 
 model AnimalPersonality {

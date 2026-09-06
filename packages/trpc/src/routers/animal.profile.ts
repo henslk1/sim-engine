@@ -5,8 +5,8 @@ import { z } from "zod"
 export const animalProfileRouter = router({
   get: publicProcedure
     .input(z.object({ animalId: z.string() }))
-    .query(({ input }) => {
-      return db.animal.findUniqueOrThrow({
+    .query(async ({ input }) => {
+      const animal = await db.animal.findUniqueOrThrow({
         where: { id: input.animalId },
         include: {
           breed: {
@@ -388,6 +388,23 @@ export const animalProfileRouter = router({
           },
         },
       })
+
+      if (animal.breedId) {
+        const breedFreqs = await db.breedAlleleFrequency.findMany({
+          where: { breedId: animal.breedId, frequency: { gt: 0 } },
+          select: { allele: { select: { locusId: true } } },
+        })
+        const breedLoci = new Set(breedFreqs.map(f => f.allele.locusId))
+        return {
+          ...animal,
+          genotypes: animal.genotypes.filter(g => {
+            const isHealth = g.locus.panelEntries.some(e => e.panelDef.panelType === "HEALTH")
+            return !isHealth || breedLoci.has(g.locusId)
+          }),
+        }
+      }
+
+      return animal
     }),
 
     getOffspring: publicProcedure

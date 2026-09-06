@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { trpc } from "@/lib/trpc"
 import { cn } from "@/lib/utils"
-import { Network, Dna, Trophy, Baby, TrendingUp } from "lucide-react"
+import { Network, Dna, Trophy, Baby, TrendingUp, Scroll } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import type { AnimalProfile } from "./types"
 import { PedigreeTab } from "./tabs/PedigreeTab"
@@ -10,9 +10,9 @@ import { CompHistoryTab } from "./tabs/CompHistoryTab"
 import { OffspringTab } from "./tabs/OffspringTab"
 import { StatHistoryTab } from "./tabs/StatHistoryTab"
 
-type WorkspaceTab = "pedigree" | "genetics" | "comp-history" | "offspring" | "stat-history"
+type WorkspaceTab = "pedigree" | "genetics" | "comp-history" | "offspring" | "stat-history" | "lore"
 
-const WORKSPACE_TABS: { id: WorkspaceTab; label: string; Icon: LucideIcon }[] = [
+const BASE_TABS: { id: WorkspaceTab; label: string; Icon: LucideIcon }[] = [
   { id: "genetics", label: "Genetics", Icon: Dna },
   { id: "pedigree", label: "Pedigree", Icon: Network },
   { id: "comp-history", label: "Comp. History", Icon: Trophy },
@@ -33,9 +33,13 @@ export function WorkspaceTabs({
   config: AnimalProfile["game"]["gameConfig"]
   hideTabs?: WorkspaceTab[]
 }) {
-  const visibleTabs = WORKSPACE_TABS.filter((t) => !hideTabs.includes(t.id))
+  const allTabs: { id: WorkspaceTab; label: string; Icon: LucideIcon }[] = [
+    ...(animal.lore ? [{ id: "lore" as const, label: "Lore", Icon: Scroll }] : []),
+    ...BASE_TABS,
+  ]
+  const visibleTabs = allTabs.filter((t) => !hideTabs.includes(t.id))
   const [activeTab, setActiveTab] = useState<WorkspaceTab>(
-    hideTabs.includes("genetics") ? (visibleTabs[0]?.id ?? "pedigree") : "genetics"
+    animal.lore ? "lore" : hideTabs.includes("genetics") ? (visibleTabs[0]?.id ?? "pedigree") : "genetics"
   )
 
   const { data: offspring, isLoading: offspringLoading } = trpc.animalProfile.getOffspring.useQuery(
@@ -68,6 +72,9 @@ export function WorkspaceTabs({
         ))}
       </div>
       <div className="mx-auto w-full max-w-4xl min-h-0 flex-1 overflow-y-auto p-3">
+        {activeTab === "lore" && (
+          <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{animal.lore}</p>
+        )}
         {activeTab === "pedigree" && <PedigreeTab animal={animal} />}
         {activeTab === "genetics" && <GeneticsTab animal={animal} config={config} />}
         {activeTab === "comp-history" && <CompHistoryTab animal={animal} cycleToAge={cycleToAge} />}

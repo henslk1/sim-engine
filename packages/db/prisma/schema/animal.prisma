@@ -124,12 +124,12 @@ model Breed {
 }
 
 model BreedStatProfile {
-  id         String  @id @default(cuid())
-  breedId    String
-  statDefId  String
+  id        String  @id @default(cuid())
+  breedId   String
+  statDefId String
   weight    Float
-  breed      Breed   @relation(fields: [breedId], references: [id])
-  statDef    StatDef @relation(fields: [statDefId], references: [id])
+  breed     Breed   @relation(fields: [breedId], references: [id])
+  statDef   StatDef @relation(fields: [statDefId], references: [id])
 
   @@unique([breedId, statDefId])
 }
@@ -168,6 +168,7 @@ model Animal {
   isCastrated                         Boolean                          @default(false)
   isPinned                            Boolean                          @default(false)
   phenotypeDescription                String?
+  lore                                String?
   structuralRisk                      Float                            @default(0)
   preferredTerrain                    VenueTerrain[]
   preferredClimate                    VenueClimate[]

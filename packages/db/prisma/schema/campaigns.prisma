@@ -138,7 +138,7 @@ model FoundationAnimal {
 }
 
 model AnimalTemplate {
-  id                        String                   @id @default(cuid())
+  id                        String                      @id @default(cuid())
   gameId                    String
   breedId                   String?
   breedName                 String?
@@ -148,19 +148,26 @@ model AnimalTemplate {
   startingAgeInCycles       Int?
   statMode                  AnimalStatMode
   statFloor                 Float?
-  healthClear               Boolean                  @default(false)
   personalityMode           PersonalityMode
   personalityMin            Float?
   personalityMax            Float?
   alleleQualityBias         Float?
+  lore                      String?
+  isTutorialBase            Boolean                     @default(false)
+  baseTutorialTemplateId    String?
   genotype                  AnimalTemplateGenotype[]
   stats                     AnimalTemplateStat[]
   compTiers                 AnimalTemplateCompTier[]
+  personalityValues         AnimalTemplatePersonality[]
   rewardTiers               CampaignRewardTier[]
-  starterBreedOptionsMale   StarterBreedOption[]     @relation("TutorialMaleTemplate")
-  starterBreedOptionsFemale StarterBreedOption[]     @relation("TutorialFemaleTemplate")
-  breed                     Breed?                   @relation(fields: [breedId], references: [id])
-  game                      Game                     @relation(fields: [gameId], references: [id])
+  starterBreedOptionsMale   StarterBreedOption[]        @relation("TutorialMaleTemplate")
+  starterBreedOptionsFemale StarterBreedOption[]        @relation("TutorialFemaleTemplate")
+  basedOnTemplates          AnimalTemplate[]            @relation("BaseTutorialTemplate")
+  baseTutorialTemplate      AnimalTemplate?             @relation("BaseTutorialTemplate", fields: [baseTutorialTemplateId], references: [id])
+  gameConfigAsMaleBase      GameConfig[]                @relation("GameConfigTutorialMale")
+  gameConfigAsFemaleBase    GameConfig[]                @relation("GameConfigTutorialFemale")
+  breed                     Breed?                      @relation(fields: [breedId], references: [id])
+  game                      Game                        @relation(fields: [gameId], references: [id])
 }
 
 model AnimalTemplateStat {
@@ -187,17 +194,29 @@ model AnimalTemplateCompTier {
 }
 
 model AnimalTemplateGenotype {
-  id          String         @id @default(cuid())
-  templateId  String
-  locusId     String
-  alleleOneId String
-  alleleTwoId String
-  alleleTwo   Allele         @relation("TemplateAlleleTwo", fields: [alleleTwoId], references: [id])
-  alleleOne   Allele         @relation("TemplateAlleleOne", fields: [alleleOneId], references: [id])
-  locus       Locus          @relation(fields: [locusId], references: [id])
-  template    AnimalTemplate @relation(fields: [templateId], references: [id])
+  id              String         @id @default(cuid())
+  templateId      String
+  locusId         String
+  alleleOneId     String
+  alleleTwoId     String
+  isTestedByOwner Boolean        @default(false)
+  alleleTwo       Allele         @relation("TemplateAlleleTwo", fields: [alleleTwoId], references: [id])
+  alleleOne       Allele         @relation("TemplateAlleleOne", fields: [alleleOneId], references: [id])
+  locus           Locus          @relation(fields: [locusId], references: [id])
+  template        AnimalTemplate @relation(fields: [templateId], references: [id])
 
   @@unique([templateId, locusId])
+}
+
+model AnimalTemplatePersonality {
+  id         String              @id @default(cuid())
+  templateId String
+  traitDefId String
+  value      Float
+  template   AnimalTemplate      @relation(fields: [templateId], references: [id])
+  traitDef   PersonalityTraitDef @relation(fields: [traitDefId], references: [id])
+
+  @@unique([templateId, traitDefId])
 }
 
 model CampaignRewardTier {

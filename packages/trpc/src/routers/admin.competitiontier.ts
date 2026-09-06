@@ -11,6 +11,16 @@ export const competitionTierAdminRouter = router({
         orderBy: { tierIndex: "asc" },
       })
     ),
+
+  listByGame: publicProcedure
+    .input(z.object({ gameId: z.string() }))
+    .query(({ input }) =>
+      db.competitionTierDef.findMany({
+        where: { gameId: input.gameId },
+        orderBy: { tierIndex: "asc" },
+        select: { id: true, disciplineDefId: true, tierIndex: true, name: true },
+      })
+    ),
   save: publicProcedure
     .input(z.object({
       id: z.string().optional(),

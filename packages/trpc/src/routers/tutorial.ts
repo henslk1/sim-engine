@@ -63,7 +63,7 @@ export const tutorialRouter = router({
             breed: { select: { name: true } },
             tutorialFemaleTemplate: {
               select: {
-                breedId: true, breedName: true, sex: true, name: true,
+                breedId: true, breedName: true, sex: true, name: true, lore: true,
                 fertility: true, startingAgeInCycles: true,
                 statMode: true, statFloor: true,
                 personalityMode: true, personalityMin: true, personalityMax: true,
@@ -74,7 +74,7 @@ export const tutorialRouter = router({
             },
             tutorialMaleTemplate: {
               select: {
-                breedId: true, breedName: true, sex: true, name: true,
+                breedId: true, breedName: true, sex: true, name: true, lore: true,
                 fertility: true, startingAgeInCycles: true,
                 statMode: true, statFloor: true,
                 personalityMode: true, personalityMin: true, personalityMax: true,
@@ -114,7 +114,34 @@ export const tutorialRouter = router({
         db.breedStatProfile.findMany({ where: { breedId }, select: { statDefId: true, naturalMin: true, naturalMax: true } }),
         db.breedPersonalityProfile.findMany({ where: { breedId }, select: { traitDefId: true, naturalMin: true, naturalMax: true } }),
         db.breed.findUnique({ where: { id: breedId }, select: { immunityMin: true, immunityMax: true, lifeExpectancyBaseline: true } }),
-        db.gameConfig.findUnique({ where: { gameId }, select: { lifeExpectancyBaseline: true } }),
+        db.gameConfig.findUnique({
+          where: { gameId },
+          select: {
+            lifeExpectancyBaseline: true,
+            tutorialMaleBaseTemplate: {
+              select: {
+                sex: true, fertility: true, startingAgeInCycles: true,
+                statMode: true, statFloor: true,
+                personalityMode: true, personalityMin: true, personalityMax: true,
+                stats: { select: { statDefId: true, innateValue: true, trainedValue: true } },
+                compTiers: { select: { disciplineDefId: true, tier: true } },
+                genotype: { select: { locusId: true, alleleOneId: true, alleleTwoId: true, isTestedByOwner: true } },
+                personalityValues: { select: { traitDefId: true, value: true } },
+              },
+            },
+            tutorialFemaleBaseTemplate: {
+              select: {
+                sex: true, fertility: true, startingAgeInCycles: true,
+                statMode: true, statFloor: true,
+                personalityMode: true, personalityMin: true, personalityMax: true,
+                stats: { select: { statDefId: true, innateValue: true, trainedValue: true } },
+                compTiers: { select: { disciplineDefId: true, tier: true } },
+                genotype: { select: { locusId: true, alleleOneId: true, alleleTwoId: true, isTestedByOwner: true } },
+                personalityValues: { select: { traitDefId: true, value: true } },
+              },
+            },
+          },
+        }),
         db.breedAlleleFrequency.findMany({
           where: { breedId },
           select: { alleleId: true, frequency: true, allele: { select: { locusId: true } } },
@@ -152,6 +179,43 @@ export const tutorialRouter = router({
 
       const femaleTpl = starterOption.tutorialFemaleTemplate
       const maleTpl = starterOption.tutorialMaleTemplate
+      const maleBase = gameConfigForGen?.tutorialMaleBaseTemplate ?? null
+      const femaleBase = gameConfigForGen?.tutorialFemaleBaseTemplate ?? null
+
+      function mergeTemplate<T extends typeof femaleTpl>(base: typeof femaleBase, tpl: T) {
+        const baseGenotypeLoci = new Set((base?.genotype ?? []).map(g => g.locusId))
+        return {
+          breedId: tpl.breedId,
+          breedName: tpl.breedName,
+          name: tpl.name,
+          lore: tpl.lore ?? null,
+          sex: base?.sex ?? tpl.sex,
+          fertility: base?.fertility ?? tpl.fertility,
+          startingAgeInCycles: base?.startingAgeInCycles ?? tpl.startingAgeInCycles,
+          statMode: base?.statMode ?? tpl.statMode,
+          statFloor: base?.statFloor ?? tpl.statFloor,
+          personalityMode: base?.personalityMode ?? tpl.personalityMode,
+          personalityMin: base?.personalityMin ?? tpl.personalityMin,
+          personalityMax: base?.personalityMax ?? tpl.personalityMax,
+          stats: Array.from(
+            new Map([
+              ...(base?.stats ?? []).map(s => [s.statDefId, s] as const),
+              ...(tpl.stats ?? []).map(s => [s.statDefId, s] as const),
+            ]).values()
+          ),
+          compTiers: Array.from(
+            new Map([
+              ...(base?.compTiers ?? []).map(c => [c.disciplineDefId, c] as const),
+              ...(tpl.compTiers ?? []).map(c => [c.disciplineDefId, c] as const),
+            ]).values()
+          ),
+          personalityValues: base?.personalityValues,
+          genotype: [
+            ...(base?.genotype ?? []),
+            ...tpl.genotype.filter(g => !baseGenotypeLoci.has(g.locusId)),
+          ],
+        }
+      }
 
       const sharedOpts = {
         gameId,
@@ -173,43 +237,13 @@ export const tutorialRouter = router({
         // 1. Female ancestor (owned by game account)
         const femaleId = await generateFromTemplate(tx, {
           ...sharedOpts,
-          template: {
-            breedId: femaleTpl.breedId,
-            breedName: femaleTpl.breedName,
-            sex: femaleTpl.sex,
-            name: femaleTpl.name,
-            fertility: femaleTpl.fertility,
-            startingAgeInCycles: femaleTpl.startingAgeInCycles,
-            statMode: femaleTpl.statMode,
-            statFloor: femaleTpl.statFloor,
-            personalityMode: femaleTpl.personalityMode,
-            personalityMin: femaleTpl.personalityMin,
-            personalityMax: femaleTpl.personalityMax,
-            stats: femaleTpl.stats,
-            compTiers: femaleTpl.compTiers,
-            genotype: femaleTpl.genotype,
-          },
+          template: mergeTemplate(femaleBase, femaleTpl),
         })
 
         // 2. Male ancestor (owned by game account) + stud listing
         const maleId = await generateFromTemplate(tx, {
           ...sharedOpts,
-          template: {
-            breedId: maleTpl.breedId,
-            breedName: maleTpl.breedName,
-            sex: maleTpl.sex,
-            name: maleTpl.name,
-            fertility: maleTpl.fertility,
-            startingAgeInCycles: maleTpl.startingAgeInCycles,
-            statMode: maleTpl.statMode,
-            statFloor: maleTpl.statFloor,
-            personalityMode: maleTpl.personalityMode,
-            personalityMin: maleTpl.personalityMin,
-            personalityMax: maleTpl.personalityMax,
-            stats: maleTpl.stats,
-            compTiers: maleTpl.compTiers,
-            genotype: maleTpl.genotype,
-          },
+          template: mergeTemplate(maleBase, maleTpl),
         })
         await tx.breedingListing.create({
           data: { gameId, ownerPlayerId: gameAccount.id, animalId: maleId, pricePerSlot: 0, isActive: true },
