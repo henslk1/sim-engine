@@ -1,30 +1,62 @@
 import { router, publicProcedure } from "../trpc.js"
 import { db } from "@sim-engine/db"
 import { z } from "zod"
+import { computePhenotypeDescription } from "@sim-engine/engine"
 
 export const animalTemplateAdminRouter = router({
   list: publicProcedure
     .input(z.object({ gameId: z.string() }))
-    .query(({ input }) =>
-    db.animalTemplate.findMany({
-      where: { gameId: input.gameId },
-      include: {
-        breed: { select: { id: true, name: true } },
-        stats: { include: { statDef: { select: { id: true, name: true } } } },
-        compTiers: { include: { discipline: { select: { id: true, name: true } } } },
-        genotype: {
-          include: {
-            locus: { select: { id: true, name: true } },
-            alleleOne: { select: { id: true, symbol: true } },
-            alleleTwo: { select: { id: true, symbol: true } },
+    .query(async ({ input }) => {
+      const templates = await db.animalTemplate.findMany({
+        where: { gameId: input.gameId },
+        include: {
+          breed: { select: { id: true, name: true } },
+          stats: { include: { statDef: { select: { id: true, name: true } } } },
+          compTiers: { include: { discipline: { select: { id: true, name: true } } } },
+          genotype: {
+            include: {
+              locus: {
+                select: {
+                  id: true,
+                  name: true,
+                  panelEntries: { select: { panelDef: { select: { panelType: true } } } },
+                },
+              },
+              alleleOne: { select: { id: true, symbol: true } },
+              alleleTwo: { select: { id: true, symbol: true } },
+            },
           },
+          personalityValues: { include: { traitDef: { select: { id: true, name: true } } } },
+          baseTutorialTemplate: { select: { id: true, name: true } },
         },
-        personalityValues: { include: { traitDef: { select: { id: true, name: true } } } },
-        baseTutorialTemplate: { select: { id: true, name: true } },
-      },
-      orderBy: { name: "asc" },
-    })
-  ),
+        orderBy: { name: "asc" },
+      })
+
+      const colorCombinations = templates.flatMap((t) =>
+        t.genotype
+          .filter((g) => g.locus.panelEntries.some((e) => e.panelDef.panelType === "COLOR"))
+          .map((g) => ({ locusId: g.locusId, alleleOneId: g.alleleOneId, alleleTwoId: g.alleleTwoId }))
+      )
+
+      const expressionRules = colorCombinations.length > 0
+        ? await db.expressionRule.findMany({
+            where: { OR: colorCombinations },
+            select: { locusId: true, alleleOneId: true, alleleTwoId: true, phenotype: true },
+          })
+        : []
+
+      return templates.map((t) => {
+        const colorGts = t.genotype
+          .filter((g) => g.locus.panelEntries.some((e) => e.panelDef.panelType === "COLOR"))
+          .map((g) => ({ locusId: g.locusId, alleleOneId: g.alleleOneId, alleleTwoId: g.alleleTwoId }))
+        return {
+          ...t,
+          predictedColor: colorGts.length > 0
+            ? computePhenotypeDescription(colorGts, expressionRules)
+            : null,
+        }
+      })
+    }),
 
   save: publicProcedure
     .input(z.object({

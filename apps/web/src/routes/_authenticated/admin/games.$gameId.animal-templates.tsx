@@ -729,6 +729,7 @@ function AnimalTemplatesPage() {
                   <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Base Template</th>
                 )}
                 <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Stat Mode</th>
+                <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Color</th>
                 <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Stats</th>
                 <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
               </tr>
@@ -745,6 +746,7 @@ function AnimalTemplatesPage() {
                     <td className="px-3 py-2 text-muted-foreground">{t.baseTutorialTemplate?.name ?? "—"}</td>
                   )}
                   <td className="px-3 py-2 text-muted-foreground font-mono text-xs">{t.statMode}</td>
+                  <td className="px-3 py-2 text-muted-foreground capitalize">{t.predictedColor ?? "—"}</td>
                   <td className="px-3 py-2 text-center text-muted-foreground">{t.stats.length}</td>
                   <td className="px-3 py-2 text-right">
                     <Button size="sm" variant="ghost" onClick={() => openEdit(t)}>Edit</Button>
@@ -753,7 +755,7 @@ function AnimalTemplatesPage() {
               ))}
               {activeList.length === 0 && (
                 <tr>
-                  <td colSpan={tab === "templates" ? 7 : 6} className="px-3 py-6 text-center text-sm text-muted-foreground">
+                  <td colSpan={tab === "templates" ? 8 : 7} className="px-3 py-6 text-center text-sm text-muted-foreground">
                     {tab === "base" ? "No base templates yet. Create one to share stats and configuration across tutorial animals." : "No templates yet."}
                   </td>
                 </tr>
