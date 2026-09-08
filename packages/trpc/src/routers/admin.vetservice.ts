@@ -26,10 +26,11 @@ export const vetServiceAdminRouter = router({
       currencyDefId: z.string().min(1),
       hasSubscriberDiscount: z.boolean().default(false),
       panelDefId: z.string().nullish(),
+      panelType: z.enum(["HEALTH", "CONFORMATION", "COLOR", "VARIANCE"]).nullish(),
     }))
     .mutation(({ input }) => {
-      const { id, gameId, panelDefId, ...rest } = input
-      const data = { ...rest, panelDefId: panelDefId ?? null }
+      const { id, gameId, panelDefId, panelType, ...rest } = input
+      const data = { ...rest, panelDefId: panelDefId ?? null, panelType: panelType ?? null }
       if (id) return db.vetServiceDef.update({ where: { id }, data })
       return db.vetServiceDef.create({ data: { gameId, ...data } })
     }),

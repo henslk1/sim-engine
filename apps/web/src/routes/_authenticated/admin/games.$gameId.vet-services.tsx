@@ -7,13 +7,17 @@ import { Button } from "@/components/ui/button"
 const SERVICE_TYPES = ["EXAM", "PANEL_TEST", "GENETIC_COLLECTION", "GENETIC_STORAGE", "CASTRATION", "ULTRASOUND", "NATURAL_COVER", "PREGNANCY_ABORT"] as const
 type ServiceType = typeof SERVICE_TYPES[number]
 
+const PANEL_TYPES = ["COLOR", "HEALTH", "CONFORMATION"] as const
+
 type VetServiceForm = {
   name: string
   serviceType: ServiceType
   baseCost: string
   currencyDefId: string
   hasSubscriberDiscount: boolean
+  panelScope: "specific" | "byType"
   panelDefId: string
+  panelType: string
   linkedConditionIds: string[]
 }
 const emptyForm = (): VetServiceForm => ({
@@ -22,7 +26,9 @@ const emptyForm = (): VetServiceForm => ({
   baseCost: "",
   currencyDefId: "",
   hasSubscriberDiscount: false,
+  panelScope: "specific",
   panelDefId: "",
+  panelType: "",
   linkedConditionIds: [],
 })
 
@@ -89,16 +95,18 @@ function VetServicesPage() {
   }
 
   function submit() {
-    if (!editing || !gameId || !editing.name.trim() || !editing.currencyDefId || editing.baseCost === "") return
+    const isPanelTest = editing?.serviceType === "PANEL_TEST"
+    if (!editing || !gameId || !editing.name.trim() || !editing.currencyDefId || (!isPanelTest && editing.baseCost === "")) return
     save.mutate({
       id: editingId ?? undefined,
       gameId,
       name: editing.name.trim(),
       serviceType: editing.serviceType,
-      baseCost: parseInt(editing.baseCost),
+      baseCost: isPanelTest ? 0 : parseInt(editing.baseCost),
       currencyDefId: editing.currencyDefId,
       hasSubscriberDiscount: editing.hasSubscriberDiscount,
-      panelDefId: editing.panelDefId || null,
+      panelDefId: editing.panelScope === "specific" ? editing.panelDefId || null : null,
+      panelType: editing.panelScope === "byType" ? (editing.panelType as "HEALTH" | "CONFORMATION" | "COLOR" | "VARIANCE") || null : null,
     })
   }
 
@@ -139,7 +147,9 @@ function VetServicesPage() {
                     ? s.conditions.length === 0
                       ? <span className="text-xs italic">All conditions</span>
                       : <span>{s.conditions.length} condition{s.conditions.length !== 1 ? "s" : ""}</span>
-                    : s.panelDef?.name ?? "—"}
+                    : s.panelType
+                      ? <span>All {s.panelType} panels</span>
+                      : s.panelDef?.name ?? "—"}
                 </td>
                 <td className="px-4 py-2 text-right space-x-1">
                   <Button size="sm" variant="ghost" onClick={() => {
@@ -150,7 +160,9 @@ function VetServicesPage() {
                       baseCost: s.baseCost.toString(),
                       currencyDefId: s.currencyDef.id,
                       hasSubscriberDiscount: s.hasSubscriberDiscount,
+                      panelScope: s.panelType ? "byType" : "specific",
                       panelDefId: s.panelDefId ?? "",
+                      panelType: s.panelType ?? "",
                       linkedConditionIds: s.conditions.map((c) => c.conditionDefId),
                     })
                   }}>Edit</Button>
@@ -193,7 +205,7 @@ function VetServicesPage() {
                 <label className="text-xs font-medium text-muted-foreground">Service Type</label>
                 <select
                   value={editing.serviceType}
-                  onChange={(e) => setEditing({ ...editing, serviceType: e.target.value as ServiceType, panelDefId: "" })}
+                  onChange={(e) => setEditing({ ...editing, serviceType: e.target.value as ServiceType, panelScope: "specific", panelDefId: "", panelType: "" })}
                   className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
                 >
                   {SERVICE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -201,18 +213,20 @@ function VetServicesPage() {
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Base Cost</label>
-                <Input
-                  type="number"
-                  step="1"
-                  min="0"
-                  value={editing.baseCost}
-                  onChange={(e) => setEditing({ ...editing, baseCost: e.target.value })}
-                  placeholder="e.g. 100"
-                  className="mt-1"
-                />
-              </div>
+              {editing.serviceType !== "PANEL_TEST" && (
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Base Cost</label>
+                  <Input
+                    type="number"
+                    step="1"
+                    min="0"
+                    value={editing.baseCost}
+                    onChange={(e) => setEditing({ ...editing, baseCost: e.target.value })}
+                    placeholder="e.g. 100"
+                    className="mt-1"
+                  />
+                </div>
+              )}
               <div>
                 <label className="text-xs font-medium text-muted-foreground">Currency</label>
                 <select
@@ -226,16 +240,50 @@ function VetServicesPage() {
               </div>
             </div>
             {editing.serviceType === "PANEL_TEST" && (
-              <div className="max-w-xs">
-                <label className="text-xs font-medium text-muted-foreground">Panel <span className="font-normal">(optional)</span></label>
-                <select
-                  value={editing.panelDefId}
-                  onChange={(e) => setEditing({ ...editing, panelDefId: e.target.value })}
-                  className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                >
-                  <option value="">— None —</option>
-                  {panels?.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-muted-foreground">Panel scope</label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                    <input
+                      type="radio"
+                      checked={editing.panelScope === "specific"}
+                      onChange={() => setEditing({ ...editing, panelScope: "specific", panelType: "" })}
+                    />
+                    Specific panel
+                  </label>
+                  <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                    <input
+                      type="radio"
+                      checked={editing.panelScope === "byType"}
+                      onChange={() => setEditing({ ...editing, panelScope: "byType", panelDefId: "" })}
+                    />
+                    All panels of type
+                  </label>
+                </div>
+                {editing.panelScope === "specific" && (
+                  <select
+                    value={editing.panelDefId}
+                    onChange={(e) => setEditing({ ...editing, panelDefId: e.target.value })}
+                    className="block max-w-xs rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  >
+                    <option value="">— None —</option>
+                    {panels?.filter((p) => {
+                      if (p.panelType !== "HEALTH" && p.panelType !== "CONFORMATION") return false
+                      const alreadyUsed = services?.some((s) => s.serviceType === "PANEL_TEST" && s.panelDefId === p.id && s.id !== editingId)
+                      return !alreadyUsed || editing?.panelDefId === p.id
+                    }).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                )}
+                {editing.panelScope === "byType" && (
+                  <select
+                    value={editing.panelType}
+                    onChange={(e) => setEditing({ ...editing, panelType: e.target.value })}
+                    className="block max-w-xs rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  >
+                    <option value="">— Select type —</option>
+                    {PANEL_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                )}
               </div>
             )}
             {editing.serviceType === "EXAM" && allConditions && allConditions.length > 0 && (
@@ -273,7 +321,7 @@ function VetServicesPage() {
             <div className="flex gap-2 pt-1">
               <Button
                 onClick={submit}
-                disabled={save.isPending || setConditions.isPending || !editing.name.trim() || !editing.currencyDefId || editing.baseCost === ""}
+                disabled={save.isPending || setConditions.isPending || !editing.name.trim() || !editing.currencyDefId || (editing.serviceType !== "PANEL_TEST" && editing.baseCost === "")}
               >
                 {save.isPending || setConditions.isPending ? "Saving…" : editingId ? "Save" : "Add Service"}
               </Button>

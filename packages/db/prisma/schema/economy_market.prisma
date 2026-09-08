@@ -83,6 +83,7 @@ model VetServiceDef {
   vetVisitLogs          VetVisitLog[]
   conditions            VetServiceCondition[]
   panelDefId            String?
+  panelType             GeneticPanelType?
   panelDef              GeneticPanelDef?      @relation(fields: [panelDefId], references: [id])
   currencyDef           CurrencyDef           @relation(fields: [currencyDefId], references: [id])
   game                  Game                  @relation(fields: [gameId], references: [id])

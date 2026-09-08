@@ -1,4 +1,5 @@
 import { useRouter, Link, useNavigate, useLocation } from "@tanstack/react-router";
+import { useState, useEffect } from "react";
 import { authClient } from "@/lib/auth-client";
 import {
   DropdownMenu,
@@ -113,16 +114,27 @@ export function Header({ session }: { session: Session}) {
 
 function TestCurrencyButton({ playerAccountId, gameId }: { playerAccountId: string; gameId: string }) {
   const utils = trpc.useUtils()
+  const [flash, setFlash] = useState(false)
+
   const grant = trpc.player.addTestCurrency.useMutation({
-    onSuccess: () => utils.player.balances.invalidate({ playerAccountId }),
+    onSuccess: () => {
+      utils.player.balances.invalidate({ playerAccountId })
+      setFlash(true)
+    },
   })
+
+  useEffect(() => {
+    if (!flash) return
+    const t = setTimeout(() => setFlash(false), 1200)
+    return () => clearTimeout(t)
+  }, [flash])
 
   return (
     <ActionButton
       onClick={() => grant.mutate({ playerAccountId, gameId })}
-      disabled={grant.isPending || grant.isSuccess}
+      className={flash ? "bg-green-600 text-white hover:bg-green-600 scale-105" : "transition-transform"}
     >
-      {grant.isSuccess ? "+1,000 ✓" : grant.isPending ? "…" : "+1,000"}
+      {flash ? "✓ Added!" : "Add 1,000 Gold"}
     </ActionButton>
   )
 }

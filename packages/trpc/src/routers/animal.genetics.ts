@@ -53,7 +53,7 @@ export const animalGeneticsRouter = router({
 
         const panelDef = await tx.geneticPanelDef.findUniqueOrThrow({
           where: { id: input.panelDefId },
-          select: { testCost: true, loci: { select: { locusId: true } } },
+          select: { testCost: true, panelType: true, loci: { select: { locusId: true } } },
         })
 
         const panelLocusIds = panelDef.loci.map((l) => l.locusId)
@@ -78,7 +78,14 @@ export const animalGeneticsRouter = router({
 
         if (totalCost > 0) {
           const vetService = await tx.vetServiceDef.findFirstOrThrow({
-            where: { gameId: animal.gameId, panelDefId: input.panelDefId, serviceType: "PANEL_TEST" },
+            where: {
+              gameId: animal.gameId,
+              serviceType: "PANEL_TEST",
+              OR: [
+                { panelDefId: input.panelDefId },
+                { panelType: panelDef.panelType },
+              ],
+            },
             select: { id: true, currencyDefId: true },
           })
 

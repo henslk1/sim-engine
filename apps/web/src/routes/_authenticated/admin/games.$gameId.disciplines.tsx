@@ -743,7 +743,7 @@ function DisciplinesPage() {
                   </td>
                   <td className="px-3 py-2 text-center text-muted-foreground">{d._count.statWeights}</td>
                   <td className="px-3 py-2 text-center text-muted-foreground">{d._count.personalityWeights}</td>
-                  <td className="px-3 py-2 text-center text-muted-foreground">{d._count.equipmentRequirements > 0 ? <span className="text-primary">✓</span> : <span className="opacity-30">—</span>}</td>
+                  <td className="px-3 py-2 text-center text-muted-foreground">{d._count.equipmentRequirements > 0 ? d._count.equipmentRequirements : <span className="opacity-30">—</span>}</td>
                   <td className="px-3 py-2 text-right">
                     <Button size="sm" variant="ghost" onClick={() => openEdit(d)}>Edit</Button>
                   </td>

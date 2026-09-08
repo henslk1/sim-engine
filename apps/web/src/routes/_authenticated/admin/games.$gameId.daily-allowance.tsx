@@ -9,6 +9,17 @@ export const Route = createFileRoute("/_authenticated/admin/games/$gameId/daily-
   component: DailyAllowancePage,
 })
 
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
+      <div className="border-b border-border bg-secondary/40 px-3 py-2">
+        <h2 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{title}</h2>
+      </div>
+      {children}
+    </div>
+  )
+}
+
 function DailyAllowancePage() {
   const { gameId } = Route.useParams()
   const utils = trpc.useUtils()
@@ -69,17 +80,6 @@ function DailyAllowancePage() {
     if (!itemForm.itemDefId || isNaN(quantity) || quantity < 1) return
     upsertItem.mutate({ id: editingItemId ?? undefined, gameId, itemDefId: itemForm.itemDefId, quantity, subscriberOnly: itemForm.subscriberOnly })
     setEditingItemId(null)
-  }
-
-  function Section({ title, children }: { title: string; children: React.ReactNode }) {
-    return (
-      <div className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
-        <div className="border-b border-border bg-secondary/40 px-3 py-2">
-          <h2 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{title}</h2>
-        </div>
-        {children}
-      </div>
-    )
   }
 
   return (

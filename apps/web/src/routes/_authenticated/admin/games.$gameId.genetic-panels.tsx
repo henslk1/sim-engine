@@ -18,6 +18,7 @@ type PanelForm = {
   name: string
   panelType: "HEALTH" | "CONFORMATION" | "COLOR"
   colorRole: string | null
+  testCost: string
 }
 
 type LocusCreateForm = {
@@ -35,7 +36,7 @@ type RuleForm = {
   numericModifier: string
 }
 
-const emptyPanel = (): PanelForm => ({ name: "", panelType: "HEALTH", colorRole: null })
+const emptyPanel = (): PanelForm => ({ name: "", panelType: "HEALTH", colorRole: null, testCost: "0" })
 const emptyLocusCreate = (): LocusCreateForm => ({ name: "", biasTarget: "NONE", minTestCycle: "", description: null })
 const emptyRule = (): RuleForm => ({ alleleOneId: "", alleleTwoId: "", phenotype: "", numericModifier: "" })
 
@@ -647,7 +648,7 @@ function GeneticPanelsPage() {
 
   function handleSavePanel() {
     if (!editing || !gameId) return
-    savePanel.mutate({ ...editing, gameId })
+    savePanel.mutate({ ...editing, gameId, testCost: parseInt(editing.testCost) || 0 })
   }
 
   // ── List view ────────────────────────────────────────────────────────────────
@@ -665,7 +666,7 @@ function GeneticPanelsPage() {
               </div>
               <div className="divide-y divide-border">
                 {panels?.map(p => (
-                  <button key={p.id} onClick={() => setEditing({ id: p.id, name: p.name, panelType: p.panelType, colorRole: (p as any).colorRole ?? null })}
+                  <button key={p.id} onClick={() => setEditing({ id: p.id, name: p.name, panelType: p.panelType, colorRole: (p as any).colorRole ?? null, testCost: String((p as any).testCost ?? 0) })}
                     className="w-full text-left px-3 py-2.5 transition-colors hover:bg-muted/40">
                     <div className="text-sm font-medium text-foreground">{p.name}</div>
                     <div className="text-xs capitalize text-muted-foreground">
@@ -744,6 +745,15 @@ function GeneticPanelsPage() {
                   </select>
                 </div>
               )}
+              <div className="flex flex-col gap-1">
+                <FL>Test Cost <span className="font-normal normal-case">(per locus)</span></FL>
+                <Input
+                  type="number" min="0" step="1"
+                  className="h-8 text-sm"
+                  value={editing.testCost}
+                  onChange={e => setEditing(p => p ? { ...p, testCost: e.target.value } : p)}
+                />
+              </div>
               {savePanel.error && <p className="text-sm text-destructive">{savePanel.error.message}</p>}
               <Button className="h-8 w-full text-sm" onClick={handleSavePanel}
                 disabled={savePanel.isPending || !editing.name.trim()}>
