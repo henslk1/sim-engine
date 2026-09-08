@@ -389,7 +389,7 @@ function AnimalTemplatesPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {template?.stats.map(s => {
+                      {[...(template?.stats ?? [])].sort((a, b) => a.statDef.name.localeCompare(b.statDef.name)).map(s => {
                         const edit = statEdits.get(s.statDefId)
                         const innate = edit?.innate ?? s.innateValue?.toString() ?? ""
                         const trained = edit?.trained ?? s.trainedValue?.toString() ?? ""

@@ -1,7 +1,7 @@
 import { router, publicProcedure } from "../trpc.js"
 import { db } from "@sim-engine/db"
 import { z } from "zod"
-import { computePhenotypeDescription } from "@sim-engine/engine"
+import { computePhenotypeDescription, computeCoatFromCodes } from "@sim-engine/engine"
 
 export const animalTemplateAdminRouter = router({
   list: publicProcedure
@@ -27,34 +27,102 @@ export const animalTemplateAdminRouter = router({
             },
           },
           personalityValues: { include: { traitDef: { select: { id: true, name: true } } } },
-          baseTutorialTemplate: { select: { id: true, name: true } },
+          baseTutorialTemplate: {
+            select: {
+              id: true,
+              name: true,
+              genotype: {
+                select: {
+                  locusId: true,
+                  alleleOneId: true,
+                  alleleTwoId: true,
+                  locus: {
+                    select: {
+                      panelEntries: { select: { panelDef: { select: { panelType: true } } } },
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
         orderBy: { name: "asc" },
       })
 
-      const colorCombinations = templates.flatMap((t) =>
-        t.genotype
-          .filter((g) => g.locus.panelEntries.some((e) => e.panelDef.panelType === "COLOR"))
-          .map((g) => ({ locusId: g.locusId, alleleOneId: g.alleleOneId, alleleTwoId: g.alleleTwoId }))
-      )
+      const PHENOTYPE_PANELS = ["COLOR", "VARIANCE"] as const
 
-      const expressionRules = colorCombinations.length > 0
-        ? await db.expressionRule.findMany({
-            where: { OR: colorCombinations },
-            select: { locusId: true, alleleOneId: true, alleleTwoId: true, phenotype: true },
-          })
-        : []
+      const [phenotypeLoci, phenotypeRules] = await Promise.all([
+        db.geneticPanelLocus.findMany({
+          where: { panelDef: { gameId: input.gameId, panelType: { in: [...PHENOTYPE_PANELS] } } },
+          select: { locusId: true },
+        }),
+        db.expressionRule.findMany({
+          where: {
+            locus: { panelEntries: { some: { panelDef: { gameId: input.gameId, panelType: { in: [...PHENOTYPE_PANELS] } } } } },
+            phenotype: { not: "" },
+          },
+          select: { locusId: true, alleleOneId: true, alleleTwoId: true, phenotype: true },
+        }),
+      ])
+
+      const allPhenotypeLocusIds = new Set(phenotypeLoci.map((l) => l.locusId))
+
+      // All non-empty phenotype codes each COLOR/VARIANCE locus can ever produce
+      const codesByLocus = new Map<string, Set<string>>()
+      for (const rule of phenotypeRules) {
+        if (!codesByLocus.has(rule.locusId)) codesByLocus.set(rule.locusId, new Set())
+        codesByLocus.get(rule.locusId)!.add(rule.phenotype)
+      }
+
+      const isPhenoLocus = (g: { locus: { panelEntries: { panelDef: { panelType: string } }[] } }) =>
+        g.locus.panelEntries.some((e) => (PHENOTYPE_PANELS as readonly string[]).includes(e.panelDef.panelType))
 
       return templates.map((t) => {
-        const colorGts = t.genotype
-          .filter((g) => g.locus.panelEntries.some((e) => e.panelDef.panelType === "COLOR"))
-          .map((g) => ({ locusId: g.locusId, alleleOneId: g.alleleOneId, alleleTwoId: g.alleleTwoId }))
-        return {
-          ...t,
-          predictedColor: colorGts.length > 0
-            ? computePhenotypeDescription(colorGts, expressionRules)
-            : null,
+        // Merge base template genotypes with per-starter overrides (per-starter wins on same locusId)
+        const ownGts = t.genotype.filter(isPhenoLocus)
+        const ownLocusIds = new Set(ownGts.map((g) => g.locusId))
+        const baseGts = (t.baseTutorialTemplate?.genotype ?? [])
+          .filter(isPhenoLocus)
+          .filter((g) => !ownLocusIds.has(g.locusId))
+
+        const colorGts = [...baseGts, ...ownGts].map((g) => ({
+          locusId: g.locusId,
+          alleleOneId: g.alleleOneId,
+          alleleTwoId: g.alleleTwoId,
+        }))
+
+        if (colorGts.length === 0) return { ...t, predictedColor: null }
+
+        // Collect codes from this template's configured genotypes
+        const configuredCodes = new Set<string>()
+        for (const gt of colorGts) {
+          const rule = phenotypeRules.find(
+            (r) =>
+              r.locusId === gt.locusId &&
+              ((r.alleleOneId === gt.alleleOneId && r.alleleTwoId === gt.alleleTwoId) ||
+                (r.alleleOneId === gt.alleleTwoId && r.alleleTwoId === gt.alleleOneId))
+          )
+          if (rule) configuredCodes.add(rule.phenotype)
         }
+
+        const basePhenotype = computeCoatFromCodes(configuredCodes)
+
+        // For each unconfigured COLOR/VARIANCE locus, test if any code it could produce changes the result
+        const configuredLocusIds = new Set(colorGts.map((g) => g.locusId))
+        for (const locusId of allPhenotypeLocusIds) {
+          if (configuredLocusIds.has(locusId)) continue
+          const possibleCodes = codesByLocus.get(locusId)
+          if (!possibleCodes) continue
+          for (const code of possibleCodes) {
+            const testCodes = new Set(configuredCodes)
+            testCodes.add(code)
+            if (computeCoatFromCodes(testCodes) !== basePhenotype) {
+              return { ...t, predictedColor: null }
+            }
+          }
+        }
+
+        return { ...t, predictedColor: basePhenotype }
       })
     }),
 
