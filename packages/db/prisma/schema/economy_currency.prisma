@@ -63,6 +63,7 @@ model CurrencyDef {
   competitionTierPrizes        CompetitionTierPrize[]
   seasonPrizeConfigs           SeasonPrizeConfig[]
   tutorialStepGrants           TutorialStepDef[]
+  dailyAllowanceCurrencies     DailyAllowanceCurrency[]
   game                         Game                         @relation(fields: [gameId], references: [id])
 
   @@unique([gameId, name])
@@ -98,4 +99,16 @@ model Transaction {
   actingPlayer          PlayerAccount?  @relation("ActingPlayer", fields: [actingPlayerAccountId], references: [id])
   currencyDef           CurrencyDef     @relation(fields: [currencyDefId], references: [id])
   game                  Game            @relation(fields: [gameId], references: [id])
+}
+
+model DailyAllowanceCurrency {
+  id             String      @id @default(cuid())
+  gameId         String
+  currencyDefId  String
+  amount         Int
+  subscriberOnly Boolean     @default(false)
+  game           Game        @relation(fields: [gameId], references: [id])
+  currencyDef    CurrencyDef @relation(fields: [currencyDefId], references: [id])
+
+  @@unique([gameId, currencyDefId, subscriberOnly])
 }

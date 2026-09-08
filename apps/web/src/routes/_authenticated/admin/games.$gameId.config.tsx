@@ -75,8 +75,6 @@ function GameConfigPage() {
     topGradeDoubleBonusChance: 0.1,
     overworkInjuryThreshold: 0,
     overworkInjuryChance: 0,
-    dailyAllowanceBase: 0,
-    dailyAllowanceSubscriber: 0,
   })
 
   function n(key: keyof typeof cf, float = false) {
@@ -141,8 +139,6 @@ function GameConfigPage() {
           topGradeDoubleBonusChance: g.topGradeDoubleBonusChance,
           overworkInjuryThreshold: g.overworkInjuryThreshold,
           overworkInjuryChance: g.overworkInjuryChance,
-          dailyAllowanceBase: g.dailyAllowanceBase,
-          dailyAllowanceSubscriber: g.dailyAllowanceSubscriber,
         })
       }
     }
@@ -281,12 +277,6 @@ function GameConfigPage() {
               </div>
             </Panel>
 
-            <Panel title="Daily Allowance">
-              <div className="space-y-2">
-                <F label="Currency — Free"><Input type="number" step="1" min="0" {...n("dailyAllowanceBase")} /></F>
-                <F label="Currency — Subscriber"><Input type="number" step="1" min="0" {...n("dailyAllowanceSubscriber")} /></F>
-              </div>
-            </Panel>
           </div>
 
           {saveConfig.error && <p className="text-sm text-destructive">{saveConfig.error.message}</p>}

@@ -73,8 +73,6 @@ export const gameAdminRouter = router({
         topGradeDoubleBonusChance: z.number().min(0).max(1).default(0.1),
         overworkInjuryThreshold: z.number().default(0),
         overworkInjuryChance: z.number().default(0),
-        dailyAllowanceBase: z.number().int().min(0).default(0),
-        dailyAllowanceSubscriber: z.number().int().min(0).default(0),
       }))
       .mutation(({ input }) => {
         const { gameId, containerLabel, subContainerLabel, lifeExpectancyBaseline, maxBreedingSlots, ...rest } = input
@@ -92,6 +90,34 @@ export const gameAdminRouter = router({
           update: { ...rest, ...labels, ...nullable },
         })
       }),
+
+  listDailyAllowanceCurrencies: publicProcedure
+    .input(z.object({ gameId: z.string() }))
+    .query(({ input }) =>
+      db.dailyAllowanceCurrency.findMany({
+        where: { gameId: input.gameId },
+        select: { id: true, amount: true, subscriberOnly: true, currencyDef: { select: { id: true, name: true } } },
+        orderBy: [{ subscriberOnly: "asc" }, { currencyDef: { name: "asc" } }],
+      })
+    ),
+
+  upsertDailyAllowanceCurrency: publicProcedure
+    .input(z.object({
+      id: z.string().optional(),
+      gameId: z.string(),
+      currencyDefId: z.string(),
+      amount: z.number().int().min(0),
+      subscriberOnly: z.boolean().default(false),
+    }))
+    .mutation(({ input }) => {
+      const { id, ...data } = input
+      if (id) return db.dailyAllowanceCurrency.update({ where: { id }, data: { amount: data.amount, subscriberOnly: data.subscriberOnly } })
+      return db.dailyAllowanceCurrency.create({ data })
+    }),
+
+  deleteDailyAllowanceCurrency: publicProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(({ input }) => db.dailyAllowanceCurrency.delete({ where: { id: input.id } })),
 
   listDailyAllowanceItems: publicProcedure
     .input(z.object({ gameId: z.string() }))
