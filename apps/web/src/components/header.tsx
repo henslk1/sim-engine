@@ -54,6 +54,7 @@ export function Header({ session }: { session: Session}) {
           <Link to="/shop" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Shop</Link>
         </div>
         <div className="flex items-center gap-3">
+          {me && gameId && <TestCurrencyButton playerAccountId={me.id} gameId={gameId} />}
           <ActionButton
           variant="danger"
             onClick={() => navigate({ to: "/bug-reports", search: { from: location.pathname } })}
@@ -107,5 +108,21 @@ export function Header({ session }: { session: Session}) {
         </div>
       </div>
     </header>
+  )
+}
+
+function TestCurrencyButton({ playerAccountId, gameId }: { playerAccountId: string; gameId: string }) {
+  const utils = trpc.useUtils()
+  const grant = trpc.player.addTestCurrency.useMutation({
+    onSuccess: () => utils.player.balances.invalidate({ playerAccountId }),
+  })
+
+  return (
+    <ActionButton
+      onClick={() => grant.mutate({ playerAccountId, gameId })}
+      disabled={grant.isPending || grant.isSuccess}
+    >
+      {grant.isSuccess ? "+1,000 ✓" : grant.isPending ? "…" : "+1,000"}
+    </ActionButton>
   )
 }

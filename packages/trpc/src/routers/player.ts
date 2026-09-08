@@ -383,6 +383,38 @@ export const playerRouter = router({
       })
     }),
 
+  addTestCurrency: protectedProcedure
+    .input(z.object({ playerAccountId: z.string(), gameId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const account = await db.playerAccount.findUnique({ where: { id: input.playerAccountId }, select: { userId: true } })
+      if (!account || account.userId !== ctx.userId) throw new TRPCError({ code: "FORBIDDEN" })
+
+      const baseCurrency = await db.currencyDef.findFirst({
+        where: { gameId: input.gameId, currencyType: "BASE" },
+        select: { id: true },
+      })
+      if (!baseCurrency) throw new TRPCError({ code: "NOT_FOUND", message: "No base currency configured" })
+
+      const AMOUNT = 1000
+
+      await db.$transaction([
+        db.playerBalance.upsert({
+          where: { playerAccountId_currencyDefId: { playerAccountId: input.playerAccountId, currencyDefId: baseCurrency.id } },
+          create: { playerAccountId: input.playerAccountId, currencyDefId: baseCurrency.id, balance: AMOUNT },
+          update: { balance: { increment: AMOUNT } },
+        }),
+        db.transaction.create({
+          data: {
+            gameId: input.gameId,
+            toPlayerAccountId: input.playerAccountId,
+            currencyDefId: baseCurrency.id,
+            amount: AMOUNT,
+            txnType: "TESTING_GRANT",
+          },
+        }),
+      ])
+    }),
+
   getSubscription: protectedProcedure
     .input(z.object({ playerAccountId: z.string() }))
     .query(async ({ ctx, input }) => {

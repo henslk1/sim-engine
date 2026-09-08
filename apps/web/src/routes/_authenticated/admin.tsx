@@ -9,7 +9,7 @@ import {
   Dna, GitBranch, FlaskConical, SlidersHorizontal, Heart, Activity,
   Pill, FileCheck, Dumbbell, Gauge, Star, Award, Layers, MapPin,
   CalendarDays, BookOpen, CircleDollarSign, Package, ShoppingCart,
-  ShoppingBag, Crown, Bell, Filter, ChevronDown, ChevronRight, ArrowLeft,
+  ShoppingBag, Crown, Bell, Filter, ChevronDown, ChevronRight, ArrowLeft, Gift,
   Stethoscope, Swords, Plus, Settings, Gamepad2, Loader2, CircleDot,
 } from "lucide-react"
 
@@ -97,6 +97,7 @@ function makeConfigGroups(gameId: string): NavGroupDef[] {
         { to: `/admin/games/${gameId}/vet-services`, label: "Vet Services", icon: Stethoscope },
         { to: `/admin/games/${gameId}/store-listings`, label: "Store Listings", icon: ShoppingCart },
         { to: `/admin/games/${gameId}/game-shop`, label: "Game Shop", icon: ShoppingBag },
+        { to: `/admin/games/${gameId}/daily-allowance`, label: "Daily Allowance", icon: Gift },
       ],
     },
     {
