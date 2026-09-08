@@ -874,7 +874,7 @@ function HealthConditionsPage() {
                                             </td>
                                             <td className="py-1.5 pr-4">
                                               {(editingRestriction?.restrictionType === "TRAINING" || editingRestriction?.restrictionType === "ALL") && (
-                                                <Input type="number" min="0" value={editingRestriction?.maxIntensityTier ?? ""} onChange={(e) => setEditingRestriction(p => p ? { ...p, maxIntensityTier: e.target.value } : null)} className="h-7 text-sm w-20" placeholder="Any" />
+                                                <Input type="number" min="0" value={editingRestriction?.maxIntensityTier ?? ""} onChange={(e) => setEditingRestriction(p => p ? { ...p, maxIntensityTier: e.target.value } : null)} className="h-7 text-sm w-20" placeholder="None" />
                                               )}
                                             </td>
                                             <td className="py-1.5 pr-4">
@@ -896,7 +896,7 @@ function HealthConditionsPage() {
                                         ) : (
                                           <tr key={r.id} className="border-b border-border last:border-0">
                                             <td className="py-1.5 pr-4 font-medium text-foreground">{RESTRICTION_LABELS[r.restrictionType as RestrictionType]}</td>
-                                            <td className="py-1.5 pr-4 text-muted-foreground">{(r.restrictionType === "TRAINING" || r.restrictionType === "ALL") ? (r.maxIntensityTier ?? <span className="italic">Any</span>) : <span className="italic text-muted-foreground/50">—</span>}</td>
+                                            <td className="py-1.5 pr-4 text-muted-foreground">{(r.restrictionType === "TRAINING" || r.restrictionType === "ALL") ? (r.maxIntensityTier ?? <span className="italic">None</span>) : <span className="italic text-muted-foreground/50">—</span>}</td>
                                             <td className="py-1.5 pr-4 text-muted-foreground">{r.durationCycles != null ? `${r.durationCycles} cycles` : <span className="italic">Lifelong</span>}</td>
                                             <td className="py-1.5 text-right space-x-2">
                                               <Button size="sm" variant="ghost" onClick={() => { setEditingRestrictionId(r.id); setEditingRestriction({ restrictionType: r.restrictionType as RestrictionType, maxIntensityTier: r.maxIntensityTier?.toString() ?? "", durationCycles: r.durationCycles?.toString() ?? "", isLifelong: r.durationCycles == null }) }}>Edit</Button>
@@ -913,7 +913,7 @@ function HealthConditionsPage() {
                                         </td>
                                         <td className="py-1.5 pr-4">
                                           {(newRestriction.restrictionType === "TRAINING" || newRestriction.restrictionType === "ALL") && (
-                                            <Input type="number" min="0" value={newRestriction.maxIntensityTier} onChange={(e) => setNewRestriction({ ...newRestriction, maxIntensityTier: e.target.value })} className="h-7 text-sm w-20" placeholder="Any" />
+                                            <Input type="number" min="0" value={newRestriction.maxIntensityTier} onChange={(e) => setNewRestriction({ ...newRestriction, maxIntensityTier: e.target.value })} className="h-7 text-sm w-20" placeholder="None" />
                                           )}
                                         </td>
                                         <td className="py-1.5 pr-4">

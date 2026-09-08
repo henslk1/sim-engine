@@ -8,13 +8,16 @@ type CertForm = {
   name: string
   validForCycles: string
   requiredForCompetition: boolean
+  cost: string
+  currencyDefId: string
 }
 
-const emptyCert = (): CertForm => ({ name: "", validForCycles: "", requiredForCompetition: false })
+const emptyCert = (): CertForm => ({ name: "", validForCycles: "", requiredForCompetition: false, cost: "0", currencyDefId: "" })
 
 function HealthCertificatesPage() {
   const { gameId } = Route.useParams()
 
+  const { data: currencies } = trpc.admin.currency.list.useQuery({ gameId: gameId! }, { enabled: !!gameId })
   const { data: certs } = trpc.admin.healthCert.list.useQuery(
     { gameId: gameId! },
     {}
@@ -46,6 +49,8 @@ function HealthCertificatesPage() {
       name: cert.name,
       validForCycles: cert.validForCycles.toString(),
       requiredForCompetition: cert.requiredForCompetition,
+      cost: String(cert.cost ?? 0),
+      currencyDefId: cert.currencyDefId ?? "",
     })
   }
 
@@ -57,6 +62,8 @@ function HealthCertificatesPage() {
       name: editing.name.trim(),
       validForCycles: parseInt(editing.validForCycles),
       requiredForCompetition: editing.requiredForCompetition,
+      cost: parseInt(editing.cost) || 0,
+      currencyDefId: editing.currencyDefId || null,
     })
   }
 
@@ -91,6 +98,29 @@ function HealthCertificatesPage() {
                 value={editing.validForCycles}
                 onChange={(e) => setEditing({ ...editing, validForCycles: e.target.value })}
               />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Cost</label>
+              <Input
+                className="h-8 text-sm"
+                type="number"
+                min="0"
+                value={editing.cost}
+                onChange={(e) => setEditing({ ...editing, cost: e.target.value })}
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Currency</label>
+              <select
+                className="h-8 rounded-md border border-input bg-background px-2 text-sm"
+                value={editing.currencyDefId}
+                onChange={(e) => setEditing({ ...editing, currencyDefId: e.target.value })}
+              >
+                <option value="">— None (free) —</option>
+                {currencies?.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}{c.symbol ? ` (${c.symbol})` : ""}</option>
+                ))}
+              </select>
             </div>
             <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
               <input
@@ -136,6 +166,7 @@ function HealthCertificatesPage() {
               <tr className="border-b border-border">
                 <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Name</th>
                 <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Valid For</th>
+                <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Cost</th>
                 <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Req. for Competition</th>
                 <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
               </tr>
@@ -145,6 +176,9 @@ function HealthCertificatesPage() {
                 <tr key={c.id} className="border-b border-border last:border-0">
                   <td className="px-3 py-2 font-medium text-foreground">{c.name}</td>
                   <td className="px-3 py-2 text-muted-foreground">{c.validForCycles} cycles</td>
+                  <td className="px-3 py-2 text-muted-foreground">
+                    {c.cost > 0 ? `${c.cost}${(c as any).currencyDef?.symbol ? ` ${(c as any).currencyDef.symbol}` : ""}` : "Free"}
+                  </td>
                   <td className="px-3 py-2 text-center">
                     {c.requiredForCompetition ? <span className="text-primary">✓</span> : <span className="text-muted-foreground">—</span>}
                   </td>
@@ -155,7 +189,7 @@ function HealthCertificatesPage() {
               ))}
               {certs?.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-3 py-6 text-center text-sm text-muted-foreground">No health certificates defined yet.</td>
+                  <td colSpan={5} className="px-3 py-6 text-center text-sm text-muted-foreground">No health certificates defined yet.</td>
                 </tr>
               )}
             </tbody>

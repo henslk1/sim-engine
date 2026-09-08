@@ -352,12 +352,14 @@ function CertificatesPanel({
   playerAccountId,
   selectedAnimalId,
   onSelectAnimal,
+  balances,
 }: {
-  certDefs: { id: string; name: string; validForCycles: number; requiredForCompetition: boolean }[]
+  certDefs: { id: string; name: string; validForCycles: number; requiredForCompetition: boolean; cost: number; currencyDefId: string | null; currencyDef: { id: string; name: string; symbol: string | null } | null }[]
   aliveAnimals: AliveAnimal[]
   playerAccountId: string | undefined
   selectedAnimalId: string
   onSelectAnimal: (id: string) => void
+  balances: { currencyDef: { id: string }; balance: number }[] | undefined
 }) {
   const utils = trpc.useUtils()
 
@@ -418,6 +420,8 @@ function CertificatesPanel({
             const isValid = cert && cert.isValid && !isExpired
             const remainingCycles = cert ? cert.expiresAtCycle - ageInCycles : 0
             const isPending = issueCert.isPending && issueCert.variables?.certDefId === def.id
+            const playerBalance = def.currencyDefId ? (balances?.find((b) => b.currencyDef.id === def.currencyDefId)?.balance ?? 0) : Infinity
+            const canAfford = def.cost <= 0 || playerBalance >= def.cost
 
             const statusMeta = isValid
               ? { icon: ShieldCheck, cls: "text-chart-2 bg-chart-2/12" }
@@ -438,10 +442,16 @@ function CertificatesPanel({
                       ? `Expires in ${remainingCycles} cycle${remainingCycles !== 1 ? "s" : ""}`
                       : isExpired ? "Expired" : "Not certified"}
                   </p>
+                  {def.cost > 0 && def.currencyDef && (
+                    <p className={cn("text-xs", canAfford ? "text-muted-foreground" : "text-destructive")}>
+                      {def.cost}{def.currencyDef.symbol ? ` ${def.currencyDef.symbol}` : ` ${def.currencyDef.name}`}
+                      {!canAfford && " — insufficient funds"}
+                    </p>
+                  )}
                 </div>
                 <button
                   type="button"
-                  disabled={!effectiveAnimalId || !playerAccountId || isPending}
+                  disabled={!effectiveAnimalId || !playerAccountId || isPending || !canAfford}
                   onClick={() => playerAccountId && issueCert.mutate({ animalId: effectiveAnimalId, playerAccountId, certDefId: def.id })}
                   className={cn(
                     "shrink-0 rounded px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50",
@@ -1023,7 +1033,7 @@ function VetPage() {
       case "otc":
         return <OTCPanel vetStoreListings={vetStoreListings ?? []} playerInventory={playerInventory} playerAccountId={playerAccountId} />
       case "certificates":
-        return <CertificatesPanel certDefs={certDefs ?? []} aliveAnimals={aliveAnimals} playerAccountId={playerAccountId} selectedAnimalId={selectedAnimalId} onSelectAnimal={setSelectedAnimalId} />
+        return <CertificatesPanel certDefs={certDefs ?? []} aliveAnimals={aliveAnimals} playerAccountId={playerAccountId} selectedAnimalId={selectedAnimalId} onSelectAnimal={setSelectedAnimalId} balances={balances} />
       case "euthanasia":
         return <EuthanasiaPanel aliveAnimals={aliveAnimals} />
       case "collect":

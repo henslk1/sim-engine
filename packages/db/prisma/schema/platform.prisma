@@ -491,6 +491,7 @@ model GameConfig {
   subContainerLabel               String?
   breedingEnergyCost              Float           @default(0)
   gestationCycles                 Int             @default(12)
+  gestationRestrictCycle          Int             @default(0)
   moodDecayRate                   Float           @default(0)
   conditionDecayRate              Float           @default(0)
   conditionWorkGain               Float           @default(0)

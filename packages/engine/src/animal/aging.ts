@@ -209,7 +209,24 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
           ...(justCompleted && { isCompleted: true, completedAt: new Date() }),
         },
       })
-      if (justCompleted) pregnancyCompleted = pregnancy.id
+
+      const restrictAt = gameConfig.gestationRestrictCycle
+      if (restrictAt > 0 && newCycles === restrictAt && !justCompleted) {
+        await tx.activityRestriction.createMany({
+          data: [
+            { animalId, pregnancyId: pregnancy.id, restrictionType: "TRAINING", remainingCycles: 0, isLifelong: true },
+            { animalId, pregnancyId: pregnancy.id, restrictionType: "COMPETITION", remainingCycles: 0, isLifelong: true },
+          ],
+        })
+      }
+
+      if (justCompleted) {
+        await tx.activityRestriction.updateMany({
+          where: { pregnancyId: pregnancy.id, isActive: true },
+          data: { isActive: false },
+        })
+        pregnancyCompleted = pregnancy.id
+      }
     }
 
     // Advance active treatment records

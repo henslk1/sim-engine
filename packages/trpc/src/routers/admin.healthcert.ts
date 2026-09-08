@@ -9,6 +9,7 @@ export const healthCertAdminRouter = router({
       db.healthCertificateDef.findMany({
         where: { gameId: input.gameId },
         orderBy: { name: "asc" },
+        include: { currencyDef: { select: { id: true, name: true, symbol: true } } },
       })
     ),
 
@@ -19,9 +20,12 @@ export const healthCertAdminRouter = router({
       name: z.string().min(1),
       validForCycles: z.number().int().min(1),
       requiredForCompetition: z.boolean(),
+      cost: z.number().int().min(0).default(0),
+      currencyDefId: z.string().nullish(),
     }))
     .mutation(({ input }) => {
-      const { id, gameId, ...data } = input
+      const { id, gameId, currencyDefId, ...rest } = input
+      const data = { ...rest, currencyDefId: currencyDefId ?? null }
       if (id) return db.healthCertificateDef.update({ where: { id }, data })
       return db.healthCertificateDef.create({ data: { gameId, ...data } })
     }),

@@ -152,6 +152,7 @@ model ActivityRestriction {
   id                String                  @id @default(cuid())
   animalId          String
   treatmentRecordId String?
+  pregnancyId       String?
   restrictionType   ActivityRestrictionType
   maxIntensityTier  Int?
   remainingCycles   Int
@@ -159,6 +160,7 @@ model ActivityRestriction {
   isActive          Boolean                 @default(true)
   animal            Animal                  @relation(fields: [animalId], references: [id])
   treatmentRecord   AnimalTreatmentRecord?  @relation(fields: [treatmentRecordId], references: [id])
+  pregnancy         Pregnancy?              @relation(fields: [pregnancyId], references: [id])
 }
 
 model AnimalTestResult {
@@ -178,7 +180,10 @@ model HealthCertificateDef {
   name                   String
   validForCycles         Int
   requiredForCompetition Boolean             @default(false)
+  cost                   Int                 @default(0)
+  currencyDefId          String?
   certificates           HealthCertificate[]
+  currencyDef            CurrencyDef?        @relation(fields: [currencyDefId], references: [id])
   game                   Game                @relation(fields: [gameId], references: [id])
 
   @@unique([gameId, name])

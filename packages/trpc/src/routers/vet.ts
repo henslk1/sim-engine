@@ -172,14 +172,38 @@ export const vetRouter = router({
             treatmentDef: {
               include: {
                 items: { include: { itemDef: { select: { id: true, name: true } } } },
+                currencyDef: { select: { id: true, name: true } },
               },
             },
-            animal: { select: { ageInCycles: true } },
+            animal: { select: { ageInCycles: true, gameId: true } },
             healthRecord: { select: { id: true } },
           },
         })
 
         if (!record.isActive) throw new Error("Treatment is not active")
+
+        if (record.treatmentDef.treatmentType === "PRESCRIPTION" && record.treatmentDef.cost && record.treatmentDef.cost > 0 && record.treatmentDef.currencyDefId) {
+          const balance = await tx.playerBalance.findUnique({
+            where: { playerAccountId_currencyDefId: { playerAccountId: input.playerAccountId, currencyDefId: record.treatmentDef.currencyDefId } },
+            select: { balance: true },
+          })
+          if (!balance || balance.balance < record.treatmentDef.cost) {
+            throw new Error(`Insufficient ${record.treatmentDef.currencyDef?.name ?? "currency"} balance`)
+          }
+          await tx.playerBalance.update({
+            where: { playerAccountId_currencyDefId: { playerAccountId: input.playerAccountId, currencyDefId: record.treatmentDef.currencyDefId } },
+            data: { balance: { decrement: record.treatmentDef.cost } },
+          })
+          await tx.transaction.create({
+            data: {
+              gameId: record.animal.gameId,
+              fromPlayerAccountId: input.playerAccountId,
+              currencyDefId: record.treatmentDef.currencyDefId,
+              amount: record.treatmentDef.cost,
+              txnType: "TREATMENT_FEE",
+            },
+          })
+        }
 
         if (record.treatmentDef.treatmentType === "OTC") {
           for (const item of record.treatmentDef.items) {
@@ -280,7 +304,7 @@ export const vetRouter = router({
           })
         }
 
-        if (treatmentDef.cost && treatmentDef.cost > 0 && treatmentDef.currencyDefId) {
+        if (treatmentDef.treatmentType !== "PRESCRIPTION" && treatmentDef.cost && treatmentDef.cost > 0 && treatmentDef.currencyDefId) {
           const balance = await tx.playerBalance.findUnique({
             where: {
               playerAccountId_currencyDefId: {
@@ -477,6 +501,7 @@ export const vetRouter = router({
       db.healthCertificateDef.findMany({
         where: { gameId: input.gameId },
         orderBy: { name: "asc" },
+        include: { currencyDef: { select: { id: true, name: true, symbol: true } } },
       })
     ),
 
@@ -500,14 +525,34 @@ export const vetRouter = router({
         const [animal, certDef] = await Promise.all([
           tx.animal.findUniqueOrThrow({
             where: { id: input.animalId },
-            select: { ageInCycles: true, status: true },
+            select: { ageInCycles: true, status: true, gameId: true },
           }),
           tx.healthCertificateDef.findUniqueOrThrow({
             where: { id: input.certDefId },
-            select: { validForCycles: true },
+            select: { validForCycles: true, cost: true, currencyDefId: true },
           }),
         ])
         if (animal.status !== "ALIVE") throw new Error("Animal is not alive")
+        if (certDef.cost > 0 && certDef.currencyDefId) {
+          const balance = await tx.playerBalance.findUnique({
+            where: { playerAccountId_currencyDefId: { playerAccountId: input.playerAccountId, currencyDefId: certDef.currencyDefId } },
+            select: { balance: true },
+          })
+          if (!balance || balance.balance < certDef.cost) throw new Error("Insufficient funds")
+          await tx.playerBalance.update({
+            where: { playerAccountId_currencyDefId: { playerAccountId: input.playerAccountId, currencyDefId: certDef.currencyDefId } },
+            data: { balance: { decrement: certDef.cost } },
+          })
+          await tx.transaction.create({
+            data: {
+              gameId: animal.gameId,
+              playerAccountId: input.playerAccountId,
+              currencyDefId: certDef.currencyDefId,
+              amount: -certDef.cost,
+              type: "VET_SERVICE_FEE",
+            },
+          })
+        }
         return tx.healthCertificate.upsert({
           where: { animalId_certDefId: { animalId: input.animalId, certDefId: input.certDefId } },
           create: {
