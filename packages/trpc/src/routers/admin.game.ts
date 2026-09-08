@@ -73,6 +73,8 @@ export const gameAdminRouter = router({
         topGradeDoubleBonusChance: z.number().min(0).max(1).default(0.1),
         overworkInjuryThreshold: z.number().default(0),
         overworkInjuryChance: z.number().default(0),
+        dailyAllowanceBase: z.number().int().min(0).default(0),
+        dailyAllowanceSubscriber: z.number().int().min(0).default(0),
       }))
       .mutation(({ input }) => {
         const { gameId, containerLabel, subContainerLabel, lifeExpectancyBaseline, maxBreedingSlots, ...rest } = input
@@ -91,6 +93,34 @@ export const gameAdminRouter = router({
         })
       }),
 
+  listDailyAllowanceItems: publicProcedure
+    .input(z.object({ gameId: z.string() }))
+    .query(({ input }) =>
+      db.dailyAllowanceItem.findMany({
+        where: { gameId: input.gameId },
+        select: { id: true, quantity: true, subscriberOnly: true, itemDef: { select: { id: true, name: true } } },
+        orderBy: { itemDef: { name: "asc" } },
+      })
+    ),
+
+  upsertDailyAllowanceItem: publicProcedure
+    .input(z.object({
+      id: z.string().optional(),
+      gameId: z.string(),
+      itemDefId: z.string(),
+      quantity: z.number().int().min(1),
+      subscriberOnly: z.boolean().default(false),
+    }))
+    .mutation(({ input }) => {
+      const { id, ...data } = input
+      if (id) return db.dailyAllowanceItem.update({ where: { id }, data: { quantity: data.quantity, subscriberOnly: data.subscriberOnly } })
+      return db.dailyAllowanceItem.create({ data })
+    }),
+
+  deleteDailyAllowanceItem: publicProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(({ input }) => db.dailyAllowanceItem.delete({ where: { id: input.id } })),
+
   setupCounts: publicProcedure
     .input(z.object({ gameId: z.string() }))
     .query(async ({ input }) => {
@@ -103,6 +133,7 @@ export const gameAdminRouter = router({
         trainingActions, intensityTiers, stageActivities, titles,
         disciplines, competitionTiers, venues, seasonCategories, records,
         vetServices, storeListings, gameShopBreedConfigs, groupPrestigeTiers,
+        dailyAllowanceItems,
       ] = await Promise.all([
         db.gameConfig.findUnique({ where: { gameId }, select: { gameId: true } }),
         db.currencyDef.count({ where: { gameId } }),
@@ -134,6 +165,7 @@ export const gameAdminRouter = router({
         db.storeListing.count({ where: { gameId } }),
         db.gameShopBreedConfig.count({ where: { gameId } }),
         db.groupPrestigeTierDef.count({ where: { gameId } }),
+        db.dailyAllowanceItem.count({ where: { gameId } }),
       ])
       return {
         gameConfig: !!gameConfigRow,
@@ -143,6 +175,7 @@ export const gameAdminRouter = router({
         trainingActions, intensityTiers, stageActivities, titles,
         disciplines, competitionTiers, venues, seasonCategories, records,
         vetServices, storeListings, gameShopBreedConfigs, groupPrestigeTiers,
+        dailyAllowanceItems,
       }
     }),
 })

@@ -24,6 +24,8 @@ enum TransactionType {
   SUBSCRIPTION
   ADMIN_ADJUSTMENT
   GROUP_CONTRIBUTION
+  DAILY_ALLOWANCE
+  TUTORIAL_GRANT
   GROUP_TREASURY_PAYOUT
   GROUP_CARE_CHARGE
   GROUP_FEE_SHARE
@@ -60,6 +62,7 @@ model CurrencyDef {
   campaignRewardTierCurrencies CampaignRewardTierCurrency[]
   competitionTierPrizes        CompetitionTierPrize[]
   seasonPrizeConfigs           SeasonPrizeConfig[]
+  tutorialStepGrants           TutorialStepDef[]
   game                         Game                         @relation(fields: [gameId], references: [id])
 
   @@unique([gameId, name])

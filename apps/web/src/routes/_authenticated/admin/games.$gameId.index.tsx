@@ -38,6 +38,7 @@ type Counts = {
   storeListings: number
   gameShopBreedConfigs: number
   groupPrestigeTiers: number
+  dailyAllowanceItems: number
 }
 
 type CountKey = keyof Counts
@@ -84,6 +85,7 @@ function makeGroups(gameId: string): { label: string; sections: Section[] }[] {
         { key: "vetServices", label: "Vet Services", route: `/admin/games/${gameId}/vet-services`, deps: ["currencies"] },
         { key: "storeListings", label: "Store Listings", route: `/admin/games/${gameId}/store-listings`, deps: ["items"] },
         { key: "gameShopBreedConfigs", label: "Game Shop", route: `/admin/games/${gameId}/game-shop`, deps: ["breeds", "currencies"] },
+        { key: "dailyAllowanceItems", label: "Daily Allowance Items", route: `/admin/games/${gameId}/daily-allowance`, deps: ["items"] },
       ],
     },
     {
@@ -136,6 +138,7 @@ const LABEL_MAP_KEYS: [CountKey, string][] = [
   ["titles", "Titles"], ["disciplines", "Disciplines"], ["competitionTiers", "Competition Tiers"],
   ["venues", "Venues"], ["seasonCategories", "Season Categories"], ["records", "Records"],
   ["groupPrestigeTiers", "Prestige Tiers"],
+  ["dailyAllowanceItems", "Daily Allowance Items"],
 ]
 const LABEL_MAP = Object.fromEntries(LABEL_MAP_KEYS) as Partial<Record<CountKey, string>>
 

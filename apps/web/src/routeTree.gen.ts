@@ -97,6 +97,7 @@ import { Route as AuthenticatedAdminGamesGameIdEventsRouteImport } from './route
 import { Route as AuthenticatedAdminGamesGameIdEconomyRouteImport } from './routes/_authenticated/admin/games.$gameId.economy'
 import { Route as AuthenticatedAdminGamesGameIdDisciplinesRouteImport } from './routes/_authenticated/admin/games.$gameId.disciplines'
 import { Route as AuthenticatedAdminGamesGameIdDirectoryFiltersRouteImport } from './routes/_authenticated/admin/games.$gameId.directory-filters'
+import { Route as AuthenticatedAdminGamesGameIdDailyAllowanceRouteImport } from './routes/_authenticated/admin/games.$gameId.daily-allowance'
 import { Route as AuthenticatedAdminGamesGameIdCurrenciesRouteImport } from './routes/_authenticated/admin/games.$gameId.currencies'
 import { Route as AuthenticatedAdminGamesGameIdConformationSectionsRouteImport } from './routes/_authenticated/admin/games.$gameId.conformation-sections'
 import { Route as AuthenticatedAdminGamesGameIdConfigRouteImport } from './routes/_authenticated/admin/games.$gameId.config'
@@ -609,6 +610,12 @@ const AuthenticatedAdminGamesGameIdDirectoryFiltersRoute =
     path: '/directory-filters',
     getParentRoute: () => AuthenticatedAdminGamesGameIdRoute,
   } as any)
+const AuthenticatedAdminGamesGameIdDailyAllowanceRoute =
+  AuthenticatedAdminGamesGameIdDailyAllowanceRouteImport.update({
+    id: '/daily-allowance',
+    path: '/daily-allowance',
+    getParentRoute: () => AuthenticatedAdminGamesGameIdRoute,
+  } as any)
 const AuthenticatedAdminGamesGameIdCurrenciesRoute =
   AuthenticatedAdminGamesGameIdCurrenciesRouteImport.update({
     id: '/currencies',
@@ -716,6 +723,7 @@ export interface FileRoutesByFullPath {
   '/admin/games/$gameId/config': typeof AuthenticatedAdminGamesGameIdConfigRoute
   '/admin/games/$gameId/conformation-sections': typeof AuthenticatedAdminGamesGameIdConformationSectionsRoute
   '/admin/games/$gameId/currencies': typeof AuthenticatedAdminGamesGameIdCurrenciesRoute
+  '/admin/games/$gameId/daily-allowance': typeof AuthenticatedAdminGamesGameIdDailyAllowanceRoute
   '/admin/games/$gameId/directory-filters': typeof AuthenticatedAdminGamesGameIdDirectoryFiltersRoute
   '/admin/games/$gameId/disciplines': typeof AuthenticatedAdminGamesGameIdDisciplinesRoute
   '/admin/games/$gameId/economy': typeof AuthenticatedAdminGamesGameIdEconomyRoute
@@ -807,6 +815,7 @@ export interface FileRoutesByTo {
   '/admin/games/$gameId/config': typeof AuthenticatedAdminGamesGameIdConfigRoute
   '/admin/games/$gameId/conformation-sections': typeof AuthenticatedAdminGamesGameIdConformationSectionsRoute
   '/admin/games/$gameId/currencies': typeof AuthenticatedAdminGamesGameIdCurrenciesRoute
+  '/admin/games/$gameId/daily-allowance': typeof AuthenticatedAdminGamesGameIdDailyAllowanceRoute
   '/admin/games/$gameId/directory-filters': typeof AuthenticatedAdminGamesGameIdDirectoryFiltersRoute
   '/admin/games/$gameId/disciplines': typeof AuthenticatedAdminGamesGameIdDisciplinesRoute
   '/admin/games/$gameId/economy': typeof AuthenticatedAdminGamesGameIdEconomyRoute
@@ -905,6 +914,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/games/$gameId/config': typeof AuthenticatedAdminGamesGameIdConfigRoute
   '/_authenticated/admin/games/$gameId/conformation-sections': typeof AuthenticatedAdminGamesGameIdConformationSectionsRoute
   '/_authenticated/admin/games/$gameId/currencies': typeof AuthenticatedAdminGamesGameIdCurrenciesRoute
+  '/_authenticated/admin/games/$gameId/daily-allowance': typeof AuthenticatedAdminGamesGameIdDailyAllowanceRoute
   '/_authenticated/admin/games/$gameId/directory-filters': typeof AuthenticatedAdminGamesGameIdDirectoryFiltersRoute
   '/_authenticated/admin/games/$gameId/disciplines': typeof AuthenticatedAdminGamesGameIdDisciplinesRoute
   '/_authenticated/admin/games/$gameId/economy': typeof AuthenticatedAdminGamesGameIdEconomyRoute
@@ -1003,6 +1013,7 @@ export interface FileRouteTypes {
     | '/admin/games/$gameId/config'
     | '/admin/games/$gameId/conformation-sections'
     | '/admin/games/$gameId/currencies'
+    | '/admin/games/$gameId/daily-allowance'
     | '/admin/games/$gameId/directory-filters'
     | '/admin/games/$gameId/disciplines'
     | '/admin/games/$gameId/economy'
@@ -1094,6 +1105,7 @@ export interface FileRouteTypes {
     | '/admin/games/$gameId/config'
     | '/admin/games/$gameId/conformation-sections'
     | '/admin/games/$gameId/currencies'
+    | '/admin/games/$gameId/daily-allowance'
     | '/admin/games/$gameId/directory-filters'
     | '/admin/games/$gameId/disciplines'
     | '/admin/games/$gameId/economy'
@@ -1191,6 +1203,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/games/$gameId/config'
     | '/_authenticated/admin/games/$gameId/conformation-sections'
     | '/_authenticated/admin/games/$gameId/currencies'
+    | '/_authenticated/admin/games/$gameId/daily-allowance'
     | '/_authenticated/admin/games/$gameId/directory-filters'
     | '/_authenticated/admin/games/$gameId/disciplines'
     | '/_authenticated/admin/games/$gameId/economy'
@@ -1852,6 +1865,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminGamesGameIdDirectoryFiltersRouteImport
       parentRoute: typeof AuthenticatedAdminGamesGameIdRoute
     }
+    '/_authenticated/admin/games/$gameId/daily-allowance': {
+      id: '/_authenticated/admin/games/$gameId/daily-allowance'
+      path: '/daily-allowance'
+      fullPath: '/admin/games/$gameId/daily-allowance'
+      preLoaderRoute: typeof AuthenticatedAdminGamesGameIdDailyAllowanceRouteImport
+      parentRoute: typeof AuthenticatedAdminGamesGameIdRoute
+    }
     '/_authenticated/admin/games/$gameId/currencies': {
       id: '/_authenticated/admin/games/$gameId/currencies'
       path: '/currencies'
@@ -1961,6 +1981,7 @@ interface AuthenticatedAdminGamesGameIdRouteChildren {
   AuthenticatedAdminGamesGameIdConfigRoute: typeof AuthenticatedAdminGamesGameIdConfigRoute
   AuthenticatedAdminGamesGameIdConformationSectionsRoute: typeof AuthenticatedAdminGamesGameIdConformationSectionsRoute
   AuthenticatedAdminGamesGameIdCurrenciesRoute: typeof AuthenticatedAdminGamesGameIdCurrenciesRoute
+  AuthenticatedAdminGamesGameIdDailyAllowanceRoute: typeof AuthenticatedAdminGamesGameIdDailyAllowanceRoute
   AuthenticatedAdminGamesGameIdDirectoryFiltersRoute: typeof AuthenticatedAdminGamesGameIdDirectoryFiltersRoute
   AuthenticatedAdminGamesGameIdDisciplinesRoute: typeof AuthenticatedAdminGamesGameIdDisciplinesRoute
   AuthenticatedAdminGamesGameIdEconomyRoute: typeof AuthenticatedAdminGamesGameIdEconomyRoute
@@ -2010,6 +2031,8 @@ const AuthenticatedAdminGamesGameIdRouteChildren: AuthenticatedAdminGamesGameIdR
       AuthenticatedAdminGamesGameIdConformationSectionsRoute,
     AuthenticatedAdminGamesGameIdCurrenciesRoute:
       AuthenticatedAdminGamesGameIdCurrenciesRoute,
+    AuthenticatedAdminGamesGameIdDailyAllowanceRoute:
+      AuthenticatedAdminGamesGameIdDailyAllowanceRoute,
     AuthenticatedAdminGamesGameIdDirectoryFiltersRoute:
       AuthenticatedAdminGamesGameIdDirectoryFiltersRoute,
     AuthenticatedAdminGamesGameIdDisciplinesRoute:

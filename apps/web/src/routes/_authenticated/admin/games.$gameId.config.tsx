@@ -75,6 +75,8 @@ function GameConfigPage() {
     topGradeDoubleBonusChance: 0.1,
     overworkInjuryThreshold: 0,
     overworkInjuryChance: 0,
+    dailyAllowanceBase: 0,
+    dailyAllowanceSubscriber: 0,
   })
 
   function n(key: keyof typeof cf, float = false) {
@@ -139,6 +141,8 @@ function GameConfigPage() {
           topGradeDoubleBonusChance: g.topGradeDoubleBonusChance,
           overworkInjuryThreshold: g.overworkInjuryThreshold,
           overworkInjuryChance: g.overworkInjuryChance,
+          dailyAllowanceBase: g.dailyAllowanceBase,
+          dailyAllowanceSubscriber: g.dailyAllowanceSubscriber,
         })
       }
     }
@@ -274,6 +278,13 @@ function GameConfigPage() {
                 <F label="Recovery Rate"><Input type="number" step="0.001" {...n("immunityRecoveryRate", true)} /></F>
                 <F label="Min"><Input type="number" step="0.1" {...n("immunityMin", true)} /></F>
                 <F label="Max"><Input type="number" step="0.1" {...n("immunityMax", true)} /></F>
+              </div>
+            </Panel>
+
+            <Panel title="Daily Allowance">
+              <div className="space-y-2">
+                <F label="Currency — Free"><Input type="number" step="1" min="0" {...n("dailyAllowanceBase")} /></F>
+                <F label="Currency — Subscriber"><Input type="number" step="1" min="0" {...n("dailyAllowanceSubscriber")} /></F>
               </div>
             </Panel>
           </div>

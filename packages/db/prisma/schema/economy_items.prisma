@@ -59,6 +59,8 @@ model ItemDef {
   disciplineRequirements  DisciplineEquipmentRequirement[]
   seasonPrizeConfigs      SeasonPrizeConfig[]
   conditionSuppressions   HealthConditionDef[]
+  dailyAllowanceItems     DailyAllowanceItem[]
+  tutorialStepGrants      TutorialStepGrant[]
   prizeEligible           Boolean                          @default(true)
   isSellable              Boolean                          @default(true)
   game                    Game                             @relation(fields: [gameId], references: [id])
@@ -114,4 +116,14 @@ model SubContainer {
   sortDefault     String?
   filterConfig    Json?
   playerAccount   PlayerAccount @relation(fields: [playerAccountId], references: [id])
+}
+
+model DailyAllowanceItem {
+  id             String  @id @default(cuid())
+  gameId         String
+  itemDefId      String
+  quantity       Int
+  subscriberOnly Boolean @default(false)
+  game           Game    @relation(fields: [gameId], references: [id])
+  itemDef        ItemDef @relation(fields: [itemDefId], references: [id])
 }

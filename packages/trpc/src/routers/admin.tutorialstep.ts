@@ -13,9 +13,15 @@ export const tutorialStepAdminRouter = router({
           venue: { select: { id: true, name: true } },
           competitionDiscipline: { select: { id: true, name: true } },
           triggerCondition: { select: { id: true, name: true } },
+          grantCurrency: { select: { id: true, name: true } },
+          grants: {
+            select: { id: true, quantity: true, itemDef: { select: { id: true, name: true } } },
+            orderBy: { itemDef: { name: "asc" } },
+          },
         },
       })
     ),
+
   save: publicProcedure
     .input(z.object({
       id: z.string().optional(),
@@ -28,9 +34,16 @@ export const tutorialStepAdminRouter = router({
       competitionNpcCount: z.number().int().min(0).nullish(),
       triggerConditionDefId: z.string().nullish(),
       venueId: z.string().nullish(),
+      grantCurrencyDefId: z.string().nullish(),
+      grantCurrencyAmount: z.number().int().min(1).nullish(),
     }))
     .mutation(({ input }) => {
-      const { id, gameId, description, competitionDisciplineId, competitionNpcCount, triggerConditionDefId, venueId, ...rest } = input
+      const {
+        id, gameId,
+        description, competitionDisciplineId, competitionNpcCount,
+        triggerConditionDefId, venueId, grantCurrencyDefId, grantCurrencyAmount,
+        ...rest
+      } = input
       const data = {
         ...rest,
         description: description ?? null,
@@ -38,14 +51,36 @@ export const tutorialStepAdminRouter = router({
         competitionNpcCount: competitionNpcCount ?? null,
         triggerConditionDefId: triggerConditionDefId ?? null,
         venueId: venueId ?? null,
+        grantCurrencyDefId: grantCurrencyDefId ?? null,
+        grantCurrencyAmount: grantCurrencyAmount ?? null,
       }
       if (id) return db.tutorialStepDef.update({ where: { id }, data })
       return db.tutorialStepDef.create({ data: { gameId, ...data } })
     }),
+
+  addStepGrant: publicProcedure
+    .input(z.object({
+      stepDefId: z.string(),
+      itemDefId: z.string(),
+      quantity: z.number().int().min(1),
+    }))
+    .mutation(({ input }) =>
+      db.tutorialStepGrant.upsert({
+        where: { stepDefId_itemDefId: { stepDefId: input.stepDefId, itemDefId: input.itemDefId } },
+        create: input,
+        update: { quantity: input.quantity },
+      })
+    ),
+
+  removeStepGrant: publicProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(({ input }) => db.tutorialStepGrant.delete({ where: { id: input.id } })),
+
   remove: publicProcedure
     .input(z.object({ id: z.string() }))
     .mutation(({ input }) =>
       db.$transaction(async (tx) => {
+        await tx.tutorialStepGrant.deleteMany({ where: { stepDefId: input.id } })
         await tx.tutorialProgress.deleteMany({ where: { stepDefId: input.id } })
         return tx.tutorialStepDef.delete({ where: { id: input.id } })
       })

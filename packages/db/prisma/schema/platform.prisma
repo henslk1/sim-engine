@@ -76,6 +76,7 @@ model Game {
   conformationSections   ConformationSection[]
   predictorUsages        PlayerPredictorUsage[]
   starterBreedOptions    StarterBreedOption[]
+  dailyAllowanceItems    DailyAllowanceItem[]
   isActive               Boolean                 @default(false)
   createdAt              DateTime                @default(now())
 }
@@ -528,6 +529,8 @@ model GameConfig {
   tutorialFemaleBaseTemplateId    String?
   tutorialMaleBaseTemplate        AnimalTemplate? @relation("GameConfigTutorialMale", fields: [tutorialMaleBaseTemplateId], references: [id])
   tutorialFemaleBaseTemplate      AnimalTemplate? @relation("GameConfigTutorialFemale", fields: [tutorialFemaleBaseTemplateId], references: [id])
+  dailyAllowanceBase              Int             @default(0)
+  dailyAllowanceSubscriber        Int             @default(0)
   game                            Game            @relation(fields: [gameId], references: [id])
   createdAt                       DateTime        @default(now())
   updatedAt                       DateTime        @updatedAt

@@ -55,7 +55,7 @@ model TutorialAnimalPair {
 }
 
 model TutorialStepDef {
-  id                      String              @id @default(cuid())
+  id                      String               @id @default(cuid())
   gameId                  String
   stepKey                 String
   name                    String
@@ -65,14 +65,29 @@ model TutorialStepDef {
   competitionDisciplineId String?
   competitionNpcCount     Int?
   triggerConditionDefId   String?
+  grantCurrencyDefId      String?
+  grantCurrencyAmount     Int?
   tutorialProgressions    TutorialProgress[]
-  game                    Game                @relation(fields: [gameId], references: [id])
-  competitionDiscipline   DisciplineDef?      @relation(fields: [competitionDisciplineId], references: [id])
-  triggerCondition        HealthConditionDef? @relation(fields: [triggerConditionDefId], references: [id])
-  venue                   Venue?              @relation(fields: [venueId], references: [id])
+  grants                  TutorialStepGrant[]
+  game                    Game                 @relation(fields: [gameId], references: [id])
+  competitionDiscipline   DisciplineDef?       @relation(fields: [competitionDisciplineId], references: [id])
+  triggerCondition        HealthConditionDef?  @relation(fields: [triggerConditionDefId], references: [id])
+  venue                   Venue?               @relation(fields: [venueId], references: [id])
+  grantCurrency           CurrencyDef?         @relation(fields: [grantCurrencyDefId], references: [id])
 
   @@unique([gameId, stepKey])
   @@unique([gameId, stepIndex])
+}
+
+model TutorialStepGrant {
+  id          String          @id @default(cuid())
+  stepDefId   String
+  itemDefId   String
+  quantity    Int
+  stepDef     TutorialStepDef @relation(fields: [stepDefId], references: [id])
+  itemDef     ItemDef         @relation(fields: [itemDefId], references: [id])
+
+  @@unique([stepDefId, itemDefId])
 }
 
 model TutorialProgress {
