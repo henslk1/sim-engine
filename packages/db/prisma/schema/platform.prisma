@@ -563,12 +563,27 @@ model StarterBreedOption {
 }
 
 model StarterColorOption {
-  id                   String             @id @default(cuid())
+  id                   String                      @id @default(cuid())
   starterBreedOptionId String
   name                 String
   image                String?
-  isActive             Boolean            @default(true)
-  starterBreedOption   StarterBreedOption @relation(fields: [starterBreedOptionId], references: [id])
+  isActive             Boolean                     @default(true)
+  starterBreedOption   StarterBreedOption          @relation(fields: [starterBreedOptionId], references: [id])
+  genotypes            StarterColorOptionGenotype[]
+}
+
+model StarterColorOptionGenotype {
+  id                   String            @id @default(cuid())
+  starterColorOptionId String
+  locusId              String
+  alleleOneId          String
+  alleleTwoId          String
+  starterColorOption   StarterColorOption @relation(fields: [starterColorOptionId], references: [id], onDelete: Cascade)
+  locus                Locus             @relation(fields: [locusId], references: [id])
+  alleleOne            Allele            @relation("StarterAlleleOne", fields: [alleleOneId], references: [id])
+  alleleTwo            Allele            @relation("StarterAlleleTwo", fields: [alleleTwoId], references: [id])
+
+  @@unique([starterColorOptionId, locusId])
 }
 
 enum WarningType {

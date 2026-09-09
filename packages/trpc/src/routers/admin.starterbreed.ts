@@ -10,7 +10,14 @@ export const starterBreedAdminRouter = router({
         where: { gameId: input.gameId },
         include: {
           breed: { select: { id: true, name: true } },
-          colorOptions: { orderBy: { name: "asc" } },
+          colorOptions: {
+            orderBy: { name: "asc" },
+            include: {
+              genotypes: {
+                select: { id: true, locusId: true, alleleOneId: true, alleleTwoId: true },
+              },
+            },
+          },
           tutorialMaleTemplate: { select: { id: true, name: true } },
           tutorialFemaleTemplate: { select: { id: true, name: true } },
         },
@@ -63,26 +70,41 @@ export const starterBreedAdminRouter = router({
       })
     ),
 
-  listPhenotypes: publicProcedure
-    .input(z.object({ gameId: z.string() }))
-    .query(({ input }) =>
-      db.expressionRule.findMany({
+  listLoci: publicProcedure
+    .input(z.object({ gameId: z.string(), breedId: z.string() }))
+    .query(async ({ input }) => {
+      const loci = await db.locus.findMany({
         where: {
-          locus: { gameId: input.gameId },
-          ruleConditions: { none: {} },
+          gameId: input.gameId,
+          panelEntries: { none: { panelDef: { panelType: "CONFORMATION" } } },
+          alleles: { some: { frequencies: { some: { breedId: input.breedId, frequency: { gt: 0 } } } } },
         },
-        select: { phenotype: true },
-        distinct: ["phenotype"],
-        orderBy: { phenotype: "asc" },
-      }).then(rows => rows.map(r => r.phenotype))
-    ),
+        select: {
+          id: true,
+          name: true,
+          alleles: {
+            select: { id: true, symbol: true, frequencies: { where: { breedId: input.breedId }, select: { frequency: true } } },
+            orderBy: { symbol: "asc" },
+          },
+        },
+        orderBy: { name: "asc" },
+      })
+      return loci
+        .filter(l => l.alleles.filter(a => (a.frequencies[0]?.frequency ?? 0) > 0).length >= 2)
+        .map(l => ({
+          id: l.id,
+          name: l.name,
+          alleles: l.alleles
+            .filter(a => (a.frequencies[0]?.frequency ?? 0) > 0)
+            .map(a => ({ id: a.id, symbol: a.symbol })),
+        }))
+    }),
 
   saveColorOption: publicProcedure
     .input(z.object({
       id: z.string().optional(),
       starterBreedOptionId: z.string(),
       name: z.string().min(1),
-      phenotypes: z.array(z.string()).min(1),
       image: z.string().nullish(),
       isActive: z.boolean(),
     }))
@@ -91,6 +113,30 @@ export const starterBreedAdminRouter = router({
       if (id) return db.starterColorOption.update({ where: { id }, data: { ...data, image: image ?? null } })
       return db.starterColorOption.create({ data: { starterBreedOptionId, ...data, image: image ?? null } })
     }),
+
+  setColorGenotype: publicProcedure
+    .input(z.object({
+      starterColorOptionId: z.string(),
+      locusId: z.string(),
+      alleleOneId: z.string(),
+      alleleTwoId: z.string(),
+    }))
+    .mutation(({ input }) =>
+      db.starterColorOptionGenotype.upsert({
+        where: {
+          starterColorOptionId_locusId: {
+            starterColorOptionId: input.starterColorOptionId,
+            locusId: input.locusId,
+          },
+        },
+        update: { alleleOneId: input.alleleOneId, alleleTwoId: input.alleleTwoId },
+        create: input,
+      })
+    ),
+
+  clearColorGenotype: publicProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(({ input }) => db.starterColorOptionGenotype.delete({ where: { id: input.id } })),
 
   removeColorOption: publicProcedure
     .input(z.object({ id: z.string() }))

@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ActionButton } from "./game/ui";
 import { trpc } from "@/lib/trpc";
+import { Coins } from "lucide-react";
 
 type Session = typeof authClient.$Infer.Session 
 
@@ -46,17 +47,32 @@ export function Header({ session }: { session: Session}) {
   )
   const pendingRequests = friendRequestData?.pendingCount ?? 0
 
+  const { data: balances } = trpc.player.balances.useQuery(
+    { playerAccountId: me?.id ?? "" },
+    { enabled: !!me?.id },
+  )
+  const goldBalance = balances?.[0]?.balance
+
   return (
     <header className="border-b border-border bg-card">
       <div className="flex h-14 items-center justify-between px-4">
         <div className="flex items-center gap-4">
           <span className="font-serif text-lg font-semibold text-foreground"><Link to="/">Sim Engine</Link></span>
-          <Link to="/stable" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Stable</Link>
+          <Link to="/stable" data-tutorial="stable-nav" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Stable</Link>
           <Link to="/town" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Town</Link>
-          <Link to="/shop" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Shop</Link>
+          <Link to="/shop" data-tutorial="shop-nav" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Shop</Link>
         </div>
         <div className="flex items-center gap-3">
           {me && gameId && <TestCurrencyButton playerAccountId={me.id} gameId={gameId} />}
+          {me && (
+            <span
+              data-tutorial="gold-balance"
+              className="inline-flex items-center gap-1.5 rounded-full bg-card px-3 py-1 text-sm font-bold tabular-nums ring-1 ring-border"
+            >
+              <Coins className="size-3.5 text-chart-1" />
+              {(goldBalance ?? 0).toLocaleString()}
+            </span>
+          )}
           <ActionButton
           variant="danger"
             onClick={() => navigate({ to: "/bug-reports", search: { from: location.pathname } })}

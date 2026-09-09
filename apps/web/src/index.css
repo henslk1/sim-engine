@@ -154,3 +154,62 @@ textarea.bg-background,
 select.bg-background {
   background-color: var(--card);
 }
+
+/* ── Driver.js theme overrides ─────────────────────────────────────────────── */
+.driver-popover {
+  background-color: var(--card) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+  color: var(--foreground) !important;
+  box-shadow: 0 8px 32px oklch(0 0 0 / 0.18) !important;
+  font-family: var(--font-sans) !important;
+  max-width: 360px !important;
+}
+.driver-popover-title {
+  font-family: var(--font-serif) !important;
+  font-size: 1rem !important;
+  font-weight: 600 !important;
+  color: var(--foreground) !important;
+}
+.driver-popover-description {
+  font-size: 0.875rem !important;
+  color: var(--muted-foreground) !important;
+  line-height: 1.6 !important;
+}
+.driver-popover-progress-text {
+  font-size: 0.7rem !important;
+  color: var(--muted-foreground) !important;
+}
+.driver-popover-footer button {
+  font-size: 0.8rem !important;
+  border-radius: calc(var(--radius) * 0.8) !important;
+  font-family: var(--font-sans) !important;
+}
+.driver-popover-next-btn,
+.driver-popover-done-btn {
+  background-color: var(--primary) !important;
+  color: var(--primary-foreground) !important;
+  border: none !important;
+  text-shadow: none !important;
+}
+.driver-popover-next-btn:hover,
+.driver-popover-done-btn:hover {
+  background-color: oklch(from var(--primary) calc(l - 0.05) c h) !important;
+}
+.driver-popover-prev-btn {
+  background-color: transparent !important;
+  color: var(--muted-foreground) !important;
+  border: 1px solid var(--border) !important;
+  text-shadow: none !important;
+}
+.driver-popover-prev-btn:hover {
+  background-color: var(--muted) !important;
+  color: var(--foreground) !important;
+}
+.driver-popover-close-btn {
+  color: var(--muted-foreground) !important;
+}
+.driver-popover-arrow-side-left.driver-popover-arrow { border-right-color: var(--border) !important; }
+.driver-popover-arrow-side-right.driver-popover-arrow { border-left-color: var(--border) !important; }
+.driver-popover-arrow-side-top.driver-popover-arrow { border-bottom-color: var(--border) !important; }
+.driver-popover-arrow-side-bottom.driver-popover-arrow { border-top-color: var(--border) !important; }

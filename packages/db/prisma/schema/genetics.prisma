@@ -30,6 +30,7 @@ model Locus {
   groupEntryRequirements GroupEntryRequirement[]
   templateGenotypes      AnimalTemplateGenotype[]
   dqTraits               BreedDqTrait[]
+  starterColorGenotypes  StarterColorOptionGenotype[]
   game                   Game                        @relation(fields: [gameId], references: [id])
 
   @@unique([gameId, name])
@@ -45,8 +46,10 @@ model Allele {
   genotypesAsAlleleOne        AnimalGenotype[]         @relation("AlleleOne")
   genotypesAsAlleleTwo        AnimalGenotype[]         @relation("AlleleTwo")
   frequencies                 BreedAlleleFrequency[]
-  templateGenotypeAsAlleleOne AnimalTemplateGenotype[] @relation("TemplateAlleleOne")
-  templateGenotypeAsAlleleTwo AnimalTemplateGenotype[] @relation("TemplateAlleleTwo")
+  templateGenotypeAsAlleleOne  AnimalTemplateGenotype[]         @relation("TemplateAlleleOne")
+  templateGenotypeAsAlleleTwo  AnimalTemplateGenotype[]         @relation("TemplateAlleleTwo")
+  starterColorGenotypeAsAlleleOne StarterColorOptionGenotype[] @relation("StarterAlleleOne")
+  starterColorGenotypeAsAlleleTwo StarterColorOptionGenotype[] @relation("StarterAlleleTwo")
 
   locus Locus @relation(fields: [locusId], references: [id])
 

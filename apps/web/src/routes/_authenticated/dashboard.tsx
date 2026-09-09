@@ -1,6 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import { trpc } from "@/lib/trpc"
-import { useEffect } from "react"
+import { useEffect, useMemo, useState } from "react"
+import { Dialog } from "@/components/game/ui"
+import { startTutorial } from "@/lib/tutorial"
 import {
   AlertTriangle, Baby, Trophy, Coins, PawPrint, ClipboardList,
   ArrowRight, ShieldCheck, Mountain, Waves, Wind,
@@ -9,6 +11,9 @@ import {
 import { cn } from "@/lib/utils"
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    welcome: search.welcome === true || search.welcome === "true" ? true : undefined,
+  }),
   component: DashboardPage,
 })
 
@@ -398,6 +403,10 @@ function DevLogPanel({ gameName }: { gameName: string }) {
 
 function DashboardPage() {
   const navigate = useNavigate()
+  const utils = trpc.useUtils()
+  const { welcome } = Route.useSearch()
+  const [tutorialStarted, setTutorialStarted] = useState(false)
+
   const { data: gameData, isLoading: gameLoading } = trpc.admin.game.get.useQuery()
   const gameId = gameData?.id
 
@@ -411,6 +420,60 @@ function DashboardPage() {
   }, [me, meLoading, meFetching, gameId, navigate])
 
   const playerAccountId = me?.id
+
+  // Show dialog whenever tutorial is incomplete — derived from seniority, not URL state.
+  // tutorialStarted hides it once the driver tour is launched (cleared on page reload).
+  const tutorialComplete = me?.seniority?.tutorialCompleted ?? true
+  const showWelcome = !meLoading && !tutorialComplete && !tutorialStarted
+
+  const grantStartingGold = trpc.tutorial.grantStartingGold.useMutation({
+    onSuccess: () => {
+      if (playerAccountId) utils.player.balances.invalidate({ playerAccountId })
+    },
+  })
+  const setupMutation = trpc.tutorial.setup.useMutation()
+  const completeStepMutation = trpc.tutorial.completeStep.useMutation()
+  const devResetMutation = trpc.tutorial.devReset.useMutation()
+
+  const { data: tutorialProgress } = trpc.tutorial.getProgress.useQuery(
+    { gameId: gameId! },
+    { enabled: !!gameId && showWelcome },
+  )
+
+  // Map completed step defs to a Driver.js resume index.
+  // step_purchased → 6 (stable nav), step_shop → 3 (animals tab), else → 0 (beginning)
+  const resumeIndex = useMemo(() => {
+    if (!tutorialProgress) return 0
+    const completedKeys = new Set(
+      tutorialProgress.progress
+        .filter((p) => p.completedAt !== null)
+        .map((p) => tutorialProgress.steps.find((s) => s.id === p.stepDefId)?.stepKey),
+    )
+    if (completedKeys.has("step_purchased")) return 6
+    if (completedKeys.has("step_shop")) return 3
+    return 0
+  }, [tutorialProgress])
+
+  function beginTutorial() {
+    if (!gameId) return
+    setTutorialStarted(true)
+    if (welcome) navigate({ to: "/dashboard", search: {}, replace: true })
+    // setup creates the tutorial animal pair + TutorialProgress rows.
+    // Throws "Tutorial already set up" on resume — caught and ignored.
+    setupMutation.mutateAsync({ gameId })
+      .catch(() => {})
+      .finally(() => {
+        startTutorial(
+          {
+            grantGold: () => grantStartingGold.mutateAsync({ gameId }),
+            completeStep: (stepKey) => completeStepMutation.mutateAsync({ gameId, stepKey }),
+            devReset: () => devResetMutation.mutateAsync({ gameId }),
+          },
+          resumeIndex,
+          () => completeStepMutation.mutate({ gameId: gameId!, stepKey: "tutorial_complete" }),
+        )
+      })
+  }
 
   const { data: balances = [] } = trpc.player.balances.useQuery(
     { playerAccountId: playerAccountId! },
@@ -464,6 +527,37 @@ function DashboardPage() {
   })
 
   return (
+    <>
+    <Dialog open={showWelcome} title="Welcome to Your Breeding Program">
+      <div className="space-y-3 px-4 py-4">
+        {resumeIndex >= 6 ? (
+          <p className="text-sm text-muted-foreground">
+            Your foundation mare is in your Stable. Head over to meet her and get started.
+          </p>
+        ) : resumeIndex >= 3 ? (
+          <p className="text-sm text-muted-foreground">
+            Your starting funds are ready. Head to the Animals tab in the Shop to purchase your foundation mare.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              You'll begin with a foundation mare representing one of the historic lines behind your chosen breed. Together, you'll learn how to care for, train, compete, manage health, and prepare a horse for breeding.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Her foal will become your first purebred and the beginning of your own breeding program.
+            </p>
+          </div>
+        )}
+        <div className="flex justify-end">
+          <button
+            onClick={beginTutorial}
+            className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            {resumeIndex > 0 ? "Continue" : "Begin Tutorial"}
+          </button>
+        </div>
+      </div>
+    </Dialog>
     <div className="flex h-full overflow-hidden">
 
       {/* ── Left sidebar ─────────────────────────────────────────────── */}
@@ -494,5 +588,6 @@ function DashboardPage() {
       </div>
 
     </div>
+    </>
   )
 }

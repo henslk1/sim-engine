@@ -4,8 +4,8 @@ import { useState, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 
-type ColorForm = { name: string; phenotypes: string[]; isActive: boolean; image: string }
-const emptyColorForm = (): ColorForm => ({ name: "", phenotypes: [], isActive: true, image: "" })
+type ColorForm = { name: string; isActive: boolean; image: string }
+const emptyColorForm = (): ColorForm => ({ name: "", isActive: true, image: "" })
 
 export const Route = createFileRoute("/_authenticated/admin/games/$gameId/starter-breeds")({
   component: StarterBreedsPage,
@@ -15,17 +15,23 @@ function StarterBreedsPage() {
   const { gameId } = Route.useParams()
   const utils = trpc.useUtils()
 
-  const { data: starterBreeds = [] } = trpc.admin.starterBreed.list.useQuery({ gameId: gameId! })
-  const { data: allBreeds = [] } = trpc.admin.breed.list.useQuery({ gameId: gameId! })
-  const { data: tutorialAnimals = [] } = trpc.admin.starterBreed.listTemplates.useQuery({ gameId: gameId! })
-  const { data: availablePhenotypes = [] } = trpc.admin.starterBreed.listPhenotypes.useQuery({ gameId: gameId! })
-
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [editingColorId, setEditingColorId] = useState<string | null>(null)
   const [colorForm, setColorForm] = useState<ColorForm>(emptyColorForm())
   const [templateForm, setTemplateForm] = useState({ maleId: "", femaleId: "" })
+  const [pendingGenotypes, setPendingGenotypes] = useState<Record<string, { a1: string; a2: string }>>({})
+  const [saveAllPending, setSaveAllPending] = useState(false)
+
+  const { data: starterBreeds = [] } = trpc.admin.starterBreed.list.useQuery({ gameId: gameId! })
+  const { data: allBreeds = [] } = trpc.admin.breed.list.useQuery({ gameId: gameId! })
+  const { data: tutorialAnimals = [] } = trpc.admin.starterBreed.listTemplates.useQuery({ gameId: gameId! })
 
   const selected = starterBreeds.find(s => s.id === selectedId) ?? null
+
+  const { data: allLoci = [] } = trpc.admin.starterBreed.listLoci.useQuery(
+    { gameId: gameId!, breedId: selected?.breedId ?? "" },
+    { enabled: !!selected },
+  )
   const availableBreeds = allBreeds.filter(b => !starterBreeds.some(s => s.breedId === b.id))
 
   useEffect(() => {
@@ -35,7 +41,19 @@ function StarterBreedsPage() {
     })
     setEditingColorId(null)
     setColorForm(emptyColorForm())
+    setPendingGenotypes({})
   }, [selected?.id])
+
+  const editingColor = selected?.colorOptions.find(c => c.id === editingColorId) ?? null
+
+  useEffect(() => {
+    if (!editingColor) { setPendingGenotypes({}); return }
+    const initial: Record<string, { a1: string; a2: string }> = {}
+    for (const g of editingColor.genotypes) {
+      initial[g.locusId] = { a1: g.alleleOneId, a2: g.alleleTwoId }
+    }
+    setPendingGenotypes(initial)
+  }, [editingColorId])
 
   const addBreed = trpc.admin.starterBreed.save.useMutation({
     onSuccess: (created) => {
@@ -65,6 +83,30 @@ function StarterBreedsPage() {
   const removeColor = trpc.admin.starterBreed.removeColorOption.useMutation({
     onSuccess: () => utils.admin.starterBreed.list.invalidate({ gameId: gameId! }),
   })
+  const setColorGenotype = trpc.admin.starterBreed.setColorGenotype.useMutation({
+    onSuccess: () => utils.admin.starterBreed.list.invalidate({ gameId: gameId! }),
+  })
+  const clearColorGenotype = trpc.admin.starterBreed.clearColorGenotype.useMutation({
+    onSuccess: () => utils.admin.starterBreed.list.invalidate({ gameId: gameId! }),
+  })
+
+  async function saveAllGenotypes() {
+    if (!editingColorId) return
+    const toSave = Object.entries(pendingGenotypes).filter(([, { a1, a2 }]) => a1 && a2)
+    if (toSave.length === 0) return
+    setSaveAllPending(true)
+    await Promise.all(
+      toSave.map(([locusId, { a1, a2 }]) =>
+        setColorGenotype.mutateAsync({
+          starterColorOptionId: editingColorId,
+          locusId,
+          alleleOneId: a1,
+          alleleTwoId: a2,
+        })
+      )
+    )
+    setSaveAllPending(false)
+  }
 
   function submitTemplates() {
     if (!selected) return
@@ -79,31 +121,23 @@ function StarterBreedsPage() {
   }
 
   function submitColor() {
-    if (!selected || !colorForm.name.trim() || colorForm.phenotypes.length === 0) return
+    if (!selected || !colorForm.name.trim()) return
     saveColor.mutate({
       id: editingColorId ?? undefined,
       starterBreedOptionId: selected.id,
       name: colorForm.name.trim(),
-      phenotypes: colorForm.phenotypes,
       image: colorForm.image || null,
       isActive: colorForm.isActive,
     })
   }
 
-  function togglePhenotype(p: string) {
-    setColorForm(f => ({
-      ...f,
-      phenotypes: f.phenotypes.includes(p) ? f.phenotypes.filter(x => x !== p) : [...f.phenotypes, p],
-    }))
-  }
-
   const isEditing = editingColorId !== null
   const colorFormTitle = isEditing
-    ? `Edit: ${selected?.colorOptions.find(c => c.id === editingColorId)?.name ?? ""}`
+    ? `Edit: ${editingColor?.name ?? ""}`
     : "Add Color"
 
   return (
-    <div className="p-4 space-y-3 max-w-4xl mx-auto">
+    <div className="p-4 space-y-3 max-w-5xl mx-auto">
       <h1 className="font-serif text-xl font-semibold text-foreground mb-4">Starter Breeds</h1>
 
       <div className="rounded-xl border border-border bg-card shadow-md p-2">
@@ -226,7 +260,7 @@ function StarterBreedsPage() {
                     <thead>
                       <tr className="border-b border-border">
                         <th className="pb-1.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Name</th>
-                        <th className="pb-1.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Phenotypes</th>
+                        <th className="pb-1.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Loci Configured</th>
                         <th className="pb-1.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Status</th>
                         <th className="pb-1.5 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
                       </tr>
@@ -235,12 +269,11 @@ function StarterBreedsPage() {
                       {selected.colorOptions.map(c => (
                         <tr key={c.id} className={`border-b border-border last:border-0 ${editingColorId === c.id ? "bg-primary/5" : ""}`}>
                           <td className="py-1.5 font-medium text-foreground">{c.name}</td>
-                          <td className="py-1.5">
-                            <div className="flex flex-wrap gap-1">
-                              {c.phenotypes.map(p => (
-                                <span key={p} className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{p}</span>
-                              ))}
-                            </div>
+                          <td className="py-1.5 text-xs text-muted-foreground">
+                            {c.genotypes.length > 0
+                              ? `${c.genotypes.length} locus${c.genotypes.length !== 1 ? "es" : ""}`
+                              : <span className="text-amber-500">None set</span>
+                            }
                           </td>
                           <td className="py-1.5">
                             <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${c.isActive ? "bg-chart-2/15 text-chart-2" : "bg-muted text-muted-foreground"}`}>
@@ -251,7 +284,7 @@ function StarterBreedsPage() {
                             <Button size="sm" variant="ghost" className="h-7 text-xs"
                               onClick={() => {
                                 setEditingColorId(c.id)
-                                setColorForm({ name: c.name, phenotypes: c.phenotypes, isActive: c.isActive, image: c.image ?? "" })
+                                setColorForm({ name: c.name, isActive: c.isActive, image: c.image ?? "" })
                               }}>
                               Edit
                             </Button>
@@ -272,7 +305,12 @@ function StarterBreedsPage() {
 
                   {/* Add / Edit form */}
                   <div className="border-t border-border pt-3 space-y-2">
-                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{colorFormTitle}</h4>
+                    <div className="flex items-baseline justify-between">
+                      <h4 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{colorFormTitle}</h4>
+                      {!isEditing && (
+                        <span className="text-[10px] text-muted-foreground">Save a color, then edit it to configure genotypes</span>
+                      )}
+                    </div>
                     <div className="flex gap-2">
                       <Input
                         className="h-8 text-sm"
@@ -286,43 +324,21 @@ function StarterBreedsPage() {
                         value={colorForm.image}
                         onChange={e => setColorForm(f => ({ ...f, image: e.target.value }))}
                       />
-                    </div>
-
-                    {/* Phenotype picker */}
-                    <div className="space-y-1">
-                      <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                        Phenotypes {colorForm.phenotypes.length > 0 && <span className="text-primary">({colorForm.phenotypes.join(", ")})</span>}
-                      </p>
-                      {availablePhenotypes.length === 0 ? (
-                        <p className="text-xs text-muted-foreground">No expression rules found for this game.</p>
-                      ) : (
-                        <div className="flex flex-wrap gap-1.5 rounded-md border border-border bg-background p-2 max-h-36 overflow-y-auto">
-                          {availablePhenotypes.map(p => {
-                            const checked = colorForm.phenotypes.includes(p)
-                            return (
-                              <button
-                                key={p}
-                                type="button"
-                                onClick={() => togglePhenotype(p)}
-                                className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
-                                  checked
-                                    ? "bg-primary text-primary-foreground"
-                                    : "bg-muted text-muted-foreground hover:bg-muted/70"
-                                }`}
-                              >
-                                {p}
-                              </button>
-                            )
-                          })}
-                        </div>
-                      )}
+                      <label className="flex items-center gap-1.5 text-xs text-muted-foreground whitespace-nowrap">
+                        <input
+                          type="checkbox"
+                          checked={colorForm.isActive}
+                          onChange={e => setColorForm(f => ({ ...f, isActive: e.target.checked }))}
+                        />
+                        Active
+                      </label>
                     </div>
 
                     <div className="flex gap-2">
                       <Button
                         className="h-8 text-sm"
                         onClick={submitColor}
-                        disabled={saveColor.isPending || !colorForm.name.trim() || colorForm.phenotypes.length === 0}
+                        disabled={saveColor.isPending || !colorForm.name.trim()}
                       >
                         {isEditing ? "Save Changes" : "Add Color"}
                       </Button>
@@ -338,6 +354,47 @@ function StarterBreedsPage() {
                     </div>
                     {saveColor.error && <p className="text-sm text-destructive">{saveColor.error.message}</p>}
                   </div>
+
+                  {/* Genotype configurator — shown when editing a color option */}
+                  {isEditing && editingColor && (
+                    <div className="border-t border-border pt-3 space-y-2">
+                      <h4 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                        Genotype Configuration
+                        <span className="ml-2 font-normal normal-case text-muted-foreground">
+                          — set explicit allele pairs for {editingColor.name}
+                        </span>
+                      </h4>
+                      <div className="rounded-md border border-border bg-background divide-y divide-border">
+                        {allLoci.map(locus => {
+                          const existing = editingColor.genotypes.find(g => g.locusId === locus.id)
+                          const pending = pendingGenotypes[locus.id] ?? { a1: "", a2: "" }
+                          return (
+                            <LocusRow
+                              key={locus.id}
+                              locus={locus}
+                              existing={existing ?? null}
+                              a1={pending.a1}
+                              a2={pending.a2}
+                              onChange={(a1, a2) => setPendingGenotypes(p => ({ ...p, [locus.id]: { a1, a2 } }))}
+                              onClear={existing ? () => clearColorGenotype.mutate({ id: existing.id }) : undefined}
+                            />
+                          )
+                        })}
+                        {allLoci.length === 0 && (
+                          <p className="px-3 py-3 text-xs text-muted-foreground">No loci configured for this game.</p>
+                        )}
+                      </div>
+                      <div className="flex justify-end pt-1">
+                        <Button
+                          className="h-8 text-sm"
+                          onClick={saveAllGenotypes}
+                          disabled={saveAllPending || Object.values(pendingGenotypes).every(({ a1, a2 }) => !a1 || !a2)}
+                        >
+                          {saveAllPending ? "Saving…" : "Save All"}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </>
             ) : (
@@ -348,6 +405,59 @@ function StarterBreedsPage() {
           </div>
 
         </div>
+      </div>
+    </div>
+  )
+}
+
+function LocusRow({
+  locus,
+  existing,
+  a1,
+  a2,
+  onChange,
+  onClear,
+}: {
+  locus: { id: string; name: string; alleles: { id: string; symbol: string }[] }
+  existing: { id: string; alleleOneId: string; alleleTwoId: string } | null
+  a1: string
+  a2: string
+  onChange: (a1: string, a2: string) => void
+  onClear?: () => void
+}) {
+  const isSaved = !!existing && a1 === existing.alleleOneId && a2 === existing.alleleTwoId
+
+  return (
+    <div className="flex items-center gap-3 px-3 py-2">
+      <span className="w-32 shrink-0 text-xs font-medium text-foreground truncate">{locus.name}</span>
+      <div className="flex items-center gap-1.5 flex-1">
+        <select
+          value={a1}
+          onChange={e => onChange(e.target.value, a2)}
+          className="h-7 flex-1 rounded border border-input bg-background px-2 text-xs"
+        >
+          <option value="">— allele 1 —</option>
+          {locus.alleles.map(a => <option key={a.id} value={a.id}>{a.symbol}</option>)}
+        </select>
+        <span className="text-xs text-muted-foreground">/</span>
+        <select
+          value={a2}
+          onChange={e => onChange(a1, e.target.value)}
+          className="h-7 flex-1 rounded border border-input bg-background px-2 text-xs"
+        >
+          <option value="">— allele 2 —</option>
+          {locus.alleles.map(a => <option key={a.id} value={a.id}>{a.symbol}</option>)}
+        </select>
+      </div>
+      <div className="flex items-center gap-1 shrink-0">
+        {isSaved && (
+          <span className="text-[10px] text-chart-2 font-medium">Saved</span>
+        )}
+        {existing && onClear && (
+          <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px] text-destructive hover:text-destructive" onClick={onClear}>
+            Clear
+          </Button>
+        )}
       </div>
     </div>
   )

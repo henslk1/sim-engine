@@ -1,6 +1,6 @@
 import { createFileRoute, redirect, Outlet, useLocation, useRouter } from "@tanstack/react-router"
 import { Header } from "@/components/header"
-import { trpcVanilla } from "@/lib/trpc"
+import { trpc, trpcVanilla } from "@/lib/trpc"
 import { MessagingWidget } from "@/components/messaging-widget"
 import { authClient } from "@/lib/auth-client"
 
@@ -46,7 +46,31 @@ function SetupHeader({ session }: { session: Session }) {
   )
 }
 
-const TUTORIAL_EXEMPT = ["/tutorial", "/setup", "/admin"]
+// TODO: remove before launch
+const TUTORIAL_DEV_MODE = true
+
+function TutorialDevBar() {
+  const { data: gameData } = trpc.admin.game.get.useQuery()
+  const devReset = trpc.tutorial.devReset.useMutation({
+    onSuccess: () => { window.location.href = "/dashboard?welcome=true" },
+  })
+
+  if (!TUTORIAL_DEV_MODE || !gameData) return null
+
+  return (
+    <div className="fixed right-3 top-15 z-9999">
+      <button
+        onClick={() => devReset.mutate({ gameId: gameData.id })}
+        disabled={devReset.isPending}
+        className="rounded-md bg-destructive px-3 py-1.5 text-xs font-semibold text-white shadow-lg transition-opacity hover:opacity-90 disabled:opacity-50"
+      >
+        {devReset.isPending ? "Resetting…" : "↺ Restart Step"}
+      </button>
+    </div>
+  )
+}
+
+const TUTORIAL_EXEMPT = ["/tutorial", "/setup", "/admin", "/dashboard"]
 const completedUsers = new Set<string>()
 
 export const Route = createFileRoute("/_authenticated")({
@@ -69,7 +93,7 @@ export const Route = createFileRoute("/_authenticated")({
       return
     }
     if (player?.seniority && !player.seniority.tutorialCompleted) {
-      throw redirect({ to: "/tutorial" })
+      throw redirect({ to: "/dashboard", search: { welcome: true } })
     }
   },
   component: AuthenticatedLayout,
@@ -87,6 +111,7 @@ function AuthenticatedLayout() {
         <Outlet />
       </main>
       {!isSetup && <MessagingWidget />}
+      {!isSetup && <TutorialDevBar />}
     </div>
   )
 }

@@ -60,11 +60,13 @@ function AnimalCard({
   subContainers,
   cycleToAge,
   conformationName,
+  tutorialAttr,
 }: {
   animal: Animal
   subContainers: SubContainer[]
   cycleToAge: (n: number) => string
   conformationName: string
+  tutorialAttr?: string
 }) {
   const [showMove, setShowMove] = useState(false)
   const utils = trpc.useUtils()
@@ -80,7 +82,9 @@ function AnimalCard({
   const hasChips = hasAlert || isPregnant || !!animal.disciplineDef || isInspected
 
   return (
-    <div className={cn(
+    <div
+      {...(tutorialAttr ? { "data-tutorial": tutorialAttr } : {})}
+      className={cn(
       "group relative overflow-visible rounded-xl border transition-all",
       isDeceased
         ? "border-destructive/50 bg-destructive/15 hover:bg-destructive/20"
@@ -413,6 +417,12 @@ function StablePage() {
     { playerAccountId: playerAccountId! },
     { enabled: !!playerAccountId },
   )
+
+  const { data: tutorialMare } = trpc.tutorial.shopAnimal.useQuery(
+    { gameId: gameId! },
+    { enabled: !!gameId },
+  )
+  const tutorialMareId = tutorialMare?.id
   const [selected, setSelected] = useState<Selection>("all")
   const [nameFilter, setNameFilter] = useState("")
   const [sortBy, setSortBy] = useState<SortBy>("name")
@@ -488,14 +498,14 @@ function StablePage() {
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden">
+    <div data-tutorial="stable-content" className="flex h-full flex-col overflow-hidden">
 
       {/* ── Page header ──────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between border-b border-border bg-gradient-to-r from-secondary/70 to-card px-8 py-5">
         <div>
           <h1 className="font-serif text-3xl font-semibold text-foreground">{stableLabel}</h1>
           <div className="mt-0.5 flex items-center gap-3">
-            <span className="text-sm text-muted-foreground">{liveAnimals.length} alive</span>
+            <span data-tutorial="stable-horse-count" className="text-sm text-muted-foreground">{liveAnimals.length} alive</span>
             {deceasedAnimals.length > 0 && (
               <span className="text-sm font-medium text-destructive">
                 {deceasedAnimals.length} deceased — needs attention
@@ -628,7 +638,7 @@ function StablePage() {
       </div>
 
       {/* ── Group tabs ───────────────────────────────────────────────────── */}
-      <div className="flex items-center border-b border-border bg-card/30 px-5 py-2">
+      <div data-tutorial="stable-paddocks" className="flex items-center border-b border-border bg-card/30 px-5 py-2">
         <div className="flex flex-1 items-center gap-1 overflow-x-auto">
           <Tab
             label="All"
@@ -704,7 +714,14 @@ function StablePage() {
           ) : (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
             {displayAnimals.map((a) => (
-              <AnimalCard key={a.id} animal={a} subContainers={subContainers} cycleToAge={cycleToAge} conformationName={conformationName} />
+              <AnimalCard
+                key={a.id}
+                animal={a}
+                subContainers={subContainers}
+                cycleToAge={cycleToAge}
+                conformationName={conformationName}
+                tutorialAttr={a.id === tutorialMareId ? "tutorial-mare-stable-card" : undefined}
+              />
             ))}
           </div>
           )

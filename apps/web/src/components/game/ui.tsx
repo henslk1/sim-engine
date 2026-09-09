@@ -163,13 +163,13 @@ export function Dialog({
   className,
 }: {
   open: boolean
-  onClose: () => void
+  onClose?: () => void
   title: string
   children: ReactNode
   className?: string
 }) {
   useEffect(() => {
-    if (!open) return
+    if (!open || !onClose) return
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose() }
     window.addEventListener("keydown", handler)
     return () => window.removeEventListener("keydown", handler)
@@ -188,13 +188,15 @@ export function Dialog({
       >
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <h2 className="font-semibold text-foreground">{title}</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            <X className="size-3.5" />
-          </button>
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <X className="size-3.5" />
+            </button>
+          )}
         </div>
         <div>{children}</div>
       </div>

@@ -88,7 +88,7 @@ export const tutorialRouter = router({
         seniority.starterColorOptionId
           ? db.starterColorOption.findUnique({
               where: { id: seniority.starterColorOptionId },
-              select: { name: true, phenotypes: true },
+              select: { name: true, genotypes: { select: { locusId: true, alleleOneId: true, alleleTwoId: true } } },
             })
           : Promise.resolve(null),
           db.locus.findMany({
@@ -110,7 +110,7 @@ export const tutorialRouter = router({
       const breedId = starterOption.breedId
 
       // Batch 3
-      const [breedStatProfile, breedPersonalityProfiles, breedImmunity, gameConfigForGen, breedAlleleFreqs, colorExpressionRules] = await Promise.all([
+      const [breedStatProfile, breedPersonalityProfiles, breedImmunity, gameConfigForGen, breedAlleleFreqs] = await Promise.all([
         db.breedStatProfile.findMany({ where: { breedId }, select: { statDefId: true, naturalMin: true, naturalMax: true } }),
         db.breedPersonalityProfile.findMany({ where: { breedId }, select: { traitDefId: true, naturalMin: true, naturalMax: true } }),
         db.breed.findUnique({ where: { id: breedId }, select: { immunityMin: true, immunityMax: true, lifeExpectancyBaseline: true } }),
@@ -146,12 +146,6 @@ export const tutorialRouter = router({
           where: { breedId },
           select: { alleleId: true, frequency: true, allele: { select: { locusId: true } } },
         }),
-        colorOption?.phenotypes.length
-          ? db.expressionRule.findMany({
-              where: { phenotype: { in: colorOption.phenotypes } },
-              select: { locusId: true, alleleOneId: true, alleleTwoId: true },
-            })
-          : Promise.resolve([]),
       ])
 
       // Build compTierLookup
@@ -250,9 +244,10 @@ export const tutorialRouter = router({
         })
 
         // 3. Embryo (starter animal)
-        const forcedLociSet = new Set(colorExpressionRules.map(r => r.locusId))
+        const colorGenotypes = colorOption?.genotypes ?? []
+        const forcedLociSet = new Set(colorGenotypes.map(r => r.locusId))
         const embryoGenotypes: { locusId: string; alleleOneId: string; alleleTwoId: string }[] = [
-          ...colorExpressionRules,
+          ...colorGenotypes,
         ]
         for (const [locusId, alleles] of byLocus) {
           if (forcedLociSet.has(locusId) || alleles.length === 0) continue
@@ -415,6 +410,81 @@ export const tutorialRouter = router({
       })
 
       return pair?.ancestorOne ?? null
+    }),
+
+  grantStartingGold: protectedProcedure
+    .input(z.object({ gameId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const { gameId } = input
+
+      const player = await db.playerAccount.findUnique({
+        where: { userId_gameId: { userId: ctx.userId, gameId } },
+        select: { id: true },
+      })
+      if (!player) throw new Error("Player not found")
+
+      const baseCurrency = await db.currencyDef.findFirst({
+        where: { gameId, currencyType: "BASE" },
+        select: { id: true },
+      })
+      if (!baseCurrency) throw new Error("No base currency configured")
+
+      const AMOUNT = 300
+
+      await db.$transaction([
+        db.playerBalance.upsert({
+          where: { playerAccountId_currencyDefId: { playerAccountId: player.id, currencyDefId: baseCurrency.id } },
+          create: { playerAccountId: player.id, currencyDefId: baseCurrency.id, balance: AMOUNT },
+          update: { balance: { increment: AMOUNT } },
+        }),
+        db.transaction.create({
+          data: {
+            gameId,
+            toPlayerAccountId: player.id,
+            currencyDefId: baseCurrency.id,
+            amount: AMOUNT,
+            txnType: "TESTING_GRANT",
+          },
+        }),
+      ])
+    }),
+
+  // TODO: remove before launch
+  devReset: protectedProcedure
+    .input(z.object({ gameId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const { gameId } = input
+
+      const player = await db.playerAccount.findUnique({
+        where: { userId_gameId: { userId: ctx.userId, gameId } },
+        select: { id: true },
+      })
+      if (!player) throw new Error("Player not found")
+
+      const completed = await db.tutorialProgress.findMany({
+        where: { playerAccountId: player.id, completedAt: { not: null } },
+        select: {
+          stepDefId: true,
+          stepDef: { select: { stepIndex: true, stepKey: true } },
+        },
+        orderBy: { stepDef: { stepIndex: "desc" } },
+      })
+
+      if (!completed.length) return
+
+      const latest = completed[0]!
+
+      await db.tutorialProgress.update({
+        where: { playerAccountId_stepDefId: { playerAccountId: player.id, stepDefId: latest.stepDefId } },
+        data: { completedAt: null },
+      })
+
+      if (latest.stepDef.stepKey === "tutorial_complete") {
+        await db.playerSeniority.update({
+          where: { playerAccountId: player.id },
+          data: { tutorialCompleted: false },
+        })
+      }
     }),
 
     buyFemale: protectedProcedure

@@ -43,7 +43,7 @@ function SetupPage() {
   const create = trpc.player.create.useMutation({
     onSuccess: async () => {
       await utils.player.me.invalidate()
-      navigate({ to: "/dashboard" })
+      navigate({ to: "/dashboard", search: { welcome: true } })
     },
   })
 

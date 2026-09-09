@@ -332,6 +332,8 @@ function AnimalBreedRow({
           return (
             <article
               key={sa.id}
+              data-tutorial="shop-animal-card"
+              data-animal-id={sa.animal.id}
               className="flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm ring-1 ring-border transition-all hover:-translate-y-0.5 hover:shadow-md"
             >
               <div className="flex aspect-[4/3] w-full items-center justify-center overflow-hidden bg-gradient-to-b from-secondary/50 to-card">
@@ -355,6 +357,7 @@ function AnimalBreedRow({
                   </div>
                   <button
                     type="button"
+                    data-tutorial="shop-animal-buy"
                     disabled={!canAfford || isBuying || !!isBuyingId}
                     onClick={() => onBuyAnimal(sa.id)}
                     className="inline-flex items-center gap-1 rounded-md bg-primary px-2.5 py-1 text-[11px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
@@ -492,7 +495,7 @@ function ShopPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+    <div data-tutorial="shop-content" className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
 
       {/* Fixed toast stack — outside document flow, no layout shift */}
       <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2 pointer-events-none">
@@ -567,6 +570,7 @@ function ShopPage() {
             <button
               key={t.id}
               type="button"
+              {...(t.id === "animals" ? { "data-tutorial": "shop-animals-tab" } : {})}
               onClick={() => {
                 setTab(t.id)
                 setFilter("all")
