@@ -88,7 +88,7 @@ export const tutorialRouter = router({
         seniority.starterColorOptionId
           ? db.starterColorOption.findUnique({
               where: { id: seniority.starterColorOptionId },
-              select: { name: true },
+              select: { name: true, phenotypes: true },
             })
           : Promise.resolve(null),
           db.locus.findMany({
@@ -146,9 +146,9 @@ export const tutorialRouter = router({
           where: { breedId },
           select: { alleleId: true, frequency: true, allele: { select: { locusId: true } } },
         }),
-        colorOption
+        colorOption?.phenotypes.length
           ? db.expressionRule.findMany({
-              where: { phenotype: colorOption.name },
+              where: { phenotype: { in: colorOption.phenotypes } },
               select: { locusId: true, alleleOneId: true, alleleTwoId: true },
             })
           : Promise.resolve([]),

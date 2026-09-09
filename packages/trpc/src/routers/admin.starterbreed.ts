@@ -63,18 +63,33 @@ export const starterBreedAdminRouter = router({
       })
     ),
 
+  listPhenotypes: publicProcedure
+    .input(z.object({ gameId: z.string() }))
+    .query(({ input }) =>
+      db.expressionRule.findMany({
+        where: {
+          locus: { gameId: input.gameId },
+          ruleConditions: { none: {} },
+        },
+        select: { phenotype: true },
+        distinct: ["phenotype"],
+        orderBy: { phenotype: "asc" },
+      }).then(rows => rows.map(r => r.phenotype))
+    ),
+
   saveColorOption: publicProcedure
     .input(z.object({
       id: z.string().optional(),
       starterBreedOptionId: z.string(),
       name: z.string().min(1),
+      phenotypes: z.array(z.string()).min(1),
       image: z.string().nullish(),
       isActive: z.boolean(),
     }))
     .mutation(({ input }) => {
       const { id, starterBreedOptionId, image, ...data } = input
       if (id) return db.starterColorOption.update({ where: { id }, data: { ...data, image: image ?? null } })
-        return db.starterColorOption.create({ data: { starterBreedOptionId, ...data, image: image ?? null } })
+      return db.starterColorOption.create({ data: { starterBreedOptionId, ...data, image: image ?? null } })
     }),
 
   removeColorOption: publicProcedure

@@ -1,13 +1,35 @@
-import { createFileRoute, Link, redirect } from '@tanstack/react-router'
+import { createFileRoute, Link, useNavigate, useRouter } from '@tanstack/react-router'
+import { authClient } from '@/lib/auth-client'
+import { trpc, trpcVanilla } from '@/lib/trpc'
+
+function getInitials(name: string) {
+  return name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
+}
 
 export const Route = createFileRoute('/')({
-  beforeLoad: ({ context }) => {
-    if (context.session) throw redirect({ to: '/dashboard' })
-  },
   component: LandingPage,
 })
 
 function LandingPage() {
+  const { session } = Route.useRouteContext()
+  const navigate = useNavigate()
+  const router = useRouter()
+  const { data: myRoles = [] } = trpc.admin.ops.players.myRoles.useQuery(undefined, { enabled: !!session })
+
+  async function handleSignOut() {
+    await authClient.signOut()
+    await router.invalidate()
+  }
+
+  async function handlePlay() {
+    if (!session) { void navigate({ to: '/signup' }); return }
+    if (!session.user.emailVerified) { void navigate({ to: '/verify-email' }); return }
+    const game = await trpcVanilla.admin.game.get.query()
+    if (!game) return
+    const player = await trpcVanilla.player.me.query({ gameId: game.id })
+    void navigate({ to: player ? '/dashboard' : '/setup' })
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* Nav */}
@@ -15,18 +37,46 @@ function LandingPage() {
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-6">
           <span className="font-serif text-lg font-semibold text-foreground">Sim Engine</span>
           <div className="flex items-center gap-3">
-            <Link
-              to="/login"
-              className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-            >
-              Sign in
-            </Link>
-            <Link
-              to="/signup"
-              className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-            >
-              Sign up
-            </Link>
+            {session ? (
+              <div className="relative group">
+                <button className="flex items-center gap-2 rounded-md px-2 py-1 text-sm text-foreground hover:bg-muted">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground overflow-hidden">
+                    {session.user.image
+                      ? <img src={session.user.image} alt={session.user.name ?? ""} className="h-full w-full object-cover" />
+                      : getInitials(session.user.name ?? "?")}
+                  </div>
+                  <span>{session.user.name}</span>
+                </button>
+                <div className="absolute right-0 top-full mt-1 hidden group-focus-within:block group-hover:block w-40 rounded-md border border-border bg-card shadow-md py-1 z-50">
+                  {myRoles.length > 0 && (
+                    <>
+                      <Link
+                        to="/admin"
+                        className="block px-3 py-1.5 text-sm text-foreground hover:bg-muted"
+                      >
+                        Admin Console
+                      </Link>
+                      <div className="my-1 h-px bg-border" />
+                    </>
+                  )}
+                  <button
+                    onClick={handleSignOut}
+                    className="w-full px-3 py-1.5 text-left text-sm text-foreground hover:bg-muted"
+                  >
+                    Sign out
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <Link to="/login" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+                  Sign in
+                </Link>
+                <Link to="/signup" className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
+                  Sign up
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -39,20 +89,6 @@ function LandingPage() {
         <p className="mx-auto mt-5 max-w-xl text-lg text-muted-foreground">
           Breed, train, and compete in a living simulation. Every choice shapes your legacy.
         </p>
-        <div className="mt-8 flex justify-center gap-3">
-          <Link
-            to="/signup"
-            className="rounded-md bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            Get started
-          </Link>
-          <Link
-            to="/login"
-            className="rounded-md border border-border bg-card px-5 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
-          >
-            Sign in
-          </Link>
-        </div>
       </section>
 
       {/* Games */}
@@ -67,12 +103,12 @@ function LandingPage() {
             <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
               Breed racehorses, develop training programs, and compete for titles.
             </p>
-            <Link
-              to="/dashboard"
-              className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary transition-colors hover:text-primary/80"
+            <button
+              onClick={handlePlay}
+              className="mt-4 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
             >
-              Play now →
-            </Link>
+              Play now
+            </button>
           </div>
         </div>
       </section>

@@ -37,7 +37,7 @@ function RootComponent() {
   const [trpcClient] = useState(() =>
     trpc.createClient({
       links: [httpBatchLink({ 
-        url: "http://localhost:3000/trpc",
+        url: `${import.meta.env.VITE_SERVER_URL ?? "http://localhost:3000"}/trpc`,
         fetch: (url, options) => fetch(url, { ...options, credentials: "include" }),
       })],
     })

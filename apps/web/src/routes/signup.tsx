@@ -31,7 +31,7 @@ function SignUp() {
       return
     }
 
-    const { error } = await authClient.signUp.email({ name, email, password, callbackURL: "/" })
+    const { error } = await authClient.signUp.email({ name, email, password, callbackURL: window.location.origin })
 
     if (error) {
       setError(error.message ?? "Sign up failed")
