@@ -20,6 +20,7 @@ export const Route = createFileRoute("/_authenticated")({
     if (!game) return
 
     const player = await trpcVanilla.player.me.query({ gameId: game.id })
+    if (!player) throw redirect({ to: "/setup" })
     if (player?.seniority?.tutorialCompleted) {
       completedUsers.add(userId)
       return

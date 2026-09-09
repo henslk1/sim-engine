@@ -38,7 +38,7 @@ function OpsBroadcast() {
     const targets = targetMode === "custom"
       ? customTargets.split(",").map(s => s.trim()).filter(Boolean)
       : undefined
-    sendMutation.mutate({ gameId, fromPlayerAccountId: fromAccountId, body, targetPlayerAccountIds: targets, staffUserId: "CURRENT_USER" })
+    sendMutation.mutate({ gameId, fromPlayerAccountId: fromAccountId, body, targetPlayerAccountIds: targets })
   }
 
   return (

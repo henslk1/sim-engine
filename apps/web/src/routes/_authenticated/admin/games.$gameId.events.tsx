@@ -39,7 +39,7 @@ function OpsEvents() {
     let parsed: Record<string, unknown>
     try { parsed = JSON.parse(configJson) } catch { setJsonError("Invalid JSON"); return }
     setJsonError("")
-    createMutation.mutate({ gameId: gameId!, eventType, configOverrides: parsed, startsAt: new Date(startsAt).toISOString(), endsAt: new Date(endsAt).toISOString(), isTemplate, staffUserId: "CURRENT_USER" })
+    createMutation.mutate({ gameId: gameId!, eventType, configOverrides: parsed, startsAt: new Date(startsAt).toISOString(), endsAt: new Date(endsAt).toISOString(), isTemplate })
   }
 
   const now = new Date()
@@ -145,13 +145,13 @@ function OpsEvents() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => updateMutation.mutate({ eventId: ev.id, isActive: !ev.isActive, staffUserId: "CURRENT_USER" })}
+                      onClick={() => updateMutation.mutate({ eventId: ev.id, isActive: !ev.isActive })}
                     >
                       {ev.isActive ? "Deactivate" : "Activate"}
                     </Button>
                   )}
                   <button
-                    onClick={() => { if (confirm("Delete this event?")) deleteMutation.mutate({ eventId: ev.id, staffUserId: "CURRENT_USER" }) }}
+                    onClick={() => { if (confirm("Delete this event?")) deleteMutation.mutate({ eventId: ev.id }) }}
                     className="rounded-md border border-border p-1 text-muted-foreground hover:border-destructive/30 hover:text-destructive"
                   >
                     <Trash2 className="size-3.5" />

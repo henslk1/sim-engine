@@ -39,6 +39,7 @@ export function Header({ session }: { session: Session}) {
   const { data: gameData } = trpc.admin.game.get.useQuery()
   const gameId = gameData?.id ?? ""
   const { data: me } = trpc.player.me.useQuery({ gameId }, { enabled: !!gameId, staleTime: Infinity })
+  const { data: myRoles = [] } = trpc.admin.ops.players.myRoles.useQuery()
   const { data: friendRequestData } = trpc.social.getFriendRequests.useQuery(
     { playerAccountId: me?.id!, gameId },
     { enabled: !!me?.id && !!gameId }
@@ -97,10 +98,14 @@ export function Header({ session }: { session: Session}) {
                 <Link to="/support" className="cursor-pointer">Support</Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link to="/admin" className="cursor-pointer">Admin Console</Link>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
+              {myRoles.length > 0 && (
+                <>
+                  <DropdownMenuItem asChild>
+                    <Link to="/admin" className="cursor-pointer">Admin Console</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
               <DropdownMenuItem onSelect={handleSignOut} className="cursor-pointer">
                 Sign out
               </DropdownMenuItem>

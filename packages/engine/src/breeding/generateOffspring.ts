@@ -177,7 +177,10 @@ export function generateOffspring(input: GenerateOffspringInput): GenerateOffspr
       ? Math.max(sire.breedGeneration ?? 0, dam.breedGeneration ?? 0) + 1
       : null
 
-  const offspringInnateMax = ((sire.immunity?.innateMax ?? 100) + (dam.immunity?.innateMax ?? 100)) / 2
+  const offspringInnateMax = Math.max(
+    0,
+    ((sire.immunity?.innateMax ?? 100) + (dam.immunity?.innateMax ?? 100)) / 2 - coi * 40
+  )
   const careMultiplier = Math.max(gameConfig.gestationCareFloor, damCareScore / 100)
 
   // Fertility: parent average ± small variance. No systematic gain.

@@ -405,7 +405,7 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
         data: {
           value: Math.max(0, Math.min(100,
             mood.value
-            - gameConfig.moodDecayRate * (isOverworked ? 3 : 1)
+            - gameConfig.moodDecayRate * (isOverworked ? 3 : ltcOverdue ? 2 : 1)
             + conditionMoodEffect
             + personalityRecords.reduce((sum, p) => {
                 const effective = p.value + p.personalityModifier

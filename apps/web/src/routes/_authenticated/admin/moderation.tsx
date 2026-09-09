@@ -111,14 +111,14 @@ function OpsModeration() {
                 />
                 <div className="flex gap-2">
                   <button
-                    onClick={() => reviewMutation.mutate({ reportId: r.id, status: "REVIEWED", adminNote: adminNote || undefined, reviewedByPlayerId: "CURRENT_PLAYER_ACCOUNT" })}
+                    onClick={() => reviewMutation.mutate({ reportId: r.id, status: "REVIEWED", adminNote: adminNote || undefined })}
                     disabled={reviewMutation.isPending}
                     className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
                   >
                     Mark Reviewed
                   </button>
                   <button
-                    onClick={() => reviewMutation.mutate({ reportId: r.id, status: "DISMISSED", adminNote: adminNote || undefined, reviewedByPlayerId: "CURRENT_PLAYER_ACCOUNT" })}
+                    onClick={() => reviewMutation.mutate({ reportId: r.id, status: "DISMISSED", adminNote: adminNote || undefined })}
                     disabled={reviewMutation.isPending}
                     className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
                   >

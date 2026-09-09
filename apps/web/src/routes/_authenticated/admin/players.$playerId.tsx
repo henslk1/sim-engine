@@ -201,7 +201,7 @@ function PlayerDetail() {
             <button
               onClick={() => {
                 if (!gameData?.id || !noteBody.trim()) return
-                noteMutation.mutate({ playerAccountId: playerId, authorUserId: "CURRENT_USER", body: noteBody })
+                noteMutation.mutate({ playerAccountId: playerId, body: noteBody })
                 setNoteBody("")
               }}
               disabled={!noteBody.trim() || noteMutation.isPending}
@@ -260,7 +260,7 @@ function PlayerDetail() {
               className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
             />
             <button
-              onClick={() => grantMutation.mutate({ playerAccountId: playerId, currencyDefId: grantCurrencyId, amount: parseInt(grantAmount), reason: grantReason, staffUserId: "CURRENT_USER" })}
+              onClick={() => grantMutation.mutate({ playerAccountId: playerId, currencyDefId: grantCurrencyId, amount: parseInt(grantAmount), reason: grantReason })}
               disabled={!grantCurrencyId || !grantAmount || !grantReason || grantMutation.isPending}
               className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground disabled:opacity-50"
             >
@@ -286,7 +286,7 @@ function PlayerDetail() {
               className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary resize-none"
             />
             <button
-              onClick={() => warnMutation.mutate({ playerAccountId: playerId, issuedByUserId: "CURRENT_USER", reason: warnReason, warningType: warnType })}
+              onClick={() => warnMutation.mutate({ playerAccountId: playerId, reason: warnReason, warningType: warnType })}
               disabled={!warnReason || warnMutation.isPending}
               className="rounded-md bg-orange-500 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
             >
@@ -311,7 +311,7 @@ function PlayerDetail() {
               />
             </div>
             <button
-              onClick={() => banMutation.mutate({ userId: player.user.id, bannedByUserId: "CURRENT_USER", reason: banReason, expiresAt: banExpiry || undefined, gameId: player.gameId })}
+              onClick={() => banMutation.mutate({ userId: player.user.id, reason: banReason, expiresAt: banExpiry || undefined, gameId: player.gameId })}
               disabled={!banReason || banMutation.isPending}
               className="rounded-md bg-destructive px-3 py-1.5 text-sm font-medium text-destructive-foreground disabled:opacity-50"
             >
@@ -321,7 +321,7 @@ function PlayerDetail() {
 
           <ActionCard title="Other Actions">
             <button
-              onClick={() => bypassMutation.mutate({ playerAccountId: playerId, staffUserId: "CURRENT_USER" })}
+              onClick={() => bypassMutation.mutate({ playerAccountId: playerId })}
               disabled={player.seniority?.gatesBypassed || bypassMutation.isPending}
               className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium hover:bg-muted disabled:opacity-50"
             >
@@ -342,7 +342,7 @@ function PlayerDetail() {
               />
             </div>
             <button
-              onClick={() => resetNameMutation.mutate({ animalId: resetAnimalId, newName: resetAnimalName, staffUserId: "CURRENT_USER", gameId: player.gameId })}
+              onClick={() => resetNameMutation.mutate({ animalId: resetAnimalId, newName: resetAnimalName, gameId: player.gameId })}
               disabled={!resetAnimalId || !resetAnimalName || resetNameMutation.isPending}
               className="rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium hover:bg-muted disabled:opacity-50"
             >

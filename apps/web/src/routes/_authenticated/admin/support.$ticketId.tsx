@@ -16,7 +16,6 @@ const STATUS_COLORS: Record<string, string> = {
 
 function TicketDetail() {
   const { ticketId } = Route.useParams()
-  const { session } = Route.useRouteContext()
   const { data, refetch } = trpc.admin.ops.support.getById.useQuery({ ticketId })
   const replyMutation = trpc.admin.ops.support.reply.useMutation({ onSuccess: () => { refetch(); setBody("") } })
   const setStatusMutation = trpc.admin.ops.support.setStatus.useMutation({ onSuccess: () => refetch() })
@@ -40,10 +39,7 @@ function TicketDetail() {
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <button
-            onClick={() => setClaimMutation.mutate({
-              ticketId,
-              staffUserId: data.claimedByUserId ? null : session.user.id,
-            })}
+            onClick={() => setClaimMutation.mutate({ ticketId, claim: !data.claimedByUserId })}
             disabled={setClaimMutation.isPending}
             className={cn(
               "rounded-md border px-3 py-1 text-xs font-medium transition-colors",
@@ -59,7 +55,7 @@ function TicketDetail() {
           </span>
           <select
             value={data.status}
-            onChange={e => setStatusMutation.mutate({ ticketId, status: e.target.value as never, staffUserId: session.user.id })}
+            onChange={e => setStatusMutation.mutate({ ticketId, status: e.target.value as never })}
             className="rounded-md border border-border bg-background px-2 py-1 text-xs outline-none focus:border-primary"
           >
             <option value="OPEN">Open</option>
@@ -96,7 +92,7 @@ function TicketDetail() {
           className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary resize-none"
         />
         <button
-          onClick={() => replyMutation.mutate({ ticketId, authorId: session.user.id, body })}
+          onClick={() => replyMutation.mutate({ ticketId, body })}
           disabled={!body.trim() || replyMutation.isPending}
           className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
         >

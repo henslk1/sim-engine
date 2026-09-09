@@ -2,7 +2,7 @@ import { createFileRoute, redirect } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/verify-email')({
   beforeLoad: ({ context }) => {
-    if (context.session) throw redirect({ to: "/" })
+    if (context.session?.user.emailVerified) throw redirect({ to: "/" })
   },
   component: VerifyEmailPage,
 })

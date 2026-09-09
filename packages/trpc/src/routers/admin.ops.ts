@@ -1,11 +1,11 @@
-import { router, publicProcedure } from "../trpc.js"
+import { router, publicProcedure, protectedProcedure, staffProcedure, ownerProcedure } from "../trpc.js"
 import { db, Prisma } from "@sim-engine/db"
 import { z } from "zod"
 
 // ── Overview ────────────────────────────────────────────────────────────────
 
 const overviewRouter = router({
-  stats: publicProcedure
+  stats: staffProcedure
     .input(z.object({ gameId: z.string().optional() }))
     .query(async ({ input }) => {
       const { gameId } = input
@@ -69,7 +69,11 @@ const overviewRouter = router({
 // ── Players ──────────────────────────────────────────────────────────────────
 
 const playersOpsRouter = router({
-  list: publicProcedure
+  myRoles: protectedProcedure.query(async ({ ctx }) => {
+    return db.staffRole.findMany({ where: { userId: ctx.userId } })
+  }),
+
+  list: staffProcedure
     .input(z.object({
       gameId: z.string().optional(),
       search: z.string().optional(),
@@ -115,7 +119,7 @@ const playersOpsRouter = router({
       return { players: players.slice(0, limit), hasMore, nextCursor: hasMore ? players[limit - 1]!.id : undefined }
     }),
 
-  getById: publicProcedure
+  getById: staffProcedure
     .input(z.object({ playerAccountId: z.string() }))
     .query(async ({ input }) => {
       const player = await db.playerAccount.findUniqueOrThrow({
@@ -151,15 +155,14 @@ const playersOpsRouter = router({
       return { player, recentTransactions, reportsAgainst }
     }),
 
-  grantCurrency: publicProcedure
+  grantCurrency: staffProcedure
     .input(z.object({
       playerAccountId: z.string(),
       currencyDefId: z.string(),
       amount: z.number().int(),
       reason: z.string(),
-      staffUserId: z.string(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const player = await db.playerAccount.findUniqueOrThrow({ where: { id: input.playerAccountId } })
       await db.$transaction([
         db.playerBalance.upsert({
@@ -179,7 +182,7 @@ const playersOpsRouter = router({
         }),
         db.adminActionLog.create({
           data: {
-            staffUserId: input.staffUserId,
+            staffUserId: ctx.userId,
             gameId: player.gameId,
             action: `grant_currency:${input.amount}:${input.reason}`,
             targetType: "PlayerAccount",
@@ -189,21 +192,20 @@ const playersOpsRouter = router({
       ])
     }),
 
-  issueWarning: publicProcedure
+  issueWarning: staffProcedure
     .input(z.object({
       playerAccountId: z.string(),
-      issuedByUserId: z.string(),
       reason: z.string(),
       warningType: z.enum(["VERBAL", "FORMAL", "FINAL"]),
       expiresAt: z.string().datetime().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const player = await db.playerAccount.findUniqueOrThrow({ where: { id: input.playerAccountId } })
       await db.$transaction([
         db.playerWarning.create({
           data: {
             playerAccountId: input.playerAccountId,
-            issuedByUserId: input.issuedByUserId,
+            issuedByUserId: ctx.userId,
             reason: input.reason,
             warningType: input.warningType,
             expiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
@@ -211,7 +213,7 @@ const playersOpsRouter = router({
         }),
         db.adminActionLog.create({
           data: {
-            staffUserId: input.issuedByUserId,
+            staffUserId: ctx.userId,
             gameId: player.gameId,
             action: `issue_warning:${input.warningType}:${input.reason}`,
             targetType: "PlayerAccount",
@@ -221,27 +223,26 @@ const playersOpsRouter = router({
       ])
     }),
 
-  ban: publicProcedure
+  ban: staffProcedure
     .input(z.object({
       userId: z.string(),
-      bannedByUserId: z.string(),
       reason: z.string(),
       expiresAt: z.string().datetime().optional(),
       gameId: z.string(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       await db.$transaction([
         db.banRecord.create({
           data: {
             userId: input.userId,
-            bannedByUserId: input.bannedByUserId,
+            bannedByUserId: ctx.userId,
             reason: input.reason,
             expiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
           },
         }),
         db.adminActionLog.create({
           data: {
-            staffUserId: input.bannedByUserId,
+            staffUserId: ctx.userId,
             gameId: input.gameId,
             action: `ban:${input.expiresAt ? "temp" : "permanent"}:${input.reason}`,
             targetType: "User",
@@ -251,15 +252,14 @@ const playersOpsRouter = router({
       ])
     }),
 
-  banIp: publicProcedure
+  banIp: staffProcedure
     .input(z.object({
       ipAddress: z.string(),
       reason: z.string(),
       expiresAt: z.string().datetime().optional(),
-      staffUserId: z.string(),
       gameId: z.string(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       await db.$transaction([
         db.ipBan.upsert({
           where: { ipAddress: input.ipAddress },
@@ -268,7 +268,7 @@ const playersOpsRouter = router({
         }),
         db.adminActionLog.create({
           data: {
-            staffUserId: input.staffUserId,
+            staffUserId: ctx.userId,
             gameId: input.gameId,
             action: `ban_ip:${input.ipAddress}:${input.reason}`,
             targetType: "IpAddress",
@@ -278,20 +278,19 @@ const playersOpsRouter = router({
       ])
     }),
 
-  assignRole: publicProcedure
+  assignRole: ownerProcedure
     .input(z.object({
       userId: z.string(),
       gameId: z.string().optional(),
       role: z.enum(["OWNER", "ADMIN", "MODERATOR"]),
-      staffUserId: z.string(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       await db.staffRole.create({
         data: { userId: input.userId, gameId: input.gameId ?? null, role: input.role },
       })
       await db.adminActionLog.create({
         data: {
-          staffUserId: input.staffUserId,
+          staffUserId: ctx.userId,
           gameId: input.gameId ?? null,
           action: `assign_role:${input.role}`,
           targetType: "User",
@@ -300,18 +299,17 @@ const playersOpsRouter = router({
       })
     }),
 
-  removeRole: publicProcedure
+  removeRole: ownerProcedure
     .input(z.object({
       staffRoleId: z.string(),
-      staffUserId: z.string(),
       gameId: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const role = await db.staffRole.findUniqueOrThrow({ where: { id: input.staffRoleId } })
       await db.staffRole.delete({ where: { id: input.staffRoleId } })
       await db.adminActionLog.create({
         data: {
-          staffUserId: input.staffUserId,
+          staffUserId: ctx.userId,
           gameId: input.gameId ?? null,
           action: `remove_role:${role.role}`,
           targetType: "User",
@@ -320,9 +318,9 @@ const playersOpsRouter = router({
       })
     }),
 
-  bypassGates: publicProcedure
-    .input(z.object({ playerAccountId: z.string(), staffUserId: z.string() }))
-    .mutation(async ({ input }) => {
+  bypassGates: staffProcedure
+    .input(z.object({ playerAccountId: z.string() }))
+    .mutation(async ({ input, ctx }) => {
       const player = await db.playerAccount.findUniqueOrThrow({ where: { id: input.playerAccountId } })
       await db.$transaction([
         db.playerSeniority.upsert({
@@ -332,7 +330,7 @@ const playersOpsRouter = router({
         }),
         db.adminActionLog.create({
           data: {
-            staffUserId: input.staffUserId,
+            staffUserId: ctx.userId,
             gameId: player.gameId,
             action: "bypass_seniority_gates",
             targetType: "PlayerAccount",
@@ -342,19 +340,18 @@ const playersOpsRouter = router({
       ])
     }),
 
-  resetAnimalName: publicProcedure
+  resetAnimalName: staffProcedure
     .input(z.object({
       animalId: z.string(),
       newName: z.string(),
-      staffUserId: z.string(),
       gameId: z.string(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       await db.$transaction([
         db.animal.update({ where: { id: input.animalId }, data: { name: input.newName } }),
         db.adminActionLog.create({
           data: {
-            staffUserId: input.staffUserId,
+            staffUserId: ctx.userId,
             gameId: input.gameId,
             action: `reset_animal_name:${input.newName}`,
             targetType: "Animal",
@@ -364,19 +361,18 @@ const playersOpsRouter = router({
       ])
     }),
 
-  addNote: publicProcedure
+  addNote: staffProcedure
     .input(z.object({
       playerAccountId: z.string(),
-      authorUserId: z.string(),
       body: z.string().min(1),
     }))
-    .mutation(({ input }) =>
+    .mutation(({ input, ctx }) =>
       db.staffPlayerNote.create({
-        data: { playerAccountId: input.playerAccountId, authorUserId: input.authorUserId, body: input.body },
+        data: { playerAccountId: input.playerAccountId, authorUserId: ctx.userId, body: input.body },
       })
     ),
 
-  deleteNote: publicProcedure
+  deleteNote: staffProcedure
     .input(z.object({ noteId: z.string() }))
     .mutation(({ input }) => db.staffPlayerNote.delete({ where: { id: input.noteId } })),
 })
@@ -384,7 +380,7 @@ const playersOpsRouter = router({
 // ── Economy ───────────────────────────────────────────────────────────────────
 
 const economyOpsRouter = router({
-  stats: publicProcedure
+  stats: staffProcedure
     .input(z.object({ gameId: z.string() }))
     .query(async ({ input }) => {
       const currencyDefs = await db.currencyDef.findMany({
@@ -413,7 +409,7 @@ const economyOpsRouter = router({
       return { circulation, dailyVolume }
     }),
 
-  transactions: publicProcedure
+  transactions: staffProcedure
     .input(z.object({
       gameId: z.string(),
       playerAccountId: z.string().optional(),
@@ -446,7 +442,7 @@ const economyOpsRouter = router({
 // ── Support Tickets ───────────────────────────────────────────────────────────
 
 const supportOpsRouter = router({
-  list: publicProcedure
+  list: staffProcedure
     .input(z.object({
       gameId: z.string(),
       status: z.enum(["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"]).optional(),
@@ -469,7 +465,7 @@ const supportOpsRouter = router({
       return { tickets: tickets.slice(0, limit), hasMore, nextCursor: hasMore ? tickets[limit - 1]!.id : undefined }
     }),
 
-  getById: publicProcedure
+  getById: staffProcedure
     .input(z.object({ ticketId: z.string() }))
     .query(({ input }) =>
       db.supportTicket.findUniqueOrThrow({
@@ -482,52 +478,51 @@ const supportOpsRouter = router({
       })
     ),
 
-  reply: publicProcedure
-    .input(z.object({ ticketId: z.string(), authorId: z.string(), body: z.string().min(1) }))
-    .mutation(({ input }) =>
+  reply: staffProcedure
+    .input(z.object({ ticketId: z.string(), body: z.string().min(1) }))
+    .mutation(({ input, ctx }) =>
       db.supportTicketMessage.create({
-        data: { ticketId: input.ticketId, authorId: input.authorId, body: input.body },
+        data: { ticketId: input.ticketId, authorId: ctx.userId, body: input.body },
       })
     ),
 
-  setClaim: publicProcedure
+  setClaim: staffProcedure
     .input(z.object({
       ticketId: z.string(),
-      staffUserId: z.string().nullable(),
+      claim: z.boolean(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const ticket = await db.supportTicket.findUniqueOrThrow({ where: { id: input.ticketId } })
       await db.supportTicket.update({
         where: { id: input.ticketId },
         data: {
-          claimedByUserId: input.staffUserId,
-          claimedAt: input.staffUserId ? new Date() : null,
+          claimedByUserId: input.claim ? ctx.userId : null,
+          claimedAt: input.claim ? new Date() : null,
         },
       })
       await db.adminActionLog.create({
         data: {
-          staffUserId: input.staffUserId ?? ticket.claimedByUserId ?? "",
+          staffUserId: ctx.userId,
           gameId: ticket.gameId,
-          action: input.staffUserId ? "ticket_claim" : "ticket_unclaim",
+          action: input.claim ? "ticket_claim" : "ticket_unclaim",
           targetType: "SupportTicket",
           targetId: input.ticketId,
         },
       })
     }),
 
-  setStatus: publicProcedure
+  setStatus: staffProcedure
     .input(z.object({
       ticketId: z.string(),
       status: z.enum(["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"]),
-      staffUserId: z.string(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const ticket = await db.supportTicket.findUniqueOrThrow({ where: { id: input.ticketId } })
       await db.$transaction([
         db.supportTicket.update({ where: { id: input.ticketId }, data: { status: input.status } }),
         db.adminActionLog.create({
           data: {
-            staffUserId: input.staffUserId,
+            staffUserId: ctx.userId,
             gameId: ticket.gameId,
             action: `ticket_status:${input.status}`,
             targetType: "SupportTicket",
@@ -541,7 +536,7 @@ const supportOpsRouter = router({
 // ── Bug Reports ───────────────────────────────────────────────────────────────
 
 const bugsOpsRouter = router({
-  list: publicProcedure
+  list: staffProcedure
     .input(z.object({
       gameId: z.string(),
       status: z.enum(["OPEN", "CONFIRMED", "IN_PROGRESS", "NEEDS_MORE_INFO", "NOT_A_BUG", "RESOLVED", "CLOSED"]).optional(),
@@ -571,7 +566,7 @@ const bugsOpsRouter = router({
       return { reports: reports.slice(0, limit), hasMore, nextCursor: hasMore ? reports[limit - 1]!.id : undefined }
     }),
 
-  getById: publicProcedure
+  getById: staffProcedure
     .input(z.object({ reportId: z.string() }))
     .query(({ input }) =>
       db.bugReport.findUniqueOrThrow({
@@ -587,19 +582,18 @@ const bugsOpsRouter = router({
       })
     ),
 
-  setStatus: publicProcedure
+  setStatus: staffProcedure
     .input(z.object({
       reportId: z.string(),
       status: z.enum(["OPEN", "CONFIRMED", "IN_PROGRESS", "NEEDS_MORE_INFO", "NOT_A_BUG", "RESOLVED", "CLOSED"]),
-      staffUserId: z.string(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const report = await db.bugReport.findUniqueOrThrow({ where: { id: input.reportId } })
       await db.$transaction([
         db.bugReport.update({ where: { id: input.reportId }, data: { status: input.status } }),
         db.adminActionLog.create({
           data: {
-            staffUserId: input.staffUserId,
+            staffUserId: ctx.userId,
             gameId: report.gameId,
             action: `bug_status:${input.status}`,
             targetType: "BugReport",
@@ -609,19 +603,18 @@ const bugsOpsRouter = router({
       ])
     }),
 
-  setExploit: publicProcedure
+  setExploit: staffProcedure
     .input(z.object({
       reportId: z.string(),
       isExploit: z.boolean(),
-      staffUserId: z.string(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const report = await db.bugReport.findUniqueOrThrow({ where: { id: input.reportId } })
       await db.$transaction([
         db.bugReport.update({ where: { id: input.reportId }, data: { isExploit: input.isExploit } }),
         db.adminActionLog.create({
           data: {
-            staffUserId: input.staffUserId,
+            staffUserId: ctx.userId,
             gameId: report.gameId,
             action: input.isExploit ? "bug_flag_exploit" : "bug_unflag_exploit",
             targetType: "BugReport",
@@ -631,47 +624,48 @@ const bugsOpsRouter = router({
       ])
     }),
 
-  setClaim: publicProcedure
+  setClaim: staffProcedure
     .input(z.object({
       reportId: z.string(),
-      staffUserId: z.string().nullable(),
+      claim: z.boolean(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const report = await db.bugReport.findUniqueOrThrow({ where: { id: input.reportId } })
       await db.bugReport.update({
         where: { id: input.reportId },
         data: {
-          claimedByUserId: input.staffUserId,
-          claimedAt: input.staffUserId ? new Date() : null,
+          claimedByUserId: input.claim ? ctx.userId : null,
+          claimedAt: input.claim ? new Date() : null,
         },
       })
       await db.adminActionLog.create({
         data: {
-          staffUserId: input.staffUserId ?? report.claimedByUserId ?? "",
+          staffUserId: ctx.userId,
           gameId: report.gameId,
-          action: input.staffUserId ? "bug_claim" : "bug_unclaim",
+          action: input.claim ? "bug_claim" : "bug_unclaim",
           targetType: "BugReport",
           targetId: input.reportId,
         },
       })
     }),
 
-  addComment: publicProcedure
-    .input(z.object({ bugReportId: z.string(), authorId: z.string(), body: z.string().min(1) }))
-    .mutation(({ input }) =>
-      db.bugReportComment.create({
-        data: { bugReportId: input.bugReportId, authorId: input.authorId, body: input.body },
+  addComment: staffProcedure
+    .input(z.object({ bugReportId: z.string(), body: z.string().min(1) }))
+    .mutation(async ({ input, ctx }) => {
+      const report = await db.bugReport.findUniqueOrThrow({ where: { id: input.bugReportId } })
+      const player = await db.playerAccount.findFirstOrThrow({ where: { userId: ctx.userId, gameId: report.gameId } })
+      return db.bugReportComment.create({
+        data: { bugReportId: input.bugReportId, authorId: player.id, body: input.body },
       })
-    ),
+    }),
 
-  merge: publicProcedure
+  merge: staffProcedure
     .input(z.object({
       sourceReportId: z.string(),
       targetReportId: z.string(),
-      staffUserId: z.string(),
     }))
-    .mutation(async ({ input }) => {
-      const { sourceReportId, targetReportId, staffUserId } = input
+    .mutation(async ({ input, ctx }) => {
+      const { sourceReportId, targetReportId } = input
       if (sourceReportId === targetReportId) throw new Error("Cannot merge a report into itself")
 
       const source = await db.bugReport.findUniqueOrThrow({
@@ -709,7 +703,7 @@ const bugsOpsRouter = router({
         db.bugReport.delete({ where: { id: sourceReportId } }),
         db.adminActionLog.create({
           data: {
-            staffUserId,
+            staffUserId: ctx.userId,
             gameId: source.gameId,
             action: `bug_merge:${targetReportId}`,
             targetType: "BugReport",
@@ -725,7 +719,7 @@ const bugsOpsRouter = router({
 // ── Moderation ────────────────────────────────────────────────────────────────
 
 const moderationOpsRouter = router({
-  list: publicProcedure
+  list: staffProcedure
     .input(z.object({
       gameId: z.string(),
       status: z.enum(["PENDING", "REVIEWED", "DISMISSED"]).optional(),
@@ -749,30 +743,31 @@ const moderationOpsRouter = router({
       return { reports: reports.slice(0, limit), hasMore, nextCursor: hasMore ? reports[limit - 1]!.id : undefined }
     }),
 
-  review: publicProcedure
+  review: staffProcedure
     .input(z.object({
       reportId: z.string(),
       status: z.enum(["REVIEWED", "DISMISSED"]),
       adminNote: z.string().optional(),
-      reviewedByPlayerId: z.string(),
     }))
-    .mutation(({ input }) =>
-      db.userReport.update({
+    .mutation(async ({ input, ctx }) => {
+      const report = await db.userReport.findUniqueOrThrow({ where: { id: input.reportId } })
+      const player = await db.playerAccount.findFirstOrThrow({ where: { userId: ctx.userId, gameId: report.gameId } })
+      return db.userReport.update({
         where: { id: input.reportId },
         data: {
           status: input.status,
           adminNote: input.adminNote ?? null,
-          reviewedByPlayerId: input.reviewedByPlayerId,
+          reviewedByPlayerId: player.id,
           reviewedAt: new Date(),
         },
       })
-    ),
+    }),
 })
 
 // ── Seasons ───────────────────────────────────────────────────────────────────
 
 const seasonsOpsRouter = router({
-  list: publicProcedure
+  list: staffProcedure
     .input(z.object({ gameId: z.string() }))
     .query(({ input }) =>
       db.season.findMany({
@@ -783,7 +778,7 @@ const seasonsOpsRouter = router({
       })
     ),
 
-  getCompetitions: publicProcedure
+  getCompetitions: staffProcedure
     .input(z.object({ gameId: z.string(), status: z.enum(["OPEN", "IN_PROGRESS", "COMPLETED", "CANCELLED"]).optional() }))
     .query(({ input }) =>
       db.competition.findMany({
@@ -801,7 +796,7 @@ const seasonsOpsRouter = router({
 // ── Events / LiveOps ──────────────────────────────────────────────────────────
 
 const eventsOpsRouter = router({
-  list: publicProcedure
+  list: staffProcedure
     .input(z.object({ gameId: z.string() }))
     .query(({ input }) =>
       db.liveOpsEvent.findMany({
@@ -810,7 +805,7 @@ const eventsOpsRouter = router({
       })
     ),
 
-  create: publicProcedure
+  create: staffProcedure
     .input(z.object({
       gameId: z.string(),
       eventType: z.string(),
@@ -819,9 +814,8 @@ const eventsOpsRouter = router({
       endsAt: z.string().datetime(),
       isTemplate: z.boolean().default(false),
       templateOf: z.string().optional(),
-      staffUserId: z.string(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const event = await db.liveOpsEvent.create({
         data: {
           gameId: input.gameId,
@@ -835,7 +829,7 @@ const eventsOpsRouter = router({
       })
       await db.adminActionLog.create({
         data: {
-          staffUserId: input.staffUserId,
+          staffUserId: ctx.userId,
           gameId: input.gameId,
           action: `create_live_ops_event:${input.eventType}`,
           targetType: "LiveOpsEvent",
@@ -845,16 +839,15 @@ const eventsOpsRouter = router({
       return event
     }),
 
-  update: publicProcedure
+  update: staffProcedure
     .input(z.object({
       eventId: z.string(),
       startsAt: z.string().datetime().optional(),
       endsAt: z.string().datetime().optional(),
       configOverrides: z.record(z.unknown()).optional(),
       isActive: z.boolean().optional(),
-      staffUserId: z.string(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const updateData: Prisma.LiveOpsEventUpdateInput = {}
       if (input.startsAt) updateData.startsAt = new Date(input.startsAt)
       if (input.endsAt) updateData.endsAt = new Date(input.endsAt)
@@ -866,7 +859,7 @@ const eventsOpsRouter = router({
       })
       await db.adminActionLog.create({
         data: {
-          staffUserId: input.staffUserId,
+          staffUserId: ctx.userId,
           gameId: event.gameId,
           action: "update_live_ops_event",
           targetType: "LiveOpsEvent",
@@ -876,14 +869,14 @@ const eventsOpsRouter = router({
       return event
     }),
 
-  delete: publicProcedure
-    .input(z.object({ eventId: z.string(), staffUserId: z.string() }))
-    .mutation(async ({ input }) => {
+  delete: staffProcedure
+    .input(z.object({ eventId: z.string() }))
+    .mutation(async ({ input, ctx }) => {
       const event = await db.liveOpsEvent.findUniqueOrThrow({ where: { id: input.eventId } })
       await db.liveOpsEvent.delete({ where: { id: input.eventId } })
       await db.adminActionLog.create({
         data: {
-          staffUserId: input.staffUserId,
+          staffUserId: ctx.userId,
           gameId: event.gameId,
           action: "delete_live_ops_event",
           targetType: "LiveOpsEvent",
@@ -896,7 +889,7 @@ const eventsOpsRouter = router({
 // ── Integrity ─────────────────────────────────────────────────────────────────
 
 const integrityOpsRouter = router({
-  sharedIps: publicProcedure
+  sharedIps: staffProcedure
     .input(z.object({ gameId: z.string(), minAccounts: z.number().int().min(2).default(2) }))
     .query(async ({ input }) => {
       const logs = await db.userIpLog.findMany({
@@ -920,7 +913,7 @@ const integrityOpsRouter = router({
         .map(([ipAddress, users]) => ({ ipAddress, count: users.length, users }))
     }),
 
-  sharedFingerprints: publicProcedure
+  sharedFingerprints: staffProcedure
     .input(z.object({ gameId: z.string(), minAccounts: z.number().int().min(2).default(2) }))
     .query(async ({ input }) => {
       const logs = await db.userDeviceLog.findMany({
@@ -944,7 +937,7 @@ const integrityOpsRouter = router({
         .map(([fingerprintHash, users]) => ({ fingerprintHash, count: users.length, users }))
     }),
 
-  excessiveTransfers: publicProcedure
+  excessiveTransfers: staffProcedure
     .input(z.object({ gameId: z.string(), hoursBack: z.number().int().min(1).max(168).default(24), threshold: z.number().int().default(10) }))
     .query(async ({ input }) => {
       const since = new Date(Date.now() - input.hoursBack * 3600000)
@@ -979,7 +972,7 @@ const integrityOpsRouter = router({
 // ── Audit Log ─────────────────────────────────────────────────────────────────
 
 const auditOpsRouter = router({
-  list: publicProcedure
+  list: staffProcedure
     .input(z.object({
       gameId: z.string(),
       staffUserId: z.string().optional(),
@@ -1004,7 +997,7 @@ const auditOpsRouter = router({
 // ── System ────────────────────────────────────────────────────────────────────
 
 const systemOpsRouter = router({
-  recentLogs: publicProcedure
+  recentLogs: staffProcedure
     .input(z.object({ gameId: z.string() }))
     .query(({ input }) =>
       db.nightlyUpdateLog.findMany({
@@ -1014,7 +1007,7 @@ const systemOpsRouter = router({
       })
     ),
 
-  shopStatus: publicProcedure
+  shopStatus: staffProcedure
     .input(z.object({ gameId: z.string() }))
     .query(({ input }) =>
       db.gameShopBreedConfig.findMany({
@@ -1030,15 +1023,14 @@ const systemOpsRouter = router({
 // ── Broadcast ─────────────────────────────────────────────────────────────────
 
 const broadcastOpsRouter = router({
-  send: publicProcedure
+  send: staffProcedure
     .input(z.object({
       gameId: z.string(),
       fromPlayerAccountId: z.string(),
       body: z.string().min(1),
       targetPlayerAccountIds: z.array(z.string()).optional(),
-      staffUserId: z.string(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const targets = input.targetPlayerAccountIds
         ?? (await db.playerAccount.findMany({ where: { gameId: input.gameId }, select: { id: true } })).map(p => p.id)
 
@@ -1073,7 +1065,7 @@ const broadcastOpsRouter = router({
 
       await db.adminActionLog.create({
         data: {
-          staffUserId: input.staffUserId,
+          staffUserId: ctx.userId,
           gameId: input.gameId,
           action: `broadcast:${sent}_recipients`,
           targetType: "Broadcast",

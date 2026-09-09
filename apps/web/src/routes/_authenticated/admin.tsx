@@ -1,4 +1,5 @@
-import { createFileRoute, Outlet, Link, useNavigate } from "@tanstack/react-router"
+import { createFileRoute, Outlet, Link, useNavigate, redirect } from "@tanstack/react-router"
+import { trpcVanilla } from "@/lib/trpc"
 import { useState } from "react"
 import { cn } from "@/lib/utils"
 import { trpc } from "@/lib/trpc"
@@ -116,6 +117,10 @@ function makeConfigGroups(gameId: string): NavGroupDef[] {
 }
 
 export const Route = createFileRoute("/_authenticated/admin")({
+  beforeLoad: async () => {
+    const roles = await trpcVanilla.admin.ops.players.myRoles.query()
+    if (roles.length === 0) throw redirect({ to: "/" })
+  },
   component: AdminLayout,
 })
 

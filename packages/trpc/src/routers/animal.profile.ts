@@ -352,6 +352,7 @@ export const animalProfileRouter = router({
                   breedingEnergyCost: true,
                   maxBreedingSlots: true,
                   conformationInspectionMinCycle: true,
+                  overworkInjuryThreshold: true,
                 },
               },
               lifeStageDefs: {

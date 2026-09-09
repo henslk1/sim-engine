@@ -66,6 +66,7 @@ export const treatmentAdminRouter = router({
       treatmentDefId: z.string(),
       itemDefId: z.string(),
       quantity: z.number().int().min(1),
+      requiresEquipped: z.boolean().default(false),
     }))
     .mutation(({ input }) => {
       const { id, treatmentDefId, ...data } = input

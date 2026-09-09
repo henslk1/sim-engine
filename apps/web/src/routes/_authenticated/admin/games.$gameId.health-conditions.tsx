@@ -63,8 +63,8 @@ const emptyBehavior = (): BehaviorRow => ({ symptomText: "", careActionDefId: ""
 type TreatmentForm = { name: string; treatmentType: TreatmentType; durationCycles: string; isLifelong: boolean; cost: string; currencyDefId: string }
 const emptyTreatment = (): TreatmentForm => ({ name: "", treatmentType: "OTC", durationCycles: "", isLifelong: false, cost: "", currencyDefId: "" })
 
-type ItemRow = { itemDefId: string; quantity: string }
-const emptyItem = (): ItemRow => ({ itemDefId: "", quantity: "1" })
+type ItemRow = { itemDefId: string; quantity: string; requiresEquipped: boolean }
+const emptyItem = (): ItemRow => ({ itemDefId: "", quantity: "1", requiresEquipped: false })
 
 type RestrictionRow = { restrictionType: RestrictionType; maxIntensityTier: string; durationCycles: string; isLifelong: boolean }
 const emptyRestriction = (): RestrictionRow => ({ restrictionType: "TRAINING", maxIntensityTier: "", durationCycles: "", isLifelong: false })
@@ -383,7 +383,7 @@ function HealthConditionsPage() {
   function submitItem(id?: string) {
     const form = id ? editingItem : newItem
     if (!form || !expandedTreatmentId || !form.itemDefId) return
-    saveItem.mutate({ id, treatmentDefId: expandedTreatmentId, itemDefId: form.itemDefId, quantity: parseInt(form.quantity) || 1 })
+    saveItem.mutate({ id, treatmentDefId: expandedTreatmentId, itemDefId: form.itemDefId, quantity: form.requiresEquipped ? 1 : parseInt(form.quantity) || 1, requiresEquipped: form.requiresEquipped })
   }
 
   function toggleExpand(treatmentId: string, view: "items" | "restrictions") {
@@ -796,6 +796,7 @@ function HealthConditionsPage() {
                                       <tr className="border-b border-border">
                                         <th className="pb-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Item</th>
                                         <th className="pb-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Quantity</th>
+                                        <th className="pb-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Equipped</th>
                                         <th className="pb-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
                                       </tr>
                                     </thead>
@@ -809,7 +810,10 @@ function HealthConditionsPage() {
                                               </select>
                                             </td>
                                             <td className="py-1.5 pr-4">
-                                              <Input type="number" min="1" value={editingItem?.quantity ?? "1"} onChange={(e) => setEditingItem(p => p ? { ...p, quantity: e.target.value } : null)} className="h-7 text-sm w-20" />
+                                              <Input type="number" min="1" value={editingItem?.quantity ?? "1"} onChange={(e) => setEditingItem(p => p ? { ...p, quantity: e.target.value } : null)} className="h-7 text-sm w-20" disabled={editingItem?.requiresEquipped} />
+                                            </td>
+                                            <td className="py-1.5 pr-4">
+                                              <input type="checkbox" checked={editingItem?.requiresEquipped ?? false} onChange={(e) => setEditingItem(p => p ? { ...p, requiresEquipped: e.target.checked } : null)} />
                                             </td>
                                             <td className="py-1.5 text-right space-x-2">
                                               <Button size="sm" onClick={() => submitItem(item.id)} disabled={saveItem.isPending}>Save</Button>
@@ -819,9 +823,10 @@ function HealthConditionsPage() {
                                         ) : (
                                           <tr key={item.id} className="border-b border-border last:border-0">
                                             <td className="py-1.5 pr-4 font-medium text-foreground">{item.itemDef.name}</td>
-                                            <td className="py-1.5 pr-4 text-muted-foreground">{item.quantity}</td>
+                                            <td className="py-1.5 pr-4 text-muted-foreground">{item.requiresEquipped ? <span className="italic">—</span> : item.quantity}</td>
+                                            <td className="py-1.5 pr-4 text-muted-foreground">{item.requiresEquipped ? <span className="text-primary">✓</span> : <span className="text-muted-foreground">—</span>}</td>
                                             <td className="py-1.5 text-right space-x-2">
-                                              <Button size="sm" variant="ghost" onClick={() => { setEditingItemId(item.id); setEditingItem({ itemDefId: item.itemDefId, quantity: item.quantity.toString() }) }}>Edit</Button>
+                                              <Button size="sm" variant="ghost" onClick={() => { setEditingItemId(item.id); setEditingItem({ itemDefId: item.itemDefId, quantity: item.quantity.toString(), requiresEquipped: item.requiresEquipped }) }}>Edit</Button>
                                               <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => removeItem.mutate({ id: item.id })}>Delete</Button>
                                             </td>
                                           </tr>
@@ -840,7 +845,10 @@ function HealthConditionsPage() {
                                           </div>
                                         </td>
                                         <td className="py-1.5 pr-4">
-                                          <Input type="number" min="1" value={newItem.quantity} onChange={(e) => setNewItem({ ...newItem, quantity: e.target.value })} className="h-7 text-sm w-20" />
+                                          <Input type="number" min="1" value={newItem.quantity} onChange={(e) => setNewItem({ ...newItem, quantity: e.target.value })} className="h-7 text-sm w-20" disabled={newItem.requiresEquipped} />
+                                        </td>
+                                        <td className="py-1.5 pr-4">
+                                          <input type="checkbox" checked={newItem.requiresEquipped} onChange={(e) => setNewItem({ ...newItem, requiresEquipped: e.target.checked })} />
                                         </td>
                                         <td className="py-1.5 text-right">
                                           <Button size="sm" onClick={() => submitItem()} disabled={!newItem.itemDefId || saveItem.isPending}>Add</Button>

@@ -2,7 +2,7 @@ import { createFileRoute, Link, redirect } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/')({
   beforeLoad: ({ context }) => {
-    if (context.session) throw redirect({ to: '/stable' })
+    if (context.session) throw redirect({ to: '/dashboard' })
   },
   component: LandingPage,
 })

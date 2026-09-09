@@ -175,7 +175,7 @@ export const vetRouter = router({
                 currencyDef: { select: { id: true, name: true } },
               },
             },
-            animal: { select: { ageInCycles: true, gameId: true } },
+            animal: { select: { ageInCycles: true, gameId: true, id: true } },
             healthRecord: { select: { id: true } },
           },
         })
@@ -207,36 +207,43 @@ export const vetRouter = router({
 
         if (record.treatmentDef.treatmentType === "OTC") {
           for (const item of record.treatmentDef.items) {
-            const inv = await tx.playerInventory.findUnique({
-              where: {
-                playerAccountId_itemDefId: {
-                  playerAccountId: input.playerAccountId,
-                  itemDefId: item.itemDef.id,
-                },
-              },
-            })
-            if (!inv || inv.quantity < item.quantity) {
-              throw new Error(`Missing ${item.itemDef.name} in inventory`)
-            }
-            if (inv.quantity <= item.quantity) {
-              await tx.playerInventory.delete({
-                where: {
-                  playerAccountId_itemDefId: {
-                    playerAccountId: input.playerAccountId,
-                    itemDefId: item.itemDef.id,
-                  },
-                },
+            if (item.requiresEquipped) {
+              const equipped = await tx.animalEquipment.findFirst({
+                where: { animalId: record.animal.id, itemDefId: item.itemDef.id },
               })
+              if (!equipped) throw new Error(`${item.itemDef.name} must be equipped on this animal`)
             } else {
-              await tx.playerInventory.update({
+              const inv = await tx.playerInventory.findUnique({
                 where: {
                   playerAccountId_itemDefId: {
                     playerAccountId: input.playerAccountId,
                     itemDefId: item.itemDef.id,
                   },
                 },
-                data: { quantity: { decrement: item.quantity } },
               })
+              if (!inv || inv.quantity < item.quantity) {
+                throw new Error(`Missing ${item.itemDef.name} in inventory`)
+              }
+              if (inv.quantity <= item.quantity) {
+                await tx.playerInventory.delete({
+                  where: {
+                    playerAccountId_itemDefId: {
+                      playerAccountId: input.playerAccountId,
+                      itemDefId: item.itemDef.id,
+                    },
+                  },
+                })
+              } else {
+                await tx.playerInventory.update({
+                  where: {
+                    playerAccountId_itemDefId: {
+                      playerAccountId: input.playerAccountId,
+                      itemDefId: item.itemDef.id,
+                    },
+                  },
+                  data: { quantity: { decrement: item.quantity } },
+                })
+              }
             }
           }
         }

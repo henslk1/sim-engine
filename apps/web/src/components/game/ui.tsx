@@ -16,22 +16,33 @@ export function Meter({
   max,
   tone = "condition",
   className,
+  threshold,
 }: {
   value: number
   max: number
   tone?: "energy" | "mood" | "condition" | "care" | "immunity"
   className?: string
+  threshold?: number
 }) {
   const pct = Math.max(0, Math.min(100, (value / max) * 100))
+  const thresholdPct = threshold != null ? Math.max(0, Math.min(100, (threshold / max) * 100)) : null
   return (
-    <div className={cn("h-2 w-full overflow-hidden rounded-full bg-muted", className)}>
-      <div
-        className={cn("h-full rounded-full transition-all", toneBar[tone] ?? "bg-primary")}
-        style={{ width: `${pct}%` }}
-        role="progressbar"
-        aria-valuenow={value}
-        aria-valuemax={max}
-      />
+    <div className={cn("relative h-2 w-full", className)}>
+      <div className="absolute inset-0 overflow-hidden rounded-full bg-muted">
+        <div
+          className={cn("h-full rounded-full transition-all", toneBar[tone] ?? "bg-primary")}
+          style={{ width: `${pct}%` }}
+          role="progressbar"
+          aria-valuenow={value}
+          aria-valuemax={max}
+        />
+      </div>
+      {thresholdPct != null && (
+        <div
+          className="absolute top-1/2 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground/40"
+          style={{ left: `${thresholdPct}%`, height: "140%" }}
+        />
+      )}
     </div>
   )
 }
