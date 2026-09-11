@@ -3,6 +3,7 @@ import { Header } from "@/components/header"
 import { trpc, trpcVanilla } from "@/lib/trpc"
 import { MessagingWidget } from "@/components/messaging-widget"
 import { authClient } from "@/lib/auth-client"
+import { isTourRunning, destroyActiveTour } from "@/lib/tutorial"
 
 type Session = typeof authClient.$Infer.Session
 
@@ -52,25 +53,54 @@ const TUTORIAL_DEV_MODE = true
 function TutorialDevBar() {
   const { data: gameData } = trpc.admin.game.get.useQuery()
   const devReset = trpc.tutorial.devReset.useMutation({
-    onSuccess: () => { window.location.href = "/dashboard?welcome=true" },
+    onSuccess: () => {
+      localStorage.removeItem("tutorial_step")
+      window.location.href = "/dashboard"
+    },
+  })
+  const devFixStarter = trpc.tutorial.devFixStarter.useMutation({
+    onSuccess: () => { window.location.reload() },
+    onError: (e) => { alert(e.message) },
+  })
+  const devDeleteAccount = trpc.tutorial.devDeleteAccount.useMutation({
+    onSuccess: () => {
+      localStorage.removeItem("tutorial_step")
+      window.location.href = "/"
+    },
+    onError: (e) => { alert(e.message) },
   })
 
   if (!TUTORIAL_DEV_MODE || !gameData) return null
 
   return (
-    <div className="fixed right-3 top-15 z-9999">
+    <div className="fixed right-3 top-15 z-100002 flex flex-col gap-1">
       <button
-        onClick={() => devReset.mutate({ gameId: gameData.id })}
+        onClick={() => { destroyActiveTour(); devReset.mutate({ gameId: gameData.id }) }}
         disabled={devReset.isPending}
         className="rounded-md bg-destructive px-3 py-1.5 text-xs font-semibold text-white shadow-lg transition-opacity hover:opacity-90 disabled:opacity-50"
       >
         {devReset.isPending ? "Resetting…" : "↺ Restart Step"}
       </button>
+      <button
+        onClick={() => { destroyActiveTour(); devFixStarter.mutate({ gameId: gameData.id }) }}
+        disabled={devFixStarter.isPending}
+        className="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white shadow-lg transition-opacity hover:opacity-90 disabled:opacity-50"
+      >
+        {devFixStarter.isPending ? "Fixing…" : "Fix Starter"}
+      </button>
+      <button
+        onClick={() => { if (confirm("Delete your player account? This cannot be undone.")) { destroyActiveTour(); devDeleteAccount.mutate({ gameId: gameData.id }) } }}
+        disabled={devDeleteAccount.isPending}
+        className="rounded-md bg-zinc-700 px-3 py-1.5 text-xs font-semibold text-white shadow-lg transition-opacity hover:opacity-90 disabled:opacity-50"
+      >
+        {devDeleteAccount.isPending ? "Deleting…" : "Delete Account"}
+      </button>
     </div>
   )
 }
 
-const TUTORIAL_EXEMPT = ["/tutorial", "/setup", "/admin", "/dashboard"]
+// Pages that skip the tutorial check entirely (auth only)
+const SKIP_TUTORIAL_CHECK = ["/tutorial", "/setup", "/admin"]
 const completedUsers = new Set<string>()
 
 export const Route = createFileRoute("/_authenticated")({
@@ -78,7 +108,7 @@ export const Route = createFileRoute("/_authenticated")({
     if (!context.session) throw redirect({ to: "/login" })
     if (!context.session.user.emailVerified) throw redirect({ to: "/verify-email" })
 
-    if (TUTORIAL_EXEMPT.some(p => location.pathname.startsWith(p))) return
+    if (SKIP_TUTORIAL_CHECK.some(p => location.pathname.startsWith(p))) return
 
     const userId = context.session.user.id
     if (completedUsers.has(userId)) return
@@ -93,7 +123,28 @@ export const Route = createFileRoute("/_authenticated")({
       return
     }
     if (player?.seniority && !player.seniority.tutorialCompleted) {
-      throw redirect({ to: "/dashboard", search: { welcome: true } })
+      // isTourRunning() is a module-level flag set to true by beginTutorial (before navigation)
+      // and cleared when Driver.js is destroyed. It resets on every full page load — never stale.
+      // localStorage.tutorial_step tracks the current step across sessions for resume.
+      const touring = isTourRunning()
+      const lsRaw = parseInt(localStorage.getItem("tutorial_step") ?? "", 10)
+      const currentStep = isNaN(lsRaw) ? 0 : lsRaw
+
+      // If the tour is live and the user client-navigates back to /dashboard, return them to the
+      // active tour page so Driver.js isn't spotlighting header elements on the wrong page.
+      if (touring && location.pathname.startsWith("/dashboard") && currentStep > 0) {
+        throw redirect({ to: currentStep >= 6 ? "/stable" : "/shop" })
+      }
+
+      const allowed = ["/dashboard"]
+      if (touring) {
+        allowed.push("/shop")
+        if (currentStep >= 6) { allowed.push("/stable"); allowed.push("/animal") }
+      }
+
+      if (!allowed.some((p) => location.pathname.startsWith(p))) {
+        throw redirect({ to: "/dashboard" })
+      }
     }
   },
   component: AuthenticatedLayout,

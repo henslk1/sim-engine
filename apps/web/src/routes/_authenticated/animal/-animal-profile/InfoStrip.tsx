@@ -29,6 +29,7 @@ export function InfoStrip({
         <BrandChip key={b.id} path={b.playerBrand.path} />
       ))}
       <span
+        data-tutorial="breeding-grade"
         className={cn("inline-flex items-center justify-center rounded-md px-2 py-1", BREEDING_GRADE_BG[breedingGrade])}
         title={`Breeding quality: ${breedingGrade}`}
       >

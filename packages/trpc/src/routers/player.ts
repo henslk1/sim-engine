@@ -132,7 +132,8 @@ export const playerRouter = router({
     .query(({ input }) =>
       db.playerBalance.findMany({
         where: { playerAccountId: input.playerAccountId },
-        include: { currencyDef: { select: { id: true, name: true, symbol: true } } },
+        include: { currencyDef: { select: { id: true, name: true, symbol: true, currencyType: true } } },
+        orderBy: { currencyDef: { currencyType: "asc" } },
       })
     ),
 

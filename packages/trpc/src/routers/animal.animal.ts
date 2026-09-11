@@ -17,6 +17,7 @@ export const animalAnimalRouter = router({
       select: {
         id: true,
         name: true,
+        breedName: true,
         status: true,
         sex: true,
         image: true,

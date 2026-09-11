@@ -136,7 +136,7 @@ function AnimalCard({
           </div>
         </div>
 
-        <p className="text-xs text-muted-foreground">{animal.breed.name}</p>
+        <p className="text-xs text-muted-foreground">{animal.breed?.name ?? animal.breedName}</p>
         <p className="mt-0.5 text-[11px] text-muted-foreground/70">
           {animal.lifeStage.name} · {animal.sex === "MALE" ? "Male" : "Female"}
           {animal.isCastrated ? " · Castrated" : ""} · {cycleToAge(animal.ageInCycles)}
@@ -418,11 +418,11 @@ function StablePage() {
     { enabled: !!playerAccountId },
   )
 
-  const { data: tutorialMare } = trpc.tutorial.shopAnimal.useQuery(
+  const { data: tutorialPair } = trpc.tutorial.pairIds.useQuery(
     { gameId: gameId! },
     { enabled: !!gameId },
   )
-  const tutorialMareId = tutorialMare?.id
+  const tutorialMareId = tutorialPair?.ancestorOneId
   const [selected, setSelected] = useState<Selection>("all")
   const [nameFilter, setNameFilter] = useState("")
   const [sortBy, setSortBy] = useState<SortBy>("name")
@@ -706,7 +706,7 @@ function StablePage() {
                   className="rounded-xl border border-border/40 bg-card/40 p-4 transition-colors hover:bg-secondary/20"
                 >
                   <p className="font-serif font-semibold leading-tight text-foreground/50">{a.name}</p>
-                  <p className="mt-1 text-xs text-muted-foreground/60">{a.breed.name}</p>
+                  <p className="mt-1 text-xs text-muted-foreground/60">{a.breed?.name ?? a.breedName}</p>
                   <p className="mt-0.5 text-[11px] text-muted-foreground/40">{a.lifeStage.name} · {cycleToAge(a.ageInCycles)}</p>
                 </Link>
               ))}

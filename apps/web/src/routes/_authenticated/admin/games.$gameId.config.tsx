@@ -75,6 +75,8 @@ function GameConfigPage() {
     topGradeDoubleBonusChance: 0.1,
     overworkInjuryThreshold: 0,
     overworkInjuryChance: 0,
+    tutorialMaleBaseTemplateId: "",
+    tutorialFemaleBaseTemplateId: "",
   })
 
   function n(key: keyof typeof cf, float = false) {
@@ -139,11 +141,14 @@ function GameConfigPage() {
           topGradeDoubleBonusChance: g.topGradeDoubleBonusChance,
           overworkInjuryThreshold: g.overworkInjuryThreshold,
           overworkInjuryChance: g.overworkInjuryChance,
+          tutorialMaleBaseTemplateId: g.tutorialMaleBaseTemplateId ?? "",
+          tutorialFemaleBaseTemplateId: g.tutorialFemaleBaseTemplateId ?? "",
         })
       }
     }
   }, [data])
 
+  const { data: templates = [] } = trpc.admin.animalTemplate.list.useQuery({ gameId: gameId! })
   const saveGame = trpc.admin.game.saveGame.useMutation({ onSuccess: () => utils.admin.game.get.invalidate() })
   const saveConfig = trpc.admin.game.saveConfig.useMutation({ onSuccess: () => utils.admin.game.get.invalidate() })
 
@@ -155,6 +160,8 @@ function GameConfigPage() {
       subContainerLabel: cf.subContainerLabel || undefined,
       lifeExpectancyBaseline: cf.lifeExpectancyBaseline !== "" ? parseInt(cf.lifeExpectancyBaseline) : null,
       maxBreedingSlots: cf.maxBreedingSlots !== "" ? parseInt(cf.maxBreedingSlots) : null,
+      tutorialMaleBaseTemplateId: cf.tutorialMaleBaseTemplateId || null,
+      tutorialFemaleBaseTemplateId: cf.tutorialFemaleBaseTemplateId || null,
     })
   }
 
@@ -274,6 +281,35 @@ function GameConfigPage() {
                 <F label="Recovery Rate"><Input type="number" step="0.001" {...n("immunityRecoveryRate", true)} /></F>
                 <F label="Min"><Input type="number" step="0.1" {...n("immunityMin", true)} /></F>
                 <F label="Max"><Input type="number" step="0.1" {...n("immunityMax", true)} /></F>
+              </div>
+            </Panel>
+
+            <Panel title="Tutorial Base Templates" className="col-span-3">
+              <div className="grid grid-cols-2 gap-4">
+                <F label="Male Base Template">
+                  <select
+                    className="h-8 rounded-md border border-input bg-background px-2 text-sm text-foreground"
+                    value={cf.tutorialMaleBaseTemplateId}
+                    onChange={e => setCf(prev => ({ ...prev, tutorialMaleBaseTemplateId: e.target.value }))}
+                  >
+                    <option value="">— None —</option>
+                    {templates.map(t => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </select>
+                </F>
+                <F label="Female Base Template">
+                  <select
+                    className="h-8 rounded-md border border-input bg-background px-2 text-sm text-foreground"
+                    value={cf.tutorialFemaleBaseTemplateId}
+                    onChange={e => setCf(prev => ({ ...prev, tutorialFemaleBaseTemplateId: e.target.value }))}
+                  >
+                    <option value="">— None —</option>
+                    {templates.map(t => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </select>
+                </F>
               </div>
             </Panel>
 

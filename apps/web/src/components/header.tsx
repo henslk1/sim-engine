@@ -39,7 +39,7 @@ export function Header({ session }: { session: Session}) {
 
   const { data: gameData } = trpc.admin.game.get.useQuery()
   const gameId = gameData?.id ?? ""
-  const { data: me } = trpc.player.me.useQuery({ gameId }, { enabled: !!gameId, staleTime: Infinity })
+  const { data: me } = trpc.player.me.useQuery({ gameId }, { enabled: !!gameId, staleTime: 5 * 60 * 1000 })
   const { data: myRoles = [] } = trpc.admin.ops.players.myRoles.useQuery()
   const { data: friendRequestData } = trpc.social.getFriendRequests.useQuery(
     { playerAccountId: me?.id!, gameId },
@@ -51,7 +51,7 @@ export function Header({ session }: { session: Session}) {
     { playerAccountId: me?.id ?? "" },
     { enabled: !!me?.id },
   )
-  const goldBalance = balances?.[0]?.balance
+  const goldBalance = balances?.find(b => b.currencyDef.currencyType === "BASE")?.balance
 
   return (
     <header className="border-b border-border bg-card">

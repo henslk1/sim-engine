@@ -1,7 +1,8 @@
 import { z } from "zod"
 import { router, protectedProcedure } from "../trpc.js"
 import { db, AnimalSex } from "@sim-engine/db"
-import { generateFromTemplate, weightedSample, canonicalize, deleteAnimalsWithChildren, computeFixedFields } from "@sim-engine/engine"
+import { generateFromTemplate, weightedSample, canonicalize, deleteAnimalsWithChildren, computeFixedFields, computePhenotypeDescription } from "@sim-engine/engine"
+import type { ExpressionRuleForPhenotype } from "@sim-engine/engine"
 
 export const tutorialRouter = router({
   getProgress: protectedProcedure
@@ -69,7 +70,8 @@ export const tutorialRouter = router({
                 personalityMode: true, personalityMin: true, personalityMax: true,
                 stats: { select: { statDefId: true, innateValue: true, trainedValue: true } },
                 compTiers: { select: { disciplineDefId: true, tier: true } },
-                genotype: { select: { locusId: true, alleleOneId: true, alleleTwoId: true } },
+                genotype: { select: { locusId: true, alleleOneId: true, alleleTwoId: true, isTestedByOwner: true } },
+                personalityValues: { select: { traitDefId: true, value: true } },
               },
             },
             tutorialMaleTemplate: {
@@ -80,7 +82,8 @@ export const tutorialRouter = router({
                 personalityMode: true, personalityMin: true, personalityMax: true,
                 stats: { select: { statDefId: true, innateValue: true, trainedValue: true } },
                 compTiers: { select: { disciplineDefId: true, tier: true } },
-                genotype: { select: { locusId: true, alleleOneId: true, alleleTwoId: true } },
+                genotype: { select: { locusId: true, alleleOneId: true, alleleTwoId: true, isTestedByOwner: true } },
+                personalityValues: { select: { traitDefId: true, value: true } },
               },
             },
           },
@@ -101,7 +104,7 @@ export const tutorialRouter = router({
           db.playerAccount.findFirst({ where: { gameId }, select: { id: true } }),
       ])
 
-      if (existingPair) throw new Error("Tutorial already set up")
+      if (existingPair) return
       if (!starterOption?.tutorialFemaleTemplate || !starterOption.tutorialMaleTemplate) {
         throw new Error("Tutorial templates not configured")
       }
@@ -110,14 +113,15 @@ export const tutorialRouter = router({
       const breedId = starterOption.breedId
 
       // Batch 3
-      const [breedStatProfile, breedPersonalityProfiles, breedImmunity, gameConfigForGen, breedAlleleFreqs] = await Promise.all([
-        db.breedStatProfile.findMany({ where: { breedId }, select: { statDefId: true, naturalMin: true, naturalMax: true } }),
+      const [breedWeights, breedPersonalityProfiles, breedImmunity, gameConfigForGen, breedAlleleFreqs, gameInnateMaxRecord] = await Promise.all([
+        db.breedStatProfile.findMany({ where: { breedId }, select: { statDefId: true, weight: true } }),
         db.breedPersonalityProfile.findMany({ where: { breedId }, select: { traitDefId: true, naturalMin: true, naturalMax: true } }),
         db.breed.findUnique({ where: { id: breedId }, select: { immunityMin: true, immunityMax: true, lifeExpectancyBaseline: true } }),
         db.gameConfig.findUnique({
           where: { gameId },
           select: {
             lifeExpectancyBaseline: true,
+            defaultInnateRatio: true,
             tutorialMaleBaseTemplate: {
               select: {
                 sex: true, fertility: true, startingAgeInCycles: true,
@@ -146,6 +150,7 @@ export const tutorialRouter = router({
           where: { breedId },
           select: { alleleId: true, frequency: true, allele: { select: { locusId: true } } },
         }),
+        db.gameInnateMax.findUnique({ where: { gameId }, select: { maxTotalInnate: true, averageTotalInnate: true } }),
       ])
 
       // Build compTierLookup
@@ -177,36 +182,31 @@ export const tutorialRouter = router({
       const femaleBase = gameConfigForGen?.tutorialFemaleBaseTemplate ?? null
 
       function mergeTemplate<T extends typeof femaleTpl>(base: typeof femaleBase, tpl: T) {
-        const baseGenotypeLoci = new Set((base?.genotype ?? []).map(g => g.locusId))
+        const tplGenotypeLoci = new Set(tpl.genotype.map(g => g.locusId))
         return {
           breedId: tpl.breedId,
           breedName: tpl.breedName,
           name: tpl.name,
           lore: tpl.lore ?? null,
-          sex: base?.sex ?? tpl.sex,
-          fertility: base?.fertility ?? tpl.fertility,
-          startingAgeInCycles: base?.startingAgeInCycles ?? tpl.startingAgeInCycles,
-          statMode: base?.statMode ?? tpl.statMode,
-          statFloor: base?.statFloor ?? tpl.statFloor,
-          personalityMode: base?.personalityMode ?? tpl.personalityMode,
-          personalityMin: base?.personalityMin ?? tpl.personalityMin,
-          personalityMax: base?.personalityMax ?? tpl.personalityMax,
+          sex: tpl.sex,
+          fertility: tpl.fertility ?? base?.fertility ?? null,
+          startingAgeInCycles: tpl.startingAgeInCycles ?? base?.startingAgeInCycles ?? null,
+          statMode: tpl.statMode,
+          statFloor: tpl.statFloor ?? base?.statFloor ?? null,
+          personalityMode: tpl.personalityMode,
+          personalityMin: tpl.personalityMin ?? base?.personalityMin ?? null,
+          personalityMax: tpl.personalityMax ?? base?.personalityMax ?? null,
           stats: Array.from(
             new Map([
               ...(base?.stats ?? []).map(s => [s.statDefId, s] as const),
               ...(tpl.stats ?? []).map(s => [s.statDefId, s] as const),
             ]).values()
           ),
-          compTiers: Array.from(
-            new Map([
-              ...(base?.compTiers ?? []).map(c => [c.disciplineDefId, c] as const),
-              ...(tpl.compTiers ?? []).map(c => [c.disciplineDefId, c] as const),
-            ]).values()
-          ),
-          personalityValues: base?.personalityValues,
+          compTiers: tpl.compTiers?.length ? tpl.compTiers : (base?.compTiers ?? []),
+          personalityValues: tpl.personalityValues?.length ? tpl.personalityValues : (base?.personalityValues ?? []),
           genotype: [
-            ...(base?.genotype ?? []),
-            ...tpl.genotype.filter(g => !baseGenotypeLoci.has(g.locusId)),
+            ...tpl.genotype,
+            ...(base?.genotype ?? []).filter(g => !tplGenotypeLoci.has(g.locusId)),
           ],
         }
       }
@@ -215,8 +215,11 @@ export const tutorialRouter = router({
         gameId,
         isTutorialAnimal: true as const,
         ownerPlayerAccountId: gameAccount.id,
+        breederId: gameAccount.id,
         byLocus,
-        breedStatProfile,
+        breedWeights,
+        defaultInnateRatio: gameConfigForGen?.defaultInnateRatio ?? 0.5,
+        gameInnateMax: gameInnateMaxRecord?.maxTotalInnate ?? null,
         breedPersonalityProfiles,
         immunityMin: breedImmunity?.immunityMin ?? null,
         immunityMax: breedImmunity?.immunityMax ?? null,
@@ -260,24 +263,42 @@ export const tutorialRouter = router({
         const embryoSex: AnimalSex = seniority.starterGender === "MALE" ? "MALE" : "FEMALE"
         const sortedStages = [...lifeStages].sort((a, b) => a.stageIndex - b.stageIndex)
         const embryoLifeStage = sortedStages[0]!
+        const embryoLifeExpectancy = breedImmunity?.lifeExpectancyBaseline ?? gameConfigForGen?.lifeExpectancyBaseline ?? null
 
-        const { structuralRisk, preferredTerrain, preferredClimate } = await computeFixedFields(tx, embryoGenotypes)
+        const [{ structuralRisk, preferredTerrain, preferredClimate }, embryoPhenotypeRulesRaw] = await Promise.all([
+          computeFixedFields(tx, embryoGenotypes),
+          embryoGenotypes.length > 0
+            ? tx.expressionRule.findMany({
+                where: {
+                  OR: embryoGenotypes.map(g => ({ locusId: g.locusId, alleleOneId: g.alleleOneId, alleleTwoId: g.alleleTwoId })),
+                },
+                select: { locusId: true, alleleOneId: true, alleleTwoId: true, phenotype: true },
+              })
+            : Promise.resolve([]),
+        ])
+        const embryoPhenotypeDescription = computePhenotypeDescription(
+          embryoGenotypes,
+          embryoPhenotypeRulesRaw.filter((r): r is ExpressionRuleForPhenotype => r.phenotype !== null),
+        )
 
         const embryo = await tx.animal.create({
           data: {
             gameId,
             playerAccountId: player.id,
+            breederId: player.id,
             breedId,
             breedName: null,
             lifeStageId: embryoLifeStage.id,
             sex: embryoSex,
             name: `${starterOption.breed.name} ${embryoSex === "MALE" ? "Colt" : "Filly"}`,
-            fertility: Math.random(),
+            fertility: femaleBase?.fertility ?? maleBase?.fertility ?? 1,
             ageInCycles: 0,
             status: "EMBRYO_STORED",
             inbreedingCoefficient: 0,
             breedGeneration: 1,
+            lifeExpectancy: embryoLifeExpectancy,
             isTutorialAnimal: false,
+            phenotypeDescription: embryoPhenotypeDescription,
             structuralRisk,
             preferredTerrain: preferredTerrain as any,
             preferredClimate: preferredClimate as any,
@@ -292,16 +313,21 @@ export const tutorialRouter = router({
           tx.animalImmunity.create({ data: { animalId: embryo.id, value: 60, innateMax: 100 } }),
           tx.animalCareScore.create({ data: { animalId: embryo.id, score: 75 } }),
           tx.animalBreedComposition.create({ data: { animalId: embryo.id, breedId, percentage: 1.0 } }),
-          ...breedStatProfile.map(sp =>
-            tx.animalStat.create({
-              data: {
-                animalId: embryo.id,
-                statDefId: sp.statDefId,
-                innateValue: sp.naturalMin + Math.random() * (sp.naturalMax - sp.naturalMin),
-                trainedValue: 0,
-              },
-            })
-          ),
+          ...(() => {
+            const totalW = breedWeights.reduce((s, w) => s + w.weight, 0) || 1
+            // Use averageTotalInnate — embryo is a foundation-quality animal, not an exceptional one
+            const pool = (gameConfigForGen?.defaultInnateRatio ?? 0.5) * (gameInnateMaxRecord?.averageTotalInnate ?? gameInnateMaxRecord?.maxTotalInnate ?? 100)
+            return breedWeights.map(sp =>
+              tx.animalStat.create({
+                data: {
+                  animalId: embryo.id,
+                  statDefId: sp.statDefId,
+                  innateValue: pool * (sp.weight / totalW),
+                  trainedValue: 0,
+                },
+              })
+            )
+          })(),
           ...breedPersonalityProfiles.map(pp =>
             tx.animalPersonality.create({
               data: {
@@ -316,11 +342,8 @@ export const tutorialRouter = router({
               data: { animalId: embryo.id, locusId: g.locusId, alleleOneId: g.alleleOneId, alleleTwoId: g.alleleTwoId },
             })
           ),
-          ...ltcDefs.map(def =>
-            tx.animalLongTermCareRecord.create({
-              data: { animalId: embryo.id, longTermCareActionDefId: def.id, nextDueCycle: def.intervalCycles },
-            })
-          ),
+          // LTC records are NOT created here — the embryo goes through the normal birth system
+          // (breeding.pregnancy birth handler) which creates them when status changes to ALIVE.
         ])
 
         // 4. TutorialAnimalPair
@@ -384,6 +407,21 @@ export const tutorialRouter = router({
       }
     }),
 
+  pairIds: protectedProcedure
+    .input(z.object({ gameId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const player = await db.playerAccount.findUnique({
+        where: { userId_gameId: { userId: ctx.userId, gameId: input.gameId } },
+        select: { id: true },
+      })
+      if (!player) return null
+      const pair = await db.tutorialAnimalPair.findUnique({
+        where: { playerAccountId: player.id },
+        select: { ancestorOneId: true, ancestorTwoId: true },
+      })
+      return pair ?? null
+    }),
+
   shopAnimal: protectedProcedure
     .input(z.object({ gameId: z.string() }))
     .query(async ({ ctx, input }) => {
@@ -395,12 +433,13 @@ export const tutorialRouter = router({
 
       const pair = await db.tutorialAnimalPair.findUnique({
         where: { playerAccountId: player.id },
-        select: { 
+        select: {
           ancestorOne: {
             select: {
               id: true,
               name: true,
               sex: true,
+              playerAccountId: true,
               breed: { select: { name: true } },
               breedName: true,
               lifeStage: { select: { name: true } },
@@ -409,7 +448,9 @@ export const tutorialRouter = router({
         },
       })
 
-      return pair?.ancestorOne ?? null
+      // Return null once the player has purchased her (ownership transferred)
+      if (!pair?.ancestorOne || pair.ancestorOne.playerAccountId === player.id) return null
+      return pair.ancestorOne
     }),
 
   grantStartingGold: protectedProcedure
@@ -431,12 +472,21 @@ export const tutorialRouter = router({
 
       const AMOUNT = 300
 
+      const existing = await db.playerBalance.findUnique({
+        where: { playerAccountId_currencyDefId: { playerAccountId: player.id, currencyDefId: baseCurrency.id } },
+        select: { id: true, balance: true },
+      })
+      if (existing && existing.balance > 0) return
+
       await db.$transaction([
-        db.playerBalance.upsert({
-          where: { playerAccountId_currencyDefId: { playerAccountId: player.id, currencyDefId: baseCurrency.id } },
-          create: { playerAccountId: player.id, currencyDefId: baseCurrency.id, balance: AMOUNT },
-          update: { balance: { increment: AMOUNT } },
-        }),
+        existing
+          ? db.playerBalance.update({
+              where: { playerAccountId_currencyDefId: { playerAccountId: player.id, currencyDefId: baseCurrency.id } },
+              data: { balance: AMOUNT },
+            })
+          : db.playerBalance.create({
+              data: { playerAccountId: player.id, currencyDefId: baseCurrency.id, balance: AMOUNT },
+            }),
         db.transaction.create({
           data: {
             gameId,
@@ -447,6 +497,77 @@ export const tutorialRouter = router({
           },
         }),
       ])
+    }),
+
+  // TODO: remove before launch
+  devDeleteAccount: protectedProcedure
+    .input(z.object({ gameId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const { gameId } = input
+
+      const player = await db.playerAccount.findUnique({
+        where: { userId_gameId: { userId: ctx.userId, gameId } },
+        select: { id: true },
+      })
+      if (!player) throw new Error("Player not found")
+
+      // Collect tutorial ancestor IDs before deleting the pair
+      const pair = await db.tutorialAnimalPair.findUnique({
+        where: { playerAccountId: player.id },
+        select: { ancestorOneId: true, ancestorTwoId: true },
+      })
+
+      // All player-owned animals
+      const playerAnimals = await db.animal.findMany({
+        where: { playerAccountId: player.id },
+        select: { id: true },
+      })
+      // Tutorial ancestors are owned by the game account; collect from pair if it still exists,
+      // then also sweep isTutorialAnimal=true non-player animals so retries still catch them
+      const tutorialAncestorIds = [pair?.ancestorOneId, pair?.ancestorTwoId].filter((id): id is string => !!id)
+      const orphanedTutorialAnimals = await db.animal.findMany({
+        where: { gameId, isTutorialAnimal: true, NOT: { playerAccountId: player.id } },
+        select: { id: true },
+      })
+      const allAnimalIds = [...new Set([
+        ...playerAnimals.map(a => a.id),
+        ...tutorialAncestorIds,
+        ...orphanedTutorialAnimals.map(a => a.id),
+      ])]
+
+      // Tutorial records must be deleted before animals (embryoId FK is RESTRICT)
+      await db.tutorialProgress.deleteMany({ where: { playerAccountId: player.id } })
+      await db.tutorialAnimalPair.deleteMany({ where: { playerAccountId: player.id } })
+
+      // Clear any breeding listings referencing these animals (game-account-owned stud listings
+      // won't be caught by the ownerPlayerId delete below)
+      if (allAnimalIds.length > 0) {
+        await db.breedingListing.deleteMany({ where: { animalId: { in: allAnimalIds } } })
+      }
+
+      await deleteAnimalsWithChildren(allAnimalIds)
+
+      // Social
+      await db.follow.deleteMany({ where: { OR: [{ followerPlayerId: player.id }, { followedPlayerId: player.id }] } })
+      await db.friendRequest.deleteMany({ where: { OR: [{ senderPlayerId: player.id }, { recipientPlayerId: player.id }] } })
+      await db.blockedPlayer.deleteMany({ where: { OR: [{ blockerPlayerId: player.id }, { blockedPlayerId: player.id }] } })
+
+      // Economy
+      await db.transaction.deleteMany({ where: { OR: [{ fromPlayerAccountId: player.id }, { toPlayerAccountId: player.id }] } })
+      await db.breedingListing.deleteMany({ where: { ownerPlayerId: player.id } })
+      await db.playerBalance.deleteMany({ where: { playerAccountId: player.id } })
+
+      await db.playerAchievement.deleteMany({ where: { playerAccountId: player.id } })
+
+      // Account records (delete children before parent)
+      await db.profileVisibilitySetting.deleteMany({ where: { playerAccountId: player.id } })
+      await db.playerProfile.deleteMany({ where: { playerAccountId: player.id } })
+      await db.playerSeniority.deleteMany({ where: { playerAccountId: player.id } })
+      await db.playerReputation.deleteMany({ where: { playerAccountId: player.id } })
+      await db.playerCapacity.deleteMany({ where: { playerAccountId: player.id } })
+      await db.subContainer.deleteMany({ where: { playerAccountId: player.id } })
+
+      await db.playerAccount.delete({ where: { id: player.id } })
     }),
 
   // TODO: remove before launch
@@ -461,30 +582,35 @@ export const tutorialRouter = router({
       })
       if (!player) throw new Error("Player not found")
 
-      const completed = await db.tutorialProgress.findMany({
-        where: { playerAccountId: player.id, completedAt: { not: null } },
-        select: {
-          stepDefId: true,
-          stepDef: { select: { stepIndex: true, stepKey: true } },
-        },
-        orderBy: { stepDef: { stepIndex: "desc" } },
-      })
+      const [baseCurrency, premiumCurrency] = await Promise.all([
+        db.currencyDef.findFirst({ where: { gameId, currencyType: "BASE" }, select: { id: true } }),
+        db.currencyDef.findFirst({ where: { gameId, currencyType: "PREMIUM" }, select: { id: true } }),
+      ])
 
-      if (!completed.length) return
-
-      const latest = completed[0]!
-
-      await db.tutorialProgress.update({
-        where: { playerAccountId_stepDefId: { playerAccountId: player.id, stepDefId: latest.stepDefId } },
-        data: { completedAt: null },
-      })
-
-      if (latest.stepDef.stepKey === "tutorial_complete") {
-        await db.playerSeniority.update({
+      // Full reset — clear every checkpoint so the tutorial starts from step 0.
+      const ops: Parameters<typeof db.$transaction>[0] = [
+        db.tutorialProgress.updateMany({
+          where: { playerAccountId: player.id },
+          data: { completedAt: null },
+        }),
+        db.playerSeniority.update({
           where: { playerAccountId: player.id },
           data: { tutorialCompleted: false },
-        })
+        }),
+      ]
+      if (baseCurrency) {
+        ops.push(db.playerBalance.updateMany({
+          where: { playerAccountId: player.id, currencyDefId: baseCurrency.id },
+          data: { balance: 0 },
+        }))
       }
+      if (premiumCurrency) {
+        ops.push(db.playerBalance.updateMany({
+          where: { playerAccountId: player.id, currencyDefId: premiumCurrency.id },
+          data: { balance: 0 },
+        }))
+      }
+      await db.$transaction(ops)
     }),
 
     buyFemale: protectedProcedure
@@ -507,4 +633,195 @@ export const tutorialRouter = router({
       data: { playerAccountId: player.id },
     })
   }),
+
+  // TODO: remove before launch
+  // Patches a player account whose starter selection was never stored (created before that
+  // code existed). Sets the first available StarterBreedOption + StarterColorOption on their
+  // PlayerSeniority so tutorial.setup can run successfully.
+  devFixStarter: protectedProcedure
+    .input(z.object({ gameId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const { gameId } = input
+
+      const player = await db.playerAccount.findUnique({
+        where: { userId_gameId: { userId: ctx.userId, gameId } },
+        select: { id: true },
+      })
+      if (!player) throw new Error("Player not found")
+
+      const seniority = await db.playerSeniority.findUnique({
+        where: { playerAccountId: player.id },
+        select: { starterBreedOptionId: true },
+      })
+      if (!seniority) throw new Error("Seniority record not found")
+      if (seniority.starterBreedOptionId) throw new Error("Starter already set — no fix needed")
+
+      const breedOption = await db.starterBreedOption.findFirst({
+        where: { gameId },
+        select: { id: true, colorOptions: { select: { id: true }, take: 1 } },
+      })
+      if (!breedOption) throw new Error("No StarterBreedOption configured for this game")
+
+      await db.playerSeniority.update({
+        where: { playerAccountId: player.id },
+        data: {
+          starterBreedOptionId: breedOption.id,
+          starterColorOptionId: breedOption.colorOptions[0]?.id ?? null,
+          starterGender: "FEMALE",
+        },
+      })
+    }),
+
+  // Returns the tutorial sire for the tutorial-only stud market view.
+  // Normal stud market filters isTutorialAnimal=false, so this is the only way to surface it.
+  studAnimal: protectedProcedure
+    .input(z.object({ gameId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const player = await db.playerAccount.findUnique({
+        where: { userId_gameId: { userId: ctx.userId, gameId: input.gameId } },
+        select: { id: true },
+      })
+      if (!player) return null
+
+      const pair = await db.tutorialAnimalPair.findUnique({
+        where: { playerAccountId: player.id },
+        select: {
+          ancestorTwoId: true,
+          ancestorTwo: {
+            select: {
+              id: true,
+              name: true,
+              sex: true,
+              breedName: true,
+              ageInCycles: true,
+              fertility: true,
+              breed: { select: { name: true } },
+              lifeStage: { select: { name: true } },
+            },
+          },
+        },
+      })
+
+      return pair?.ancestorTwo ?? null
+    }),
+
+  grantStartingPremium: protectedProcedure
+    .input(z.object({ gameId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const { gameId } = input
+
+      const player = await db.playerAccount.findUnique({
+        where: { userId_gameId: { userId: ctx.userId, gameId } },
+        select: { id: true },
+      })
+      if (!player) throw new Error("Player not found")
+
+      const premiumCurrency = await db.currencyDef.findFirst({
+        where: { gameId, currencyType: "PREMIUM" },
+        select: { id: true },
+      })
+      if (!premiumCurrency) throw new Error("No premium currency configured")
+
+      const AMOUNT = 2
+
+      const existing = await db.playerBalance.findUnique({
+        where: { playerAccountId_currencyDefId: { playerAccountId: player.id, currencyDefId: premiumCurrency.id } },
+        select: { id: true, balance: true },
+      })
+      if (existing && existing.balance > 0) return
+
+      await db.$transaction([
+        existing
+          ? db.playerBalance.update({
+              where: { playerAccountId_currencyDefId: { playerAccountId: player.id, currencyDefId: premiumCurrency.id } },
+              data: { balance: AMOUNT },
+            })
+          : db.playerBalance.create({
+              data: { playerAccountId: player.id, currencyDefId: premiumCurrency.id, balance: AMOUNT },
+            }),
+        db.transaction.create({
+          data: {
+            gameId,
+            toPlayerAccountId: player.id,
+            currencyDefId: premiumCurrency.id,
+            amount: AMOUNT,
+            txnType: "TESTING_GRANT",
+          },
+        }),
+      ])
+    }),
+
+  // Generates a predictor result for the tutorial using the player's starter breed stats.
+  // Tutorial ancestors are historical models, not genetically compatible with starter breeds,
+  // so we use the breed stat profile + pool math directly instead of generateOffspring.
+  // No quota consumed, no cost charged.
+  runPredictor: protectedProcedure
+    .input(z.object({ gameId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const { gameId } = input
+
+      const player = await db.playerAccount.findUnique({
+        where: { userId_gameId: { userId: ctx.userId, gameId } },
+        select: { id: true },
+      })
+      if (!player) throw new Error("Player not found")
+
+      const seniority = await db.playerSeniority.findUnique({
+        where: { playerAccountId: player.id },
+        select: { starterBreedOptionId: true },
+      })
+      if (!seniority?.starterBreedOptionId) throw new Error("Starter breed not configured")
+
+      const [starterOption, gameConfig, gameInnateMax, statDefs] = await Promise.all([
+        db.starterBreedOption.findUnique({
+          where: { id: seniority.starterBreedOptionId },
+          select: {
+            breedId: true,
+            breed: { select: { name: true, immunityMin: true, immunityMax: true } },
+          },
+        }),
+        db.gameConfig.findUnique({
+          where: { gameId },
+          select: { defaultInnateRatio: true },
+        }),
+        db.gameInnateMax.findUnique({
+          where: { gameId },
+          select: { maxTotalInnate: true, averageTotalInnate: true },
+        }),
+        db.statDef.findMany({ where: { gameId }, select: { id: true, name: true } }),
+      ])
+      if (!starterOption) throw new Error("Starter breed option not found")
+
+      const breedWeights = await db.breedStatProfile.findMany({
+        where: { breedId: starterOption.breedId },
+        select: { statDefId: true, weight: true },
+      })
+
+      const totalW = breedWeights.reduce((s, w) => s + w.weight, 0) || 1
+      const pool = (gameConfig?.defaultInnateRatio ?? 0.5) * (gameInnateMax?.averageTotalInnate ?? gameInnateMax?.maxTotalInnate ?? 100)
+
+      const statNameMap = new Map(statDefs.map((s) => [s.id, s.name]))
+      const stats = breedWeights.map((sp) => ({
+        name: statNameMap.get(sp.statDefId) ?? sp.statDefId,
+        innateValue: pool * (sp.weight / totalW),
+      }))
+
+      const immunityMid = ((starterOption.breed.immunityMin ?? 40) + (starterOption.breed.immunityMax ?? 80)) / 2
+      const sex: "MALE" | "FEMALE" = Math.random() < 0.5 ? "MALE" : "FEMALE"
+
+      return {
+        offspring: [{
+          sex,
+          breedName: starterOption.breed.name,
+          fertility: 1,
+          inbreedingCoefficient: 0,
+          stats,
+          statTotal: stats.reduce((sum, s) => sum + s.innateValue, 0),
+          immunityMax: immunityMid,
+        }],
+        quotaUsed: 0,
+        quotaLimit: 0,
+        cost: 0,
+      }
+    }),
 })

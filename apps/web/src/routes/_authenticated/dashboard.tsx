@@ -1,8 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import { trpc } from "@/lib/trpc"
+import { grantGold } from "@/lib/tutorial/utils/grant-gold"
+import { grantPremium } from "@/lib/tutorial/utils/grant-premium"
 import { useEffect, useMemo, useState } from "react"
 import { Dialog } from "@/components/game/ui"
-import { startTutorial } from "@/lib/tutorial"
+import { startTutorial, isTourRunning, setTourRunning } from "@/lib/tutorial"
 import {
   AlertTriangle, Baby, Trophy, Coins, PawPrint, ClipboardList,
   ArrowRight, ShieldCheck, Mountain, Waves, Wind,
@@ -423,55 +425,90 @@ function DashboardPage() {
 
   // Show dialog whenever tutorial is incomplete — derived from seniority, not URL state.
   // tutorialStarted hides it once the driver tour is launched (cleared on page reload).
+  // isTourRunning() hides it if Driver.js is actively running (module-level flag that resets on
+  // every full page load — unlike sessionStorage, it can't be left stale from a prior session).
   const tutorialComplete = me?.seniority?.tutorialCompleted ?? true
-  const showWelcome = !meLoading && !tutorialComplete && !tutorialStarted
+  const showWelcome = !meLoading && !tutorialComplete && !tutorialStarted && !isTourRunning()
 
-  const grantStartingGold = trpc.tutorial.grantStartingGold.useMutation({
-    onSuccess: () => {
-      if (playerAccountId) utils.player.balances.invalidate({ playerAccountId })
-    },
-  })
   const setupMutation = trpc.tutorial.setup.useMutation()
   const completeStepMutation = trpc.tutorial.completeStep.useMutation()
-  const devResetMutation = trpc.tutorial.devReset.useMutation()
 
-  const { data: tutorialProgress } = trpc.tutorial.getProgress.useQuery(
+
+  const { data: tutorialProgress, isLoading: progressLoading } = trpc.tutorial.getProgress.useQuery(
     { gameId: gameId! },
     { enabled: !!gameId && showWelcome },
   )
 
-  // Map completed step defs to a Driver.js resume index.
-  // step_purchased → 6 (stable nav), step_shop → 3 (animals tab), else → 0 (beginning)
+  // Whether setup has been called: progress records exist (created in tutorial.setup).
+  const isSetup = (tutorialProgress?.progress.length ?? 0) > 0
+
+  // First incomplete step def — drives the contextual re-entry dialog.
+  const nextIncompleteStep = tutorialProgress?.steps.find((step) => {
+    const prog = tutorialProgress.progress.find((p) => p.stepDefId === step.id)
+    return prog !== undefined && prog.completedAt === null
+  })
+
+  // Map completed step defs to a Driver.js checkpoint resume index.
+  // NOTE: DEV pause is at index 21 — remove before launch.
   const resumeIndex = useMemo(() => {
-    if (!tutorialProgress) return 0
-    const completedKeys = new Set(
-      tutorialProgress.progress
-        .filter((p) => p.completedAt !== null)
-        .map((p) => tutorialProgress.steps.find((s) => s.id === p.stepDefId)?.stepKey),
-    )
-    if (completedKeys.has("step_purchased")) return 6
-    if (completedKeys.has("step_shop")) return 3
-    return 0
+    const dbIndex = (() => {
+      if (!tutorialProgress) return 0
+      const completedKeys = new Set(
+        tutorialProgress.progress
+          .filter((p) => p.completedAt !== null)
+          .map((p) => tutorialProgress.steps.find((s) => s.id === p.stepDefId)?.stepKey),
+      )
+      if (completedKeys.has("step_mare_profile")) return 21  // training phase (dev pause for now)
+      if (completedKeys.has("step_purchased")) return 11     // profile phase start
+      if (completedKeys.has("step_shop")) return 6           // stable phase start
+      return 0
+    })()
+    // Always layer in localStorage so the user resumes at the exact Driver.js step they left.
+    // devReset clears localStorage so a full restart always lands at step 0.
+    const lsRaw = parseInt(localStorage.getItem("tutorial_step") ?? "", 10)
+    const lsIndex = isNaN(lsRaw) ? 0 : lsRaw
+    return Math.max(dbIndex, lsIndex)
   }, [tutorialProgress])
+
+  const { data: tutorialPair } = trpc.tutorial.pairIds.useQuery(
+    { gameId: gameId! },
+    { enabled: !!gameId && resumeIndex >= 11 && showWelcome },
+  )
 
   function beginTutorial() {
     if (!gameId) return
+    // Mark the tour as running before any navigation so beforeLoad (which imports
+    // isTourRunning) allows /shop immediately — 600 ms before driverObj.drive() is called.
+    setTourRunning(true)
     setTutorialStarted(true)
     if (welcome) navigate({ to: "/dashboard", search: {}, replace: true })
+
+    // Navigate to the page where the resume step's spotlight element lives,
+    // so Driver.js can find it when the tour starts.
+    const resumeRoute =
+      resumeIndex >= 11 ? (tutorialPair?.ancestorOneId ? `/animal/${tutorialPair.ancestorOneId}` : "/stable") :
+      resumeIndex >= 6 ? "/stable" :
+      resumeIndex >= 1 && resumeIndex <= 5 ? "/shop" :
+      null
+    if (resumeRoute) navigate({ to: resumeRoute })
+
     // setup creates the tutorial animal pair + TutorialProgress rows.
     // Throws "Tutorial already set up" on resume — caught and ignored.
     setupMutation.mutateAsync({ gameId })
       .catch(() => {})
       .finally(() => {
-        startTutorial(
+        const launch = () => startTutorial(
           {
-            grantGold: () => grantStartingGold.mutateAsync({ gameId }),
+            grantGold: () => grantGold(gameId!),
+            grantPremium: () => grantPremium(gameId!),
             completeStep: (stepKey) => completeStepMutation.mutateAsync({ gameId, stepKey }),
-            devReset: () => devResetMutation.mutateAsync({ gameId }),
           },
           resumeIndex,
           () => completeStepMutation.mutate({ gameId: gameId!, stepKey: "tutorial_complete" }),
         )
+        // Give React Router time to navigate before Driver.js queries the DOM.
+        if (resumeRoute) setTimeout(launch, 600)
+        else launch()
       })
   }
 
@@ -528,17 +565,12 @@ function DashboardPage() {
 
   return (
     <>
-    <Dialog open={showWelcome} title="Welcome to Your Breeding Program">
+    <Dialog
+      open={showWelcome}
+      title={!isSetup ? "Welcome to Your Breeding Program" : nextIncompleteStep ? nextIncompleteStep.name : "Continue Your Tutorial"}
+    >
       <div className="space-y-3 px-4 py-4">
-        {resumeIndex >= 6 ? (
-          <p className="text-sm text-muted-foreground">
-            Your foundation mare is in your Stable. Head over to meet her and get started.
-          </p>
-        ) : resumeIndex >= 3 ? (
-          <p className="text-sm text-muted-foreground">
-            Your starting funds are ready. Head to the Animals tab in the Shop to purchase your foundation mare.
-          </p>
-        ) : (
+        {!isSetup ? (
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">
               You'll begin with a foundation mare representing one of the historic lines behind your chosen breed. Together, you'll learn how to care for, train, compete, manage health, and prepare a horse for breeding.
@@ -547,13 +579,18 @@ function DashboardPage() {
               Her foal will become your first purebred and the beginning of your own breeding program.
             </p>
           </div>
+        ) : nextIncompleteStep ? (
+          <p className="text-sm text-muted-foreground">{nextIncompleteStep.description}</p>
+        ) : (
+          <p className="text-sm text-muted-foreground">Pick up where you left off.</p>
         )}
         <div className="flex justify-end">
           <button
             onClick={beginTutorial}
-            className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+            disabled={progressLoading}
+            className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
           >
-            {resumeIndex > 0 ? "Continue" : "Begin Tutorial"}
+            {progressLoading ? "Loading…" : isSetup ? "Continue Tutorial" : "Begin Tutorial"}
           </button>
         </div>
       </div>

@@ -50,8 +50,16 @@ export function OwnerView({ animal, animalId, playerAccountId }: { animal: Anima
     },
   })
 
+  const statTutorialKeys: Record<string, string> = {
+    Energy: "stat-energy",
+    Mood: "stat-mood",
+    Condition: "stat-condition",
+    Care: "stat-care-score",
+    Immunity: "stat-immunity",
+  }
+
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-transparent text-foreground">
+    <div data-tutorial="animal-profile" className="flex h-full flex-col overflow-hidden bg-transparent text-foreground">
 
       {birthPregnancyId && (
         <BirthDialog
@@ -62,7 +70,7 @@ export function OwnerView({ animal, animalId, playerAccountId }: { animal: Anima
       )}
 
       {/* Header */}
-      <div className="flex shrink-0 flex-col items-center gap-3 border-b border-border bg-card px-4 py-4">
+      <div data-tutorial="animal-header" className="flex shrink-0 flex-col items-center gap-3 border-b border-border bg-card px-4 py-4">
         <div className="flex flex-wrap items-center justify-center gap-2">
           <h1 className="font-serif text-2xl font-semibold tracking-tight text-foreground">{animal.name}</h1>
           <Badge tone="success">{animal.status}</Badge>
@@ -94,7 +102,7 @@ export function OwnerView({ animal, animalId, playerAccountId }: { animal: Anima
               { label: "Immunity", value: animal.immunity?.value ?? 0, max: animal.immunity?.innateMax ?? 100, tone: "immunity" as const },
             ] as const
           ).map((v) => (
-            <div key={v.label}>
+            <div key={v.label} data-tutorial={statTutorialKeys[v.label]}>
               <div className="mb-1 flex items-center justify-between">
                 <span className="text-[11px] font-medium text-muted-foreground">{v.label}</span>
                 <span className="text-[11px] font-bold tabular-nums text-foreground">{Math.round(v.value)}</span>
@@ -148,7 +156,7 @@ export function OwnerView({ animal, animalId, playerAccountId }: { animal: Anima
             {animal.lifeStage.canReceiveCare && <DailyCarePanel animal={animal} playerAccountId={playerAccountId} />}
 
             {/* Owner Actions */}
-            <div className="flex min-h-0 shrink-0 flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+            <div data-tutorial="owner-actions" className="flex min-h-0 shrink-0 flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm">
               <header className="border-b border-border bg-secondary/40 px-3 py-2">
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">Owner Actions</h3>
               </header>

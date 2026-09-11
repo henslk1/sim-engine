@@ -411,6 +411,8 @@ function ShopPage() {
   const { data: balances } = trpc.player.balances.useQuery({ playerAccountId: playerAccountId! }, { enabled: !!playerAccountId })
   const { data: inventory } = trpc.inventory.mine.useQuery({ playerAccountId: playerAccountId! }, { enabled: !!playerAccountId })
   const { data: shopAnimals } = trpc.inventory.listShopAnimals.useQuery({ gameId: gameId! }, { enabled: !!gameId })
+  const { data: tutorialMare } = trpc.tutorial.shopAnimal.useQuery({ gameId: gameId! }, { enabled: !!gameId })
+  const isTutorialMode = !!tutorialMare
 
   const utils = trpc.useUtils()
 
@@ -425,6 +427,13 @@ function ShopPage() {
 
   const buy = trpc.inventory.buy.useMutation({ onSuccess: invalidatePlayer })
   const buyAnimal = trpc.inventory.buyAnimal.useMutation({ onSuccess: invalidateAnimals })
+  const buyFemale = trpc.tutorial.buyFemale.useMutation({
+    onSuccess: () => {
+      pushToast(`${tutorialMare?.name ?? "Mare"} added to your stable`)
+      utils.tutorial.shopAnimal.invalidate({ gameId: gameId! })
+      if (playerAccountId) utils.animal.list.invalidate({ playerAccountId })
+    },
+  })
 
   const [tab, setTab] = useState<ShopTab>("BASE")
   const [filter, setFilter] = useState<string>("all")
@@ -466,7 +475,9 @@ function ShopPage() {
     return balances?.find((b) => b.currencyDef.id === currencyDefId)?.balance ?? 0
   }
 
-  const shopListings = listings?.filter((l) => l.shopType === (tab === "PREMIUM" ? "PREMIUM" : "BASE")) ?? []
+  const shopListings = isTutorialMode
+    ? []
+    : (listings?.filter((l) => l.shopType === (tab === "PREMIUM" ? "PREMIUM" : "BASE")) ?? [])
 
   const categories = useMemo(
     () => Array.from(new Set(shopListings.map((l) => l.itemDef.category))).sort(),
@@ -487,7 +498,7 @@ function ShopPage() {
   )
 
   const inventoryCount = inventory?.reduce((s, i) => s + i.quantity, 0) ?? 0
-  const animalsCount = shopAnimals?.length ?? 0
+  const animalsCount = isTutorialMode ? (tutorialMare ? 1 : 0) : (shopAnimals?.length ?? 0)
   const featuredListing = shopListings[0]
 
   if (!gameId || !me) {
@@ -614,7 +625,7 @@ function ShopPage() {
           />
           {filtered.length === 0 ? (
             <div className="rounded-xl border border-dashed border-border bg-card/50 py-16 text-center">
-              <p className="text-sm text-muted-foreground">No items match your search.</p>
+              <p className="text-sm text-muted-foreground">No items available.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -673,7 +684,50 @@ function ShopPage() {
       )}
 
       {/* Animals */}
-      {tab === "animals" &&
+      {tab === "animals" && isTutorialMode && (
+        tutorialMare ? (
+          <div className="mt-6 grid grid-cols-4 gap-3">
+            <article
+              data-tutorial="shop-animal-card"
+              className="flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm ring-1 ring-border transition-all hover:-translate-y-0.5 hover:shadow-md"
+            >
+              <div className="flex aspect-[4/3] w-full items-center justify-center overflow-hidden bg-gradient-to-b from-secondary/50 to-card">
+                <PawPrint className="size-8 text-muted-foreground/20" />
+              </div>
+              <div className="flex flex-1 flex-col gap-1.5 p-3">
+                <div>
+                  <h4 className="font-serif text-sm font-semibold leading-tight text-foreground">
+                    {tutorialMare.name}
+                  </h4>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    {tutorialMare.lifeStage.name} · {tutorialMare.sex === "MALE" ? "Male" : "Female"}
+                  </p>
+                </div>
+                <div className="mt-auto flex items-center justify-between gap-2 border-t border-border pt-2">
+                  <div className="flex items-center gap-1 text-xs font-bold tabular-nums text-foreground">
+                    <Coins className="size-3 text-chart-1" />
+                    Free
+                  </div>
+                  <button
+                    type="button"
+                    data-tutorial="shop-animal-buy"
+                    disabled={buyFemale.isPending}
+                    onClick={() => { if (gameId) buyFemale.mutate({ gameId }) }}
+                    className="inline-flex items-center gap-1 rounded-md bg-primary px-2.5 py-1 text-[11px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+                  >
+                    <Plus className="size-3" />
+                    {buyFemale.isPending ? "Buying…" : "Buy"}
+                  </button>
+                </div>
+              </div>
+            </article>
+          </div>
+        ) : (
+          <EmptyState icon={PawPrint} title="Animals up for sale" body="Browse foals and adults listed by other stables. The marketplace opens next cycle." />
+        )
+      )}
+
+      {tab === "animals" && !isTutorialMode &&
         (!shopAnimals || shopAnimals.length === 0 ? (
           <EmptyState
             icon={PawPrint}

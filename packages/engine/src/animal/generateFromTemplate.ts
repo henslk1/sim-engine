@@ -1,6 +1,8 @@
 import { Prisma, AnimalSex, AnimalStatMode, PersonalityMode } from "@sim-engine/db"
 import { weightedSample, canonicalize } from "../shop/restock.js"
 import { computeFixedFields } from "./computeFixedFields.js"
+import { computePhenotypeDescription } from "../breeding/computePhenotype.js"
+import type { ExpressionRuleForPhenotype } from "../breeding/computePhenotype.js"
 
 type Tx = Prisma.TransactionClient
 
@@ -28,8 +30,11 @@ interface GenerateFromTemplateOpts {
   gameId: string
   ownerPlayerAccountId: string
   isTutorialAnimal: boolean
+  breederId: string | null
   byLocus: Map<string, { id: string; symbol: string; frequency: number }[]>
-  breedStatProfile: { statDefId: string; naturalMin: number; naturalMax: number }[]
+  breedWeights: { statDefId: string; weight: number }[]
+  defaultInnateRatio: number
+  gameInnateMax: number | null
   breedPersonalityProfiles: { traitDefId: string; naturalMin: number; naturalMax: number }[]
   immunityMin: number | null
   immunityMax: number | null
@@ -62,23 +67,26 @@ export async function generateFromTemplate(tx: Tx, opts: GenerateFromTemplateOpt
 
   // Resolve stats
   const templateStatMap = new Map(template.stats.map((s) => [s.statDefId, s]))
-  const stats = opts.breedStatProfile.map((sp) => {
+  const totalWeight = opts.breedWeights.reduce((s, w) => s + w.weight, 0) || 1
+  const innateMax = opts.gameInnateMax ?? 100
+  const stats = opts.breedWeights.map((sp) => {
     const tStat = templateStatMap.get(sp.statDefId)
+    const normalizedWeight = sp.weight / totalWeight
     let innateValue: number
     let trainedValue: number
     if (template.statMode === "EXACT") {
       innateValue = tStat?.innateValue ?? 0
       trainedValue = tStat?.trainedValue ?? 0
     } else if (template.statMode === "BREED_MAX") {
-      innateValue = sp.naturalMax
+      innateValue = innateMax * normalizedWeight
       trainedValue = tStat?.trainedValue ?? 0
     } else {
       // FLOOR
-      const sampled = sp.naturalMin + Math.random() * (sp.naturalMax - sp.naturalMin)
-      innateValue = Math.max(sampled, template.statFloor ?? 0)
+      const pool = opts.defaultInnateRatio * innateMax
+      innateValue = Math.max(pool * normalizedWeight, template.statFloor ?? 0)
       trainedValue = tStat?.trainedValue ?? 0
     }
-    return { statDefId: sp.statDefId, innateValue, trainedValue}
+    return { statDefId: sp.statDefId, innateValue, trainedValue }
   })
 
   // Resolve personality
@@ -99,13 +107,19 @@ export async function generateFromTemplate(tx: Tx, opts: GenerateFromTemplateOpt
   const { structuralRisk, preferredTerrain, preferredClimate } = await computeFixedFields(tx, genotypes)
 
   // Apply numeric gene modifiers to life expectancy (e.g. longevity locus)
-  const lifeModifierRules = genotypes.length > 0 ? await tx.expressionRule.findMany({
-    where: {
-      OR: genotypes.map(g => ({ locusId: g.locusId, alleleOneId: g.alleleOneId, alleleTwoId: g.alleleTwoId })),
-      numericModifier: { not: null },
-    },
-    select: { numericModifier: true },
-  }) : []
+  const allMatchingRules = genotypes.length > 0
+    ? await tx.expressionRule.findMany({
+        where: {
+          OR: genotypes.map(g => ({ locusId: g.locusId, alleleOneId: g.alleleOneId, alleleTwoId: g.alleleTwoId })),
+        },
+        select: { locusId: true, alleleOneId: true, alleleTwoId: true, phenotype: true, numericModifier: true },
+      })
+    : []
+  const lifeModifierRules = allMatchingRules.filter(r => r.numericModifier !== null)
+  const phenotypeRules = allMatchingRules.filter(
+    (r): r is ExpressionRuleForPhenotype => r.phenotype !== null
+  )
+  const phenotypeDescription = computePhenotypeDescription(genotypes, phenotypeRules)
   const totalModifier = lifeModifierRules.reduce((s, r) => s + (r.numericModifier ?? 0), 0)
   const lifeExpectancyBase = opts.lifeExpectancyBaseline ?? opts.gameConfigLifeExpectancyBaseline ?? null
   const lifeExpectancy = lifeExpectancyBase !== null ? Math.round(lifeExpectancyBase * (1 + totalModifier)) : null
@@ -120,6 +134,7 @@ export async function generateFromTemplate(tx: Tx, opts: GenerateFromTemplateOpt
       playerAccountId: opts.ownerPlayerAccountId,
       breedId: template.breedId ?? null,
       breedName: template.breedId ? null : (template.breedName ?? null),
+      breederId: opts.breederId,
       lifeStageId: lifeStage.id,
       sex: template.sex,
       name: template.name ?? `${breedDisplayName} ${template.sex === "MALE" ? "Colt" : "Filly"}`,
@@ -131,6 +146,8 @@ export async function generateFromTemplate(tx: Tx, opts: GenerateFromTemplateOpt
       lifeExpectancy,
       isTutorialAnimal: opts.isTutorialAnimal,
       lore: template.lore ?? null,
+      disciplineDefId: template.compTiers[0]?.disciplineDefId ?? null,
+      phenotypeDescription,
       structuralRisk,
       preferredTerrain: preferredTerrain as any,
       preferredClimate: preferredClimate as any,

@@ -104,13 +104,12 @@ export async function restockShop(gameId: string, shopBreedConfigId?: string): P
       }
 
       // Apply numeric gene modifiers to life expectancy
-      const lifeModifierRules = genotypes.length > 0 ? await db.expressionRule.findMany({
+      const lifeModifierRules = genotypes.length > 0 ? (await db.expressionRule.findMany({
         where: {
           OR: genotypes.map(g => ({ locusId: g.locusId, alleleOneId: g.alleleOneId, alleleTwoId: g.alleleTwoId })),
-          numericModifier: { not: null },
         },
         select: { numericModifier: true },
-      }) : []
+      })).filter(r => r.numericModifier !== null) : []
       const totalModifier = lifeModifierRules.reduce((s, r) => s + (r.numericModifier ?? 0), 0)
       const lifeExpectancyBase = config.breed.lifeExpectancyBaseline ?? gameConfig?.lifeExpectancyBaseline ?? null
       const lifeExpectancy = lifeExpectancyBase !== null ? Math.round(lifeExpectancyBase * (1 + totalModifier)) : null

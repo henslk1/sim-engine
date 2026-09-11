@@ -106,7 +106,6 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
               select: { resolvedCycle: true },
             },
             ruleConditions: {
-              where: { penetrance: { not: null } },
               select: {
                 penetrance: true,
                 expressionRule: { select: { locusId: true, alleleOneId: true, alleleTwoId: true } },

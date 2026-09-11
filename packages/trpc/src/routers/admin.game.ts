@@ -73,9 +73,11 @@ export const gameAdminRouter = router({
         topGradeDoubleBonusChance: z.number().min(0).max(1).default(0.1),
         overworkInjuryThreshold: z.number().default(0),
         overworkInjuryChance: z.number().default(0),
+        tutorialMaleBaseTemplateId: z.string().nullish(),
+        tutorialFemaleBaseTemplateId: z.string().nullish(),
       }))
       .mutation(({ input }) => {
-        const { gameId, containerLabel, subContainerLabel, lifeExpectancyBaseline, maxBreedingSlots, ...rest } = input
+        const { gameId, containerLabel, subContainerLabel, lifeExpectancyBaseline, maxBreedingSlots, tutorialMaleBaseTemplateId, tutorialFemaleBaseTemplateId, ...rest } = input
         const labels = {
           containerLabel: containerLabel ?? null,
           subContainerLabel: subContainerLabel ?? null,
@@ -83,6 +85,8 @@ export const gameAdminRouter = router({
         const nullable = {
           lifeExpectancyBaseline: lifeExpectancyBaseline ?? null,
           maxBreedingSlots: maxBreedingSlots ?? null,
+          tutorialMaleBaseTemplateId: tutorialMaleBaseTemplateId ?? null,
+          tutorialFemaleBaseTemplateId: tutorialFemaleBaseTemplateId ?? null,
         }
         return db.gameConfig.upsert({
           where: { gameId },
