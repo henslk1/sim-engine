@@ -65,7 +65,7 @@ export function ParentCard({ label, grade, animal }: {
           >
             {animal.name}
           </Link>
-          <p className="text-[11px] text-muted-foreground">{animal.breed.name}</p>
+          <p className="text-[11px] text-muted-foreground">{animal.breed?.name ?? animal.breedName ?? ""}</p>
         </div>
         <span className={cn("shrink-0 rounded px-2 py-0.5 text-xs font-bold", BREEDING_GRADE_BG[grade], BREEDING_GRADE_COLOR[grade])}>
           {grade}

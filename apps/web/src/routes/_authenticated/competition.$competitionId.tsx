@@ -77,7 +77,7 @@ function CompetitionDetailPage() {
                     >
                       {entry.animal.name}
                     </Link>
-                    <p className="text-[11px] text-muted-foreground">{entry.animal.breed.name} · {entry.animal.sex === "MALE" ? "M" : "F"}</p>
+                    <p className="text-[11px] text-muted-foreground">{entry.animal.breed?.name ?? entry.animal.breedName ?? ""} · {entry.animal.sex === "MALE" ? "M" : "F"}</p>
                   </td>
                   <td className="px-3 py-2 text-sm text-muted-foreground">{entry.playerAccount.username}</td>
                   <td className="px-3 py-2 text-[11px] text-muted-foreground">{entry.tierDef.name}</td>

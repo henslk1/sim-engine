@@ -184,7 +184,7 @@ function EntryTable({ comp }: { comp: Competition }) {
               >
                 {animal.name}
               </Link>
-              <span className="text-muted-foreground/60">{animal.breed.name}</span>
+              <span className="text-muted-foreground/60">{animal.breed?.name ?? animal.breedName ?? ""}</span>
             </div>
             {isConformation ? (
               <span className="tabular-nums text-muted-foreground">

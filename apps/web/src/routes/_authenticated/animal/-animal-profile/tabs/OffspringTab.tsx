@@ -60,7 +60,7 @@ export function OffspringTab({
                     <span className="text-muted-foreground/50">—</span>
                   )}
                 </td>
-                <td className="px-2 py-1 text-muted-foreground">{o.breed.name}</td>
+                <td className="px-2 py-1 text-muted-foreground">{o.breed?.name ?? o.breedName ?? ""}</td>
                 <td className="px-2 py-1 text-muted-foreground">{o.sex}</td>
                 <td className="px-2 py-1">
                   <Badge tone={o.status === "ALIVE" ? "success" : "muted"}>{o.status}</Badge>

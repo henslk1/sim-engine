@@ -144,7 +144,7 @@ export function OwnerView({ animal, animalId, playerAccountId }: { animal: Anima
               <div className="w-full bg-linear-to-t from-card/90 to-transparent px-4 py-3">
                 <p className="font-serif text-lg font-semibold text-foreground">{animal.name}</p>
                 <p className="text-xs text-muted-foreground">
-                  {animal.breed.name} · {animal.lifeStage.name}
+                  {animal.breed?.name ?? animal.breedName ?? "Unknown"} · {animal.lifeStage.name}
                 </p>
               </div>
             </div>

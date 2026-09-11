@@ -43,7 +43,7 @@ export function formatBreedLabel(animal: AnimalProfile): string {
       .map((bc) => `${bc.breed.name} ${Math.round(bc.percentage)}%`)
       .join(" / ")
   }
-  return animal.breed.name
+  return animal.breed?.name ?? animal.breedName ?? ""
 }
 
 export function getTrainingCap(

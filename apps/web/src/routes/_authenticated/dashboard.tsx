@@ -190,7 +190,7 @@ function AlertsSection({
                 }
                 <div className="min-w-0">
                   <p className="truncate font-medium text-foreground">{animal.name}</p>
-                  <p className="truncate text-muted-foreground/60">{animal.breed.name}</p>
+                  <p className="truncate text-muted-foreground/60">{animal.breed?.name ?? animal.breedName ?? ""}</p>
                 </div>
               </div>
               {type === "health" && (

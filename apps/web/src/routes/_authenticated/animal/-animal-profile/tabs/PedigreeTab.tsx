@@ -112,7 +112,7 @@ function PedigreeNode({ ancestor }: { ancestor: Ancestor }) {
         {ancestor.ancestor.name}
       </Link>
       <span className="block text-[10px] text-muted-foreground">
-        {ancestor.ancestor.breed.name}
+        {ancestor.ancestor.breed?.name ?? ""}
       </span>
     </div>
   )
@@ -156,7 +156,7 @@ export function PedigreeTab({ animal }: { animal: AnimalProfile }) {
         <div className="mb-2 flex flex-wrap gap-1.5">
           {animal.breedComposition.map((bc: AnimalProfile["breedComposition"][number]) => (
             <Badge key={bc.breedId} tone="outline">
-              {bc.breed.name} · {bc.percentage * 100 < 1 ? "< 1" : Math.round(bc.percentage * 100)}%
+              {bc.breed?.name ?? ""} · {bc.percentage * 100 < 1 ? "< 1" : Math.round(bc.percentage * 100)}%
             </Badge>
           ))}
         </div>

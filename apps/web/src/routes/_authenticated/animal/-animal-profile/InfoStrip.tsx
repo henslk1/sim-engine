@@ -16,7 +16,7 @@ export function InfoStrip({
 }) {
   return (
     <div className="flex shrink-0 flex-wrap items-center justify-center gap-1.5 border-b border-border bg-card/50 px-4 py-2">
-      <InfoChip>{animal.breed.name}</InfoChip>
+      <InfoChip>{animal.breed?.name ?? animal.breedName ?? "Unknown"}</InfoChip>
       <InfoChip>{displaySex(animal.sex, animal.isCastrated)}</InfoChip>
       <InfoChip>{animal.lifeStage.name}</InfoChip>
       <InfoChip>Age {cycleToAge(animal.ageInCycles)}</InfoChip>

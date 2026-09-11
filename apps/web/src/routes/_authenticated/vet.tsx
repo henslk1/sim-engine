@@ -177,7 +177,7 @@ function DiagnosticsPanel({
             <option value="">— Select animal —</option>
             {filteredAnimals.map((a) => (
               <option key={a.id} value={a.id}>
-                {a.name} — {a.breed.name} · {a.sex === "MALE" ? "M" : "F"} · {a.lifeStage.name}
+                {a.name} — {a.breed?.name ?? a.breedName ?? ""} · {a.sex === "MALE" ? "M" : "F"} · {a.lifeStage.name}
               </option>
             ))}
           </SelectInput>
@@ -407,7 +407,7 @@ function CertificatesPanel({
             <option value="">— Select animal —</option>
             {filteredAnimals.map((a) => (
               <option key={a.id} value={a.id}>
-                {a.name} — {a.breed.name} · {a.sex === "MALE" ? "M" : "F"}
+                {a.name} — {a.breed?.name ?? a.breedName ?? ""} · {a.sex === "MALE" ? "M" : "F"}
               </option>
             ))}
           </SelectInput>
@@ -507,7 +507,7 @@ function EuthanasiaPanel({ aliveAnimals }: { aliveAnimals: AliveAnimal[] }) {
             <option value="">— Select animal —</option>
             {aliveAnimals.map((a) => (
               <option key={a.id} value={a.id}>
-                {a.name} — {a.breed.name} · {a.sex === "MALE" ? "M" : "F"}
+                {a.name} — {a.breed?.name ?? a.breedName ?? ""} · {a.sex === "MALE" ? "M" : "F"}
               </option>
             ))}
           </SelectInput>
@@ -518,7 +518,7 @@ function EuthanasiaPanel({ aliveAnimals }: { aliveAnimals: AliveAnimal[] }) {
             <p className="mb-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Patient Summary</p>
             <div className="grid grid-cols-2 gap-1 text-sm">
               <div><span className="text-muted-foreground">Name: </span><span className="font-medium">{selectedAnimal.name}</span></div>
-              <div><span className="text-muted-foreground">Breed: </span>{selectedAnimal.breed.name}</div>
+              <div><span className="text-muted-foreground">Breed: </span>{selectedAnimal.breed?.name ?? selectedAnimal.breedName ?? ""}</div>
               <div><span className="text-muted-foreground">Sex: </span>{selectedAnimal.sex === "MALE" ? "Male" : "Female"}</div>
               <div><span className="text-muted-foreground">Stage: </span>{selectedAnimal.lifeStage.name}</div>
             </div>
@@ -625,7 +625,7 @@ function CollectPanel({
           <SelectInput value={effectiveAnimalId} onChange={(v) => { onSelectAnimal(v); collectMaterial.reset() }}>
             <option value="">— Select animal —</option>
             {filteredAnimals.map((a) => (
-              <option key={a.id} value={a.id}>{a.name} — {a.breed.name}</option>
+              <option key={a.id} value={a.id}>{a.name} — {a.breed?.name ?? a.breedName ?? ""}</option>
             ))}
           </SelectInput>
         </div>
@@ -648,7 +648,7 @@ function CollectPanel({
                 <span className="font-medium text-foreground">{m.animal?.name ?? "Unknown"}</span>
                 <div className="flex items-center gap-3">
                   {m.animal?.breed?.name && (
-                    <span className="text-xs text-muted-foreground">{m.animal.breed.name}</span>
+                    <span className="text-xs text-muted-foreground">{m.animal.breed?.name ?? m.animal.breedName ?? ""}</span>
                   )}
                   <span className="font-mono text-xs text-muted-foreground">
                     {new Date(m.collectedAt).toLocaleDateString()}
@@ -795,7 +795,7 @@ function ImplantEmbryoPanel({
           <SelectInput value={effectiveSurrogateId} onChange={(v) => { onSelectAnimal(v); implant.reset() }}>
             <option value="">— Select animal —</option>
             {filteredSurrogates.map((a) => (
-              <option key={a.id} value={a.id}>{a.name} — {a.breed.name} · {a.lifeStage.name}</option>
+              <option key={a.id} value={a.id}>{a.name} — {a.breed?.name ?? a.breedName ?? ""} · {a.lifeStage.name}</option>
             ))}
           </SelectInput>
         </div>
@@ -861,7 +861,7 @@ function AIPanel({
           <SelectInput value={effectiveDamId} onChange={(v) => { onSelectAnimal(v); artificialInsemination.reset() }}>
             <option value="">— Select animal —</option>
             {filteredFemales.map((a) => (
-              <option key={a.id} value={a.id}>{a.name} — {a.breed.name} · {a.lifeStage.name}</option>
+              <option key={a.id} value={a.id}>{a.name} — {a.breed?.name ?? a.breedName ?? ""} · {a.lifeStage.name}</option>
             ))}
           </SelectInput>
         </div>
@@ -900,7 +900,7 @@ function StorageSectionList({
           <Snowflake size={12} className="shrink-0 text-muted-foreground/60" />
           <span className="flex-1 font-medium text-foreground">{m.animal?.name ?? "Unknown"}</span>
           {m.animal?.breed?.name && (
-            <span className="text-xs text-muted-foreground">{m.animal.breed.name}</span>
+            <span className="text-xs text-muted-foreground">{m.animal.breed?.name ?? m.animal.breedName ?? ""}</span>
           )}
           <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
             {m.materialType === "SPERM" ? "Sperm" : m.materialType === "EGG" ? "Egg" : "Embryo"}

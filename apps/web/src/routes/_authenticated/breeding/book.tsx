@@ -111,7 +111,9 @@ function BookBreedingPage() {
   }
 
   const offspringCOIColor = preview ? getCOIColor(preview.offspringCOI) : ""
-  const isCrossBreed = preview ? preview.sire.breedId !== preview.dam.breedId : false
+  const sireName = preview?.sire.breed?.name ?? preview?.sire.breedName
+  const damName  = preview?.dam.breed?.name  ?? preview?.dam.breedName
+  const isCrossBreed = preview ? sireName !== damName : false
   const isPending = sendPending || acceptPending
 
   return (

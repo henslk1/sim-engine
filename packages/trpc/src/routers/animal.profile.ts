@@ -291,6 +291,7 @@ export const animalProfileRouter = router({
                 select: {
                   id: true,
                   name: true,
+                  breedName: true,
                   breed: { select: { id: true, name: true } },
                   playerAccount: { select: { id: true, username: true } },
                 },
@@ -310,6 +311,7 @@ export const animalProfileRouter = router({
                 select: {
                   id: true,
                   name: true,
+                  breedName: true,
                   breed: { select: { id: true, name: true } },
                   playerAccount: { select: { id: true, username: true } },
                 },
@@ -432,6 +434,7 @@ export const animalProfileRouter = router({
             ageInCycles: true,
             breedingCooldownUntilCycle: true,
             bornAt: true,
+            breedName: true,
             breed: { select: { id: true, name: true } },
             breedComposition: { select: { breedId: true, percentage: true } },
             conformationScores: {

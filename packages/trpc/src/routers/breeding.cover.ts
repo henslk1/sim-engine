@@ -66,6 +66,7 @@ const parentSelect = {
   generation: true,
   playerAccountId: true,
   breedId: true,
+  breedName: true,
   ageInCycles: true,
   breed: { select: { name: true } },
   fertility: true,
@@ -153,6 +154,7 @@ const breedingDisplaySelect = {
   fertility: true,
   inbreedingCoefficient: true,
   breedId: true,
+  breedName: true,
   breed: { select: { id: true, name: true } },
   playerAccount: { select: { id: true, username: true } },
   lifeStage: { select: { name: true } },
@@ -614,8 +616,8 @@ export const breedingCoverRouter = router({
             gameId: offer.gameId,
             sireId: offer.sireId,
             damId: offer.damId,
-            sireSnapshot: { animalId: offer.sireId, name: sire.name, breedId: sire.breedId, breedName: sire.breed?.name ?? "" },
-            damSnapshot: { animalId: offer.damId, name: dam.name, breedId: dam.breedId, breedName: dam.breed?.name ?? "" },
+            sireSnapshot: { animalId: offer.sireId, name: sire.name, breedId: sire.breedId, breedName: sire.breed?.name ?? sire.breedName ?? "" },
+            damSnapshot: { animalId: offer.damId, name: dam.name, breedId: dam.breedId, breedName: dam.breed?.name ?? dam.breedName ?? "" },
           },
           select: { id: true },
         })
@@ -666,13 +668,16 @@ export const breedingCoverRouter = router({
 
         const breedAlleleFrequencies = await buildBreedFreqMap(sire.breedComposition, dam.breedComposition)
 
+        const gradeId = gradeBread?.id ?? sire.breedId ?? dam.breedId
+        if (!gradeId) throw new Error("No grade breed configured for this game — add one via Admin > Breeds")
+
         const result = generateOffspring({
-          sire: { ...sire, breedId: sire.breedId!, quality: parentQuality(sire), personality: flattenPersonality(sire) },
-          dam: { ...dam, breedId: dam.breedId!, quality: parentQuality(dam), personality: flattenPersonality(dam) },
+          sire: { ...sire, breedId: sire.breedId ?? gradeId, quality: parentQuality(sire), personality: flattenPersonality(sire) },
+          dam: { ...dam, breedId: dam.breedId ?? gradeId, quality: parentQuality(dam), personality: flattenPersonality(dam) },
           damCareScore: damCareScore?.score ?? 100,
           gameConfig,
           gameInnateMax: gameInnateMax ?? { maxTotalInnate: 2000, averageTotalInnate: 1000 },
-          gradeBreedId: gradeBread?.id ?? sire.breedId!,
+          gradeBreedId: gradeId,
           breedAlleleFrequencies,
         })
 
@@ -1131,13 +1136,16 @@ export const breedingCoverRouter = router({
 
       const breedAlleleFrequencies = await buildBreedFreqMap(sire.breedComposition, dam.breedComposition)
 
+      const gradeId = gradeBreed?.id ?? sire.breedId ?? dam.breedId
+      if (!gradeId) throw new Error("No grade breed configured for this game — add one via Admin > Breeds")
+
       const result = generateOffspring({
-        sire: { ...sire, breedId: sire.breedId!, quality: parentQuality(sire), personality: flattenP(sire) },
-        dam: { ...dam, breedId: dam.breedId!, quality: parentQuality(dam), personality: flattenP(dam) },
+        sire: { ...sire, breedId: sire.breedId ?? gradeId, quality: parentQuality(sire), personality: flattenP(sire) },
+        dam: { ...dam, breedId: dam.breedId ?? gradeId, quality: parentQuality(dam), personality: flattenP(dam) },
         damCareScore: dam.careScore?.score ?? 100,
         gameConfig,
         gameInnateMax: gameInnateMax ?? { maxTotalInnate: 2000, averageTotalInnate: 1000 },
-        gradeBreedId: gradeBreed?.id ?? sire.breedId!,
+        gradeBreedId: gradeId,
         skipConceptionRoll: true,
         breedAlleleFrequencies,
       })

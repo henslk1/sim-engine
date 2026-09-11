@@ -83,6 +83,7 @@ export const breedingMaterialRouter = router({
             name: true,
             sex: true,
             breedId: true,
+            breedName: true,
             inbreedingCoefficient: true,
             breed: { select: { id: true, name: true } },
             fertility: true,
@@ -304,7 +305,7 @@ export const breedingMaterialRouter = router({
           name: animal.name,
           sex: animal.sex,
           breedId: animal.breedId,
-          breedName: animal.breed?.name ?? "",
+          breedName: animal.breed?.name ?? animal.breedName ?? "",
           fertility: animal.fertility,
           generation: animal.generation,
           breedGeneration: animal.breedGeneration,
@@ -653,6 +654,7 @@ export const breedingMaterialRouter = router({
             playerAccountId: true,
             gameId: true,
             breedId: true,
+            breedName: true,
             breedGeneration: true,
             generation: true,
             ageInCycles: true,
@@ -852,18 +854,21 @@ export const breedingMaterialRouter = router({
 
         const breedAlleleFrequencies = await buildBreedFreqMap(sireDataBase.breedComposition, dam.breedComposition)
 
+        const gradeId = gradeBread?.id ?? spermSnap.breedId ?? dam.breedId
+        if (!gradeId) throw new Error("No grade breed configured for this game")
+
         const result = generateOffspring({
           sire: sireData,
           dam: {
             ...dam,
             quality: damQuality,
-            breedId: dam.breedId!,
+            breedId: dam.breedId ?? gradeId,
             personality: dam.personality.map(p => ({ traitDefId: p.traitDefId, value: p.value, labelRanges: p.traitDef.labelRanges })),
           },
           damCareScore: dam.careScore?.score ?? 100,
           gameConfig,
           gameInnateMax: gameInnateMax ?? { maxTotalInnate: 2000, averageTotalInnate: 1000 },
-          gradeBreedId: gradeBread?.id ?? spermSnap.breedId,
+          gradeBreedId: gradeId,
           breedAlleleFrequencies,
         })
 
@@ -887,7 +892,7 @@ export const breedingMaterialRouter = router({
             sireId: sperm.animalId,
             damId: input.damId,
             sireSnapshot: { animalId: sperm.animalId, name: spermSnap.name, breedId: spermSnap.breedId, breedName: spermSnap.breedName },
-            damSnapshot: { animalId: input.damId, name: dam.name, breedId: dam.breedId!, breedName: dam.breed?.name ?? "" },
+            damSnapshot: { animalId: input.damId, name: dam.name, breedId: dam.breedId!, breedName: dam.breed?.name ?? dam.breedName ?? "" },
           },
           select: { id: true },
         })

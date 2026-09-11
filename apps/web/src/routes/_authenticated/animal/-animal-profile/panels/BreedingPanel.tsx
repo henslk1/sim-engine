@@ -478,7 +478,7 @@ export function BreedingPanel({
                         <option value="">Select a female…</option>
                         {ownFemales?.map((f) => (
                           <option key={f.id} value={f.id}>
-                            {f.name} · {f.breed.name} · {f.lifeStage.name}
+                            {f.name} · {f.breed?.name ?? f.breedName ?? ""} · {f.lifeStage.name}
                           </option>
                         ))}
                       </select>
@@ -531,7 +531,7 @@ export function BreedingPanel({
                             <option value="">Select a female…</option>
                             {playerResult.females.map((f) => (
                               <option key={f.id} value={f.id}>
-                                {f.name} · {f.breed.name} · {f.lifeStage.name}
+                                {f.name} · {f.breed?.name ?? f.breedName ?? ""} · {f.lifeStage.name}
                               </option>
                             ))}
                           </select>
@@ -653,7 +653,7 @@ export function BreedingPanel({
                           >
                             {offer.sire.name}
                           </Link>
-                          <span className="ml-1.5 text-[11px] text-muted-foreground">· {offer.sire.breed.name}</span>
+                          <span className="ml-1.5 text-[11px] text-muted-foreground">· {offer.sire.breed?.name ?? offer.sire.breedName ?? ""}</span>
                           <p className="text-[10px] text-muted-foreground">from {offer.sire.playerAccount.username}</p>
                         </div>
                         {offer.price > 0 && (
@@ -720,7 +720,7 @@ export function BreedingPanel({
                           >
                             {offer.dam.name}
                           </Link>
-                          <span className="ml-1.5 text-[11px] text-muted-foreground">· {offer.dam.breed.name}</span>
+                          <span className="ml-1.5 text-[11px] text-muted-foreground">· {offer.dam.breed?.name ?? offer.dam.breedName ?? ""}</span>
                           <p className="text-[10px] text-muted-foreground">to {offer.dam.playerAccount.username}</p>
                         </div>
                         {offer.price > 0 && (

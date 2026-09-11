@@ -91,7 +91,7 @@ function AnimalCard({ animal, cyclesPerYear }: {
       </div>
       <div className="p-1.5">
         <p className="truncate text-[11px] font-medium text-foreground">{animal.name}</p>
-        <p className="truncate text-[10px] text-muted-foreground">{animal.breed.name}</p>
+        <p className="truncate text-[10px] text-muted-foreground">{animal.breed?.name ?? animal.breedName ?? ""}</p>
         <p className="text-[10px] text-muted-foreground/70">{formatAge(animal.ageInCycles, cyclesPerYear)}</p>
       </div>
     </Link>
@@ -420,7 +420,7 @@ function MarketplacePanel({
                   </div>
                   <div className="min-w-0">
                     <p className="truncate text-xs font-medium text-foreground">{l.animal.name}</p>
-                    <p className="truncate text-[10px] text-muted-foreground">{l.animal.breed.name}</p>
+                    <p className="truncate text-[10px] text-muted-foreground">{l.animal.breed?.name ?? l.animal.breedName ?? ""}</p>
                   </div>
                 </Link>
               ))}

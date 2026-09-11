@@ -285,7 +285,7 @@ function ArchiveTab({ playerAccountId }: { playerAccountId: string }) {
               <div>
                 <p className="font-medium text-foreground/70">{a.name}</p>
                 <p className="text-xs text-muted-foreground">
-                  {a.breed.name} · {cycleToAge(a.ageInCycles)}
+                  {a.breed?.name ?? a.breedName ?? ""} · {cycleToAge(a.ageInCycles)}
                   {a.diedAt ? ` · Died ${new Date(a.diedAt).toLocaleDateString()}` : ""}
                   {a.causeOfDeath ? ` · ${a.causeOfDeath.replace(/_/g, " ")}` : ""}
                 </p>
