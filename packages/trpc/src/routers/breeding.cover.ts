@@ -56,7 +56,6 @@ function eligibleFemaleWhere(playerAccountId: string, gameId: string) {
     status: "ALIVE" as const,
     lifeStage: { canBreed: true },
     pregnancies: { none: { isCompleted: false } },
-    NOT: [{ gameShopAnimal: { isAvailable: true } }],
   }
 }
 
@@ -313,7 +312,6 @@ export const breedingCoverRouter = router({
           select: {
             sex: true, gameId: true,
             lifeStage: { select: { canBreed: true } },
-            gameShopAnimal: { select: { isAvailable: true } },
             energy: { select: { currentEnergy: true } },
           },
         }),
@@ -321,7 +319,6 @@ export const breedingCoverRouter = router({
 
       if (sire.sex !== "MALE") throw new Error("Sire must be male")
       if (dam.sex !== "FEMALE") throw new Error("Dam must be female")
-      if (dam.gameShopAnimal?.isAvailable) throw new Error("Dam is a game shop animal and cannot receive cover offers")
       if (sire.isCastrated) throw new Error("Sire is castrated")
       if (!sire.lifeStage.canBreed) throw new Error("Sire cannot breed at this life stage")
       if (!dam.lifeStage.canBreed) throw new Error("Dam cannot breed at this life stage")

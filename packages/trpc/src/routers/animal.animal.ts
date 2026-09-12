@@ -11,7 +11,7 @@ export const animalAnimalRouter = router({
       where: {
         playerAccountId: input.playerAccountId,
         status: { notIn: ["EMBRYO_STORED", "BURIED"] },
-        NOT: { gameShopAnimal: { isAvailable: true } },
+        isTutorialAnimal: false,
       },
       orderBy: { name: "asc" },
       select: {
@@ -25,6 +25,7 @@ export const animalAnimalRouter = router({
         breed: { select: { id: true, name: true, isUnregistered: true } },
         lifeStage: { select: { name: true, stageIndex: true } },
         disciplineDefId: true,
+        secondaryDisciplineDefId: true,
         disciplineDef: { select: { name: true, isConformation: true } },
         conformationScores: { select: { breedId: true } },
         equipment: { select: { itemDef: { select: { id: true } } } },
@@ -207,6 +208,33 @@ export const animalAnimalRouter = router({
           await tx.animal.update({
             where: { id: input.animalId },
             data: { disciplineDefId: input.disciplineDefId },
+          })
+
+          if (lowestTier) {
+            await tx.animalCompetitionTier.upsert({
+              where: { animalId_disciplineDefId: { animalId: input.animalId, disciplineDefId: input.disciplineDefId } },
+              create: { animalId: input.animalId, disciplineDefId: input.disciplineDefId, tierDefId: lowestTier.id },
+              update: {},
+            })
+          }
+
+          return { animalId: input.animalId, disciplineDefId: input.disciplineDefId }
+        })
+      }),
+
+    setSecondaryDiscipline: publicProcedure
+      .input(z.object({ animalId: z.string(), disciplineDefId: z.string() }))
+      .mutation(async ({ input }) => {
+        const lowestTier = await db.competitionTierDef.findFirst({
+          where: { disciplineDefId: input.disciplineDefId },
+          orderBy: { tierIndex: "asc" },
+          select: { id: true },
+        })
+
+        return db.$transaction(async (tx) => {
+          await tx.animal.update({
+            where: { id: input.animalId },
+            data: { secondaryDisciplineDefId: input.disciplineDefId },
           })
 
           if (lowestTier) {

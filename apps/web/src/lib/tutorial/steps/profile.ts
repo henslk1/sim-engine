@@ -18,7 +18,7 @@ export function profileSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks): 
       },
     },
 
-    // ── [12] Animal header — info ──────────────────────────────────────────────
+    // ── [12] Animal info strip — info ─────────────────────────────────────────
     {
       element: '[data-tutorial="animal-header"]',
       popover: {

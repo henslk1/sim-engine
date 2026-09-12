@@ -58,6 +58,7 @@ type AliveAnimal = {
   breed: { id: string; name: string; isUnregistered: boolean }
   lifeStage: { name: string; stageIndex: number }
   disciplineDefId: string | null
+  secondaryDisciplineDefId: string | null
   compTiers: { disciplineDefId: string; tierDefId: string }[]
   equipment: { itemDef: { id: string } }[]
   conformationScores: { breedId: string }[]
@@ -441,7 +442,7 @@ function VenueDetailPage() {
   function eligibleAnimalsFor(comp: Competition): AliveAnimal[] {
     return aliveAnimals.filter((a) => {
       if (comp.breedId && a.breed.id !== comp.breedId) return false
-      if (!comp.disciplineDef.isConformation && a.disciplineDefId !== comp.disciplineDef.id) return false
+      if (!comp.disciplineDef.isConformation && a.disciplineDefId !== comp.disciplineDef.id && a.secondaryDisciplineDefId !== comp.disciplineDef.id) return false
       if (comp.disciplineDef.minLifeStageIndex !== null && a.lifeStage.stageIndex < comp.disciplineDef.minLifeStageIndex) return false
       if (comp.disciplineDef.maxLifeStageIndex !== null && a.lifeStage.stageIndex > comp.disciplineDef.maxLifeStageIndex) return false
       if (!meetsEquipmentReqs(a, comp)) return false
@@ -477,7 +478,7 @@ function VenueDetailPage() {
 
   function isEligibleForAnimal(comp: Competition, animal: AliveAnimal): boolean {
     if (comp.breedId && animal.breed.id !== comp.breedId) return false
-    if (!comp.disciplineDef.isConformation && animal.disciplineDefId !== comp.disciplineDef.id) return false
+    if (!comp.disciplineDef.isConformation && animal.disciplineDefId !== comp.disciplineDef.id && animal.secondaryDisciplineDefId !== comp.disciplineDef.id) return false
     if (comp.disciplineDef.minLifeStageIndex !== null && animal.lifeStage.stageIndex < comp.disciplineDef.minLifeStageIndex) return false
     if (comp.disciplineDef.maxLifeStageIndex !== null && animal.lifeStage.stageIndex > comp.disciplineDef.maxLifeStageIndex) return false
     if (!meetsEquipmentReqs(animal, comp)) return false

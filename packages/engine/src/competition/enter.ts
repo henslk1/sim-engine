@@ -33,9 +33,12 @@ export async function enterCompetition(
     if (!competition.disciplineDef.isConformation) {
       const animalDiscipline = await tx.animal.findUniqueOrThrow({
         where: { id: animalId },
-        select: { disciplineDefId: true },
+        select: { disciplineDefId: true, secondaryDisciplineDefId: true },
       })
-      if (animalDiscipline.disciplineDefId !== competition.disciplineDefId) {
+      if (
+        animalDiscipline.disciplineDefId !== competition.disciplineDefId &&
+        animalDiscipline.secondaryDisciplineDefId !== competition.disciplineDefId
+      ) {
         throw new Error("Animal has not been assigned this discipline")
       }
     }

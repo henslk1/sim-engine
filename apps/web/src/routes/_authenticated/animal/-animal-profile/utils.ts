@@ -106,46 +106,55 @@ export function computeBreedingGrade(
   animal: AnimalProfile,
   config: AnimalProfile["game"]["gameConfig"]
 ): string {
-  const parts: number[] = []
-  parts.push((animal.careScore?.score ?? 0) / 100)
-  const topTier = [...animal.compTiers]
-    .filter(t => t.disciplineDef.maxLifeStageIndex === null)
-    .sort((a, b) => b.tierDef.tierIndex - a.tierDef.tierIndex)[0]
-  if (topTier) {
-    const maxTierIndex = topTier.disciplineDef.compTierDefs[0]?.tierIndex ?? topTier.tierDef.tierIndex
-    parts.push((topTier.tierDef.tierIndex + 1) / (maxTierIndex + 1))
-  } else {
-    parts.push(0)
+  const care = (animal.careScore?.score ?? 0) / 100
+
+  function discFraction(defId: string | null | undefined): number {
+    if (!defId) return 0
+    const tier = animal.compTiers.find((t) => t.disciplineDefId === defId)
+    if (!tier) return 0
+    const maxTierIndex = tier.disciplineDef.compTierDefs[0]?.tierIndex ?? tier.tierDef.tierIndex
+    return (tier.tierDef.tierIndex + 1) / (maxTierIndex + 1)
   }
-  parts.push(Math.max(0, 1 - animal.inbreedingCoefficient / 0.25))
-  if (animal.stats.length > 0 && config) {
-    parts.push(
-      animal.stats.reduce((sum, s) => {
+
+  const disc1 = discFraction(animal.disciplineDefId)
+  const disc2 = discFraction(animal.secondaryDisciplineDefId)
+
+  const coi = Math.max(0, 1 - animal.inbreedingCoefficient / 0.25)
+
+  const stats = animal.stats.length > 0 && config
+    ? animal.stats.reduce((sum, s) => {
         const cap = s.innateValue * config.trainingCeilingMultiplier
         return sum + Math.min(s.trainedValue / cap, 1)
       }, 0) / animal.stats.length
-    )
-  } else {
-    parts.push(0)
-  }
-  const isCross = animal.breedComposition.length > 1
-  if (!isCross && animal.conformationScores.length > 0) {
-    parts.push(animal.conformationScores.reduce((sum, s) => sum + s.score, 0) / animal.conformationScores.length / 100)
-  }
+    : 0
+
   const healthLoci = animal.genotypes.filter((g) =>
     g.locus.panelEntries.some((e) => e.panelDef.panelType === "HEALTH")
   )
-  if (healthLoci.length > 0) {
-    parts.push(healthLoci.filter((g) => g.isTestedByOwner).length / healthLoci.length)
+  const health = healthLoci.length > 0
+    ? healthLoci.filter((g) => g.isTestedByOwner).length / healthLoci.length
+    : 1
+
+  const conditions = Math.max(0, 1 - animal.healthRecords.filter((r) => r.isActive).length * 0.15)
+
+  const sum = care + disc1 * 1.5 + disc2 * 1.5 + coi + stats + health + conditions
+  const pct = (sum / 8) * 100
+
+  function isAtMaxTier(defId: string | null | undefined): boolean {
+    if (!defId) return false
+    const tier = animal.compTiers.find((t) => t.disciplineDefId === defId)
+    if (!tier) return false
+    const maxTierIndex = tier.disciplineDef.compTierDefs[0]?.tierIndex ?? tier.tierDef.tierIndex
+    return tier.tierDef.tierIndex >= maxTierIndex
   }
-  parts.push(Math.max(0, 1 - animal.healthRecords.filter((r) => r.isActive).length * 0.15))
-  const pct = (parts.reduce((a, b) => a + b, 0) / parts.length) * 100
-  const hasTopSportTier = animal.compTiers
-    .filter((t) => !t.disciplineDef.isConformation && t.disciplineDef.maxLifeStageIndex === null)
-    .some((t) => t.tierDef.tierIndex >= (t.disciplineDef.compTierDefs[0]?.tierIndex ?? t.tierDef.tierIndex))
-  const hasTopConformationTier = animal.compTiers
-    .filter((t) => t.disciplineDef.isConformation && t.disciplineDef.maxLifeStageIndex === null)
-    .some((t) => t.tierDef.tierIndex >= (t.disciplineDef.compTierDefs[0]?.tierIndex ?? t.tierDef.tierIndex))
-  const isS = pct >= 100 && hasTopSportTier && hasTopConformationTier
-  return isS ? "S" : pct >= 85 ? "A" : pct >= 70 ? "B" : pct >= 55 ? "C" : pct >= 40 ? "D" : "F"
+
+  const isPurebred = animal.breedComposition.length === 1
+  const disc1Max = isAtMaxTier(animal.disciplineDefId)
+  const disc2Max = isAtMaxTier(animal.secondaryDisciplineDefId)
+  const avgConformation = animal.conformationScores.length > 0
+    ? animal.conformationScores.reduce((s, c) => s + c.score, 0) / animal.conformationScores.length
+    : 0
+  const isS = pct >= 90 && disc1Max && disc2Max && isPurebred && avgConformation >= 85
+
+  return isS ? "S" : pct >= 90 ? "A" : pct >= 75 ? "B" : pct >= 65 ? "C" : pct >= 50 ? "D" : "F"
 }

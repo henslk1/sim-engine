@@ -46,6 +46,14 @@ export function startTutorial(
     devPauseStep(ctrl, devPausedRef),    // 21
   ]
 
+  // Save the live step index to localStorage on page unload so a refresh resumes
+  // from the exact step, not just the last checkpoint that called ctrl.moveNext().
+  const saveStepOnUnload = () => {
+    const idx = _activeDriver?.getActiveIndex() ?? null
+    if (idx !== null) localStorage.setItem("tutorial_step", String(idx))
+  }
+  window.addEventListener("beforeunload", saveStepOnUnload)
+
   const driverObj = driver({
     showProgress: true,
     animate: true,
@@ -53,6 +61,7 @@ export function startTutorial(
     smoothScroll: true,
     allowClose: false,
     onDestroyStarted: () => {
+      window.removeEventListener("beforeunload", saveStepOnUnload)
       _tourRunning = false
       if (ctrl.isLastStep() && !devPausedRef.value) {
         ctrl.destroy()

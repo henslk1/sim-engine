@@ -1,9 +1,10 @@
+import { useState, useEffect } from "react"
 import { createFileRoute, redirect, Outlet, useLocation, useRouter } from "@tanstack/react-router"
 import { Header } from "@/components/header"
 import { trpc, trpcVanilla } from "@/lib/trpc"
 import { MessagingWidget } from "@/components/messaging-widget"
 import { authClient } from "@/lib/auth-client"
-import { isTourRunning, destroyActiveTour } from "@/lib/tutorial"
+import { isTourRunning, destroyActiveTour, startTutorial, setTourRunning } from "@/lib/tutorial"
 
 type Session = typeof authClient.$Infer.Session
 
@@ -136,11 +137,11 @@ export const Route = createFileRoute("/_authenticated")({
         throw redirect({ to: currentStep >= 6 ? "/stable" : "/shop" })
       }
 
+      // Allow pages based on stored step index so a page refresh doesn't evict the user.
+      // `touring` resets on every full page load; `currentStep` persists via localStorage.
       const allowed = ["/dashboard"]
-      if (touring) {
-        allowed.push("/shop")
-        if (currentStep >= 6) { allowed.push("/stable"); allowed.push("/animal") }
-      }
+      if (touring || currentStep >= 1) allowed.push("/shop")
+      if (touring || currentStep >= 6) { allowed.push("/stable"); allowed.push("/animal") }
 
       if (!allowed.some((p) => location.pathname.startsWith(p))) {
         throw redirect({ to: "/dashboard" })
@@ -149,6 +150,74 @@ export const Route = createFileRoute("/_authenticated")({
   },
   component: AuthenticatedLayout,
 })
+
+// Auto-resumes Driver.js when a page refreshes mid-tutorial.
+// Only fires when: not on /dashboard (welcome dialog handles that), not already touring,
+// already on the correct page for the stored step, and tutorial data has loaded.
+function TutorialResumeGate() {
+  const location = useLocation()
+
+  const lsRaw = parseInt(localStorage.getItem("tutorial_step") ?? "", 10)
+  const storedStep = isNaN(lsRaw) ? 0 : lsRaw
+
+  const skipPaths = ["/tutorial", "/setup", "/admin", "/dashboard"]
+  const isSkipPath = skipPaths.some(p => location.pathname.startsWith(p))
+  const active = storedStep > 0 && !isTourRunning() && !isSkipPath
+
+  const { data: gameData } = trpc.admin.game.get.useQuery(undefined, { enabled: active })
+  const gameId = gameData?.id
+
+  const { data: me, isLoading: meLoading } = trpc.player.me.useQuery(
+    { gameId: gameId! },
+    { enabled: !!gameId && active },
+  )
+  const tutorialComplete = me?.seniority?.tutorialCompleted
+
+  const { data: tutorialPair, isLoading: pairLoading } = trpc.tutorial.pairIds.useQuery(
+    { gameId: gameId! },
+    { enabled: !!gameId && active && storedStep >= 11 },
+  )
+
+  const completeStepMutation = trpc.tutorial.completeStep.useMutation()
+  const grantGoldMutation = trpc.tutorial.grantStartingGold.useMutation()
+  const grantPremiumMutation = trpc.tutorial.grantStartingPremium.useMutation()
+
+  const [launched, setLaunched] = useState(false)
+
+  useEffect(() => {
+    if (!active || launched || isTourRunning()) return
+    if (!gameId || meLoading || tutorialComplete == null) return
+    if (tutorialComplete) return
+    if (storedStep >= 11 && pairLoading) return
+
+    // Only resume if already on the correct page — wrong-page case falls back to welcome dialog
+    const animalId = tutorialPair?.ancestorOneId
+    const onCorrectPage =
+      storedStep >= 11
+        ? !!animalId && location.pathname === `/animal/${animalId}`
+        : storedStep >= 6
+          ? location.pathname.startsWith("/stable")
+          : location.pathname.startsWith("/shop")
+
+    if (!onCorrectPage) return
+
+    setLaunched(true)
+    setTourRunning(true)
+    setTimeout(() => {
+      startTutorial(
+        {
+          grantGold: () => grantGoldMutation.mutateAsync({ gameId: gameId! }),
+          grantPremium: () => grantPremiumMutation.mutateAsync({ gameId: gameId! }),
+          completeStep: (key) => completeStepMutation.mutateAsync({ gameId: gameId!, stepKey: key }),
+        },
+        storedStep,
+        () => completeStepMutation.mutate({ gameId: gameId!, stepKey: "tutorial_complete" }),
+      )
+    }, 500)
+  }, [active, launched, gameId, meLoading, tutorialComplete, pairLoading, tutorialPair, storedStep, location.pathname])
+
+  return null
+}
 
 function AuthenticatedLayout() {
   const { session } = Route.useRouteContext()
@@ -163,6 +232,7 @@ function AuthenticatedLayout() {
       </main>
       {!isSetup && <MessagingWidget />}
       {!isSetup && <TutorialDevBar />}
+      {!isSetup && <TutorialResumeGate />}
     </div>
   )
 }

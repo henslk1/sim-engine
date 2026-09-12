@@ -53,7 +53,8 @@ model DisciplineDef {
   seasonCategories       SeasonCategory[]
   recordDefs             RecordDef[]
   titleDefs              TitleDef[]
-  animals                Animal[]
+  animalsPrimary         Animal[]                         @relation("AnimalPrimaryDiscipline")
+  animalsSecondary       Animal[]                         @relation("AnimalSecondaryDiscipline")
   groups                 Group[]
   equipmentRequirements  DisciplineEquipmentRequirement[]
   templateCompTiers      AnimalTemplateCompTier[]

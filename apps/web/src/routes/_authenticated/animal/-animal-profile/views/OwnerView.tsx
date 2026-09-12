@@ -69,30 +69,31 @@ export function OwnerView({ animal, animalId, playerAccountId }: { animal: Anima
         />
       )}
 
-      {/* Header */}
-      <div data-tutorial="animal-header" className="flex shrink-0 flex-col items-center gap-3 border-b border-border bg-card px-4 py-4">
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          <h1 className="font-serif text-2xl font-semibold tracking-tight text-foreground">{animal.name}</h1>
-          <Badge tone="success">{animal.status}</Badge>
-          {activeConditions.length > 0 && (
-            <Badge tone="danger">
-              <Stethoscope className="size-3" />
-              {activeConditions.length} condition{activeConditions.length > 1 ? "s" : ""}
-            </Badge>
-          )}
-        </div>
+      {/* Header + info strip */}
+      <div className="flex shrink-0 flex-col items-center border-b border-border bg-card px-4 pt-4">
+        <div data-tutorial="animal-header" className="flex w-full max-w-5xl flex-col items-center gap-3">
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <h1 className="font-serif text-2xl font-semibold tracking-tight text-foreground">{animal.name}</h1>
+            <Badge tone="success">{animal.status}</Badge>
+            {activeConditions.length > 0 && (
+              <Badge tone="danger">
+                <Stethoscope className="size-3" />
+                {activeConditions.length} condition{activeConditions.length > 1 ? "s" : ""}
+              </Badge>
+            )}
+          </div>
 
-        <ActionButton
-          variant="soft"
-          disabled={advancePending || animal.status !== "ALIVE"}
-          onClick={() => advanceAge({ animalId: animal.id })}
-        >
-          {advancePending ? <Loader2 className="size-3.5 animate-spin" /> : <Clock className="size-3.5" />}
-          Advance Age
-        </ActionButton>
+          <ActionButton
+            variant="soft"
+            disabled={advancePending || animal.status !== "ALIVE"}
+            onClick={() => advanceAge({ animalId: animal.id })}
+          >
+            {advancePending ? <Loader2 className="size-3.5 animate-spin" /> : <Clock className="size-3.5" />}
+            Advance Age
+          </ActionButton>
 
-        {/* Vitals */}
-        <div className="grid w-full max-w-lg grid-cols-5 gap-x-4 gap-y-2">
+          {/* Vitals */}
+          <div className="grid w-full max-w-lg grid-cols-5 gap-x-4 gap-y-2">
           {(
             [
               { label: "Energy", value: animal.energy?.currentEnergy ?? 0, max: animal.energy?.maxEnergy ?? 100, tone: "energy" as const, threshold: config.overworkInjuryThreshold > 0 ? config.overworkInjuryThreshold : undefined },
@@ -110,17 +111,18 @@ export function OwnerView({ animal, animalId, playerAccountId }: { animal: Anima
               <Meter value={v.value} max={v.max} tone={v.tone} threshold={"threshold" in v ? v.threshold : undefined} />
             </div>
           ))}
+          </div>
+
+          <div className="w-full">
+            <AlertBanner animal={animal} />
+            <InfoStrip
+              animal={animal}
+              cycleToAge={cycleToAge}
+              breedingGrade={breedingGrade}
+            />
+          </div>
         </div>
       </div>
-
-      {/* Info strip */}
-      <AlertBanner animal={animal} />
-
-      <InfoStrip
-        animal={animal}
-        cycleToAge={cycleToAge}
-        breedingGrade={breedingGrade}
-      />
 
       <main className="min-h-0 flex-1 overflow-auto p-3">
         <div className="grid min-h-0 gap-3 grid-cols-1 min-[1400px]:h-full min-[1400px]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,2.6fr)_minmax(0,1.15fr)_minmax(0,0.85fr)]">

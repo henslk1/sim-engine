@@ -86,7 +86,7 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
       tx.animalImmunity.findUnique({ where: { animalId } }),
       tx.animalCareScore.findUnique({ where: { animalId } }),
     ])
-    if (immunity && immunity.innateMax > 0) {
+    if (!animal.isTutorialAnimal && immunity && immunity.innateMax > 0) {
       const immunityRatio = immunity.value / 100
       const careRatio = careScore ? careScore.score / 100 : 1
       const illnessChance = (1 - immunityRatio * careRatio) / 25
@@ -360,7 +360,7 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
     const isOverworked = !!(energy && gameConfig.overworkInjuryThreshold > 0 && energy.currentEnergy < gameConfig.overworkInjuryThreshold)
 
     // Overwork injury: fires if animal ends the cycle with critically low energy
-    if (isOverworked) {
+    if (!animal.isTutorialAnimal && isOverworked) {
       if (Math.random() < gameConfig.overworkInjuryChance + animal.structuralRisk) {
         const injuryPool = await tx.healthConditionDef.findMany({
           where: {

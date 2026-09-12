@@ -179,6 +179,7 @@ model Animal {
   breedGeneration                     Int?
   lifeExpectancy                      Int?
   disciplineDefId                     String?
+  secondaryDisciplineDefId            String?
   breedingCooldownUntilCycle          Int?
   geneticCollectionCooldownUntilCycle Int?
   subContainerId                      String?
@@ -248,7 +249,8 @@ model Animal {
   breeder       PlayerAccount? @relation("AnimalBreeder", fields: [breederId], references: [id])
   breed         Breed?         @relation(fields: [breedId], references: [id])
   lifeStage     LifeStageDef   @relation(fields: [lifeStageId], references: [id])
-  disciplineDef DisciplineDef? @relation(fields: [disciplineDefId], references: [id])
+  disciplineDef          DisciplineDef? @relation("AnimalPrimaryDiscipline", fields: [disciplineDefId], references: [id])
+  secondaryDisciplineDef DisciplineDef? @relation("AnimalSecondaryDiscipline", fields: [secondaryDisciplineDefId], references: [id])
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 }

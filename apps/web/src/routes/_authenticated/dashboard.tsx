@@ -445,7 +445,7 @@ function DashboardPage() {
   // First incomplete step def — drives the contextual re-entry dialog.
   const nextIncompleteStep = tutorialProgress?.steps.find((step) => {
     const prog = tutorialProgress.progress.find((p) => p.stepDefId === step.id)
-    return prog !== undefined && prog.completedAt === null
+    return !prog || prog.completedAt === null
   })
 
   // Map completed step defs to a Driver.js checkpoint resume index.

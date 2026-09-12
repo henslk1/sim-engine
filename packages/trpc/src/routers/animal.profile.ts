@@ -27,6 +27,7 @@ export const animalProfileRouter = router({
             },
           },
           disciplineDef: true,
+          secondaryDisciplineDef: true,
           breedComposition: { include: { breed: true } },
 
           // Pedigree

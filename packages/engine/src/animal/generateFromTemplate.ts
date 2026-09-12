@@ -147,6 +147,7 @@ export async function generateFromTemplate(tx: Tx, opts: GenerateFromTemplateOpt
       isTutorialAnimal: opts.isTutorialAnimal,
       lore: template.lore ?? null,
       disciplineDefId: template.compTiers[0]?.disciplineDefId ?? null,
+      secondaryDisciplineDefId: template.compTiers[1]?.disciplineDefId ?? null,
       phenotypeDescription,
       structuralRisk,
       preferredTerrain: preferredTerrain as any,
