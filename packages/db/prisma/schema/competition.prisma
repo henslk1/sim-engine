@@ -41,6 +41,7 @@ model DisciplineDef {
   name                   String
   description            String?
   isConformation         Boolean                          @default(false)
+  isTutorialSelectable   Boolean                          @default(false)
   minLifeStageIndex      Int?
   maxLifeStageIndex      Int?
   statWeights            DisciplineStatWeight[]

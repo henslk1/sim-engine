@@ -26,8 +26,12 @@ export const animalProfileRouter = router({
               stageActivityDefs: { include: { traitDef: true } },
             },
           },
-          disciplineDef: true,
-          secondaryDisciplineDef: true,
+          disciplineDef: {
+            include: { equipmentRequirements: { select: { itemDefId: true } } },
+          },
+          secondaryDisciplineDef: {
+            include: { equipmentRequirements: { select: { itemDefId: true } } },
+          },
           breedComposition: { include: { breed: true } },
 
           // Pedigree

@@ -230,12 +230,33 @@ export const tutorialRouter = router({
         compTierLookup,
       }
 
+      // Pre-fetch equipment requirements for the tutorial female so we can equip her at setup.
+      const mergedFemaleTpl = mergeTemplate(femaleBase, femaleTpl)
+      const femaleDiscId = mergedFemaleTpl.compTiers[0]?.disciplineDefId ?? null
+      const femaleEquipReqs = femaleDiscId
+        ? await db.disciplineEquipmentRequirement.findMany({
+            where: { disciplineDefId: femaleDiscId },
+            select: { itemDefId: true },
+          })
+        : []
+
       return await db.$transaction(async (tx) => {
         // 1. Female ancestor (owned by game account)
         const femaleId = await generateFromTemplate(tx, {
           ...sharedOpts,
-          template: mergeTemplate(femaleBase, femaleTpl),
+          template: mergedFemaleTpl,
         })
+
+        if (femaleEquipReqs.length > 0) {
+          await tx.animalEquipment.createMany({
+            data: femaleEquipReqs.map(r => ({
+              animalId: femaleId,
+              itemDefId: r.itemDefId,
+              slot: r.itemDefId,
+            })),
+            skipDuplicates: true,
+          })
+        }
 
         // 2. Male ancestor (owned by game account) + stud listing
         const maleId = await generateFromTemplate(tx, {

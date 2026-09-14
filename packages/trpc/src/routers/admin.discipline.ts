@@ -27,6 +27,7 @@ export const disciplineAdminRouter = router({
       name: z.string().min(1),
       description: z.string().nullish(),
       isConformation: z.boolean().default(false),
+      isTutorialSelectable: z.boolean().default(false),
       minLifeStageIndex: z.number().int().nullish(),
       maxLifeStageIndex: z.number().int().nullish(),
     }))

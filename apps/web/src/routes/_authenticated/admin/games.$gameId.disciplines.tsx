@@ -4,8 +4,8 @@ import { useState, useEffect, Fragment } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 
-type DisciplineForm = { id?: string; name: string; description: string; isConformation: boolean; minLifeStageIndex: string; maxLifeStageIndex: string }
-const emptyDiscipline = (): DisciplineForm => ({ name: "", description: "", isConformation: false, minLifeStageIndex: "", maxLifeStageIndex: "" })
+type DisciplineForm = { id?: string; name: string; description: string; isConformation: boolean; isTutorialSelectable: boolean; minLifeStageIndex: string; maxLifeStageIndex: string }
+const emptyDiscipline = (): DisciplineForm => ({ name: "", description: "", isConformation: false, isTutorialSelectable: false, minLifeStageIndex: "", maxLifeStageIndex: "" })
 
 // ─── StatWeightRow ────────────────────────────────────────────────────────────
 
@@ -408,7 +408,7 @@ function DisciplinesPage() {
   const availableTraits = traits?.filter((t) => !usedTraitIds.has(t.id)) ?? []
 
   function openEdit(d: NonNullable<typeof disciplines>[number]) {
-    setEditing({ id: d.id, name: d.name, description: d.description ?? "", isConformation: d.isConformation, minLifeStageIndex: d.minLifeStageIndex?.toString() ?? "", maxLifeStageIndex: d.maxLifeStageIndex?.toString() ?? "" })
+    setEditing({ id: d.id, name: d.name, description: d.description ?? "", isConformation: d.isConformation, isTutorialSelectable: d.isTutorialSelectable, minLifeStageIndex: d.minLifeStageIndex?.toString() ?? "", maxLifeStageIndex: d.maxLifeStageIndex?.toString() ?? "" })
     setActiveTab("stats")
     setEditingPersonalityWeightId(null); setEditingPersonalityWeight({ idealMin: "", idealMax: "", bonusPercent: "" })
     setNewPersonalityWeight({ traitDefId: "", idealMin: "", idealMax: "", bonusPercent: "" })
@@ -421,6 +421,7 @@ function DisciplinesPage() {
       ...editing,
       gameId,
       description: editing.description || null,
+      isTutorialSelectable: editing.isTutorialSelectable,
       minLifeStageIndex: editing.minLifeStageIndex !== "" ? parseInt(editing.minLifeStageIndex) : null,
       maxLifeStageIndex: editing.maxLifeStageIndex !== "" ? parseInt(editing.maxLifeStageIndex) : null,
     })
@@ -470,6 +471,10 @@ function DisciplinesPage() {
                 <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
                   <input type="checkbox" checked={editing.isConformation} onChange={(e) => setEditing({ ...editing, isConformation: e.target.checked })} className="h-4 w-4 rounded border border-input accent-primary" />
                   Conformation discipline
+                </label>
+                <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
+                  <input type="checkbox" checked={editing.isTutorialSelectable} onChange={(e) => setEditing({ ...editing, isTutorialSelectable: e.target.checked })} className="h-4 w-4 rounded border border-input accent-primary" />
+                  Available in tutorial discipline picker
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="flex flex-col gap-1">
@@ -727,6 +732,7 @@ function DisciplinesPage() {
                 <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Stat Wts</th>
                 <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Trait Wts</th>
                 <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Equipment</th>
+                <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Tutorial</th>
                 <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
               </tr>
             </thead>
@@ -744,6 +750,9 @@ function DisciplinesPage() {
                   <td className="px-3 py-2 text-center text-muted-foreground">{d._count.statWeights}</td>
                   <td className="px-3 py-2 text-center text-muted-foreground">{d._count.personalityWeights}</td>
                   <td className="px-3 py-2 text-center text-muted-foreground">{d._count.equipmentRequirements > 0 ? d._count.equipmentRequirements : <span className="opacity-30">—</span>}</td>
+                  <td className="px-3 py-2 text-center text-muted-foreground">
+                    {d.isTutorialSelectable ? <span className="text-chart-2">✓</span> : <span className="opacity-30">—</span>}
+                  </td>
                   <td className="px-3 py-2 text-right">
                     <Button size="sm" variant="ghost" onClick={() => openEdit(d)}>Edit</Button>
                   </td>
@@ -751,7 +760,7 @@ function DisciplinesPage() {
               ))}
               {disciplines?.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-3 py-6 text-center text-sm text-muted-foreground">No disciplines yet.</td>
+                  <td colSpan={8} className="px-3 py-6 text-center text-sm text-muted-foreground">No disciplines yet.</td>
                 </tr>
               )}
             </tbody>
