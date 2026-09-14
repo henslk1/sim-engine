@@ -19,10 +19,35 @@ export const nightlyWorker = new Worker (
       data: { status: "BURIED"}
     })
 
-    const animals = await db.animal.findMany({
-      where: { gameId, status: "ALIVE" },
-      select: { id: true, lifeStageId: true },
+    // Only age animals that were interacted with during their current cycle.
+    // Shop animals (isAvailable: true) are always excluded.
+    const candidates = await db.animal.findMany({
+      where: { gameId, status: "ALIVE", NOT: { gameShopAnimal: { isAvailable: true } } },
+      select: { id: true, lifeStageId: true, ageInCycles: true },
     })
+
+    const candidateIds = candidates.map(a => a.id)
+    const cyclesInPlay = [...new Set(candidates.map(a => a.ageInCycles))]
+
+    // COVER_ACCEPTED is written to the sire when a female owner accepts a stud market
+    // cover — the stud owner played no part, so it must not count as an interaction.
+    const interactedLogs = await db.animalDailyLog.findMany({
+      where: {
+        animalId: { in: candidateIds },
+        cycleNumber: { in: cyclesInPlay },
+        NOT: { eventType: "COVER_ACCEPTED" },
+      },
+      select: { animalId: true, cycleNumber: true },
+      distinct: ["animalId"],
+    })
+
+    const interactedIds = new Set(
+      interactedLogs
+        .filter(log => candidates.find(a => a.id === log.animalId)?.ageInCycles === log.cycleNumber)
+        .map(log => log.animalId)
+    )
+
+    const animals = candidates.filter(a => interactedIds.has(a.id))
 
     for (const animal of animals) {
       try {
@@ -79,5 +104,5 @@ export const nightlyWorker = new Worker (
     console.log(`[nightly] gameId=${gameId} aged=${animals.length} deaths=${deaths} transitions=${transitions}`)
     
   },
-  { connection }
+  { connection, lockDuration: 120000 }
 )

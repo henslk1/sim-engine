@@ -414,7 +414,7 @@ function StablePage() {
   const conformationName = disciplines?.find((d) => d.isConformation)?.name ?? "Conformation"
 
   const { data: animals = [], isLoading: animalsLoading } = trpc.animal.list.useQuery(
-    { playerAccountId: playerAccountId! },
+    { playerAccountId: playerAccountId!, includeTutorial: true },
     { enabled: !!playerAccountId },
   )
 

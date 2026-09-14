@@ -54,8 +54,15 @@ model TutorialAnimalPair {
   playerAccount   PlayerAccount @relation(fields: [playerAccountId], references: [id])
 }
 
+enum TutorialCompletionCondition {
+  TRAINING_CAPPED
+  COMPETITION_TIER
+  PREGNANCY_COMPLETE
+  LIFE_STAGE
+}
+
 model TutorialStepDef {
-  id                      String               @id @default(cuid())
+  id                      String                        @id @default(cuid())
   gameId                  String
   stepKey                 String
   name                    String
@@ -67,6 +74,8 @@ model TutorialStepDef {
   triggerConditionDefId   String?
   grantCurrencyDefId      String?
   grantCurrencyAmount     Int?
+  completionCondition     TutorialCompletionCondition?
+  completionTarget        Int?
   tutorialProgressions    TutorialProgress[]
   grants                  TutorialStepGrant[]
   game                    Game                 @relation(fields: [gameId], references: [id])

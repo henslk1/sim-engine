@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useRef } from "react"
 import type { AnimalProfile } from "../types"
 import { Panel, Badge, Meter, ActionButton } from "@/components/game/ui"
 import { Dumbbell, Ban, Loader2, Zap, HeartHandshake } from "lucide-react"
@@ -89,11 +89,34 @@ export function TrainingPanel({
   const activities = animal.lifeStage.stageActivityDefs
   const performedThisCycle = animal.stageActivityLogs.some((l) => l.cycleNumber === animal.ageInCycles)
 
+  const lockedTargetStatIdRef = useRef<string | null>(null)
+
+  const targetStat = config && animal.stats.length > 0
+    ? animal.stats.reduce((best, s) => {
+        const cap = getTrainingCap(s.innateValue, config, animal.personality)
+        const bestCap = getTrainingCap(best.innateValue, config, animal.personality)
+        return (cap - s.trainedValue) > (bestCap - best.trainedValue) ? s : best
+      })
+    : null
+
+  const maxTierIndex = tiers.length > 0 ? Math.max(...tiers.map(t => t.tierIndex)) : -1
+  const minTierIndex = tiers.length > 0 ? Math.min(...tiers.map(t => t.tierIndex)) : -1
+
+  // Lock in the tutorial target stat on first render so it doesn't shift
+  // as trainedValue increases and changes the headroom ranking.
+  if (targetStat && lockedTargetStatIdRef.current === null) {
+    lockedTargetStatIdRef.current = targetStat.statDef.id
+  }
+  const tutorialTargetStatId = lockedTargetStatIdRef.current
+
   return (
     <Panel
+      data-tutorial={canTrainStage ? "training-panel" : undefined}
       title={canTrainStage ? "Training" : "Bonding"}
       icon={canTrainStage ? <Dumbbell className="size-4 text-chart-2" /> : <HeartHandshake className="size-4 text-chart-5" />}
-      action={canTrainStage && config ? <Badge tone="outline">Cap = innate × {config.trainingCeilingMultiplier}</Badge> : undefined}
+      action={canTrainStage && config
+        ? <span data-tutorial="training-cap"><Badge tone="outline">Cap = innate × {config.trainingCeilingMultiplier}</Badge></span>
+        : undefined}
     >
       {!canTrainStage ? (
         <div className="space-y-1.5">
@@ -185,14 +208,16 @@ export function TrainingPanel({
               Training restricted due to active treatment
             </div>
           )}
-          <div className="space-y-1.5">
-            {animal.stats.map((stat: Stat) => {
+          <div className="space-y-1.5" data-tutorial="training-innate">
+            {(() => {
+              const cards = animal.stats.map((stat: Stat) => {
               const cap = getTrainingCap(stat.innateValue, config, animal.personality)
               const trainingDef = animal.game.trainingActionDefs.find((d) => d.statDefId === stat.statDef.id)
               const tierId = selectedTier[stat.statDef.id] ?? tiers[0]?.id
               const tier = tiers.find((t) => t.id === tierId)
               const isPending = pendingStatId === stat.statDef.id
               const atCap = stat.trainedValue >= cap
+              const isNearCap = !atCap && (cap - stat.trainedValue) / cap < 0.15
               const hasEnergy = tier != null && (animal.energy?.currentEnergy ?? 0) >= tier.energyCost
               const tierLocked = tier != null && (
                 (maxAllowedTierIndex != null && tier.tierIndex > maxAllowedTierIndex) ||
@@ -208,18 +233,28 @@ export function TrainingPanel({
                 : maxAllowedTierIndex != null && tier != null && tier.tierIndex > maxAllowedTierIndex ? "Vet restriction"
                 : null
 
+              const isTargetStat = targetStat?.statDef.id === stat.statDef.id
+              const isFirstStat = animal.stats[0]?.statDef.id === stat.statDef.id
+
               return (
-                <div key={stat.statDef.name} className="rounded-md border border-border/70 bg-secondary/30 px-2 py-1.5">
+                <div
+                  key={stat.statDef.name}
+                  className="rounded-md border border-border/70 bg-secondary/30 px-2 py-1.5"
+                  data-tutorial={stat.statDef.id === tutorialTargetStatId ? "training-target-stat" : undefined}
+                >
                   <div className="mb-0.5 flex items-center justify-between">
                     <span className="text-[11px] font-semibold text-foreground">{stat.statDef.name}</span>
                     <span className="text-[10px] tabular-nums text-muted-foreground">
                       <span className="font-semibold text-foreground">{Math.round(stat.trainedValue)}</span> / {Math.round(cap)}
                     </span>
                   </div>
-                  <Meter value={stat.trainedValue} max={cap} tone="condition" className="mb-1 h-[3px]" />
+                  <Meter value={stat.trainedValue} max={cap} tone="condition" className="mb-1 h-0.75" />
 
                   {!readonly && tiers.length > 0 && (
-                    <div className="mb-1 flex gap-1">
+                    <div
+                      className="mb-1 flex gap-1"
+                      data-tutorial={isFirstStat ? "training-intensities" : undefined}
+                    >
                       {tiers.map((t: IntensityTier) => {
                         const locked =
                           (maxAllowedTierIndex != null && t.tierIndex > maxAllowedTierIndex) ||
@@ -237,6 +272,17 @@ export function TrainingPanel({
                               type="button"
                               disabled={locked || isRestricted}
                               onClick={() => setSelectedTier((prev) => ({ ...prev, [stat.statDef.id]: t.id }))}
+                              data-tutorial={
+                                isFirstStat && tierBlockReason === "Mood too low" ? "training-intense-blocked"
+                                : stat.statDef.id === tutorialTargetStatId && t.tierIndex === maxTierIndex && !locked && !isRestricted ? "training-target-intense"
+                                : isNearCap && t.tierIndex === minTierIndex && !locked && !isRestricted ? "training-light-tier"
+                                : undefined
+                              }
+                              data-tutorial-selected={
+                                stat.statDef.id === tutorialTargetStatId && t.tierIndex === maxTierIndex
+                                  ? (selectedTier[stat.statDef.id] === t.id ? "true" : "false")
+                                  : undefined
+                              }
                               className={cn(
                                 "w-full rounded px-1 py-0.5 text-[10px] font-semibold transition-colors",
                                 tierId === t.id
@@ -259,6 +305,11 @@ export function TrainingPanel({
                         variant="soft"
                         disabled={!canTrain}
                         className="h-5 w-full justify-center"
+                        data-tutorial={
+                          stat.statDef.id === tutorialTargetStatId ? "training-target-train"
+                          : isNearCap ? "training-near-cap-train"
+                          : undefined
+                        }
                         onClick={() => {
                           if (!canTrain || !trainingDef || !tierId) return
                           setPendingStatId(stat.statDef.id)
@@ -278,7 +329,16 @@ export function TrainingPanel({
                   )}
                 </div>
               )
-            })}
+              })
+              return (
+                <>
+                  <div data-tutorial="training-near-cap-group" className="space-y-1.5">
+                    {cards.slice(0, 2)}
+                  </div>
+                  {cards.slice(2)}
+                </>
+              )
+            })()}
           </div>
         </>
       )}

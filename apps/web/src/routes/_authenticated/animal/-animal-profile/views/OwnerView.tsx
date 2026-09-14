@@ -84,6 +84,7 @@ export function OwnerView({ animal, animalId, playerAccountId }: { animal: Anima
           </div>
 
           <ActionButton
+            data-tutorial="advance-age"
             variant="soft"
             disabled={advancePending || animal.status !== "ALIVE"}
             onClick={() => advanceAge({ animalId: animal.id })}

@@ -1,5 +1,5 @@
 export type TutorialCallbacks = {
-  grantGold: () => Promise<void>
+  grantGold: (amount: number) => Promise<void>
   grantPremium: () => Promise<void>
   completeStep: (stepKey: string) => Promise<void>
 }
@@ -9,4 +9,5 @@ export type TutorialCtrl = {
   isLastStep: () => boolean
   destroy: () => void
   refresh: () => void
+  reDrive: () => void
 }

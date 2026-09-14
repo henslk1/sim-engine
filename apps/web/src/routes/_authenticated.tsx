@@ -5,6 +5,7 @@ import { trpc, trpcVanilla } from "@/lib/trpc"
 import { MessagingWidget } from "@/components/messaging-widget"
 import { authClient } from "@/lib/auth-client"
 import { isTourRunning, destroyActiveTour, startTutorial, setTourRunning } from "@/lib/tutorial"
+import { grantGold } from "@/lib/tutorial/utils/grant-gold"
 
 type Session = typeof authClient.$Infer.Session
 
@@ -55,9 +56,9 @@ function TutorialDevBar() {
   const { data: gameData } = trpc.admin.game.get.useQuery()
   const devReset = trpc.tutorial.devReset.useMutation({
     onSuccess: () => {
-      localStorage.removeItem("tutorial_step")
       window.location.href = "/dashboard"
     },
+    onError: (e) => { alert(`Reset failed: ${e.message}`) },
   })
   const devFixStarter = trpc.tutorial.devFixStarter.useMutation({
     onSuccess: () => { window.location.reload() },
@@ -74,24 +75,34 @@ function TutorialDevBar() {
   if (!TUTORIAL_DEV_MODE || !gameData) return null
 
   return (
-    <div className="fixed right-3 top-15 z-100002 flex flex-col gap-1">
+    <div className="fixed right-3 top-15 flex flex-col gap-1" style={{ zIndex: 1000000001, pointerEvents: "auto" }}>
       <button
-        onClick={() => { destroyActiveTour(); devReset.mutate({ gameId: gameData.id }) }}
+        onMouseDown={() => {
+        const raw = parseInt(localStorage.getItem("tutorial_step") ?? "", 10)
+        const stepIndex = isNaN(raw) ? 0 : raw
+        const phaseStart = stepIndex >= 21 ? 21 : stepIndex >= 11 ? 11 : stepIndex >= 6 ? 6 : 0
+        localStorage.setItem("tutorial_step", String(phaseStart))
+        destroyActiveTour()
+        devReset.mutate({ gameId: gameData.id, stepIndex })
+      }}
         disabled={devReset.isPending}
+        style={{ pointerEvents: "auto" }}
         className="rounded-md bg-destructive px-3 py-1.5 text-xs font-semibold text-white shadow-lg transition-opacity hover:opacity-90 disabled:opacity-50"
       >
         {devReset.isPending ? "Resetting…" : "↺ Restart Step"}
       </button>
       <button
-        onClick={() => { destroyActiveTour(); devFixStarter.mutate({ gameId: gameData.id }) }}
+        onMouseDown={() => { destroyActiveTour(); devFixStarter.mutate({ gameId: gameData.id }) }}
         disabled={devFixStarter.isPending}
+        style={{ pointerEvents: "auto" }}
         className="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white shadow-lg transition-opacity hover:opacity-90 disabled:opacity-50"
       >
         {devFixStarter.isPending ? "Fixing…" : "Fix Starter"}
       </button>
       <button
-        onClick={() => { if (confirm("Delete your player account? This cannot be undone.")) { destroyActiveTour(); devDeleteAccount.mutate({ gameId: gameData.id }) } }}
+        onMouseDown={() => { if (confirm("Delete your player account? This cannot be undone.")) { destroyActiveTour(); devDeleteAccount.mutate({ gameId: gameData.id }) } }}
         disabled={devDeleteAccount.isPending}
+        style={{ pointerEvents: "auto" }}
         className="rounded-md bg-zinc-700 px-3 py-1.5 text-xs font-semibold text-white shadow-lg transition-opacity hover:opacity-90 disabled:opacity-50"
       >
         {devDeleteAccount.isPending ? "Deleting…" : "Delete Account"}
@@ -179,7 +190,6 @@ function TutorialResumeGate() {
   )
 
   const completeStepMutation = trpc.tutorial.completeStep.useMutation()
-  const grantGoldMutation = trpc.tutorial.grantStartingGold.useMutation()
   const grantPremiumMutation = trpc.tutorial.grantStartingPremium.useMutation()
 
   const [launched, setLaunched] = useState(false)
@@ -206,7 +216,7 @@ function TutorialResumeGate() {
     setTimeout(() => {
       startTutorial(
         {
-          grantGold: () => grantGoldMutation.mutateAsync({ gameId: gameId! }),
+          grantGold: (amount) => grantGold(gameId!, amount),
           grantPremium: () => grantPremiumMutation.mutateAsync({ gameId: gameId! }),
           completeStep: (key) => completeStepMutation.mutateAsync({ gameId: gameId!, stepKey: key }),
         },

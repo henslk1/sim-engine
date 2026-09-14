@@ -21,13 +21,15 @@ function Banner({
   tone,
   icon,
   children,
+  tutorialId,
 }: {
   tone: keyof typeof toneClass
   icon: ReactNode
   children: ReactNode
+  tutorialId?: string
 }) {
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${toneClass[tone]}`}>
+    <span data-tutorial={tutorialId} className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${toneClass[tone]}`}>
       {icon}
       {children}
     </span>
@@ -71,7 +73,7 @@ export function AlertBanner({ animal }: { animal: AnimalProfile }) {
   if (overdue.length > 0) {
     const first = overdue[0]
     banners.push(
-      <Banner key="care" tone="warning" icon={<Clock className="size-3.5 shrink-0" />}>
+      <Banner key="care" tone="warning" icon={<Clock className="size-3.5 shrink-0" />} tutorialId="ltc-alert">
         {first.longTermCareActionDef.name} is overdue
         {overdue.length > 1 && ` · +${overdue.length - 1} more`}
       </Banner>

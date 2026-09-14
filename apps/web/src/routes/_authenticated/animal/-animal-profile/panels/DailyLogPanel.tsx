@@ -175,12 +175,15 @@ export function DailyLogPanel({ animal }: { animal: AnimalProfile }) {
   ].sort((a, b) => b.cycleNumber - a.cycleNumber || b.createdAt.getTime() - a.createdAt.getTime())
 
   return (
-    <Panel title="Daily Log" icon={<ScrollText className="size-4 text-muted-foreground" />}>
+    <Panel title="Daily Log" icon={<ScrollText className="size-4 text-muted-foreground" />} data-tutorial="daily-log-panel">
       {entries.length === 0 ? (
         <p className="text-[11px] text-muted-foreground">No recent activity</p>
       ) : (
         <ol className="relative space-y-2.5 border-l border-border pl-4">
-          {entries.map((e) => {
+          {(() => {
+            const firstCareIdx = entries.findIndex(e => e.type === "care")
+            const firstTrainingIdx = entries.findIndex(e => e.type === "training")
+            return entries.map((e, i) => {
             const details: { text: string; color: string }[] = []
             if (e.type === "training") {
               details.push(e.reachedCap
@@ -200,7 +203,15 @@ export function DailyLogPanel({ animal }: { animal: AnimalProfile }) {
 
             return (
               <li key={e.key} className="relative">
-                <span className={cn("absolute -left-[21px] top-1 size-2.5 rounded-full ring-2 ring-card", DOT[e.type])} />
+                <div
+                  data-tutorial={
+                    i === firstCareIdx && firstCareIdx !== -1 ? "daily-log-care"
+                    : i === firstTrainingIdx && firstTrainingIdx !== -1 ? "daily-log-training"
+                    : undefined
+                  }
+                  className="relative -ml-5 pl-5"
+                >
+                <span className={cn("absolute left-0 top-1 size-2.5 rounded-full ring-2 ring-card", DOT[e.type])} />
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                     {e.type}
@@ -218,9 +229,11 @@ export function DailyLogPanel({ animal }: { animal: AnimalProfile }) {
                     ))}
                   </p>
                 </div>
+                </div>
               </li>
             )
-          })}
+          })
+          })()}
         </ol>
       )}
     </Panel>

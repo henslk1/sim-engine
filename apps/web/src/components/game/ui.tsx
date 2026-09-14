@@ -88,6 +88,7 @@ export function Panel({
   className,
   bodyClassName,
   fit = false,
+  "data-tutorial": dataTutorial,
 }: {
   title: ReactNode
   icon?: ReactNode
@@ -96,9 +97,11 @@ export function Panel({
   className?: string
   bodyClassName?: string
   fit?: boolean
+  "data-tutorial"?: string
 }) {
   return (
     <section
+      data-tutorial={dataTutorial}
       className={cn(
         "flex flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm",
         fit ? "shrink-0" : "h-full min-h-0",
@@ -124,6 +127,7 @@ export function ActionButton({
   className,
   title,
   onClick,
+  "data-tutorial": dataTutorial,
 }: {
   children: ReactNode
   variant?: "primary" | "soft" | "ghost" | "danger"
@@ -131,6 +135,7 @@ export function ActionButton({
   className?: string
   title?: string
   onClick?: () => void
+  "data-tutorial"?: string
 }) {
   const variants = {
     primary: "bg-primary text-primary-foreground hover:bg-primary/90",
@@ -144,6 +149,7 @@ export function ActionButton({
       disabled={disabled}
       title={title}
       onClick={onClick}
+      data-tutorial={dataTutorial}
       className={cn(
         "inline-flex items-center justify-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-45",
         variants[variant],

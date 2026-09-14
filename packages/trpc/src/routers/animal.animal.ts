@@ -5,13 +5,13 @@ import { advanceAnimalAging, runConformationInspection, pruneAnimalData } from "
 
 export const animalAnimalRouter = router({
   list: publicProcedure
-    .input(z.object({ playerAccountId: z.string() }))
+    .input(z.object({ playerAccountId: z.string(), includeTutorial: z.boolean().optional().default(false) }))
     .query(({ input }) =>
     db.animal.findMany({
       where: {
         playerAccountId: input.playerAccountId,
         status: { notIn: ["EMBRYO_STORED", "BURIED"] },
-        isTutorialAnimal: false,
+        ...(input.includeTutorial ? {} : { isTutorialAnimal: false }),
       },
       orderBy: { name: "asc" },
       select: {

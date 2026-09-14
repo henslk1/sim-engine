@@ -36,12 +36,15 @@ export const tutorialStepAdminRouter = router({
       venueId: z.string().nullish(),
       grantCurrencyDefId: z.string().nullish(),
       grantCurrencyAmount: z.number().int().min(1).nullish(),
+      completionCondition: z.enum(["TRAINING_CAPPED", "COMPETITION_TIER", "PREGNANCY_COMPLETE", "LIFE_STAGE"]).nullish(),
+      completionTarget: z.number().int().min(0).nullish(),
     }))
     .mutation(({ input }) => {
       const {
         id, gameId,
         description, competitionDisciplineId, competitionNpcCount,
         triggerConditionDefId, venueId, grantCurrencyDefId, grantCurrencyAmount,
+        completionCondition, completionTarget,
         ...rest
       } = input
       const data = {
@@ -53,6 +56,8 @@ export const tutorialStepAdminRouter = router({
         venueId: venueId ?? null,
         grantCurrencyDefId: grantCurrencyDefId ?? null,
         grantCurrencyAmount: grantCurrencyAmount ?? null,
+        completionCondition: completionCondition ?? null,
+        completionTarget: completionTarget ?? null,
       }
       if (id) return db.tutorialStepDef.update({ where: { id }, data })
       return db.tutorialStepDef.create({ data: { gameId, ...data } })

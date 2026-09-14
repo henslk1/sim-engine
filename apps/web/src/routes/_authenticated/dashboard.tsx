@@ -499,7 +499,7 @@ function DashboardPage() {
       .finally(() => {
         const launch = () => startTutorial(
           {
-            grantGold: () => grantGold(gameId!),
+            grantGold: (amount) => grantGold(gameId!, amount),
             grantPremium: () => grantPremium(gameId!),
             completeStep: (stepKey) => completeStepMutation.mutateAsync({ gameId, stepKey }),
           },

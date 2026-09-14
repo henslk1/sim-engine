@@ -145,49 +145,51 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
       }
     }
 
-    // Genetic condition onset rolls
-    const genotypes = await tx.animalGenotype.findMany({ where: { animalId } })
-    for (const genotype of genotypes) {
-      const rule = await tx.expressionRule.findUnique({
-        where: {
-          locusId_alleleOneId_alleleTwoId: {
-            locusId: genotype.locusId,
-            alleleOneId: genotype.alleleOneId,
-            alleleTwoId: genotype.alleleTwoId,
-          },
-        },
-        include: { ruleConditions: { include: { healthConditionDef: true } } },
-      })
-
-      if (!rule?.ruleConditions.length) continue
-
-      for (const rc of rule.ruleConditions) {
-        const condDef = rc.healthConditionDef
-        if (!condDef.isGenetic) continue
-        if (condDef.onsetMinCycle !== null && newAge < condDef.onsetMinCycle) continue
-
-        const alreadyExists = await tx.animalHealthRecord.findFirst({
+    if (!animal.isTutorialAnimal) {
+      // Genetic condition onset rolls
+      const genotypes = await tx.animalGenotype.findMany({ where: { animalId } })
+      for (const genotype of genotypes) {
+        const rule = await tx.expressionRule.findUnique({
           where: {
-            animalId,
-            conditionDefId: condDef.id,
-            ...(condDef.isEpisodic ? { isActive: true } : {}),
+            locusId_alleleOneId_alleleTwoId: {
+              locusId: genotype.locusId,
+              alleleOneId: genotype.alleleOneId,
+              alleleTwoId: genotype.alleleTwoId,
+            },
           },
+          include: { ruleConditions: { include: { healthConditionDef: true } } },
         })
-        if (alreadyExists) continue
 
-        if (condDef.isEpisodic && condDef.flareupCooldownCycles) {
-          const lastResolved = await tx.animalHealthRecord.findFirst({
-            where: { animalId, conditionDefId: condDef.id, isActive: false },
-            orderBy: { resolvedCycle: "desc" },
-            select: { resolvedCycle: true },
-          })
-          if (lastResolved?.resolvedCycle != null && newAge < lastResolved.resolvedCycle + condDef.flareupCooldownCycles) continue
-        }
+        if (!rule?.ruleConditions.length) continue
 
-        if (Math.random() < (rc.penetrance ?? 1.0)) {
-          await tx.animalHealthRecord.create({
-            data: { animalId, conditionDefId: condDef.id, isActive: true },
+        for (const rc of rule.ruleConditions) {
+          const condDef = rc.healthConditionDef
+          if (!condDef.isGenetic) continue
+          if (condDef.onsetMinCycle !== null && newAge < condDef.onsetMinCycle) continue
+
+          const alreadyExists = await tx.animalHealthRecord.findFirst({
+            where: {
+              animalId,
+              conditionDefId: condDef.id,
+              ...(condDef.isEpisodic ? { isActive: true } : {}),
+            },
           })
+          if (alreadyExists) continue
+
+          if (condDef.isEpisodic && condDef.flareupCooldownCycles) {
+            const lastResolved = await tx.animalHealthRecord.findFirst({
+              where: { animalId, conditionDefId: condDef.id, isActive: false },
+              orderBy: { resolvedCycle: "desc" },
+              select: { resolvedCycle: true },
+            })
+            if (lastResolved?.resolvedCycle != null && newAge < lastResolved.resolvedCycle + condDef.flareupCooldownCycles) continue
+          }
+
+          if (Math.random() < (rc.penetrance ?? 1.0)) {
+            await tx.animalHealthRecord.create({
+              data: { animalId, conditionDefId: condDef.id, isActive: true },
+            })
+          }
         }
       }
     }

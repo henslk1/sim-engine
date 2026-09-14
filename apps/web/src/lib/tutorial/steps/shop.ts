@@ -60,7 +60,7 @@ export function shopSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks): Dri
           if (!btn || btn.disabled) return
           btn.disabled = true
           btn.textContent = "Adding…"
-          grantGold()
+          grantGold(300)
             .catch((e) => console.error("[tutorial step 2] grantGold error:", e))
             .finally(() => setTimeout(() => ctrl.moveNext(), 800))
         },

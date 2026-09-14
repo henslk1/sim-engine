@@ -59,6 +59,8 @@ export function DailyCarePanel({ animal, playerAccountId }: { animal: AnimalProf
   const restrictions = getActiveRestrictions(animal)
   const careRestricted = restrictions.has("CARE_ACTION") || restrictions.has("ALL")
 
+  const groomActionId = animal.game.careActionDefs.find(a => a.name === "Groom")?.id ?? null
+
   const doneIds = new Set(
     animal.careLogs
       .filter((l) => l.cycleNumber === animal.ageInCycles)
@@ -70,17 +72,19 @@ export function DailyCarePanel({ animal, playerAccountId }: { animal: AnimalProf
   const allDone = doneCount === total && total > 0
 
   return (
-    <div className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+    <div data-tutorial="daily-care-panel" className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm">
       <header className="flex shrink-0 items-center justify-between border-b border-border bg-secondary/40 px-3 py-2">
         <div className="flex items-center gap-2">
           <Heart className="size-4 text-chart-4" />
           <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">Daily Care</h3>
         </div>
         {total > 0 && (
-          <span className={cn(
-            "text-[11px] font-semibold tabular-nums",
-            allDone ? "text-chart-2" : "text-muted-foreground"
-          )}>
+          <span
+            data-tutorial="daily-care-counter"
+            className={cn(
+              "text-[11px] font-semibold tabular-nums",
+              allDone ? "text-chart-2" : "text-muted-foreground"
+            )}>
             {allDone ? "Completed" : `${doneCount}/${total} today`}
           </span>
         )}
@@ -91,7 +95,7 @@ export function DailyCarePanel({ animal, playerAccountId }: { animal: AnimalProf
         {animal.game.careActionDefs.length === 0 ? (
           <p className="text-[11px] text-muted-foreground">No care actions configured</p>
         ) : (
-          <div>
+          <div data-tutorial="daily-care-actions">
             <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               Daily Actions
             </h4>
@@ -135,6 +139,7 @@ export function DailyCarePanel({ animal, playerAccountId }: { animal: AnimalProf
                           variant="soft"
                           disabled={isPending}
                           className="h-6 px-2 text-[11px]"
+                          data-tutorial={action.id === groomActionId ? "care-groom" : "daily-care-perform"}
                           onClick={() => performCare({
                             animalId: animal.id,
                             careActionDefId: action.id,
@@ -158,7 +163,7 @@ export function DailyCarePanel({ animal, playerAccountId }: { animal: AnimalProf
 
         {/* Long-term care schedule */}
         {animal.longTermCareRecords.length > 0 && (
-          <div>
+          <div data-tutorial="ltc-section">
             <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               Long-Term Schedule
             </h4>
@@ -181,11 +186,9 @@ export function DailyCarePanel({ animal, playerAccountId }: { animal: AnimalProf
                           in {record.nextDueCycle - animal.ageInCycles} cycles
                         </span>
                       )}
-                      {record.longTermCareActionDef.currencyAmount != null && record.longTermCareActionDef.currencyAmount > 0 && (
-                        <span className="text-[10px] text-muted-foreground">{record.longTermCareActionDef.currencyAmount}G</span>
-                      )}
                       {animal.ageInCycles >= record.nextDueCycle ? (
                         <ActionButton
+                          data-tutorial="ltc-perform"
                           variant="soft"
                           className="h-6 px-2 text-[11px]"
                           disabled={ltcPendingId === record.id || careRestricted}
@@ -194,7 +197,7 @@ export function DailyCarePanel({ animal, playerAccountId }: { animal: AnimalProf
                           {ltcPendingId === record.id
                             ? <Loader2 className="size-3 animate-spin" />
                             : <CheckCircle2 className="size-3" />}
-                          Perform
+                          Perform{record.longTermCareActionDef.currencyAmount != null && record.longTermCareActionDef.currencyAmount > 0 ? ` · ${record.longTermCareActionDef.currencyAmount}G` : ""}
                         </ActionButton>
                       ) : (
                         <span className="text-[11px] font-medium text-chart-2">Done</span>

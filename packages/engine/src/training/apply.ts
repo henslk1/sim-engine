@@ -54,7 +54,7 @@ export async function applyTrainingAction(
 
     const animalStage = await tx.animal.findUniqueOrThrow({
       where: { id: animalId },
-      select: { lifeStage: { select: { energyCostMultiplier: true } } },
+      select: { isTutorialAnimal: true, lifeStage: { select: { energyCostMultiplier: true } } },
     })
     const energyUsed = tier.energyCost * animalStage.lifeStage.energyCostMultiplier
     const energy = await tx.animalEnergy.findUnique({ where: { animalId } })
@@ -161,31 +161,76 @@ export async function applyTrainingAction(
       },
     })
 
-    // Check TRAINING_TIER condition triggers on the animal's genotypes
-    const genotypes = await tx.animalGenotype.findMany({ where: { animalId } })
-    for (const genotype of genotypes) {
-      const rule = await tx.expressionRule.findUnique({
-        where: {
-          locusId_alleleOneId_alleleTwoId: {
-            locusId: genotype.locusId,
-            alleleOneId: genotype.alleleOneId,
-            alleleTwoId: genotype.alleleTwoId,
+    if (!animalStage.isTutorialAnimal) {
+      // Check TRAINING_TIER condition triggers on the animal's genotypes
+      const genotypes = await tx.animalGenotype.findMany({ where: { animalId } })
+      for (const genotype of genotypes) {
+        const rule = await tx.expressionRule.findUnique({
+          where: {
+            locusId_alleleOneId_alleleTwoId: {
+              locusId: genotype.locusId,
+              alleleOneId: genotype.alleleOneId,
+              alleleTwoId: genotype.alleleTwoId,
+            },
           },
-        },
-        include: {
-          ruleConditions: {
-            include: {
-              healthConditionDef: {
-                include: { conditionTriggers: { where: { triggerType: "TRAINING_TIER" } } },
+          include: {
+            ruleConditions: {
+              include: {
+                healthConditionDef: {
+                  include: { conditionTriggers: { where: { triggerType: "TRAINING_TIER" } } },
+                },
               },
             },
           },
+        })
+        if (!rule?.ruleConditions.length) continue
+        for (const rc of rule.ruleConditions) {
+          const condDef = rc.healthConditionDef
+          if (condDef.conditionType === "INJURY") continue
+          if (!condDef.conditionTriggers.length) continue
+          const matchingTriggers = condDef.conditionTriggers.filter(
+            t => t.minTierIndex === null || tier.tierIndex >= t.minTierIndex
+          )
+          if (matchingTriggers.length === 0) continue
+
+          const alreadyActive = await tx.animalHealthRecord.findFirst({
+            where: { animalId, conditionDefId: condDef.id, isActive: true },
+          })
+          if (alreadyActive) continue
+
+          if (condDef.flareupCooldownCycles) {
+            const lastResolved = await tx.animalHealthRecord.findFirst({
+              where: { animalId, conditionDefId: condDef.id, isActive: false },
+              orderBy: { resolvedCycle: "desc" },
+              select: { resolvedCycle: true },
+            })
+            if (lastResolved?.resolvedCycle != null && cycleNumber < lastResolved.resolvedCycle + condDef.flareupCooldownCycles) continue
+          }
+
+          const bestTrigger = matchingTriggers.reduce((best, t) =>
+            (t.minTierIndex ?? -1) > (best.minTierIndex ?? -1) ? t : best
+          )
+          if (Math.random() < bestTrigger.triggerChance) {
+            await tx.animalHealthRecord.create({
+              data: { animalId, conditionDefId: condDef.id, isActive: true },
+            })
+          }
+        }
+      }
+
+      // Check TRAINING_TIER triggers on INJURY conditions (not genotype-linked)
+      const injuryTriggerDefs = await tx.healthConditionDef.findMany({
+        where: {
+          gameId: action.gameId,
+          conditionType: "INJURY",
+          conditionTriggers: { some: { triggerType: "TRAINING_TIER" } },
+        },
+        include: {
+          conditionTriggers: { where: { triggerType: "TRAINING_TIER" } },
         },
       })
-      if (!rule?.ruleConditions.length) continue
-      for (const rc of rule.ruleConditions) {
-        const condDef = rc.healthConditionDef
-        if (!condDef.conditionTriggers.length) continue
+
+      for (const condDef of injuryTriggerDefs) {
         const matchingTriggers = condDef.conditionTriggers.filter(
           t => t.minTierIndex === null || tier.tierIndex >= t.minTierIndex
         )
@@ -205,55 +250,13 @@ export async function applyTrainingAction(
           if (lastResolved?.resolvedCycle != null && cycleNumber < lastResolved.resolvedCycle + condDef.flareupCooldownCycles) continue
         }
 
-        for (const trigger of matchingTriggers) {
-          if (Math.random() < trigger.triggerChance) {
-            await tx.animalHealthRecord.create({
-              data: { animalId, conditionDefId: condDef.id, isActive: true },
-            })
-            break
-          }
-        }
-      }
-    }
-
-    // Check TRAINING_TIER triggers on INJURY conditions (not genotype-linked)
-    const injuryTriggerDefs = await tx.healthConditionDef.findMany({
-      where: {
-        gameId: action.gameId,
-        conditionType: "INJURY",
-        conditionTriggers: { some: { triggerType: "TRAINING_TIER" } },
-      },
-      include: {
-        conditionTriggers: { where: { triggerType: "TRAINING_TIER" } },
-      },
-    })
-
-    for (const condDef of injuryTriggerDefs) {
-      const matchingTriggers = condDef.conditionTriggers.filter(
-        t => t.minTierIndex === null || tier.tierIndex >= t.minTierIndex
-      )
-      if (matchingTriggers.length === 0) continue
-
-      const alreadyActive = await tx.animalHealthRecord.findFirst({
-        where: { animalId, conditionDefId: condDef.id, isActive: true },
-      })
-      if (alreadyActive) continue
-
-      if (condDef.flareupCooldownCycles) {
-        const lastResolved = await tx.animalHealthRecord.findFirst({
-          where: { animalId, conditionDefId: condDef.id, isActive: false },
-          orderBy: { resolvedCycle: "desc" },
-          select: { resolvedCycle: true },
-        })
-        if (lastResolved?.resolvedCycle != null && cycleNumber < lastResolved.resolvedCycle + condDef.flareupCooldownCycles) continue
-      }
-
-      for (const trigger of matchingTriggers) {
-        if (Math.random() < trigger.triggerChance) {
+        const bestTrigger = matchingTriggers.reduce((best, t) =>
+          (t.minTierIndex ?? -1) > (best.minTierIndex ?? -1) ? t : best
+        )
+        if (Math.random() < bestTrigger.triggerChance) {
           await tx.animalHealthRecord.create({
             data: { animalId, conditionDefId: condDef.id, isActive: true },
           })
-          break
         }
       }
     }

@@ -454,9 +454,9 @@ export const tutorialRouter = router({
     }),
 
   grantStartingGold: protectedProcedure
-    .input(z.object({ gameId: z.string() }))
+    .input(z.object({ gameId: z.string(), amount: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      const { gameId } = input
+      const { gameId, amount } = input
 
       const player = await db.playerAccount.findUnique({
         where: { userId_gameId: { userId: ctx.userId, gameId } },
@@ -470,29 +470,25 @@ export const tutorialRouter = router({
       })
       if (!baseCurrency) throw new Error("No base currency configured")
 
-      const AMOUNT = 300
-
-      const existing = await db.playerBalance.findUnique({
-        where: { playerAccountId_currencyDefId: { playerAccountId: player.id, currencyDefId: baseCurrency.id } },
-        select: { id: true, balance: true },
+      // Guard: each distinct grant amount can only be claimed once.
+      const alreadyGranted = await db.transaction.findFirst({
+        where: { toPlayerAccountId: player.id, txnType: "TESTING_GRANT", amount },
+        select: { id: true },
       })
-      if (existing && existing.balance > 0) return
+      if (alreadyGranted) return
 
       await db.$transaction([
-        existing
-          ? db.playerBalance.update({
-              where: { playerAccountId_currencyDefId: { playerAccountId: player.id, currencyDefId: baseCurrency.id } },
-              data: { balance: AMOUNT },
-            })
-          : db.playerBalance.create({
-              data: { playerAccountId: player.id, currencyDefId: baseCurrency.id, balance: AMOUNT },
-            }),
+        db.playerBalance.upsert({
+          where: { playerAccountId_currencyDefId: { playerAccountId: player.id, currencyDefId: baseCurrency.id } },
+          create: { playerAccountId: player.id, currencyDefId: baseCurrency.id, balance: amount },
+          update: { balance: { increment: amount } },
+        }),
         db.transaction.create({
           data: {
             gameId,
             toPlayerAccountId: player.id,
             currencyDefId: baseCurrency.id,
-            amount: AMOUNT,
+            amount,
             txnType: "TESTING_GRANT",
           },
         }),
@@ -572,9 +568,9 @@ export const tutorialRouter = router({
 
   // TODO: remove before launch
   devReset: protectedProcedure
-    .input(z.object({ gameId: z.string() }))
+    .input(z.object({ gameId: z.string(), stepIndex: z.number().int().min(0) }))
     .mutation(async ({ ctx, input }) => {
-      const { gameId } = input
+      const { gameId, stepIndex } = input
 
       const player = await db.playerAccount.findUnique({
         where: { userId_gameId: { userId: ctx.userId, gameId } },
@@ -582,35 +578,83 @@ export const tutorialRouter = router({
       })
       if (!player) throw new Error("Player not found")
 
-      const [baseCurrency, premiumCurrency] = await Promise.all([
-        db.currencyDef.findFirst({ where: { gameId, currencyType: "BASE" }, select: { id: true } }),
-        db.currencyDef.findFirst({ where: { gameId, currencyType: "PREMIUM" }, select: { id: true } }),
+      const pair = await db.tutorialAnimalPair.findUnique({
+        where: { playerAccountId: player.id },
+        select: { ancestorOneId: true },
+      })
+
+      // Reset tutorial female's training and care state so the current step is replayable.
+      if (pair?.ancestorOneId) {
+        const femaleId = pair.ancestorOneId
+
+        const trainingLogs = await db.trainingLog.findMany({
+          where: { animalId: femaleId },
+          select: { trainingActionDef: { select: { statDefId: true } }, statGained: true },
+        })
+
+        // Sum total gains per stat so we can decrement back to the pre-tutorial value.
+        const gainByStatId = new Map<string, number>()
+        for (const log of trainingLogs) {
+          const sid = log.trainingActionDef.statDefId
+          gainByStatId.set(sid, (gainByStatId.get(sid) ?? 0) + log.statGained)
+        }
+
+        await Promise.all([
+          db.trainingLog.deleteMany({ where: { animalId: femaleId } }),
+          db.careLog.deleteMany({ where: { animalId: femaleId } }),
+          db.animalDailyLog.deleteMany({ where: { animalId: femaleId } }),
+          ...[...gainByStatId.entries()].map(([statDefId, totalGained]) =>
+            db.animalStat.updateMany({
+              where: { animalId: femaleId, statDefId },
+              data: { trainedValue: { decrement: totalGained } },
+            })
+          ),
+          db.animalEnergy.updateMany({ where: { animalId: femaleId }, data: { currentEnergy: 100 } }),
+          db.animalMood.updateMany({ where: { animalId: femaleId }, data: { value: 75 } }),
+          db.animalCondition.updateMany({ where: { animalId: femaleId }, data: { value: 75 } }),
+          db.animalCareScore.updateMany({ where: { animalId: femaleId }, data: { score: 75 } }),
+          // Reset LTC records so the Perform buttons appear again.
+          db.animalLongTermCareRecord.updateMany({
+            where: { animalId: femaleId },
+            data: { nextDueCycle: 0, lastPerformedCycle: null },
+          }),
+        ])
+      }
+
+      // Reset gold to the training-section base and clear the LTC grant transaction
+      // so the step can fire cleanly on replay.
+      await Promise.all([
+        db.playerBalance.updateMany({
+          where: { playerAccountId: player.id },
+          data: { balance: 100 },
+        }),
+        db.transaction.deleteMany({
+          where: { toPlayerAccountId: player.id, txnType: "TESTING_GRANT", amount: 100 },
+        }),
       ])
 
-      // Full reset — clear every checkpoint so the tutorial starts from step 0.
-      const ops: Parameters<typeof db.$transaction>[0] = [
-        db.tutorialProgress.updateMany({
-          where: { playerAccountId: player.id },
-          data: { completedAt: null },
-        }),
-        db.playerSeniority.update({
-          where: { playerAccountId: player.id },
-          data: { tutorialCompleted: false },
-        }),
+      // Restore checkpoint progress to match the current step position.
+      // Each entry: [firstStepIndexOfNextPhase, stepKey]
+      const CHECKPOINTS: [number, string][] = [
+        [6,  "step_shop"],
+        [11, "step_purchased"],
+        [21, "step_mare_profile"],
+        [50, "step_training_intro"],
       ]
-      if (baseCurrency) {
-        ops.push(db.playerBalance.updateMany({
-          where: { playerAccountId: player.id, currencyDefId: baseCurrency.id },
-          data: { balance: 0 },
-        }))
-      }
-      if (premiumCurrency) {
-        ops.push(db.playerBalance.updateMany({
-          where: { playerAccountId: player.id, currencyDefId: premiumCurrency.id },
-          data: { balance: 0 },
-        }))
-      }
-      await db.$transaction(ops)
+      const stepDefs = await db.tutorialStepDef.findMany({
+        where: { gameId, stepKey: { in: CHECKPOINTS.map(([, k]) => k) } },
+        select: { id: true, stepKey: true },
+      })
+      const now = new Date()
+      await Promise.all(
+        stepDefs.map(({ id: stepDefId, stepKey }) => {
+          const threshold = CHECKPOINTS.find(([, k]) => k === stepKey)?.[0] ?? Infinity
+          return db.tutorialProgress.update({
+            where: { playerAccountId_stepDefId: { playerAccountId: player.id, stepDefId } },
+            data: { completedAt: stepIndex >= threshold ? now : null },
+          })
+        })
+      )
     }),
 
     buyFemale: protectedProcedure
