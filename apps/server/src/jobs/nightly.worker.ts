@@ -106,3 +106,6 @@ export const nightlyWorker = new Worker (
   },
   { connection, lockDuration: 120000 }
 )
+
+nightlyWorker.on("failed", (job, err) => console.error(`[nightly] job ${job?.id} failed:`, err))
+nightlyWorker.on("error", (err) => console.error("[nightly] worker error:", err))

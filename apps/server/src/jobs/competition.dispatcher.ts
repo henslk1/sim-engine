@@ -18,3 +18,6 @@ export const competitionDispatcherWorker = new Worker(
   },
   { connection }
 )
+
+competitionDispatcherWorker.on("failed", (job, err) => console.error(`[competition-dispatch] job ${job?.id} failed:`, err))
+competitionDispatcherWorker.on("error", (err) => console.error("[competition-dispatch] worker error:", err))

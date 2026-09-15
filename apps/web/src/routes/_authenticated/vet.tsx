@@ -413,7 +413,7 @@ function CertificatesPanel({
           </SelectInput>
         </div>
 
-        <div className="grid gap-2">
+        <div data-tutorial="vet-health-certs" className="grid gap-2">
           {certDefs.map((def) => {
             const cert = animalCerts?.certs.find((c) => c.certDefId === def.id)
             const isExpired = cert && (!cert.isValid || cert.expiresAtCycle <= ageInCycles)
@@ -451,6 +451,7 @@ function CertificatesPanel({
                 </div>
                 <button
                   type="button"
+                  data-tutorial="cert-issue-btn"
                   disabled={!effectiveAnimalId || !playerAccountId || isPending || !canAfford}
                   onClick={() => playerAccountId && issueCert.mutate({ animalId: effectiveAnimalId, playerAccountId, certDefId: def.id })}
                   className={cn(
@@ -1056,7 +1057,7 @@ function VetPage() {
         <div className="mx-auto flex max-w-5xl items-center justify-between">
           <div className="flex items-center gap-4">
             {initialAnimalId && (
-              <Link to="/animal/$animalId" params={{ animalId: initialAnimalId }} className="text-muted-foreground hover:text-foreground">
+              <Link data-tutorial="vet-back-link" to="/animal/$animalId" params={{ animalId: initialAnimalId }} className="text-muted-foreground hover:text-foreground">
                 <ChevronLeft size={18} />
               </Link>
             )}

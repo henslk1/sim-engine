@@ -80,7 +80,7 @@ function TutorialDevBar() {
         onMouseDown={() => {
         const raw = parseInt(localStorage.getItem("tutorial_step") ?? "", 10)
         const stepIndex = isNaN(raw) ? 0 : raw
-        const phaseStart = stepIndex >= 21 ? 21 : stepIndex >= 11 ? 11 : stepIndex >= 6 ? 6 : 0
+        const phaseStart = stepIndex >= 56 ? 56 : stepIndex >= 49 ? 49 : stepIndex >= 20 ? 20 : stepIndex >= 10 ? 10 : stepIndex >= 5 ? 5 : 0
         localStorage.setItem("tutorial_step", String(phaseStart))
         destroyActiveTour()
         devReset.mutate({ gameId: gameData.id, stepIndex })
@@ -145,14 +145,18 @@ export const Route = createFileRoute("/_authenticated")({
       // If the tour is live and the user client-navigates back to /dashboard, return them to the
       // active tour page so Driver.js isn't spotlighting header elements on the wrong page.
       if (touring && location.pathname.startsWith("/dashboard") && currentStep > 0) {
-        throw redirect({ to: currentStep >= 6 ? "/stable" : "/shop" })
+        const dest = currentStep >= 58 && currentStep <= 60 ? "/vet" : currentStep >= 5 ? "/stable" : "/shop"
+        throw redirect({ to: dest })
       }
 
       // Allow pages based on stored step index so a page refresh doesn't evict the user.
       // `touring` resets on every full page load; `currentStep` persists via localStorage.
+      const inVetPhase = currentStep >= 58 && currentStep <= 60
       const allowed = ["/dashboard"]
       if (touring || currentStep >= 1) allowed.push("/shop")
-      if (touring || currentStep >= 6) { allowed.push("/stable"); allowed.push("/animal") }
+      if (touring || currentStep >= 5) allowed.push("/stable")
+      if ((touring || currentStep >= 5) && !inVetPhase) allowed.push("/animal")
+      if (touring || currentStep >= 56) allowed.push("/vet")
 
       if (!allowed.some((p) => location.pathname.startsWith(p))) {
         throw redirect({ to: "/dashboard" })
@@ -203,11 +207,15 @@ function TutorialResumeGate() {
     // Only resume if already on the correct page — wrong-page case falls back to welcome dialog
     const animalId = tutorialPair?.ancestorOneId
     const onCorrectPage =
-      storedStep >= 11
+      storedStep >= 61
         ? !!animalId && location.pathname === `/animal/${animalId}`
-        : storedStep >= 6
-          ? location.pathname.startsWith("/stable")
-          : location.pathname.startsWith("/shop")
+        : storedStep >= 58
+          ? location.pathname.startsWith("/vet")
+          : storedStep >= 11
+            ? !!animalId && location.pathname === `/animal/${animalId}`
+            : storedStep >= 6
+              ? location.pathname.startsWith("/stable")
+              : location.pathname.startsWith("/shop")
 
     if (!onCorrectPage) return
 

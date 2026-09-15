@@ -208,7 +208,7 @@ export function TrainingPanel({
               Training restricted due to active treatment
             </div>
           )}
-          <div className="space-y-1.5" data-tutorial="training-innate">
+          <div className="space-y-1.5" data-tutorial="training-innate" data-energy-current={animal.energy?.currentEnergy ?? 0}>
             {(() => {
               const cards = animal.stats.map((stat: Stat) => {
               const cap = getTrainingCap(stat.innateValue, config, animal.personality)
@@ -283,6 +283,7 @@ export function TrainingPanel({
                                   ? (selectedTier[stat.statDef.id] === t.id ? "true" : "false")
                                   : undefined
                               }
+                              data-energy-cost={t.energyCost}
                               className={cn(
                                 "w-full rounded px-1 py-0.5 text-[10px] font-semibold transition-colors",
                                 tierId === t.id
@@ -300,7 +301,7 @@ export function TrainingPanel({
                   )}
 
                   {!readonly && (
-                    <span title={!canTrain && blockReason ? blockReason : undefined} className="w-full">
+                    <span title={!canTrain && blockReason ? blockReason : undefined} className="w-full" data-tutorial-train="true">
                       <ActionButton
                         variant="soft"
                         disabled={!canTrain}

@@ -553,10 +553,10 @@ export const vetRouter = router({
           await tx.transaction.create({
             data: {
               gameId: animal.gameId,
-              playerAccountId: input.playerAccountId,
+              fromPlayerAccountId: input.playerAccountId,
               currencyDefId: certDef.currencyDefId,
-              amount: -certDef.cost,
-              type: "VET_SERVICE_FEE",
+              amount: certDef.cost,
+              txnType: "VET_SERVICE_FEE",
             },
           })
         }

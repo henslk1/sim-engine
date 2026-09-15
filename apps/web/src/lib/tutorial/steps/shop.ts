@@ -2,6 +2,31 @@ import type { DriveStep } from "driver.js"
 import type { TutorialCallbacks, TutorialCtrl } from "../types"
 import { waitForElement } from "../utils/wait-for-element"
 
+const PULSE_STYLE_ID = "tutorial-pulse-style"
+
+function injectPulseStyle() {
+  if (document.getElementById(PULSE_STYLE_ID)) return
+  const style = document.createElement("style")
+  style.id = PULSE_STYLE_ID
+  style.textContent = `
+    @keyframes tutorial-pulse {
+      0%   { box-shadow: 0 0 0 0 rgba(99, 179, 237, 0.7); }
+      70%  { box-shadow: 0 0 0 8px rgba(99, 179, 237, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(99, 179, 237, 0); }
+    }
+    .tutorial-pulse {
+      animation: tutorial-pulse 1.4s ease-in-out infinite;
+      outline: 2px solid rgba(99, 179, 237, 0.8);
+      outline-offset: 2px;
+    }
+  `
+  document.head.appendChild(style)
+}
+
+function removePulseStyle() {
+  document.getElementById(PULSE_STYLE_ID)?.remove()
+}
+
 export function shopSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks): DriveStep[] {
   const { grantGold, completeStep } = callbacks
   let profileBlockCleanup: (() => void) | undefined
@@ -91,24 +116,12 @@ export function shopSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks): Dri
       },
     },
 
-    // ── [4] Mare card — info-auto ──────────────────────────────────────────────
+    // ── [4] Mare card + buy — action + block-profile ──────────────────────────
     {
       element: '[data-tutorial="shop-animal-card"]',
-      disableActiveInteraction: true,
       popover: {
-        title: "Great — there she is!",
-        description: "Your foundation mare is ready to join your stable.",
-        showButtons: [],
-      },
-      onHighlighted: () => { setTimeout(() => ctrl.moveNext(), 2000) },
-    },
-
-    // ── [5] Buy button — action + block-profile ────────────────────────────────
-    {
-      element: '[data-tutorial="shop-animal-buy"]',
-      popover: {
-        title: "Bring Her Home",
-        description: "Purchase your mare to continue.",
+        title: "There She Is",
+        description: "Your foundation mare is ready to join your stable. Purchase her to continue.",
         showButtons: [],
       },
       onHighlighted: (el?: Element) => {
@@ -124,16 +137,51 @@ export function shopSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks): Dri
         document.addEventListener("click", blockProfile, true)
         profileBlockCleanup = () => document.removeEventListener("click", blockProfile, true)
 
-        const buyFn = () => {
-          el.removeEventListener("click", buyFn)
+        injectPulseStyle()
+        const buyEl = document.querySelector<HTMLButtonElement>('[data-tutorial="shop-animal-buy"]')
+        if (buyEl) buyEl.classList.add("tutorial-pulse")
+
+        let obs: MutationObserver | null = null
+
+        const advance = () => {
+          obs?.disconnect()
+          obs = null
           completeStep("step_shop").catch(console.error)
-          setTimeout(() => ctrl.moveNext(), 1500)
+          ctrl.moveNext()
         }
-        el.addEventListener("click", buyFn)
+
+        const buyFn = () => {
+          buyEl?.removeEventListener("click", buyFn)
+          buyEl?.classList.remove("tutorial-pulse")
+
+          let seenDisabled = false
+          obs = new MutationObserver(() => {
+            if (!buyEl || !document.contains(buyEl)) { advance(); return }
+            if (buyEl.disabled) { seenDisabled = true; return }
+            if (seenDisabled) advance()
+          })
+          obs.observe(document.body, {
+            subtree: true,
+            childList: true,
+            attributes: true,
+            attributeFilter: ["disabled"],
+          })
+        }
+        buyEl?.addEventListener("click", buyFn)
+
+        ;(el as any).__tutorialCleanup = () => {
+          obs?.disconnect()
+          obs = null
+          buyEl?.classList.remove("tutorial-pulse")
+          buyEl?.removeEventListener("click", buyFn)
+        }
       },
-      onDeselected: () => {
+      onDeselected: (el?: Element) => {
         profileBlockCleanup?.()
         profileBlockCleanup = undefined
+        removePulseStyle()
+        const cleanup = (el as any)?.__tutorialCleanup as (() => void) | undefined
+        if (cleanup) { cleanup(); delete (el as any).__tutorialCleanup }
       },
     },
   ]

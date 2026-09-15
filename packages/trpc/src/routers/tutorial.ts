@@ -452,26 +452,33 @@ export const tutorialRouter = router({
       })
       if (!player) return null
 
-      const pair = await db.tutorialAnimalPair.findUnique({
-        where: { playerAccountId: player.id },
-        select: {
-          ancestorOne: {
-            select: {
-              id: true,
-              name: true,
-              sex: true,
-              playerAccountId: true,
-              breed: { select: { name: true } },
-              breedName: true,
-              lifeStage: { select: { name: true } },
+      const [pair, config] = await Promise.all([
+        db.tutorialAnimalPair.findUnique({
+          where: { playerAccountId: player.id },
+          select: {
+            ancestorOne: {
+              select: {
+                id: true,
+                name: true,
+                sex: true,
+                playerAccountId: true,
+                breed: { select: { name: true } },
+                breedName: true,
+                lifeStage: { select: { name: true } },
+              },
             },
           },
-        },
-      })
+        }),
+        db.gameConfig.findUnique({
+          where: { gameId: input.gameId },
+          select: { tutorialFemalePrice: true },
+        }),
+      ])
 
       // Return null once the player has purchased her (ownership transferred)
       if (!pair?.ancestorOne || pair.ancestorOne.playerAccountId === player.id) return null
-      return pair.ancestorOne
+
+      return { ...pair.ancestorOne, price: config?.tutorialFemalePrice ?? 0 }
     }),
 
   grantStartingGold: protectedProcedure
@@ -644,11 +651,15 @@ export const tutorialRouter = router({
 
       // Reset gold to the training-section base and clear the LTC grant transaction
       // so the step can fire cleanly on replay.
+      const baseCurrency = await db.currencyDef.findFirst({
+        where: { gameId, currencyType: "BASE" },
+        select: { id: true },
+      })
       await Promise.all([
-        db.playerBalance.updateMany({
-          where: { playerAccountId: player.id },
+        baseCurrency ? db.playerBalance.updateMany({
+          where: { playerAccountId: player.id, currencyDefId: baseCurrency.id },
           data: { balance: 100 },
-        }),
+        }) : Promise.resolve(),
         db.transaction.deleteMany({
           where: { toPlayerAccountId: player.id, txnType: "TESTING_GRANT", amount: 100 },
         }),
@@ -657,10 +668,16 @@ export const tutorialRouter = router({
       // Restore checkpoint progress to match the current step position.
       // Each entry: [firstStepIndexOfNextPhase, stepKey]
       const CHECKPOINTS: [number, string][] = [
-        [6,  "step_shop"],
-        [11, "step_purchased"],
-        [21, "step_mare_profile"],
-        [50, "step_training_intro"],
+        [5,  "step_shop"],
+        [10, "step_purchased"],
+        [20, "step_mare_profile"],
+        [49, "step_training_intro"],
+        [50, "step_training_free"],
+        [52, "step_care_day2"],
+        [53, "step_training_guarded"],
+        [54, "step_day2_retire"],
+        [55, "step_training_complete"],
+        [56, "step_competition_transition"],
       ]
       const stepDefs = await db.tutorialStepDef.findMany({
         where: { gameId, stepKey: { in: CHECKPOINTS.map(([, k]) => k) } },
@@ -681,22 +698,56 @@ export const tutorialRouter = router({
     buyFemale: protectedProcedure
     .input(z.object({ gameId: z.string() }))
   .mutation(async ({ ctx, input }) => {
+    const { gameId } = input
     const player = await db.playerAccount.findUnique({
-      where: { userId_gameId: { userId: ctx.userId, gameId: input.gameId } },
+      where: { userId_gameId: { userId: ctx.userId, gameId } },
       select: { id: true },
     })
     if (!player) throw new Error("Player not found")
 
-    const pair = await db.tutorialAnimalPair.findUnique({
-      where: { playerAccountId: player.id },
-      select: { ancestorOneId: true },
-    })
+    const [pair, config] = await Promise.all([
+      db.tutorialAnimalPair.findUnique({
+        where: { playerAccountId: player.id },
+        select: { ancestorOneId: true },
+      }),
+      db.gameConfig.findUnique({
+        where: { gameId },
+        select: { tutorialFemalePrice: true },
+      }),
+    ])
     if (!pair) throw new Error("Tutorial not active")
 
-    await db.animal.update({
-      where: { id: pair.ancestorOneId },
-      data: { playerAccountId: player.id },
-    })
+    const price = config?.tutorialFemalePrice ?? 0
+
+    if (price > 0) {
+      const baseCurrency = await db.currencyDef.findFirst({
+        where: { gameId, currencyType: "BASE" },
+        select: { id: true },
+      })
+      if (!baseCurrency) throw new Error("No base currency configured")
+
+      await db.$transaction([
+        db.animal.update({ where: { id: pair.ancestorOneId }, data: { playerAccountId: player.id } }),
+        db.playerBalance.update({
+          where: { playerAccountId_currencyDefId: { playerAccountId: player.id, currencyDefId: baseCurrency.id } },
+          data: { balance: { decrement: price } },
+        }),
+        db.transaction.create({
+          data: {
+            gameId,
+            fromPlayerAccountId: player.id,
+            currencyDefId: baseCurrency.id,
+            amount: price,
+            txnType: "STORE_PURCHASE",
+          },
+        }),
+      ])
+    } else {
+      await db.animal.update({
+        where: { id: pair.ancestorOneId },
+        data: { playerAccountId: player.id },
+      })
+    }
   }),
 
   // TODO: remove before launch

@@ -75,6 +75,7 @@ export const gameAdminRouter = router({
         overworkInjuryChance: z.number().default(0),
         tutorialMaleBaseTemplateId: z.string().nullish(),
         tutorialFemaleBaseTemplateId: z.string().nullish(),
+        tutorialFemalePrice: z.number().int().min(0).default(0),
       }))
       .mutation(({ input }) => {
         const { gameId, containerLabel, subContainerLabel, lifeExpectancyBaseline, maxBreedingSlots, tutorialMaleBaseTemplateId, tutorialFemaleBaseTemplateId, ...rest } = input

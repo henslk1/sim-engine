@@ -29,7 +29,7 @@ function VenuesButton({ to, search, disabled }: { to: string; search: Record<str
   }
   return (
     <Link to={to} search={search}>
-      <ActionButton variant="soft" className="w-full justify-center">
+      <ActionButton variant="primary" className="w-full justify-center">
         <MapPin className="size-3.5" />
         View Venues
       </ActionButton>
@@ -190,7 +190,7 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
             </div>
           )}
           {requiredCertDefs.length > 0 && (
-            <div>
+            <div data-tutorial="competition-cert-requirements">
               <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Certificates</h4>
               <div className="space-y-1">
                 {requiredCertDefs.map((def) => {
@@ -258,7 +258,8 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
   }
 
   return (
-    <Panel title="Competition" icon={<Trophy className="size-4 text-chart-1" />}>
+    <Panel title="Competition" icon={<Trophy className="size-4 text-chart-1" />} data-tutorial="competition-panel">
+      {disc1 && <span data-tutorial="primary-discipline-name" className="sr-only">{disc1.name}</span>}
       {!canCompete ? (
         <p className="text-[11px] text-muted-foreground">Not available at this life stage.</p>
       ) : (
@@ -301,7 +302,7 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
               </div>
             )
           ) : !disc2 ? (
-            <div className="space-y-3">
+            <div data-tutorial="primary-discipline-section" className="space-y-3">
               {renderDiscipline(disc1, disc1Tier)}
               {!readonly && (
                 isAddingSecond ? (
@@ -339,6 +340,7 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
                 ) : (
                   <div className="border-t border-border pt-2">
                     <ActionButton
+                      data-tutorial="add-second-discipline"
                       variant="soft"
                       className="w-full justify-center"
                       onClick={() => setIsAddingSecond(true)}

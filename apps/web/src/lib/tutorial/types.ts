@@ -6,6 +6,7 @@ export type TutorialCallbacks = {
 
 export type TutorialCtrl = {
   moveNext: () => void
+  moveTo: (index: number) => void
   isLastStep: () => boolean
   destroy: () => void
   refresh: () => void

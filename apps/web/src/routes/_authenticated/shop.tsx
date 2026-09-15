@@ -340,7 +340,7 @@ function AnimalBreedRow({
                 <PawPrint className="size-8 text-muted-foreground/20" />
               </div>
               <div className="flex flex-1 flex-col gap-1.5 p-3">
-                <div>
+                <div data-tutorial="shop-animal-info">
                   <Link to="/animal/$animalId" params={{ animalId: sa.animal.id }}>
                     <h4 className="font-serif text-sm font-semibold leading-tight text-foreground hover:text-primary">
                       {sa.animal.name}
@@ -413,6 +413,8 @@ function ShopPage() {
   const { data: shopAnimals } = trpc.inventory.listShopAnimals.useQuery({ gameId: gameId! }, { enabled: !!gameId })
   const { data: tutorialMare } = trpc.tutorial.shopAnimal.useQuery({ gameId: gameId! }, { enabled: !!gameId })
   const isTutorialMode = !!tutorialMare
+  const mareBaseBalance = balances?.find(b => b.currencyDef.currencyType === "BASE")?.balance ?? 0
+  const canAffordMare = !tutorialMare || tutorialMare.price === 0 || mareBaseBalance >= tutorialMare.price
 
   const utils = trpc.useUtils()
 
@@ -695,7 +697,7 @@ function ShopPage() {
                 <PawPrint className="size-8 text-muted-foreground/20" />
               </div>
               <div className="flex flex-1 flex-col gap-1.5 p-3">
-                <div>
+                <div data-tutorial="shop-animal-info">
                   <h4 className="font-serif text-sm font-semibold leading-tight text-foreground">
                     {tutorialMare.name}
                   </h4>
@@ -706,12 +708,12 @@ function ShopPage() {
                 <div className="mt-auto flex items-center justify-between gap-2 border-t border-border pt-2">
                   <div className="flex items-center gap-1 text-xs font-bold tabular-nums text-foreground">
                     <Coins className="size-3 text-chart-1" />
-                    Free
+                    {tutorialMare.price === 0 ? "Free" : tutorialMare.price.toLocaleString()}
                   </div>
                   <button
                     type="button"
                     data-tutorial="shop-animal-buy"
-                    disabled={buyFemale.isPending}
+                    disabled={buyFemale.isPending || !canAffordMare}
                     onClick={() => { if (gameId) buyFemale.mutate({ gameId }) }}
                     className="inline-flex items-center gap-1 rounded-md bg-primary px-2.5 py-1 text-[11px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
                   >

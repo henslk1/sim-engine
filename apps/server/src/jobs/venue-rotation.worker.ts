@@ -9,3 +9,6 @@ export const venueRotationWorker = new Worker(
   },
   { connection }
 )
+
+venueRotationWorker.on("failed", (job, err) => console.error(`[venue-rotation] job ${job?.id} failed:`, err))
+venueRotationWorker.on("error", (err) => console.error("[venue-rotation] worker error:", err))

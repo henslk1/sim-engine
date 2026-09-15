@@ -279,7 +279,7 @@ export function HealthPanel({
           <h4 className="mb-1.5 mt-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             Certificates
           </h4>
-          <div className="space-y-1.5">
+          <div data-tutorial="health-certificates" className="space-y-1.5">
             {certDefs.map((def) => {
               const cert = animal.healthCertificates.find((c: Cert) => c.certDef.id === def.id)
               const isExpired = cert && (cert.expiresAtCycle <= animal.ageInCycles || !cert.isValid)
@@ -310,7 +310,7 @@ export function HealthPanel({
                       </span>
                     )}
                     {!readonly && (
-                      <Link to="/vet" search={{ animalId: animal.id, service: "certificates" }}>
+                      <Link data-tutorial="book-cert-testing" to="/vet" search={{ animalId: animal.id, service: "certificates" }}>
                         <ActionButton variant="soft" className="h-6 px-2 text-[11px]">
                           Book Testing
                         </ActionButton>

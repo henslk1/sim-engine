@@ -77,6 +77,7 @@ function GameConfigPage() {
     overworkInjuryChance: 0,
     tutorialMaleBaseTemplateId: "",
     tutorialFemaleBaseTemplateId: "",
+    tutorialFemalePrice: 0,
   })
 
   function n(key: keyof typeof cf, float = false) {
@@ -143,6 +144,7 @@ function GameConfigPage() {
           overworkInjuryChance: g.overworkInjuryChance,
           tutorialMaleBaseTemplateId: g.tutorialMaleBaseTemplateId ?? "",
           tutorialFemaleBaseTemplateId: g.tutorialFemaleBaseTemplateId ?? "",
+          tutorialFemalePrice: g.tutorialFemalePrice ?? 0,
         })
       }
     }
@@ -162,6 +164,7 @@ function GameConfigPage() {
       maxBreedingSlots: cf.maxBreedingSlots !== "" ? parseInt(cf.maxBreedingSlots) : null,
       tutorialMaleBaseTemplateId: cf.tutorialMaleBaseTemplateId || null,
       tutorialFemaleBaseTemplateId: cf.tutorialFemaleBaseTemplateId || null,
+      tutorialFemalePrice: cf.tutorialFemalePrice,
     })
   }
 
@@ -285,7 +288,7 @@ function GameConfigPage() {
             </Panel>
 
             <Panel title="Tutorial Base Templates" className="col-span-3">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <F label="Male Base Template">
                   <select
                     className="h-8 rounded-md border border-input bg-background px-2 text-sm text-foreground"
@@ -310,6 +313,7 @@ function GameConfigPage() {
                     ))}
                   </select>
                 </F>
+                <F label="Tutorial Female Price"><Input type="number" step="1" min="0" {...n("tutorialFemalePrice")} /></F>
               </div>
             </Panel>
 

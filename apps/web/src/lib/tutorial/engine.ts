@@ -4,6 +4,7 @@ import { shopSteps } from "./steps/shop"
 import { stableSteps } from "./steps/stable"
 import { profileSteps } from "./steps/profile"
 import { trainingSteps } from "./steps/training"
+import { competitionSteps } from "./steps/competition"
 import { devPauseStep } from "./steps/dev-pause"
 
 // Module-level flag: true only while Driver.js is actively running in this page session.
@@ -35,6 +36,7 @@ export function startTutorial(
   // Properties are stubs until wired up after driver() is created.
   const ctrl = {
     moveNext: () => {},
+    moveTo: (_index: number) => {},
     isLastStep: () => false,
     destroy: () => {},
     refresh: () => {},
@@ -45,11 +47,12 @@ export function startTutorial(
   }
 
   const steps = [
-    ...shopSteps(ctrl, callbacks),       // 0–5
-    ...stableSteps(ctrl, callbacks),     // 6–10
-    ...profileSteps(ctrl, callbacks),    // 11–20
-    ...trainingSteps(ctrl, callbacks),   // 21–49
-    devPauseStep(ctrl, devPausedRef),    // 50
+    ...shopSteps(ctrl, callbacks),          // 0–4
+    ...stableSteps(ctrl, callbacks),        // 5–9
+    ...profileSteps(ctrl, callbacks),       // 10–19
+    ...trainingSteps(ctrl, callbacks),      // 20–55
+    ...competitionSteps(ctrl, callbacks),   // 56–63
+    devPauseStep(ctrl, devPausedRef),       // 64
   ]
 
   // Save the live step index to localStorage on page unload so a refresh resumes
@@ -84,6 +87,10 @@ export function startTutorial(
     driverObj.moveNext()
     const next = driverObj.getActiveIndex()
     if (next !== null) localStorage.setItem("tutorial_step", String(next))
+  }
+  ctrl.moveTo = (index: number) => {
+    driverObj.drive(index)
+    localStorage.setItem("tutorial_step", String(index))
   }
   ctrl.isLastStep = () => driverObj.isLastStep()
   ctrl.destroy = () => driverObj.destroy()

@@ -458,9 +458,9 @@ function DashboardPage() {
           .filter((p) => p.completedAt !== null)
           .map((p) => tutorialProgress.steps.find((s) => s.id === p.stepDefId)?.stepKey),
       )
-      if (completedKeys.has("step_mare_profile")) return 21  // training phase (dev pause for now)
-      if (completedKeys.has("step_purchased")) return 11     // profile phase start
-      if (completedKeys.has("step_shop")) return 6           // stable phase start
+      if (completedKeys.has("step_mare_profile")) return 20  // training phase (dev pause for now)
+      if (completedKeys.has("step_purchased")) return 10     // profile phase start
+      if (completedKeys.has("step_shop")) return 5           // stable phase start
       return 0
     })()
     // Always layer in localStorage so the user resumes at the exact Driver.js step they left.
@@ -472,7 +472,7 @@ function DashboardPage() {
 
   const { data: tutorialPair } = trpc.tutorial.pairIds.useQuery(
     { gameId: gameId! },
-    { enabled: !!gameId && resumeIndex >= 11 && showWelcome },
+    { enabled: !!gameId && resumeIndex >= 10 && showWelcome },
   )
 
   function beginTutorial() {
@@ -485,12 +485,19 @@ function DashboardPage() {
 
     // Navigate to the page where the resume step's spotlight element lives,
     // so Driver.js can find it when the tour starts.
-    const resumeRoute =
-      resumeIndex >= 11 ? (tutorialPair?.ancestorOneId ? `/animal/${tutorialPair.ancestorOneId}` : "/stable") :
-      resumeIndex >= 6 ? "/stable" :
-      resumeIndex >= 1 && resumeIndex <= 5 ? "/shop" :
-      null
-    if (resumeRoute) navigate({ to: resumeRoute })
+    const animalId = tutorialPair?.ancestorOneId
+    let didNavigate = true
+    if (resumeIndex >= 58 && resumeIndex <= 60) {
+      navigate({ to: "/vet", search: animalId ? { animalId, service: "certificates" as const } : {} })
+    } else {
+      const resumeRoute =
+        resumeIndex >= 11 ? (animalId ? `/animal/${animalId}` : "/stable") :
+        resumeIndex >= 6 ? "/stable" :
+        resumeIndex >= 1 && resumeIndex <= 5 ? "/shop" :
+        null
+      if (resumeRoute) navigate({ to: resumeRoute })
+      else didNavigate = false
+    }
 
     // setup creates the tutorial animal pair + TutorialProgress rows.
     // Throws "Tutorial already set up" on resume — caught and ignored.
@@ -507,7 +514,7 @@ function DashboardPage() {
           () => completeStepMutation.mutate({ gameId: gameId!, stepKey: "tutorial_complete" }),
         )
         // Give React Router time to navigate before Driver.js queries the DOM.
-        if (resumeRoute) setTimeout(launch, 600)
+        if (didNavigate) setTimeout(launch, 600)
         else launch()
       })
   }

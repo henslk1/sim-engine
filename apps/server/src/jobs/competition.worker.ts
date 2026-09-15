@@ -11,3 +11,6 @@ export const competitionWorker = new Worker(
   },
   { connection }
 )
+
+competitionWorker.on("failed", (job, err) => console.error(`[competition] job ${job?.id} failed:`, err))
+competitionWorker.on("error", (err) => console.error("[competition] worker error:", err))

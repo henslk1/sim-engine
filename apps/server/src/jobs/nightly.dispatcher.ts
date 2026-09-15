@@ -18,3 +18,6 @@ export const nightlyDispatcherWorker = new Worker(
   },
   { connection }
 )
+
+nightlyDispatcherWorker.on("failed", (job, err) => console.error(`[nightly-dispatch] job ${job?.id} failed:`, err))
+nightlyDispatcherWorker.on("error", (err) => console.error("[nightly-dispatch] worker error:", err))

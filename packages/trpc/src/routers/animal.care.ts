@@ -31,8 +31,15 @@ export const animalCareRouter = router({
             where: { gameId: animal.gameId, currencyType: "BASE" },
             select: { id: true },
           })
+          const balance = await tx.playerBalance.findUnique({
+            where: { playerAccountId_currencyDefId: { playerAccountId: effectivePlayer!, currencyDefId: baseCurrency.id } },
+            select: { balance: true },
+          })
+          if (!balance || balance.balance < def.currencyAmount) {
+            throw new Error("Insufficient funds to perform this care action")
+          }
           await tx.playerBalance.update({
-            where: { playerAccountId_currencyDefId: { playerAccountId: effectivePlayer, currencyDefId: baseCurrency.id } },
+            where: { playerAccountId_currencyDefId: { playerAccountId: effectivePlayer!, currencyDefId: baseCurrency.id } },
             data: { balance: { decrement: def.currencyAmount } },
           })
           await tx.transaction.create({
