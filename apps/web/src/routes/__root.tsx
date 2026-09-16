@@ -1,6 +1,7 @@
 import { createRootRouteWithContext, Outlet } from "@tanstack/react-router"
 import { QueryClientProvider } from "@tanstack/react-query"
 import { httpBatchLink } from "@trpc/client"
+import { tutorialMutationQueue } from "@/lib/tutorial/mutation-queue"
 import { useState } from "react"
 import { trpc } from "@/lib/trpc"
 import { queryClient } from "@/lib/query-client"
@@ -36,7 +37,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 function RootComponent() {
   const [trpcClient] = useState(() =>
     trpc.createClient({
-      links: [httpBatchLink({ 
+      links: [tutorialMutationQueue, httpBatchLink({ 
         url: `${import.meta.env.VITE_SERVER_URL ?? "http://localhost:3000"}/trpc`,
         fetch: (url, options) => fetch(url, { ...options, credentials: "include" }),
       })],

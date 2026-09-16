@@ -232,8 +232,7 @@ export function trainingSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks):
         onNextClick: () => {
           const intenseBtn = document.querySelector('[data-tutorial="training-target-intense"]')
           if (intenseBtn?.getAttribute("data-tutorial-selected") === "true") {
-            ctrl.moveNext() // [33] → [34]
-            setTimeout(() => ctrl.moveNext(), 0) // [34] → [35] after Driver.js settles
+            ctrl.moveTo(34) // Intense is already selected; skip its selection step.
           } else {
             ctrl.moveNext()
           }

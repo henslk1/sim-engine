@@ -1,10 +1,12 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
-import { trpc } from "@/lib/trpc"
+import { trpc, trpcVanilla } from "@/lib/trpc"
 import { grantGold } from "@/lib/tutorial/utils/grant-gold"
 import { grantPremium } from "@/lib/tutorial/utils/grant-premium"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import { Dialog } from "@/components/game/ui"
-import { startTutorial, isTourRunning, setTourRunning } from "@/lib/tutorial"
+import { readTutorialStep, setTutorialAccess, useTutorialAccess } from "@/lib/tutorial/access"
+import { getTutorialPolicy, tutorialDestination } from "@sim-engine/trpc/tutorial-policy"
+import { startTutorial, setTourRunning, destroyActiveTour } from "@/lib/tutorial"
 import {
   AlertTriangle, Baby, Trophy, Coins, PawPrint, ClipboardList,
   ArrowRight, ShieldCheck, Mountain, Waves, Wind,
@@ -406,8 +408,10 @@ function DevLogPanel({ gameName }: { gameName: string }) {
 function DashboardPage() {
   const navigate = useNavigate()
   const utils = trpc.useUtils()
-  const { welcome } = Route.useSearch()
-  const [tutorialStarted, setTutorialStarted] = useState(false)
+
+  const [launching, setLaunching] = useState(false)
+  const tutorialAccess = useTutorialAccess()
+  const [tutorialError, setTutorialError] = useState<string | null>(null)
 
   const { data: gameData, isLoading: gameLoading } = trpc.admin.game.get.useQuery()
   const gameId = gameData?.id
@@ -428,7 +432,7 @@ function DashboardPage() {
   // isTourRunning() hides it if Driver.js is actively running (module-level flag that resets on
   // every full page load — unlike sessionStorage, it can't be left stale from a prior session).
   const tutorialComplete = me?.seniority?.tutorialCompleted ?? true
-  const showWelcome = !meLoading && !tutorialComplete && !tutorialStarted && !isTourRunning()
+  const showWelcome = !meLoading && !tutorialComplete && !tutorialAccess.running
 
   const setupMutation = trpc.tutorial.setup.useMutation()
   const completeStepMutation = trpc.tutorial.completeStep.useMutation()
@@ -448,77 +452,44 @@ function DashboardPage() {
     return !prog || prog.completedAt === null
   })
 
-  // Map completed step defs to a Driver.js checkpoint resume index.
-  // NOTE: DEV pause is at index 21 — remove before launch.
-  const resumeIndex = useMemo(() => {
-    const dbIndex = (() => {
-      if (!tutorialProgress) return 0
-      const completedKeys = new Set(
-        tutorialProgress.progress
-          .filter((p) => p.completedAt !== null)
-          .map((p) => tutorialProgress.steps.find((s) => s.id === p.stepDefId)?.stepKey),
-      )
-      if (completedKeys.has("step_mare_profile")) return 20  // training phase (dev pause for now)
-      if (completedKeys.has("step_purchased")) return 10     // profile phase start
-      if (completedKeys.has("step_shop")) return 5           // stable phase start
-      return 0
-    })()
-    // Always layer in localStorage so the user resumes at the exact Driver.js step they left.
-    // devReset clears localStorage so a full restart always lands at step 0.
-    const lsRaw = parseInt(localStorage.getItem("tutorial_step") ?? "", 10)
-    const lsIndex = isNaN(lsRaw) ? 0 : lsRaw
-    return Math.max(dbIndex, lsIndex)
-  }, [tutorialProgress])
-
-  const { data: tutorialPair } = trpc.tutorial.pairIds.useQuery(
-    { gameId: gameId! },
-    { enabled: !!gameId && resumeIndex >= 10 && showWelcome },
-  )
-
-  function beginTutorial() {
-    if (!gameId) return
-    // Mark the tour as running before any navigation so beforeLoad (which imports
-    // isTourRunning) allows /shop immediately — 600 ms before driverObj.drive() is called.
-    setTourRunning(true)
-    setTutorialStarted(true)
-    if (welcome) navigate({ to: "/dashboard", search: {}, replace: true })
-
-    // Navigate to the page where the resume step's spotlight element lives,
-    // so Driver.js can find it when the tour starts.
-    const animalId = tutorialPair?.ancestorOneId
-    let didNavigate = true
-    if (resumeIndex >= 58 && resumeIndex <= 60) {
-      navigate({ to: "/vet", search: animalId ? { animalId, service: "certificates" as const } : {} })
-    } else {
-      const resumeRoute =
-        resumeIndex >= 11 ? (animalId ? `/animal/${animalId}` : "/stable") :
-        resumeIndex >= 6 ? "/stable" :
-        resumeIndex >= 1 && resumeIndex <= 5 ? "/shop" :
-        null
-      if (resumeRoute) navigate({ to: resumeRoute })
-      else didNavigate = false
-    }
-
-    // setup creates the tutorial animal pair + TutorialProgress rows.
-    // Throws "Tutorial already set up" on resume — caught and ignored.
-    setupMutation.mutateAsync({ gameId })
-      .catch(() => {})
-      .finally(() => {
-        const launch = () => startTutorial(
-          {
-            grantGold: (amount) => grantGold(gameId!, amount),
-            grantPremium: () => grantPremium(gameId!),
-            completeStep: (stepKey) => completeStepMutation.mutateAsync({ gameId, stepKey }),
-          },
-          resumeIndex,
-          () => completeStepMutation.mutate({ gameId: gameId!, stepKey: "tutorial_complete" }),
-        )
-        // Give React Router time to navigate before Driver.js queries the DOM.
-        if (didNavigate) setTimeout(launch, 600)
-        else launch()
-      })
+  async function beginTutorial() {
+    if (!gameId || launching) return
+    setLaunching(true)
+    setTutorialError(null)
+    try {
+      // Read the authoritative index on every re-entry (including another tab).
+      const freshMe = await trpcVanilla.player.me.query({ gameId })
+      const saved = freshMe?.seniority?.tutorialDriverStep
+      const completedKeys = new Set(tutorialProgress?.progress.filter(p => p.completedAt !== null)
+        .map(p => tutorialProgress.steps.find(s => s.id === p.stepDefId)?.stepKey))
+      const checkpoint = completedKeys.has("step_mare_profile") ? 20 : completedKeys.has("step_purchased") ? 10 : completedKeys.has("step_shop") ? 5 : 0
+      const resumeIndex = saved ?? Math.max(checkpoint, readTutorialStep())
+      const index = getTutorialPolicy(resumeIndex) ? resumeIndex : 0
+      await setupMutation.mutateAsync({ gameId })
+      const pair = await trpcVanilla.tutorial.pairIds.query({ gameId })
+      const destination = tutorialDestination(index, pair?.ancestorOneId)
+      if (destination.pathname === "/dashboard" && index !== 0) throw new Error("Your tutorial mare could not be loaded. Please try again.")
+      setTutorialAccess({ restricted: true, step: index, mareId: pair?.ancestorOneId ?? null })
+      setTourRunning(true)
+      if (destination.pathname !== "/dashboard") {
+        await navigate({ to: destination.pathname, search: destination.search })
+      }
+      startTutorial({
+        setStep: step => trpcVanilla.tutorial.setDriverStep.mutate({ gameId, step }),
+        recover: error => {
+          if (error) console.error("Tutorial recovery:", error)
+          void navigate({ to: "/dashboard", replace: true })
+        },
+        grantGold: amount => grantGold(gameId, amount),
+        grantPremium: () => grantPremium(gameId),
+        completeStep: stepKey => completeStepMutation.mutateAsync({ gameId, stepKey }),
+      }, index)
+    } catch (error) {
+      destroyActiveTour()
+      setTutorialError(error instanceof Error ? error.message : "Unable to resume the tutorial. Please try again.")
+      void navigate({ to: "/dashboard", replace: true })
+    } finally { setLaunching(false) }
   }
-
   const { data: balances = [] } = trpc.player.balances.useQuery(
     { playerAccountId: playerAccountId! },
     { enabled: !!playerAccountId },
@@ -576,7 +547,7 @@ function DashboardPage() {
       open={showWelcome}
       title={!isSetup ? "Welcome to Your Breeding Program" : nextIncompleteStep ? nextIncompleteStep.name : "Continue Your Tutorial"}
     >
-      <div className="space-y-3 px-4 py-4">
+      <div data-tutorial-resume className="space-y-3 px-4 py-4">
         {!isSetup ? (
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">
@@ -591,13 +562,14 @@ function DashboardPage() {
         ) : (
           <p className="text-sm text-muted-foreground">Pick up where you left off.</p>
         )}
+        {tutorialError && <p role="alert" className="text-sm text-destructive">{tutorialError}</p>}
         <div className="flex justify-end">
           <button
             onClick={beginTutorial}
-            disabled={progressLoading}
+            disabled={progressLoading || launching}
             className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
           >
-            {progressLoading ? "Loading…" : isSetup ? "Continue Tutorial" : "Begin Tutorial"}
+            {progressLoading || launching ? "Loading…" : isSetup ? "Continue Tutorial" : "Begin Tutorial"}
           </button>
         </div>
       </div>

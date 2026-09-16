@@ -2,7 +2,7 @@
   "name": "@sim-engine/trpc",
   "version": "0.0.1",
   "type": "module",
-  "exports": { ".": "./src/index.ts" },
+  "exports": { ".": "./src/index.ts", "./tutorial-policy": "./src/tutorial-policy.ts", "./observable": "./src/observable.ts" },
   "dependencies": {
     "@sim-engine/db": "workspace:*",
     "@sim-engine/engine": "workspace:*",

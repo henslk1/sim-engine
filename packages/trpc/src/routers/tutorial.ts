@@ -1,10 +1,31 @@
 import { z } from "zod"
+import { TRPCError } from "@trpc/server"
+import { canTransitionTutorial, TUTORIAL_STEPS } from "../tutorial-policy.js"
 import { router, protectedProcedure } from "../trpc.js"
 import { db, AnimalSex } from "@sim-engine/db"
 import { generateFromTemplate, weightedSample, canonicalize, deleteAnimalsWithChildren, computeFixedFields, computePhenotypeDescription } from "@sim-engine/engine"
 import type { ExpressionRuleForPhenotype } from "@sim-engine/engine"
 
 export const tutorialRouter = router({
+  // The server owns the active Driver.js index. Older accounts import their
+  // browser checkpoint once; subsequent requests must follow the step graph.
+  setDriverStep: protectedProcedure
+    .input(z.object({ gameId: z.string(), step: z.number().int().min(0).max(TUTORIAL_STEPS.length - 1) }))
+    .mutation(async ({ ctx, input }) => {
+      const seniority = await db.playerSeniority.findFirstOrThrow({
+        where: { playerAccount: { userId: ctx.userId, gameId: input.gameId } },
+      })
+      if (seniority.tutorialCompleted) throw new TRPCError({ code: "FORBIDDEN" })
+      if (seniority.tutorialDriverStep !== null && !canTransitionTutorial(seniority.tutorialDriverStep, input.step)) {
+        throw new TRPCError({ code: "CONFLICT", message: "Tutorial progress changed. Continue from the dashboard." })
+      }
+      const result = await db.playerSeniority.updateMany({
+        where: { id: seniority.id, tutorialDriverStep: seniority.tutorialDriverStep },
+        data: { tutorialDriverStep: input.step },
+      })
+      if (!result.count) throw new TRPCError({ code: "CONFLICT", message: "Tutorial progress changed. Continue from the dashboard." })
+    }),
+
   getProgress: protectedProcedure
     .input(z.object({ gameId: z.string() }))
     .query(async ({ ctx, input }) => {
@@ -624,6 +645,11 @@ export const tutorialRouter = router({
     .input(z.object({ gameId: z.string(), stepIndex: z.number().int().min(0) }))
     .mutation(async ({ ctx, input }) => {
       const { gameId, stepIndex } = input
+      const phaseStart = stepIndex >= 56 ? 56 : stepIndex >= 49 ? 49 : stepIndex >= 20 ? 20 : stepIndex >= 10 ? 10 : stepIndex >= 5 ? 5 : 0
+      await db.playerSeniority.updateMany({
+        where: { playerAccount: { userId: ctx.userId, gameId } },
+        data: { tutorialDriverStep: phaseStart },
+      })
 
       const player = await db.playerAccount.findUnique({
         where: { userId_gameId: { userId: ctx.userId, gameId } },

@@ -38,6 +38,7 @@ model PlayerSeniority {
   starterColorOptionId String?
   starterGender        String?
   tutorialCompleted    Boolean       @default(false)
+  tutorialDriverStep   Int?
   gatesBypassed        Boolean       @default(false)
   playerAccount        PlayerAccount @relation(fields: [playerAccountId], references: [id])
 }

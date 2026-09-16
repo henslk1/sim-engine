@@ -1,4 +1,6 @@
 export type TutorialCallbacks = {
+  setStep: (index: number) => Promise<void>
+  recover: (error?: unknown) => void
   grantGold: (amount: number) => Promise<void>
   grantPremium: () => Promise<void>
   completeStep: (stepKey: string) => Promise<void>

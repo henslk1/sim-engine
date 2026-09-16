@@ -112,7 +112,7 @@ export const playerRouter = router({
           id: true,
           username: true,
           avatar: true,
-          seniority: { select: { tutorialCompleted: true } },
+          seniority: { select: { tutorialCompleted: true, tutorialDriverStep: true } },
         },
       })
     }),
