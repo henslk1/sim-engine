@@ -4,6 +4,7 @@ import { Trophy, CheckCircle, XCircle, Ban, MapPin } from "lucide-react"
 import { Link } from "@tanstack/react-router"
 import { useState } from "react"
 import { trpc } from "@/lib/trpc"
+import { isTourRunning } from "@/lib/tutorial"
 import { cn } from "@/lib/utils"
 import { getActiveRestrictions } from "../utils"
 
@@ -18,17 +19,17 @@ function InfoCard({ label, value }: { label: string; value: string }) {
   )
 }
 
-function VenuesButton({ to, search, disabled }: { to: string; search: Record<string, unknown>; disabled?: boolean }) {
+function VenuesButton({ to, search, disabled, tutorialKey }: { to: string; search: Record<string, unknown>; disabled?: boolean; tutorialKey?: string }) {
   if (disabled) {
     return (
-      <ActionButton variant="soft" className="w-full justify-center" disabled>
+      <ActionButton variant="soft" className="w-full justify-center" disabled data-tutorial={tutorialKey}>
         <MapPin className="size-3.5" />
         View Venues
       </ActionButton>
     )
   }
   return (
-    <Link to={to} search={search}>
+    <Link to={to} search={search} data-tutorial={tutorialKey}>
       <ActionButton variant="primary" className="w-full justify-center">
         <MapPin className="size-3.5" />
         View Venues
@@ -78,7 +79,8 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
 
   function renderDiscipline(
     disc: { id: string; name: string; isConformation: boolean },
-    tier: AnimalProfile["compTiers"][number] | null | undefined
+    tier: AnimalProfile["compTiers"][number] | null | undefined,
+    isSecondary = false
   ) {
     const weeklyPts = animal.weeklyPoints.find((p) => p.disciplineDefId === disc.id)?.points
     const startingTierDef = allDisciplines?.find((d) => d.id === disc.id)?.compTierDefs?.[0]
@@ -141,7 +143,7 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
             </div>
           )}
           {!readonly && (
-            <VenuesButton to="/venues" search={{ animalId: animal.id, from: "animal" }} disabled={isRestricted} />
+            <VenuesButton to="/venues" search={{ animalId: animal.id, from: "animal" }} disabled={isRestricted} tutorialKey={isSecondary ? "view-venues-btn" : undefined} />
           )}
         </div>
       )
@@ -158,9 +160,9 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
 
     if (!allEquipmentMet || !allCertsMet) {
       return (
-        <div className="space-y-3">
+        <div className="space-y-3" data-tutorial={isSecondary ? "secondary-missing-equipment" : undefined}>
           {(tier?.disciplineDef.equipmentRequirements.length ?? 0) > 0 && (
-            <div>
+            <div data-tutorial={isSecondary ? "secondary-equipment-section" : undefined}>
               <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Equipment</h4>
               <div className="space-y-1">
                 {tier!.disciplineDef.equipmentRequirements.map(
@@ -251,6 +253,7 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
             to="/venues"
             search={{ animalId: animal.id, from: "animal" }}
             disabled={isRestricted}
+            tutorialKey={isSecondary ? "view-venues-btn" : undefined}
           />
         )}
       </div>
@@ -306,20 +309,22 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
               {renderDiscipline(disc1, disc1Tier)}
               {!readonly && (
                 isAddingSecond ? (
-                  <div className="space-y-2 border-t border-border pt-3">
+                  <div data-tutorial="add-discipline-form" className="space-y-2 border-t border-border pt-3">
                     <p className="text-[11px] font-semibold text-muted-foreground">Add Second Discipline</p>
                     <div className="flex gap-2">
                       <select
+                        data-tutorial="discipline-select"
                         value={selectedSecondDisciplineId}
                         onChange={(e) => setSelectedSecondDisciplineId(e.target.value)}
                         className="flex-1 rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                       >
                         <option value="">Choose discipline…</option>
-                        {disciplinesForStage?.filter((d) => d.id !== disc1.id).map((d) => (
+                        {disciplinesForStage?.filter((d) => d.id !== disc1.id && (!isTourRunning() || d.isTutorialSelectable)).map((d) => (
                           <option key={d.id} value={d.id}>{d.name}</option>
                         ))}
                       </select>
                       <ActionButton
+                        data-tutorial="discipline-confirm"
                         variant="soft"
                         disabled={!selectedSecondDisciplineId || setSecondaryDiscipline.isPending}
                         onClick={() => selectedSecondDisciplineId && setSecondaryDiscipline.mutate({ animalId: animal.id, disciplineDefId: selectedSecondDisciplineId })}
@@ -327,6 +332,7 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
                         {setSecondaryDiscipline.isPending ? "Saving…" : "Confirm"}
                       </ActionButton>
                       <ActionButton
+                        data-tutorial="discipline-cancel"
                         variant="soft"
                         onClick={() => { setIsAddingSecond(false); setSelectedSecondDisciplineId("") }}
                       >
@@ -366,6 +372,7 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
                   {disc1.name}
                 </button>
                 <button
+                  data-tutorial="discipline-tab-2"
                   onClick={() => setActiveTabIndex(1)}
                   className={cn(
                     "flex-1 rounded px-2 py-1 text-[11px] font-medium transition-colors",
@@ -377,9 +384,11 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
                   {disc2.name}
                 </button>
               </div>
-              {activeTabIndex === 0
-                ? renderDiscipline(disc1, disc1Tier)
-                : renderDiscipline(disc2, disc2Tier)}
+              <div data-tutorial={activeTabIndex === 1 ? "secondary-discipline-section" : undefined}>
+                {activeTabIndex === 0
+                  ? renderDiscipline(disc1, disc1Tier)
+                  : renderDiscipline(disc2, disc2Tier, true)}
+              </div>
             </>
           )}
         </>

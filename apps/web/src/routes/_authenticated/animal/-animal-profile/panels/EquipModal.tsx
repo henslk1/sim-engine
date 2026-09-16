@@ -5,6 +5,7 @@ import { ActionButton } from "@/components/game/ui"
 import { Package, ShoppingBag, X, CheckCircle2 } from "lucide-react"
 import { Link } from "@tanstack/react-router"
 import { cn } from "@/lib/utils"
+import { isTourRunning } from "@/lib/tutorial"
 
 const EQUIPPABLE_CATEGORIES = ["EQUIPMENT", "BREEDING", "MISC"] as const
 type EquippableCategory = typeof EQUIPPABLE_CATEGORIES[number]
@@ -58,7 +59,7 @@ export function EquipModal({ animal, playerAccountId, onClose }: {
           <h2 className="text-base font-semibold text-foreground">Equipment</h2>
           <p className="text-xs text-muted-foreground">{animal.name}</p>
         </div>
-        <button type="button" onClick={onClose} className="text-muted-foreground transition-colors hover:text-foreground">
+        <button type="button" data-tutorial="equip-modal-close" onClick={onClose} className="text-muted-foreground transition-colors hover:text-foreground">
           <X className="size-4" />
         </button>
       </div>
@@ -67,7 +68,7 @@ export function EquipModal({ animal, playerAccountId, onClose }: {
       <div className="grid max-h-[70vh] grid-cols-[220px_1fr] divide-x divide-border overflow-hidden">
 
         {/* Left — currently equipped */}
-        <div className="flex flex-col gap-3 overflow-y-auto p-5">
+        <div data-tutorial="equipped-list" className="flex flex-col gap-3 overflow-y-auto p-5">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Equipped</p>
           {animal.equipment.length === 0 ? (
             <p className="text-xs text-muted-foreground/70">Nothing equipped yet.</p>
@@ -148,9 +149,10 @@ export function EquipModal({ animal, playerAccountId, onClose }: {
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-2.5">
-                {activeItems.map((inv) => (
+                {activeItems.map((inv, idx) => (
                   <div
                     key={inv.id}
+                    {...(isTourRunning() && idx === 0 ? { "data-tutorial": "tutorial-equip-item" } : {})}
                     className="flex flex-col gap-4 rounded-xl border border-border/60 bg-secondary/30 p-4"
                   >
                     <div>

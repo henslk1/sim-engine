@@ -1,6 +1,5 @@
 import type { DriveStep } from "driver.js"
 import type { TutorialCallbacks, TutorialCtrl } from "../types"
-import { waitForElement } from "../utils/wait-for-element"
 
 const PULSE_STYLE_ID = "tutorial-pulse-style"
 
@@ -33,6 +32,8 @@ export function shopSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks): Dri
 
   return [
     // ── [0] Shop nav — nav ─────────────────────────────────────────────────────
+    // Spotlights the shop nav link. Clicking it navigates to /shop; ctrl.moveNext()
+    // fires synchronously so localStorage is updated before beforeLoad runs.
     {
       element: '[data-tutorial="shop-nav"]',
       popover: {
@@ -45,7 +46,7 @@ export function shopSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks): Dri
         const fn = () => {
           el.removeEventListener("click", fn)
           delete (el as any).__tutorialCleanup
-          setTimeout(() => ctrl.moveNext(), 700)
+          ctrl.moveNext()
         }
         el.addEventListener("click", fn)
         ;(el as any).__tutorialCleanup = () => el.removeEventListener("click", fn)
@@ -57,14 +58,14 @@ export function shopSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks): Dri
     },
 
     // ── [1] Shop intro — page-load ─────────────────────────────────────────────
+    // waitForElement waits silently until shop-content renders on /shop.
     {
+      element: '[data-tutorial="shop-content"]',
+      waitForElement: 5000,
+      disableActiveInteraction: true,
       popover: {
         title: "The Shop",
         description: "You'll return here often for horses, equipment, supplies, and other essentials for your stable.",
-      },
-      onHighlighted: async () => {
-        await waitForElement('[data-tutorial="shop-content"]')
-        ctrl.refresh()
       },
     },
 
@@ -93,32 +94,22 @@ export function shopSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks): Dri
     },
 
     // ── [3] Animals tab — action ───────────────────────────────────────────────
+    // advanceOnClick advances immediately when the tab is clicked. The next step
+    // uses waitForElement to wait for the card to appear.
     {
       element: '[data-tutorial="shop-animals-tab"]',
+      advanceOnClick: true,
       popover: {
         title: "Animals",
         description: "Click the Animals tab to see the horses available in the game shop.",
         showButtons: [],
-      },
-      onHighlighted: (el?: Element) => {
-        if (!el) return
-        const fn = () => {
-          el.removeEventListener("click", fn)
-          delete (el as any).__tutorialCleanup
-          setTimeout(() => ctrl.moveNext(), 400)
-        }
-        el.addEventListener("click", fn)
-        ;(el as any).__tutorialCleanup = () => el.removeEventListener("click", fn)
-      },
-      onDeselected: (el?: Element) => {
-        const cleanup = (el as any)?.__tutorialCleanup as (() => void) | undefined
-        if (cleanup) { cleanup(); delete (el as any).__tutorialCleanup }
       },
     },
 
     // ── [4] Mare card + buy — action + block-profile ──────────────────────────
     {
       element: '[data-tutorial="shop-animal-card"]',
+      waitForElement: 5000,
       popover: {
         title: "There She Is",
         description: "Your foundation mare is ready to join your stable. Purchase her to continue.",

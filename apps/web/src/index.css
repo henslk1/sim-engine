@@ -213,3 +213,17 @@ select.bg-background {
 .driver-popover-arrow-side-right.driver-popover-arrow { border-left-color: var(--border) !important; }
 .driver-popover-arrow-side-top.driver-popover-arrow { border-bottom-color: var(--border) !important; }
 .driver-popover-arrow-side-bottom.driver-popover-arrow { border-top-color: var(--border) !important; }
+
+/* Tutorial interaction lock — blocks all page content when Driver.js is active.
+   Only the spotlighted element is re-enabled, and only for action steps (no driver-no-interaction).
+   Popover buttons live outside <main> so they're never affected by these rules.
+   Note: pointer-events does not cascade to descendants, so * (all descendants) is required. */
+body.driver-active header *,
+body.driver-active main * {
+  pointer-events: none !important;
+}
+body.driver-active .driver-active-element:not(.driver-no-interaction),
+body.driver-active .driver-active-element:not(.driver-no-interaction) * {
+  pointer-events: auto !important;
+}
+

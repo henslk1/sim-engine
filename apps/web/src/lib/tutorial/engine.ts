@@ -40,10 +40,6 @@ export function startTutorial(
     isLastStep: () => false,
     destroy: () => {},
     refresh: () => {},
-    // Re-drives the current step index — forces Driver.js to re-query the element selector.
-    // Use this after waitForElement resolves instead of refresh(), which only repositions
-    // the cached __activeElement and will remain floating if the element was null on entry.
-    reDrive: () => {},
   }
 
   const steps = [
@@ -51,8 +47,8 @@ export function startTutorial(
     ...stableSteps(ctrl, callbacks),        // 5–9
     ...profileSteps(ctrl, callbacks),       // 10–19
     ...trainingSteps(ctrl, callbacks),      // 20–55
-    ...competitionSteps(ctrl, callbacks),   // 56–63
-    devPauseStep(ctrl, devPausedRef),       // 64
+    ...competitionSteps(ctrl, callbacks),   // 56–78
+    devPauseStep(ctrl, devPausedRef),       // 79
   ]
 
   // Save the live step index to localStorage on page unload so a refresh resumes
@@ -66,9 +62,11 @@ export function startTutorial(
   const driverObj = driver({
     showProgress: true,
     animate: true,
+    duration: 300,
     overlayOpacity: 0.55,
     smoothScroll: true,
     allowClose: false,
+    showButtons: ["next"],
     stagePadding: 4,
     onDestroyStarted: () => {
       window.removeEventListener("beforeunload", saveStepOnUnload)
@@ -95,10 +93,6 @@ export function startTutorial(
   ctrl.isLastStep = () => driverObj.isLastStep()
   ctrl.destroy = () => driverObj.destroy()
   ctrl.refresh = () => driverObj.refresh()
-  ctrl.reDrive = () => {
-    const idx = driverObj.getActiveIndex()
-    if (idx !== null) driverObj.drive(idx)
-  }
 
   _activeDriver = driverObj
   _tourRunning = true

@@ -10,5 +10,4 @@ export type TutorialCtrl = {
   isLastStep: () => boolean
   destroy: () => void
   refresh: () => void
-  reDrive: () => void
 }

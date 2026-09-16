@@ -113,6 +113,30 @@ function TutorialDevBar() {
 
 // Pages that skip the tutorial check entirely (auth only)
 const SKIP_TUTORIAL_CHECK = ["/tutorial", "/setup", "/admin"]
+
+// Per-step page allowlist. Each range covers exactly the pages a player should
+// be able to reach at that point — no cumulative unlocking.
+// Cross-page nav steps (5, 9, 57, 60, 68, 69, 71, 72) include both source and
+// destination so the routing guard passes regardless of whether beforeLoad fires
+// before or after ctrl.moveNext() updates localStorage.
+function getTutorialAllowed(step: number): string[] {
+  const d = "/dashboard"
+  if (step <= 4)  return [d, "/shop"]
+  if (step === 5) return [d, "/shop", "/stable"]
+  if (step <= 8)  return [d, "/stable"]
+  if (step === 9) return [d, "/stable", "/animal"]
+  if (step <= 56) return [d, "/animal"]
+  if (step === 57) return [d, "/animal", "/vet"]   // book-cert click: source + dest
+  if (step <= 59) return [d, "/vet"]
+  if (step === 60) return [d, "/vet", "/animal"]   // vet-back click: source + dest
+  if (step <= 67) return [d, "/animal"]
+  if (step === 68) return [d, "/animal", "/town"]  // town nav click: source + dest
+  if (step === 69) return [d, "/town", "/shop"]    // shop card click: source + dest
+  if (step <= 70) return [d, "/shop"]
+  if (step === 71) return [d, "/shop", "/stable"]  // stable nav click: source + dest
+  if (step === 72) return [d, "/stable", "/animal"] // mare card click: source + dest
+  return [d, "/animal"]
+}
 const completedUsers = new Set<string>()
 
 export const Route = createFileRoute("/_authenticated")({
@@ -145,18 +169,16 @@ export const Route = createFileRoute("/_authenticated")({
       // If the tour is live and the user client-navigates back to /dashboard, return them to the
       // active tour page so Driver.js isn't spotlighting header elements on the wrong page.
       if (touring && location.pathname.startsWith("/dashboard") && currentStep > 0) {
-        const dest = currentStep >= 58 && currentStep <= 60 ? "/vet" : currentStep >= 5 ? "/stable" : "/shop"
+        const dest =
+          currentStep >= 58 && currentStep <= 60 ? "/vet" :
+          currentStep === 69 ? "/town" :
+          currentStep >= 70 && currentStep <= 71 ? "/shop" :
+          currentStep === 72 ? "/stable" :
+          currentStep >= 5 ? "/stable" : "/shop"
         throw redirect({ to: dest })
       }
 
-      // Allow pages based on stored step index so a page refresh doesn't evict the user.
-      // `touring` resets on every full page load; `currentStep` persists via localStorage.
-      const inVetPhase = currentStep >= 58 && currentStep <= 60
-      const allowed = ["/dashboard"]
-      if (touring || currentStep >= 1) allowed.push("/shop")
-      if (touring || currentStep >= 5) allowed.push("/stable")
-      if ((touring || currentStep >= 5) && !inVetPhase) allowed.push("/animal")
-      if (touring || currentStep >= 56) allowed.push("/vet")
+      const allowed = getTutorialAllowed(currentStep)
 
       if (!allowed.some((p) => location.pathname.startsWith(p))) {
         throw redirect({ to: "/dashboard" })
@@ -207,15 +229,23 @@ function TutorialResumeGate() {
     // Only resume if already on the correct page — wrong-page case falls back to welcome dialog
     const animalId = tutorialPair?.ancestorOneId
     const onCorrectPage =
-      storedStep >= 61
+      storedStep >= 73
         ? !!animalId && location.pathname === `/animal/${animalId}`
-        : storedStep >= 58
-          ? location.pathname.startsWith("/vet")
-          : storedStep >= 11
-            ? !!animalId && location.pathname === `/animal/${animalId}`
-            : storedStep >= 6
-              ? location.pathname.startsWith("/stable")
-              : location.pathname.startsWith("/shop")
+        : storedStep === 72
+          ? location.pathname.startsWith("/stable")
+          : storedStep >= 70 && storedStep <= 71
+            ? location.pathname.startsWith("/shop")
+            : storedStep === 69
+              ? location.pathname.startsWith("/town")
+              : storedStep >= 61
+                ? !!animalId && location.pathname === `/animal/${animalId}`
+                : storedStep >= 58
+                  ? location.pathname.startsWith("/vet")
+                  : storedStep >= 11
+                    ? !!animalId && location.pathname === `/animal/${animalId}`
+                    : storedStep >= 6
+                      ? location.pathname.startsWith("/stable")
+                      : location.pathname.startsWith("/shop")
 
     if (!onCorrectPage) return
 

@@ -443,6 +443,31 @@ export const tutorialRouter = router({
       return pair ?? null
     }),
 
+  requiredEquipmentItemIds: protectedProcedure
+    .input(z.object({ gameId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const player = await db.playerAccount.findUnique({
+        where: { userId_gameId: { userId: ctx.userId, gameId: input.gameId } },
+        select: { id: true },
+      })
+      if (!player) return null
+
+      const pair = await db.tutorialAnimalPair.findUnique({
+        where: { playerAccountId: player.id },
+        select: { ancestorOne: { select: { secondaryDisciplineDefId: true } } },
+      })
+
+      const secondaryDiscId = pair?.ancestorOne?.secondaryDisciplineDefId
+      if (!secondaryDiscId) return null
+
+      const disc = await db.disciplineDef.findUnique({
+        where: { id: secondaryDiscId },
+        select: { equipmentRequirements: { select: { itemDefId: true } } },
+      })
+
+      return disc?.equipmentRequirements.map((r) => r.itemDefId) ?? null
+    }),
+
   shopAnimal: protectedProcedure
     .input(z.object({ gameId: z.string() }))
     .query(async ({ ctx, input }) => {
@@ -608,7 +633,7 @@ export const tutorialRouter = router({
 
       const pair = await db.tutorialAnimalPair.findUnique({
         where: { playerAccountId: player.id },
-        select: { ancestorOneId: true },
+        select: { ancestorOneId: true, ancestorOne: { select: { secondaryDisciplineDefId: true } } },
       })
 
       // Reset tutorial female's training and care state so the current step is replayable.
@@ -646,6 +671,14 @@ export const tutorialRouter = router({
             where: { animalId: femaleId },
             data: { nextDueCycle: 0, lastPerformedCycle: null },
           }),
+          // Competition phase reset: clear health certs so the vet step is replayable.
+          ...(stepIndex >= 56 ? [
+            db.healthCertificate.deleteMany({ where: { animalId: femaleId } }),
+            db.animal.update({ where: { id: femaleId }, data: { secondaryDisciplineDefId: null } }),
+            ...(pair.ancestorOne?.secondaryDisciplineDefId
+              ? [db.animalCompetitionTier.deleteMany({ where: { animalId: femaleId, disciplineDefId: pair.ancestorOne.secondaryDisciplineDefId } })]
+              : []),
+          ] : []),
         ])
       }
 

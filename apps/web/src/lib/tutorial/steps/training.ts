@@ -1,6 +1,5 @@
 import type { DriveStep } from "driver.js"
 import type { TutorialCallbacks, TutorialCtrl } from "../types"
-import { waitForElement } from "../utils/wait-for-element"
 
 const PULSE_STYLE_ID = "tutorial-pulse-style"
 
@@ -41,17 +40,14 @@ export function trainingSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks):
 
   return [
     // ── [21] Training panel intro — page-load ─────────────────────────────────
+    // waitForElement waits silently until the training panel renders after the
+    // profile section transition.
     {
       element: '[data-tutorial="training-panel"]',
+      waitForElement: 5000,
       popover: {
         title: "Training",
         description: "This is where you'll develop your horse's natural abilities through daily training.",
-      },
-      onHighlighted: async (el?: Element) => {
-        if (!el) {
-          await waitForElement('[data-tutorial="training-panel"]')
-          ctrl.refresh()
-        }
       },
     },
 
@@ -96,43 +92,30 @@ export function trainingSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks):
     },
 
     // ── [26] Groom action — action ────────────────────────────────────────────
+    // advanceOnClick advances immediately on click; the next step uses
+    // waitForElement to wait for the grooming log entry to appear.
     {
       element: '[data-tutorial="care-groom"]',
+      advanceOnClick: true,
       popover: {
         title: "Start With Grooming",
         description: "Grooming is a good way to improve her Mood. Let's groom her before we continue training.",
         showButtons: [],
       },
-      onHighlighted: (el?: Element) => {
-        if (!el) return
-        const fn = () => {
-          el.removeEventListener("click", fn)
-          delete (el as any).__tutorialCleanup
-          setTimeout(() => ctrl.moveNext(), 1000)
-        }
-        el.addEventListener("click", fn)
-        ;(el as any).__tutorialCleanup = () => el.removeEventListener("click", fn)
-      },
-      onDeselected: (el?: Element) => {
-        const cleanup = (el as any)?.__tutorialCleanup as (() => void) | undefined
-        if (cleanup) { cleanup(); delete (el as any).__tutorialCleanup }
-      },
     },
 
     // ── [27] Daily log after grooming — info ──────────────────────────────────
+    // waitForElement waits for the grooming log entry to appear after the action.
     {
       element: '[data-tutorial="daily-log-care"]',
+      waitForElement: 5000,
       disableActiveInteraction: true,
       popover: {
         title: "Daily Log",
         description: "You can see the results of your daily actions recorded here in the Daily Log.",
       },
-      onHighlighted: async (el?: Element) => {
-        if (!el) {
-          await waitForElement('[data-tutorial="daily-log-care"]')
-          ctrl.reDrive()
-          return
-        }
+      onHighlighted: (el?: Element) => {
+        if (!el) return
         el.scrollIntoView({ block: "nearest" })
         setTimeout(() => ctrl.refresh(), 50)
       },
@@ -223,19 +206,17 @@ export function trainingSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks):
     },
 
     // ── [32] Training log entry — info ────────────────────────────────────────
+    // waitForElement waits for the training log entry to appear after the action.
     {
       element: '[data-tutorial="daily-log-training"]',
+      waitForElement: 5000,
       disableActiveInteraction: true,
       popover: {
         title: "Training Recorded",
         description: "Great work! You can see the training session logged here.",
       },
-      onHighlighted: async (el?: Element) => {
-        if (!el) {
-          await waitForElement('[data-tutorial="daily-log-training"]')
-          ctrl.reDrive()
-          return
-        }
+      onHighlighted: (el?: Element) => {
+        if (!el) return
         el.scrollIntoView({ block: "nearest" })
         setTimeout(() => ctrl.refresh(), 50)
       },
@@ -524,19 +505,14 @@ export function trainingSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks):
     },
 
     // ── [40] Care Alert — info ─────────────────────────────────────────────────
-    // Waits for the LTC overdue banner to appear (requires past grace period).
+    // waitForElement waits for the LTC overdue banner to appear after the grace period.
     {
       element: '[data-tutorial="ltc-alert"]',
+      waitForElement: 10000,
       disableActiveInteraction: true,
       popover: {
         title: "Care Alerts",
         description: "A few things need attention. Your mare also has some routine care due. Let's take care of those before we finish for the day.",
-      },
-      onHighlighted: async (el?: Element) => {
-        if (!el) {
-          await waitForElement('[data-tutorial="ltc-alert"]')
-          ctrl.reDrive()
-        }
       },
     },
 

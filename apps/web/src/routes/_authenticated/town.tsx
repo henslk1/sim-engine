@@ -45,6 +45,7 @@ function TownPage() {
           <Link
             key={title}
             to={to}
+            {...(to === "/shop" ? { "data-tutorial": "town-shop-card" } : {})}
             className="group flex items-start gap-4 rounded-lg border border-border bg-card px-4 py-4 shadow-sm transition-colors hover:border-primary/40 hover:bg-primary/5"
           >
             <div className="mt-0.5 shrink-0">{icon}</div>

@@ -115,6 +115,7 @@ export function OwnerActionList({ animal, playerAccountId, onEquipOpen }: Props)
       {/* Equip / Unequip */}
       <button
         type="button"
+        data-tutorial="equip-action"
         onClick={onEquipOpen}
         className="flex w-full items-center gap-3 px-3 py-3 text-left text-sm font-medium text-foreground transition-colors hover:bg-secondary/50"
       >

@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { trpc } from "@/lib/trpc"
 import { useState, useMemo, useCallback } from "react"
+import { isTourRunning } from "@/lib/tutorial"
 import {
   ShoppingBag, Package, CheckCircle, PawPrint,
   Coins, Gem, Search, Sparkles, Plus, ArrowRight, Minus,
@@ -177,6 +178,7 @@ function ItemCard({
   quantity,
   onQuantityChange,
   onBuy,
+  isTutorialItem = false,
 }: {
   listing: ListingShape
   inventory: InvSlot[] | undefined
@@ -186,12 +188,13 @@ function ItemCard({
   quantity: number
   onQuantityChange: (n: number) => void
   onBuy: () => void
+  isTutorialItem?: boolean
 }) {
   const owned = inventory?.find((s) => s.itemDef.id === listing.itemDef.id)?.quantity
   const total = listing.price * quantity
 
   return (
-    <article className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm ring-1 ring-border transition-all hover:-translate-y-0.5 hover:shadow-md">
+    <article {...(isTutorialItem ? { "data-tutorial": "tutorial-shop-item" } : {})} className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm ring-1 ring-border transition-all hover:-translate-y-0.5 hover:shadow-md">
       <div className="relative aspect-[4/3] w-full overflow-hidden bg-gradient-to-b from-secondary/50 to-card">
         <div className="flex h-full items-center justify-center">
           <Package className="size-10 text-muted-foreground/20 transition-transform duration-300 group-hover:scale-105" />
@@ -233,6 +236,7 @@ function ItemCard({
           </div>
           <button
             type="button"
+            {...(isTutorialItem ? { "data-tutorial": "tutorial-shop-buy" } : {})}
             disabled={!canAfford || isBuying}
             onClick={onBuy}
             className={cn(
@@ -413,6 +417,11 @@ function ShopPage() {
   const { data: shopAnimals } = trpc.inventory.listShopAnimals.useQuery({ gameId: gameId! }, { enabled: !!gameId })
   const { data: tutorialMare } = trpc.tutorial.shopAnimal.useQuery({ gameId: gameId! }, { enabled: !!gameId })
   const isTutorialMode = !!tutorialMare
+  const { data: tutorialEquipmentItemIds } = trpc.tutorial.requiredEquipmentItemIds.useQuery(
+    { gameId: gameId! },
+    { enabled: !!gameId && !isTutorialMode },
+  )
+  const isTutorialEquipmentMode = !isTutorialMode && isTourRunning() && (tutorialEquipmentItemIds?.length ?? 0) > 0
   const mareBaseBalance = balances?.find(b => b.currencyDef.currencyType === "BASE")?.balance ?? 0
   const canAffordMare = !tutorialMare || tutorialMare.price === 0 || mareBaseBalance >= tutorialMare.price
 
@@ -479,7 +488,9 @@ function ShopPage() {
 
   const shopListings = isTutorialMode
     ? []
-    : (listings?.filter((l) => l.shopType === (tab === "PREMIUM" ? "PREMIUM" : "BASE")) ?? [])
+    : isTutorialEquipmentMode
+      ? (listings?.filter((l) => tutorialEquipmentItemIds!.includes(l.itemDef.id)) ?? [])
+      : (listings?.filter((l) => l.shopType === (tab === "PREMIUM" ? "PREMIUM" : "BASE")) ?? [])
 
   const categories = useMemo(
     () => Array.from(new Set(shopListings.map((l) => l.itemDef.category))).sort(),
@@ -642,6 +653,7 @@ function ShopPage() {
                   quantity={getQty(l.id)}
                   onQuantityChange={(n) => setQty(l.id, n)}
                   onBuy={() => handleBuy(l.id)}
+                  isTutorialItem={isTutorialEquipmentMode}
                 />
               ))}
             </div>
