@@ -230,7 +230,10 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
           <InfoCard label="Weekly Points" value={weeklyPts !== undefined ? `${Math.round(weeklyPts)} pts` : "—"} />
         </div>
         {tier?.tierDef.advancementThreshold != null && (
-          <div className="rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2">
+          <div
+            className="rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2"
+            data-tutorial={isSecondary ? "secondary-discipline-progress-bar" : undefined}
+          >
             <div className="mb-1.5 flex items-center justify-between">
               <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                 Progress to Next Tier

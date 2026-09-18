@@ -285,7 +285,6 @@ export function trainingSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks):
       },
       onHighlighted: (el?: Element) => {
         if (!el) return
-        let trainsLeft = 4
         let advanced = false
 
         function lockOtherTiers() {
@@ -298,6 +297,12 @@ export function trainingSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks):
 
         function attachPulse() {
           if (advanced) return
+          // The introductory session plus four repeats survive dashboard recovery.
+          if (Number(el!.getAttribute("data-tutorial-training-sessions")) >= 5) {
+            advanced = true
+            setTimeout(() => ctrl.moveNext(), 500)
+            return
+          }
           lockOtherTiers()
           const trainBtn = document.querySelector<HTMLButtonElement>('[data-tutorial="training-target-train"]')
           if (!trainBtn || trainBtn.disabled) return
@@ -310,11 +315,6 @@ export function trainingSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks):
             delete (trainBtn as any).__trainListener
             trainBtn.removeEventListener("click", fn)
             delete (trainBtn as any).__trainCleanup
-            trainsLeft--
-            if (trainsLeft <= 0 && !advanced) {
-              advanced = true
-              setTimeout(() => ctrl.moveNext(), 500)
-            }
           }
           trainBtn.addEventListener("click", fn)
           ;(trainBtn as any).__trainCleanup = () => {
@@ -435,12 +435,16 @@ export function trainingSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks):
       },
       onHighlighted: (el?: Element) => {
         if (!el) return
-        let trainsLeft = 2
         let advanced = false
 
         function attachPulse() {
           if (advanced) return
           const trainBtns = Array.from(el!.querySelectorAll('[data-tutorial="training-near-cap-train"]'))
+          if (trainBtns.length === 0) {
+            advanced = true
+            setTimeout(() => ctrl.moveNext(), 500)
+            return
+          }
 
           injectPulseStyle()
 
@@ -469,11 +473,6 @@ export function trainingSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks):
               delete (button as any).__trainListener
               button.removeEventListener("click", fn)
               delete (button as any).__trainCleanup
-              trainsLeft--
-              if (trainsLeft <= 0 && !advanced) {
-                advanced = true
-                setTimeout(() => ctrl.moveNext(), 500)
-              }
             }
             button.addEventListener("click", fn)
             ;(button as any).__trainCleanup = () => {

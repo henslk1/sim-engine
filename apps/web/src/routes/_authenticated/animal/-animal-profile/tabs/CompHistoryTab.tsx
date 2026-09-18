@@ -46,8 +46,8 @@ export function CompHistoryTab({
                 </tr>
               </thead>
               <tbody>
-                {pageEntries.map((entry: AnimalProfile["competitionEntries"][number]) => (
-                  <tr key={entry.id} className="border-t border-border/60">
+                {pageEntries.map((entry: AnimalProfile["competitionEntries"][number], i) => (
+                  <tr key={entry.id} className="border-t border-border/60" data-tutorial={i === 0 && page === 0 ? "competition-result-first" : undefined}>
                     <td className="px-2 py-1 font-medium text-foreground">
                       <Link
                         to="/competition/$competitionId"
@@ -59,7 +59,9 @@ export function CompHistoryTab({
                     </td>
                     <td className="px-2 py-1 text-muted-foreground">{entry.competition.disciplineDef.name}</td>
                     <td className="px-2 py-1 text-muted-foreground">{entry.tierDef.name}</td>
-                    <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{entry.competition._count.entries}</td>
+                    <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">
+                      {entry.competition._count.entries + (Array.isArray(entry.competition.tutorialNpcData) ? entry.competition.tutorialNpcData.length : 0)}
+                    </td>
                     <td className="px-2 py-1 text-right tabular-nums text-foreground">
                       {entry.result?.score.toFixed(1) ?? "—"}
                     </td>

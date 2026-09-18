@@ -194,5 +194,21 @@ export async function generateFromTemplate(tx: Tx, opts: GenerateFromTemplateOpt
     }),
   ])
 
+  if (opts.isTutorialAnimal) {
+    const conformationEntries = await tx.geneticPanelLocus.findMany({
+      where: {
+        panelDef: { panelType: "CONFORMATION" },
+        locusId: { in: genotypes.map(g => g.locusId) },
+      },
+      select: { locusId: true },
+    })
+    if (conformationEntries.length > 0) {
+      await tx.animalGenotype.updateMany({
+        where: { animalId: animal.id, locusId: { in: conformationEntries.map(e => e.locusId) } },
+        data: { isTestedByOwner: true },
+      })
+    }
+  }
+
   return animal.id
 }

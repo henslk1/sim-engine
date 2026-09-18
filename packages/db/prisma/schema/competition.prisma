@@ -274,6 +274,7 @@ model Competition {
   status                  CompetitionStatus
   isInvitational          Boolean             @default(false)
   tutorialPlayerAccountId String?
+  tutorialNpcData         Json?
   entries                 CompetitionEntry[]
   campaignPhaseDefId      String?
   breed                   Breed?              @relation(fields: [breedId], references: [id])

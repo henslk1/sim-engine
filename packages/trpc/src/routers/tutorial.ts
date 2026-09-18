@@ -420,11 +420,17 @@ export const tutorialRouter = router({
       ])
 
       if (!player) throw new Error("Player not found")
-      if (!stepDef) throw new Error("Step not found")
+      // Optional admin milestones may lag behind the Driver.js tutorial. Its
+      // persisted index remains authoritative; unknown milestone keys still fail.
+      if (!stepDef) {
+        if (TUTORIAL_STEPS.some(step => step.checkpoint === stepKey)) return
+        throw new Error("Step not found")
+      }
 
-      await db.tutorialProgress.update({
+      await db.tutorialProgress.upsert({
         where: { playerAccountId_stepDefId: { playerAccountId: player.id, stepDefId: stepDef.id } },
-        data: { completedAt: new Date() },
+        create: { playerAccountId: player.id, stepDefId: stepDef.id, completedAt: new Date() },
+        update: { completedAt: new Date() },
       })
 
       if (stepKey === "tutorial_complete") {
@@ -534,7 +540,7 @@ export const tutorialRouter = router({
 
       const player = await db.playerAccount.findUnique({
         where: { userId_gameId: { userId: ctx.userId, gameId } },
-        select: { id: true },
+        select: { id: true, seniority: { select: { tutorialDriverStep: true } } },
       })
       if (!player) throw new Error("Player not found")
 
@@ -544,14 +550,23 @@ export const tutorialRouter = router({
       })
       if (!baseCurrency) throw new Error("No base currency configured")
 
-      // Guard: each distinct grant amount can only be claimed once.
-      const alreadyGranted = await db.transaction.findFirst({
+      const driverStep = player.seniority?.tutorialDriverStep
+      if (driverStep == null || TUTORIAL_STEPS[driverStep]?.gold !== amount) {
+        throw new TRPCError({ code: "FORBIDDEN" })
+      }
+      // Identify the grant by its step, since care and competition both give 100G.
+      // Count old transactions too so migrated accounts cannot claim them again.
+      const grantId = `tutorial-grant:${player.id}:${driverStep}`
+      const [sameGrant, previousGrants] = await Promise.all([
+        db.transaction.findUnique({ where: { id: grantId }, select: { id: true } }),
+        db.transaction.count({
         where: { toPlayerAccountId: player.id, txnType: "TESTING_GRANT", amount },
-        select: { id: true },
-      })
-      if (alreadyGranted) return
+        }),
+      ])
+      const grantOrdinal = TUTORIAL_STEPS.slice(0, driverStep + 1).filter(step => step.gold === amount).length
+      if (sameGrant || previousGrants >= grantOrdinal) return
 
-      await db.$transaction([
+      try { await db.$transaction([
         db.playerBalance.upsert({
           where: { playerAccountId_currencyDefId: { playerAccountId: player.id, currencyDefId: baseCurrency.id } },
           create: { playerAccountId: player.id, currencyDefId: baseCurrency.id, balance: amount },
@@ -559,6 +574,7 @@ export const tutorialRouter = router({
         }),
         db.transaction.create({
           data: {
+            id: grantId,
             gameId,
             toPlayerAccountId: player.id,
             currencyDefId: baseCurrency.id,
@@ -566,7 +582,10 @@ export const tutorialRouter = router({
             txnType: "TESTING_GRANT",
           },
         }),
-      ])
+      ]) } catch (error) {
+        // Another tab may have claimed the same step while this request waited.
+        if (!await db.transaction.findUnique({ where: { id: grantId }, select: { id: true } })) throw error
+      }
     }),
 
   // TODO: remove before launch
@@ -615,6 +634,21 @@ export const tutorialRouter = router({
         await db.breedingListing.deleteMany({ where: { animalId: { in: allAnimalIds } } })
       }
 
+      // Tutorial competitions reference the mare via a RESTRICT FK — delete before animals.
+      const tutorialComps = await db.competition.findMany({
+        where: { tutorialPlayerAccountId: player.id },
+        select: { id: true, entries: { select: { id: true } } },
+      })
+      const tutorialEntryIds = tutorialComps.flatMap(c => c.entries.map(e => e.id))
+      const tutorialCompIds = tutorialComps.map(c => c.id)
+      if (tutorialEntryIds.length > 0) {
+        await db.competitionResult.deleteMany({ where: { entryId: { in: tutorialEntryIds } } })
+        await db.competitionEntry.deleteMany({ where: { id: { in: tutorialEntryIds } } })
+      }
+      if (tutorialCompIds.length > 0) {
+        await db.competition.deleteMany({ where: { id: { in: tutorialCompIds } } })
+      }
+
       await deleteAnimalsWithChildren(allAnimalIds)
 
       // Social
@@ -645,6 +679,35 @@ export const tutorialRouter = router({
     .input(z.object({ gameId: z.string(), stepIndex: z.number().int().min(0) }))
     .mutation(async ({ ctx, input }) => {
       const { gameId, stepIndex } = input
+      // Venue-phase replay only removes the generated tutorial competition.
+      // Earlier care, training, certificates, equipment, and mare state stay put.
+      if (stepIndex >= 81) {
+        const player = await db.playerAccount.findUnique({
+          where: { userId_gameId: { userId: ctx.userId, gameId } },
+          select: { id: true },
+        })
+        if (!player) throw new Error("Player not found")
+        await db.$transaction(async tx => {
+          const competitions = await tx.competition.findMany({
+            where: { tutorialPlayerAccountId: player.id, gameId },
+            select: { id: true, entries: { select: { id: true } } },
+          })
+          const competitionIds = competitions.map(c => c.id)
+          const entryIds = competitions.flatMap(c => c.entries.map(e => e.id))
+          if (entryIds.length) {
+            await tx.competitionResult.deleteMany({ where: { entryId: { in: entryIds } } })
+            await tx.competitionEntry.deleteMany({ where: { id: { in: entryIds } } })
+          }
+          if (competitionIds.length) {
+            await tx.competition.deleteMany({ where: { id: { in: competitionIds } } })
+          }
+          await tx.playerSeniority.update({
+            where: { playerAccountId: player.id },
+            data: { tutorialDriverStep: 84 },
+          })
+        })
+        return
+      }
       const phaseStart = stepIndex >= 56 ? 56 : stepIndex >= 49 ? 49 : stepIndex >= 20 ? 20 : stepIndex >= 10 ? 10 : stepIndex >= 5 ? 5 : 0
       await db.playerSeniority.updateMany({
         where: { playerAccount: { userId: ctx.userId, gameId } },
@@ -702,10 +765,30 @@ export const tutorialRouter = router({
             db.healthCertificate.deleteMany({ where: { animalId: femaleId } }),
             db.animal.update({ where: { id: femaleId }, data: { secondaryDisciplineDefId: null } }),
             ...(pair.ancestorOne?.secondaryDisciplineDefId
-              ? [db.animalCompetitionTier.deleteMany({ where: { animalId: femaleId, disciplineDefId: pair.ancestorOne.secondaryDisciplineDefId } })]
+              ? [
+                  db.animalCompetitionTier.deleteMany({ where: { animalId: femaleId, disciplineDefId: pair.ancestorOne.secondaryDisciplineDefId } }),
+                  db.animalWeeklyPoints.deleteMany({ where: { animalId: femaleId, disciplineDefId: pair.ancestorOne.secondaryDisciplineDefId } }),
+                ]
               : []),
           ] : []),
         ])
+      }
+
+      // Competition phase reset: delete any tutorial competitions (entries reference the mare via a RESTRICT FK).
+      if (stepIndex >= 56) {
+        const tutorialComps = await db.competition.findMany({
+          where: { tutorialPlayerAccountId: player.id },
+          select: { id: true, entries: { select: { id: true } } },
+        })
+        const entryIds = tutorialComps.flatMap(c => c.entries.map(e => e.id))
+        const compIds = tutorialComps.map(c => c.id)
+        if (entryIds.length > 0) {
+          await db.competitionResult.deleteMany({ where: { entryId: { in: entryIds } } })
+          await db.competitionEntry.deleteMany({ where: { id: { in: entryIds } } })
+        }
+        if (compIds.length > 0) {
+          await db.competition.deleteMany({ where: { id: { in: compIds } } })
+        }
       }
 
       // Reset gold to the training-section base and clear the LTC grant transaction
@@ -998,5 +1081,373 @@ export const tutorialRouter = router({
         quotaLimit: 0,
         cost: 0,
       }
+    }),
+
+  venueInfo: protectedProcedure
+    .input(z.object({ gameId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const player = await db.playerAccount.findUnique({
+        where: { userId_gameId: { userId: ctx.userId, gameId: input.gameId } },
+        select: { id: true, tutorialAnimalPair: { select: { ancestorOneId: true } } },
+      })
+      if (!player?.tutorialAnimalPair) throw new TRPCError({ code: "NOT_FOUND" })
+      const mare = await db.animal.findUniqueOrThrow({
+        where: { id: player.tutorialAnimalPair.ancestorOneId },
+        select: {
+          preferredTerrain: true,
+          preferredClimate: true,
+          secondaryDisciplineDefId: true,
+          compTiers: {
+            select: {
+              disciplineDefId: true,
+              tierDef: { select: { id: true, name: true, tierIndex: true } },
+            },
+          },
+        },
+      })
+      if (!mare.secondaryDisciplineDefId) throw new TRPCError({ code: "NOT_FOUND", message: "Mare has no secondary discipline" })
+      const secondaryDiscipline = await db.disciplineDef.findUnique({
+        where: { id: mare.secondaryDisciplineDefId },
+        select: { id: true, name: true },
+      })
+      if (!secondaryDiscipline) throw new TRPCError({ code: "NOT_FOUND", message: "Secondary discipline not found" })
+      const tier = mare.compTiers.find(t => t.disciplineDefId === mare.secondaryDisciplineDefId)
+      const [priorCompetition, competitionStep] = await Promise.all([
+        db.competition.findFirst({
+          where: { tutorialPlayerAccountId: player.id },
+          select: { id: true },
+        }),
+        db.tutorialStepDef.findFirst({
+          where: { gameId: input.gameId, competitionNpcCount: { not: null } },
+          orderBy: { stepIndex: "desc" },
+          select: { competitionNpcCount: true },
+        }),
+      ])
+      return {
+        secondaryDisciplineId: secondaryDiscipline.id,
+        secondaryDisciplineName: secondaryDiscipline.name,
+        preferredTerrain: mare.preferredTerrain as string[],
+        preferredClimate: mare.preferredClimate as string[],
+        currentTier: tier?.tierDef ?? null,
+        hasCompeted: !!priorCompetition,
+        competitionNpcCount: competitionStep?.competitionNpcCount ?? 4,
+      }
+    }),
+
+  compete: protectedProcedure
+    .input(z.object({ gameId: z.string(), venueId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const { gameId, venueId } = input
+
+      const player = await db.playerAccount.findUnique({
+        where: { userId_gameId: { userId: ctx.userId, gameId } },
+        select: { id: true },
+      })
+      if (!player) throw new Error("Player not found")
+
+      const priorCompetition = await db.competition.findFirst({
+        where: { tutorialPlayerAccountId: player.id },
+        select: { id: true },
+      })
+      if (priorCompetition) return { competitionId: priorCompetition.id, alreadyEntered: true }
+
+      const pair = await db.tutorialAnimalPair.findUnique({
+        where: { playerAccountId: player.id },
+        select: { ancestorOneId: true },
+      })
+      if (!pair) throw new Error("Tutorial not active")
+
+      const mare = await db.animal.findUniqueOrThrow({
+        where: { id: pair.ancestorOneId },
+        select: {
+          id: true,
+          ageInCycles: true,
+          secondaryDisciplineDefId: true,
+          lifeStage: { select: { energyCostMultiplier: true } },
+        },
+      })
+      if (!mare.secondaryDisciplineDefId) throw new Error("Mare has no secondary discipline")
+
+      const stepDef = await db.tutorialStepDef.findFirst({
+        where: { gameId, competitionNpcCount: { not: null } },
+        orderBy: { stepIndex: "desc" },
+        select: { competitionNpcCount: true, completionTarget: true },
+      })
+
+      const venue = await db.venue.findFirst({
+        where: { id: venueId, gameId },
+        select: { id: true, disciplines: { select: { disciplineDefId: true } } },
+      })
+      if (!venue) throw new Error("Venue not found in this game")
+      if (!venue.disciplines.some(d => d.disciplineDefId === mare.secondaryDisciplineDefId)) {
+        throw new Error("This venue does not host the mare's discipline")
+      }
+
+      const discipline = await db.disciplineDef.findUniqueOrThrow({
+        where: { id: mare.secondaryDisciplineDefId },
+        select: {
+          id: true,
+          name: true,
+          statWeights: { select: { statDefId: true, weight: true, statDef: { select: { name: true } } } },
+        },
+      })
+
+      let animalTier = await db.animalCompetitionTier.findUnique({
+        where: { animalId_disciplineDefId: { animalId: mare.id, disciplineDefId: discipline.id } },
+        include: {
+          tierDef: { select: { id: true, tierIndex: true, advancementThreshold: true, energyCost: true, entryFee: true, name: true } },
+        },
+      })
+      if (!animalTier) {
+        const lowestTier = await db.competitionTierDef.findFirstOrThrow({
+          where: { disciplineDefId: discipline.id },
+          orderBy: { tierIndex: "asc" },
+          select: { id: true, tierIndex: true, advancementThreshold: true, energyCost: true, entryFee: true, name: true },
+        })
+        animalTier = await db.animalCompetitionTier.create({
+          data: { animalId: mare.id, disciplineDefId: discipline.id, tierDefId: lowestTier.id },
+          include: {
+            tierDef: { select: { id: true, tierIndex: true, advancementThreshold: true, energyCost: true, entryFee: true, name: true } },
+          },
+        })
+      }
+
+      const energyCost = animalTier.tierDef.energyCost * mare.lifeStage.energyCostMultiplier
+      const energy = await db.animalEnergy.findUniqueOrThrow({ where: { animalId: mare.id } })
+      if (energy.currentEnergy < energyCost) throw new Error("Not enough energy to compete")
+
+      const entryFee = animalTier.tierDef.entryFee
+      let baseCurrencyId: string | null = null
+      if (entryFee > 0) {
+        const baseCurrency = await db.currencyDef.findFirst({ where: { gameId, currencyType: "BASE" }, select: { id: true } })
+        if (!baseCurrency) throw new Error("No base currency configured")
+        baseCurrencyId = baseCurrency.id
+        const balance = await db.playerBalance.findUnique({
+          where: { playerAccountId_currencyDefId: { playerAccountId: player.id, currencyDefId: baseCurrency.id } },
+          select: { balance: true },
+        })
+        if (!balance || balance.balance < entryFee) throw new Error("Insufficient funds")
+      }
+
+      const statIds = discipline.statWeights.map(w => w.statDefId)
+      const mareStats = await db.animalStat.findMany({
+        where: { animalId: mare.id, statDefId: { in: statIds } },
+        select: { statDefId: true, trainedValue: true },
+      })
+      const mareStatMap = new Map(mareStats.map(s => [s.statDefId, s.trainedValue]))
+
+      // Self-normalised: mare is the world max for tutorial purposes.
+      const mareScore = Math.max(0,
+        discipline.statWeights.reduce((sum, w) => {
+          const val = mareStatMap.get(w.statDefId) ?? 0
+          return sum + w.weight * (val / Math.max(val, 1))
+        }, 0) * 100,
+      )
+
+      const npcCount = stepDef?.competitionNpcCount ?? 4
+      const npcEntries = Array.from({ length: npcCount }, (_, i) => {
+        const npcStats = discipline.statWeights.map(w => {
+          const mareVal = Math.max(mareStatMap.get(w.statDefId) ?? 0, 1)
+          const val = Math.random() * mareVal * 0.5
+          return { statDefId: w.statDefId, statName: w.statDef.name, trainedValue: Math.round(val * 100) / 100 }
+        })
+        const npcScore = Math.max(0,
+          discipline.statWeights.reduce((sum, w) => {
+            const stat = npcStats.find(s => s.statDefId === w.statDefId)!
+            const mareVal = Math.max(mareStatMap.get(w.statDefId) ?? 0, 1)
+            return sum + w.weight * (stat.trainedValue / mareVal)
+          }, 0) * 100,
+        )
+        return { name: `Competitor ${i + 1}`, stats: npcStats, score: Math.round(npcScore * 100) / 100, placement: i + 2 }
+      })
+
+      const now = new Date()
+      const day = now.getUTCDay()
+      const weekStart = new Date(now)
+      weekStart.setUTCDate(now.getUTCDate() - (day === 0 ? 6 : day - 1))
+      weekStart.setUTCHours(0, 0, 0, 0)
+
+      return db.$transaction(async (tx) => {
+        // Seed 3 historical competition results so comp history tab looks populated.
+        const historicalVariants = [
+          { daysAgo: 21, placement: 2, scoreMult: 0.88 },
+          { daysAgo: 14, placement: 1, scoreMult: 0.94 },
+          { daysAgo: 7,  placement: 3, scoreMult: 0.91 },
+        ]
+        for (const v of historicalVariants) {
+          const pastDate = new Date(now.getTime() - v.daysAgo * 24 * 3600 * 1000)
+          const histComp = await tx.competition.create({
+            data: {
+              gameId,
+              venueId: venue.id,
+              disciplineDefId: discipline.id,
+              tierDefId: animalTier!.tierDefId,
+              name: `${discipline.name} — ${animalTier!.tierDef.name}`,
+              maxEntries: npcCount + 1,
+              maxWaitHours: 0,
+              status: "COMPLETED",
+              tutorialPlayerAccountId: player.id,
+              expiresAt: pastDate,
+              createdAt: pastDate,
+            },
+          })
+          const histEntry = await tx.competitionEntry.create({
+            data: {
+              competitionId: histComp.id,
+              animalId: mare.id,
+              playerAccountId: player.id,
+              tierDefId: animalTier!.tierDefId,
+              cycleNumber: mare.ageInCycles,
+              createdAt: pastDate,
+            },
+          })
+          await tx.competitionResult.create({
+            data: { entryId: histEntry.id, placement: v.placement, score: Math.round(mareScore * v.scoreMult * 100) / 100 },
+          })
+        }
+
+        const competition = await tx.competition.create({
+          data: {
+            gameId,
+            venueId: venue.id,
+            disciplineDefId: discipline.id,
+            tierDefId: animalTier!.tierDefId,
+            name: `${discipline.name} — ${animalTier!.tierDef.name}`,
+            maxEntries: npcCount + 1,
+            maxWaitHours: 0,
+            status: "COMPLETED",
+            tutorialPlayerAccountId: player.id,
+            tutorialNpcData: npcEntries,
+            expiresAt: now,
+          },
+        })
+
+        const entry = await tx.competitionEntry.create({
+          data: {
+            competitionId: competition.id,
+            animalId: mare.id,
+            playerAccountId: player.id,
+            tierDefId: animalTier!.tierDefId,
+            cycleNumber: mare.ageInCycles,
+          },
+        })
+        if (mareStats.length > 0) {
+          await tx.competitionEntryStat.createMany({
+            data: mareStats.map(s => ({ entryId: entry.id, statDefId: s.statDefId, trainedValue: s.trainedValue })),
+          })
+        }
+
+        await tx.competitionResult.create({ data: { entryId: entry.id, placement: 1, score: mareScore } })
+
+        await tx.animalEnergy.update({
+          where: { animalId: mare.id },
+          data: { currentEnergy: energy.currentEnergy - energyCost },
+        })
+
+        const gameConfig = await tx.gameConfig.findFirst({ where: { gameId }, select: { conditionWorkGain: true } })
+        if (gameConfig && gameConfig.conditionWorkGain > 0) {
+          const cond = await tx.animalCondition.findUnique({ where: { animalId: mare.id } })
+          if (cond) {
+            await tx.animalCondition.update({
+              where: { animalId: mare.id },
+              data: { value: Math.min(100, cond.value + gameConfig.conditionWorkGain) },
+            })
+          }
+        }
+
+        if (entryFee > 0 && baseCurrencyId) {
+          await tx.playerBalance.update({
+            where: { playerAccountId_currencyDefId: { playerAccountId: player.id, currencyDefId: baseCurrencyId } },
+            data: { balance: { decrement: entryFee } },
+          })
+          await tx.transaction.create({
+            data: { gameId, fromPlayerAccountId: player.id, currencyDefId: baseCurrencyId, amount: entryFee, txnType: "COMPETITION_ENTRY" },
+          })
+        }
+
+        const prizes = await tx.competitionTierPrize.findMany({
+          where: { tierDefId: animalTier!.tierDefId, placement: 1, isInvitational: false },
+          select: { currencyDefId: true, amount: true },
+        })
+        const prizesAwarded: { amount: number; currencyDefId: string }[] = []
+        for (const prize of prizes) {
+          if (!prize.currencyDefId) continue
+          await tx.playerBalance.upsert({
+            where: { playerAccountId_currencyDefId: { playerAccountId: player.id, currencyDefId: prize.currencyDefId } },
+            create: { playerAccountId: player.id, currencyDefId: prize.currencyDefId, balance: prize.amount },
+            update: { balance: { increment: prize.amount } },
+          })
+          await tx.transaction.create({
+            data: { gameId, toPlayerAccountId: player.id, currencyDefId: prize.currencyDefId, amount: prize.amount, txnType: "PRIZE" },
+          })
+          prizesAwarded.push({ amount: prize.amount, currencyDefId: prize.currencyDefId })
+        }
+
+        await tx.animalWeeklyPoints.upsert({
+          where: { animalId_disciplineDefId_weekStart: { animalId: mare.id, disciplineDefId: discipline.id, weekStart } },
+          create: { animalId: mare.id, disciplineDefId: discipline.id, weekStart, points: mareScore },
+          update: { points: { increment: mareScore } },
+        })
+
+        const weeklyRecord = await tx.animalWeeklyPoints.findUniqueOrThrow({
+          where: { animalId_disciplineDefId_weekStart: { animalId: mare.id, disciplineDefId: discipline.id, weekStart } },
+        })
+
+        let advanced = false
+        let newTierIndex: number | null = null
+
+        if (animalTier!.tierDef.advancementThreshold !== null && weeklyRecord.points >= animalTier!.tierDef.advancementThreshold) {
+          const nextTier = await tx.competitionTierDef.findFirst({
+            where: { disciplineDefId: discipline.id, tierIndex: { gt: animalTier!.tierDef.tierIndex } },
+            orderBy: { tierIndex: "asc" },
+            select: { id: true, name: true, tierIndex: true },
+          })
+          if (nextTier) {
+            await tx.animalCompetitionTier.update({
+              where: { animalId_disciplineDefId: { animalId: mare.id, disciplineDefId: discipline.id } },
+              data: { tierDefId: nextTier.id },
+            })
+            await tx.animalDailyLog.create({
+              data: {
+                animalId: mare.id,
+                cycleNumber: mare.ageInCycles ?? 0,
+                eventType: "TIER_ADVANCED",
+                context: { newTierName: nextTier.name, disciplineName: discipline.name },
+              },
+            })
+            advanced = true
+            newTierIndex = nextTier.tierIndex
+          }
+        }
+
+        // Create 9 additional open competitions for the unguided competing phase.
+        const openExpiresAt = new Date(now.getTime() + 7 * 24 * 3600 * 1000)
+        for (let i = 0; i < 9; i++) {
+          await tx.competition.create({
+            data: {
+              gameId,
+              venueId: venue.id,
+              disciplineDefId: discipline.id,
+              tierDefId: animalTier!.tierDefId,
+              name: `${discipline.name} — ${animalTier!.tierDef.name}`,
+              maxEntries: npcCount + 10,
+              maxWaitHours: 168,
+              status: "OPEN",
+              tutorialPlayerAccountId: player.id,
+              expiresAt: openExpiresAt,
+            },
+          })
+        }
+
+        return {
+          competitionId: competition.id,
+          placement: 1,
+          score: Math.round(mareScore * 100) / 100,
+          npcEntries,
+          advanced,
+          newTierIndex,
+          prizesAwarded,
+        }
+      })
     }),
 })

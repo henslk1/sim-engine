@@ -356,7 +356,7 @@ export function competitionSteps(ctrl: TutorialCtrl, callbacks: TutorialCallback
           if (needsEquipment) {
             ctrl.moveNext()
           } else {
-            ctrl.moveTo(79)
+            ctrl.moveTo(77)
           }
         },
       },
@@ -604,30 +604,55 @@ export function competitionSteps(ctrl: TutorialCtrl, callbacks: TutorialCallback
       },
     },
 
-    // ── [78] Secondary Discipline — info ─────────────────────────────────────
+    // ── [78] Ready to Compete — info ─────────────────────────────────────────
     {
       element: '[data-tutorial="secondary-discipline-section"]',
       waitForElement: 3000,
       disableActiveInteraction: true,
       popover: {
         title: "Ready to Compete",
-        description: "She's ready to compete in her second discipline.",
+        description: "She's ready to compete in her second discipline. Before we choose a venue, let's check which terrain and climate suit her best.",
         showButtons: ["next"],
         onNextClick: () => ctrl.moveNext(),
       },
     },
 
-    // ── [79] View Venues — info ───────────────────────────────────────────────
-    // Pulses the View Venues button on the secondary discipline tab. Stays on
-    // /animal so the devPauseStep (global 79) fires on the correct page.
+    // ── [79] Terrain Preference — info ───────────────────────────────────────
     {
-      element: '[data-tutorial="view-venues-btn"]',
+      element: '[data-tutorial="conformation-terrain"]',
+      waitForElement: 3000,
       disableActiveInteraction: true,
       popover: {
-        title: "Ready to Compete!",
-        description: "She's ready for her debut. Head to the venues to enter her first competition.",
+        title: "Terrain Preference",
+        description: "Her terrain preference shows the type of ground that suits her best. Keep it in mind as we look at venues.",
         showButtons: ["next"],
         onNextClick: () => ctrl.moveNext(),
+      },
+    },
+
+    // ── [80] Climate Preference — info ───────────────────────────────────────
+    {
+      element: '[data-tutorial="conformation-climate"]',
+      disableActiveInteraction: true,
+      popover: {
+        title: "Climate Preference",
+        description: "Her climate preference matters too. Choosing a venue that suits her terrain and climate can give her an advantage in competition.",
+        showButtons: ["next"],
+        onNextClick: () => ctrl.moveNext(),
+      },
+    },
+
+    // ── [81] View Venues — action ─────────────────────────────────────────────
+    // advanceOnClick fires ctrl.moveNext() when the button is clicked, saving
+    // step 82 before the Link navigates to /venues. The devPauseStep renders
+    // on the venues page at step 82.
+    {
+      element: '[data-tutorial="view-venues-btn"]',
+      advanceOnClick: true,
+      popover: {
+        title: "Find a Venue",
+        description: "Now let's find a venue that suits her.",
+        showButtons: [],
       },
       onHighlighted: (el?: Element) => {
         if (!el) return

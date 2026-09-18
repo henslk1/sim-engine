@@ -1,8 +1,9 @@
-import { createFileRoute, Link } from "@tanstack/react-router"
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 
 type Banner = { name: string; suffix: string; animalId: string | null }
 import { trpc } from "@/lib/trpc"
 import { useState, useEffect } from "react"
+import { isTutorialVenueEligible } from "@/lib/tutorial/utils/tutorial-venue-filter"
 import { Trophy, MapPin, ChevronLeft, ChevronDown, Users, Clock, Mountain, Waves, Wind, Star } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -359,6 +360,14 @@ function VenueDetailPage() {
 
   const isAnimalMode = !!initialAnimalId
 
+  const navigate = useNavigate()
+  const isTutorialMode = from === "animal" && !!initialAnimalId
+
+  const { data: tutorialInfo } = trpc.tutorial.venueInfo.useQuery(
+    { gameId: gameId! },
+    { enabled: !!gameId && isTutorialMode },
+  )
+
   const [rowSelections, setRowSelections] = useState<Record<string, string>>({})
   const [enteredPairs, setEnteredPairs] = useState<Set<string>>(new Set())
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({})
@@ -370,6 +379,7 @@ function VenueDetailPage() {
   function toggleSection(key: string) {
     setExpandedSections((prev) => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n })
   }
+  const [tutorialExpanded, setTutorialExpanded] = useState(false)
 
   const [sportsFilterDisciplineId, setSportsFilterDisciplineIdRaw] = useState(() => sessionStorage.getItem("vf-sports-discipline") ?? "")
   const [sportsFilterTierId, setSportsFilterTierIdRaw] = useState(() => sessionStorage.getItem("vf-sports-tier") ?? "")
@@ -390,6 +400,14 @@ function VenueDetailPage() {
   const { data: allVenues } = trpc.competition.listVenues.useQuery({ gameId: gameId! }, { enabled: !!gameId })
   const venue = allVenues?.find((v) => v.id === venueId)
 
+  // Redirect if the user manually navigates to a non-eligible venue.
+  useEffect(() => {
+    if (!isTutorialMode || !tutorialInfo || !allVenues) return
+    if (!isTutorialVenueEligible(venue ?? {}, tutorialInfo.secondaryDisciplineId)) {
+      void navigate({ to: "/venues", search: { animalId: initialAnimalId, from: "animal" } })
+    }
+  }, [isTutorialMode, tutorialInfo, allVenues, venue, initialAnimalId, navigate])
+
   const { data: competitions, isLoading: compsLoading } = trpc.competition.listOpen.useQuery(
     { gameId: gameId!, disciplineDefId: isConformation ? undefined : disciplineDefId, isConformation: isConformation ?? undefined },
     { enabled: !!gameId },
@@ -407,6 +425,16 @@ function VenueDetailPage() {
     },
     onError: (err) => setInspectError(err.message),
   })
+  const compete = trpc.tutorial.compete.useMutation({
+    onSuccess: () => {
+      utils.animal.list.invalidate({ playerAccountId: playerAccountId! })
+      utils.tutorial.venueInfo.invalidate({ gameId: gameId! })
+    },
+    onError: (err) => {
+      setRowErrors(prev => ({ ...prev, 'tutorial-compete': err.message }))
+    },
+  })
+
   const enter = trpc.competition.enter.useMutation({
     onSuccess: (_, variables) => {
       const pair = `${variables.competitionId}:${variables.animalId}`
@@ -441,7 +469,7 @@ function VenueDetailPage() {
 
   function eligibleAnimalsFor(comp: Competition): AliveAnimal[] {
     return aliveAnimals.filter((a) => {
-      if (comp.breedId && a.breed.id !== comp.breedId) return false
+      if (comp.breedId && a.breed?.id !== comp.breedId) return false
       if (!comp.disciplineDef.isConformation && a.disciplineDefId !== comp.disciplineDef.id && a.secondaryDisciplineDefId !== comp.disciplineDef.id) return false
       if (comp.disciplineDef.minLifeStageIndex !== null && a.lifeStage.stageIndex < comp.disciplineDef.minLifeStageIndex) return false
       if (comp.disciplineDef.maxLifeStageIndex !== null && a.lifeStage.stageIndex > comp.disciplineDef.maxLifeStageIndex) return false
@@ -470,14 +498,14 @@ function VenueDetailPage() {
   const animalForFilter = isAnimalMode ? aliveAnimals.find((a) => a.id === initialAnimalId) : undefined
 
   const uninspectedPurebreds = aliveAnimals.filter(
-    (a) => !a.breed.isUnregistered && (a.conformationScores ?? []).length === 0
+    (a) => !!a.breed && !a.breed.isUnregistered && (a.conformationScores ?? []).length === 0
   )
   const showInspection = isAnimalMode
-    ? !!(animalForFilter && !animalForFilter.breed.isUnregistered && (animalForFilter.conformationScores ?? []).length === 0)
+    ? !!(animalForFilter?.breed && !animalForFilter.breed.isUnregistered && (animalForFilter.conformationScores ?? []).length === 0)
     : uninspectedPurebreds.length > 0
 
   function isEligibleForAnimal(comp: Competition, animal: AliveAnimal): boolean {
-    if (comp.breedId && animal.breed.id !== comp.breedId) return false
+    if (comp.breedId && animal.breed?.id !== comp.breedId) return false
     if (!comp.disciplineDef.isConformation && animal.disciplineDefId !== comp.disciplineDef.id && animal.secondaryDisciplineDefId !== comp.disciplineDef.id) return false
     if (comp.disciplineDef.minLifeStageIndex !== null && animal.lifeStage.stageIndex < comp.disciplineDef.minLifeStageIndex) return false
     if (comp.disciplineDef.maxLifeStageIndex !== null && animal.lifeStage.stageIndex > comp.disciplineDef.maxLifeStageIndex) return false
@@ -612,6 +640,7 @@ function VenueDetailPage() {
               to="/venues"
               search={{ animalId: initialAnimalId, disciplineDefId, isConformation, from }}
               className="mb-5 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+              data-tutorial={isTutorialMode ? "venue-back-link" : undefined}
             >
               <ChevronLeft size={14} />
               All Venues
@@ -672,6 +701,69 @@ function VenueDetailPage() {
                 ))}
               </div>
             )}
+
+        {/* Tutorial competition block — starts collapsed; step [86] spotlights the header */}
+        {isTutorialMode && tutorialInfo && (
+          <div className="mb-6 overflow-hidden rounded-lg border border-border bg-card">
+            <button
+              type="button"
+              data-tutorial="tutorial-discipline-section-btn"
+              onClick={() => setTutorialExpanded(e => !e)}
+              className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-secondary/30 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-base font-semibold text-foreground">{tutorialInfo.secondaryDisciplineName}</span>
+                <span className="rounded bg-chart-2/12 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-chart-2">Tutorial</span>
+              </div>
+              <ChevronDown size={15} className={cn("text-muted-foreground transition-transform", tutorialExpanded && "rotate-180")} />
+            </button>
+            {tutorialExpanded && (
+              <div className="border-t border-border" data-tutorial="tutorial-compete-section">
+                <div className="flex items-center gap-2 border-b border-border bg-secondary px-4 py-2.5" data-tutorial="tutorial-compete-tier">
+                  <Trophy size={13} className="text-chart-3" />
+                  <span className="text-sm font-semibold text-foreground">
+                    {tutorialInfo.currentTier?.name ?? "Rookie"}
+                  </span>
+                  <span className="ml-auto rounded bg-chart-3/12 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-chart-3">Your Tier</span>
+                </div>
+                <div className="grid grid-cols-[1fr_120px_140px] border-b border-border bg-secondary/70 px-4 py-2">
+                  <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Slots</span>
+                  <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Closes</span>
+                  <span />
+                </div>
+                <div className="grid grid-cols-[1fr_120px_140px] items-center px-4 py-2.5">
+                  <SlotBar
+                    filled={tutorialInfo.hasCompeted ? tutorialInfo.competitionNpcCount + 1 : 0}
+                    max={tutorialInfo.competitionNpcCount + 1}
+                  />
+                  <span className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
+                    <Clock size={10} />
+                    24h left
+                  </span>
+                  <div className="flex flex-col items-end gap-0.5">
+                    <button
+                      type="button"
+                      data-tutorial="tutorial-compete-btn"
+                      disabled={compete.isPending || compete.isSuccess || tutorialInfo.hasCompeted || !playerAccountId}
+                      onClick={() => { if (gameId && playerAccountId) compete.mutate({ gameId, venueId }) }}
+                      className={cn(
+                        "rounded-md px-3.5 py-1.5 text-xs font-semibold transition-colors disabled:opacity-40",
+                        compete.isSuccess || tutorialInfo.hasCompeted
+                          ? "bg-chart-2/15 text-chart-2"
+                          : "bg-primary text-primary-foreground hover:bg-primary/90",
+                      )}
+                    >
+                      {compete.isPending ? "Entering…" : compete.isSuccess || tutorialInfo.hasCompeted ? "Entered ✓" : "Enter"}
+                    </button>
+                    {rowErrors['tutorial-compete'] && (
+                      <span className="text-[10px] text-destructive">{rowErrors['tutorial-compete']}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Inspection section */}
         {showInspection && (
@@ -779,8 +871,8 @@ function VenueDetailPage() {
               </div>
             )}
 
-            {/* Sporting Disciplines */}
-            {hasSporting && (!hasConformation || activeTab === "sporting") && (
+            {/* Sporting Disciplines — hidden in tutorial mode (tutorial block replaces this) */}
+            {hasSporting && !isTutorialMode && (!hasConformation || activeTab === "sporting") && (
               <div>
                 {!hasConformation && (
                   <div className="mb-4 flex items-center gap-3">

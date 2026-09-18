@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { trpc } from "@/lib/trpc"
 import { useState } from "react"
+import { isTutorialVenueEligible } from "@/lib/tutorial/utils/tutorial-venue-filter"
 import { ChevronLeft, Mountain, Waves, Wind, ArrowRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -72,6 +73,12 @@ function VenuesPage() {
     { enabled: !!gameId },
   )
 
+  const isTutorialMode = from === "animal" && !!animalId
+  const { data: tutorialInfo } = trpc.tutorial.venueInfo.useQuery(
+    { gameId: gameId! },
+    { enabled: !!gameId && isTutorialMode },
+  )
+
   const [filterDisciplineId, setFilterDisciplineId] = useState("")
 
   const infoByVenue = competitions?.reduce<Record<string, { count: number; disciplines: Set<string>; disciplineIds: Set<string> }>>((acc, comp) => {
@@ -86,9 +93,9 @@ function VenuesPage() {
     ? [...new Map(competitions.map((c) => [c.disciplineDef.id, c.disciplineDef.name])).entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name))
     : []
 
-  const filteredVenues = venues?.filter((v) =>
-    !filterDisciplineId || infoByVenue[v.id]?.disciplineIds.has(filterDisciplineId)
-  )
+  const filteredVenues = isTutorialMode
+    ? venues?.filter(v => isTutorialVenueEligible(v, tutorialInfo?.secondaryDisciplineId))
+    : venues?.filter(v => !filterDisciplineId || infoByVenue[v.id]?.disciplineIds.has(filterDisciplineId))
 
   return (
     <div className="min-h-screen bg-background">
@@ -101,6 +108,7 @@ function VenuesPage() {
               to="/animal/$animalId"
               params={{ animalId }}
               className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+              data-tutorial={isTutorialMode ? "venues-back-link" : undefined}
             >
               <ChevronLeft size={15} />
               Back to Animal
@@ -113,7 +121,19 @@ function VenuesPage() {
             Explore the competition grounds. Each region presents unique
             environmental conditions that affect performance. Prepare your stable accordingly.
           </p>
-          {disciplineOptions.length > 1 && (
+          {isTutorialMode ? (
+            tutorialInfo?.secondaryDisciplineName && (
+              <div className="mt-5" data-tutorial="venue-discipline-filter">
+                <p className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground/70 mb-1.5">Showing venues for</p>
+                <span
+                  className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-sm font-medium text-primary"
+                  data-tutorial="venue-discipline-badge"
+                >
+                  {tutorialInfo.secondaryDisciplineName}
+                </span>
+              </div>
+            )
+          ) : disciplineOptions.length > 1 && (
             <div className="mt-5">
               <select
                 value={filterDisciplineId}
@@ -137,8 +157,8 @@ function VenuesPage() {
         ) : !filteredVenues?.length ? (
           <p className="text-sm text-muted-foreground">{filterDisciplineId ? "No venues host this discipline." : "No venues configured."}</p>
         ) : (
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredVenues.map((venue) => {
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3" data-tutorial="venues-grid">
+            {filteredVenues.map((venue, cardIndex) => {
               const info = infoByVenue[venue.id]
               const count = info?.count ?? 0
               const disciplines = info ? Array.from(info.disciplines) : []
@@ -147,6 +167,11 @@ function VenuesPage() {
               const climateIconCls = venue.climate ? CLIMATE_ICON_CLS[venue.climate] : "text-foreground/10"
               const conditions = venue.climate && venue.terrain ? CONDITIONS[venue.climate]?.[venue.terrain] : null
 
+              const isFirst = cardIndex === 0
+              const isTutorialCard = isTutorialMode && isTutorialVenueEligible(venue, tutorialInfo?.secondaryDisciplineId)
+              const terrainMatches = isTutorialMode && !!venue.terrain && (tutorialInfo?.preferredTerrain ?? []).includes(venue.terrain)
+              const climateMatches = isTutorialMode && !!venue.climate && (tutorialInfo?.preferredClimate ?? []).includes(venue.climate)
+
               return (
                 <Link
                   key={venue.id}
@@ -154,9 +179,10 @@ function VenuesPage() {
                   params={{ venueId: venue.id }}
                   search={{ animalId, disciplineDefId, isConformation, from }}
                   className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-all hover:shadow-md hover:border-primary/30"
+                  data-tutorial={isFirst ? "venue-card-first" : isTutorialCard ? "tutorial-venue-card" : undefined}
                 >
                   {/* Hero */}
-                  <div className={cn("relative h-36 overflow-hidden", heroGradient, count === 0 && "opacity-60")}>
+                  <div className={cn("relative h-36 overflow-hidden", heroGradient, count === 0 && !isTutorialCard && "opacity-60")}>
                     <div className={cn("absolute -bottom-3 -right-3 transition-transform group-hover:-translate-x-1 group-hover:translate-y-1", climateIconCls)}>
                       <TerrainIcon terrain={venue.terrain} size={88} />
                     </div>
@@ -175,9 +201,12 @@ function VenuesPage() {
 
                     {/* CONDITIONS */}
                     {conditions && (
-                      <div className="mt-3">
+                      <div className="mt-3" data-tutorial="venue-card-conditions">
                         <p className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground/70">Conditions</p>
-                        <p className="mt-1 flex items-center gap-1.5 text-sm text-foreground/80">
+                        <p
+                          className="mt-1 flex items-center gap-1.5 text-sm text-foreground/80"
+                          data-tutorial={terrainMatches || climateMatches ? "venue-condition-match" : undefined}
+                        >
                           {venue.climate && (
                             <span className={cn("rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide", climateBadge)}>
                               {venue.climate.charAt(0) + venue.climate.slice(1).toLowerCase()}
@@ -189,7 +218,7 @@ function VenuesPage() {
                     )}
 
                     {/* SANCTIONED DISCIPLINES */}
-                    <div className="mt-4">
+                    <div className="mt-4" data-tutorial={isFirst ? "venue-card-disciplines-first" : undefined}>
                       <p className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground/70">
                         Sanctioned Disciplines
                       </p>
@@ -206,6 +235,12 @@ function VenuesPage() {
                             </span>
                           )}
                         </div>
+                      ) : isTutorialCard && tutorialInfo?.secondaryDisciplineName ? (
+                        <div className="mt-1.5 flex flex-wrap gap-1.5">
+                          <span className="rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-xs text-primary">
+                            {tutorialInfo.secondaryDisciplineName}
+                          </span>
+                        </div>
                       ) : (
                         <p className="mt-1 text-xs text-muted-foreground/50">No open events</p>
                       )}
@@ -213,15 +248,22 @@ function VenuesPage() {
 
                     {/* CTA */}
                     <div className="mt-auto pt-5">
-                      <div className={cn(
-                        "flex w-full items-center justify-between rounded-lg px-4 py-2.5 text-sm font-medium transition-colors",
-                        count > 0
-                          ? "bg-primary text-primary-foreground group-hover:bg-primary/90"
-                          : "bg-muted text-muted-foreground cursor-default",
-                      )}>
-                        <span>{count > 0 ? `Visit Venue` : "No Open Events"}</span>
-                        {count > 0 && <ArrowRight size={15} className="transition-transform group-hover:translate-x-0.5" />}
-                      </div>
+                      {isTutorialCard ? (
+                        <div className="flex w-full items-center justify-between rounded-lg px-4 py-2.5 text-sm font-medium bg-primary text-primary-foreground group-hover:bg-primary/90 transition-colors">
+                          <span>Visit Venue</span>
+                          <ArrowRight size={15} className="transition-transform group-hover:translate-x-0.5" />
+                        </div>
+                      ) : (
+                        <div className={cn(
+                          "flex w-full items-center justify-between rounded-lg px-4 py-2.5 text-sm font-medium transition-colors",
+                          count > 0
+                            ? "bg-primary text-primary-foreground group-hover:bg-primary/90"
+                            : "bg-muted text-muted-foreground cursor-default",
+                        )}>
+                          <span>{count > 0 ? "Visit Venue" : "No Open Events"}</span>
+                          {count > 0 && <ArrowRight size={15} className="transition-transform group-hover:translate-x-0.5" />}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </Link>

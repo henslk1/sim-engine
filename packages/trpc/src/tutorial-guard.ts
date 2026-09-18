@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server"
 import { db } from "@sim-engine/db"
-import { isTutorialMutationAllowed } from "./tutorial-policy.js"
+import { isTutorialMutationAllowed, TUTORIAL_CERTIFICATES } from "./tutorial-policy.js"
 
 const denied = () => new TRPCError({ code: "FORBIDDEN", message: "This action is not available at your tutorial step. Continue from the dashboard." })
 
@@ -50,7 +50,7 @@ export async function guardTutorialMutation(userId: string | null, path: string,
   }
   if (path === "vet.issueCert") {
     const cert = await db.healthCertificateDef.findUnique({ where: { id: String(input.certDefId) } })
-    if (cert?.gameId !== player.gameId || !["Coggins", "Vaccination"].includes(cert.name)) throw denied()
+    if (cert?.gameId !== player.gameId || !TUTORIAL_CERTIFICATES.includes(cert.name)) throw denied()
   }
   if (path === "animal.setSecondaryDiscipline") {
     const discipline = await db.disciplineDef.findUnique({ where: { id: String(input.disciplineDefId) } })

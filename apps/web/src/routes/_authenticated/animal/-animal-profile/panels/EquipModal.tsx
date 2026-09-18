@@ -23,6 +23,9 @@ export function EquipModal({ animal, playerAccountId, onClose }: {
 }) {
   const utils = trpc.useUtils()
   const { data: inventory } = trpc.inventory.mine.useQuery({ playerAccountId })
+  const { data: requiredItemIds } = trpc.tutorial.requiredEquipmentItemIds.useQuery(
+    { gameId: animal.gameId }, { enabled: isTourRunning() },
+  )
 
   const invalidate = () => {
     utils.animalProfile.get.invalidate({ animalId: animal.id })
@@ -149,10 +152,10 @@ export function EquipModal({ animal, playerAccountId, onClose }: {
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-2.5">
-                {activeItems.map((inv, idx) => (
+                {activeItems.map((inv) => (
                   <div
                     key={inv.id}
-                    {...(isTourRunning() && idx === 0 ? { "data-tutorial": "tutorial-equip-item" } : {})}
+                    {...(isTourRunning() && requiredItemIds?.includes(inv.itemDef.id) ? { "data-tutorial": "tutorial-equip-item" } : {})}
                     className="flex flex-col gap-4 rounded-xl border border-border/60 bg-secondary/30 p-4"
                   >
                     <div>

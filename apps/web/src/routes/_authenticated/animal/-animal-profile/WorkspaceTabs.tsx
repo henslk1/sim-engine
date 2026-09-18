@@ -59,6 +59,7 @@ export function WorkspaceTabs({
             key={id}
             type="button"
             onClick={() => setActiveTab(id)}
+            data-tutorial={id === "comp-history" ? "competition-history-tab" : undefined}
             className={cn(
               "inline-flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors",
               activeTab === id

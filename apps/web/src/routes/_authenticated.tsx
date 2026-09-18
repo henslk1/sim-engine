@@ -4,9 +4,11 @@ import { Header } from "@/components/header"
 import { trpc, trpcVanilla } from "@/lib/trpc"
 import { MessagingWidget } from "@/components/messaging-widget"
 import { authClient } from "@/lib/auth-client"
-import { isTourRunning, destroyActiveTour } from "@/lib/tutorial"
-import { configureTutorialStorage, getTutorialAccess, installTutorialInteractionGuard, readTutorialStep, saveTutorialStep, setTutorialAccess, useTutorialAccess } from "@/lib/tutorial/access"
+import { isTourRunning, destroyActiveTour, startTutorial } from "@/lib/tutorial"
+import { clearTutorialStep, clearTutorialVenueId, configureTutorialStorage, getTutorialAccess, installTutorialInteractionGuard, readTutorialStep, readTutorialVenueId, saveTutorialStep, setTutorialAccess, useTutorialAccess, wasTutorialRunning } from "@/lib/tutorial/access"
 import { isTutorialRouteAllowed } from "@sim-engine/trpc/tutorial-policy"
+import { grantGold } from "@/lib/tutorial/utils/grant-gold"
+import { grantPremium } from "@/lib/tutorial/utils/grant-premium"
 
 type Session = typeof authClient.$Infer.Session
 
@@ -67,7 +69,7 @@ function TutorialDevBar() {
   })
   const devDeleteAccount = trpc.tutorial.devDeleteAccount.useMutation({
     onSuccess: () => {
-      localStorage.removeItem("tutorial_step")
+      clearTutorialStep()
       window.location.href = "/"
     },
     onError: (e) => { alert(e.message) },
@@ -81,7 +83,8 @@ function TutorialDevBar() {
         onMouseDown={() => {
         const raw = parseInt(localStorage.getItem("tutorial_step") ?? "", 10)
         const stepIndex = isNaN(raw) ? 0 : raw
-        const phaseStart = stepIndex >= 56 ? 56 : stepIndex >= 49 ? 49 : stepIndex >= 20 ? 20 : stepIndex >= 10 ? 10 : stepIndex >= 5 ? 5 : 0
+        const phaseStart = stepIndex >= 81 ? 84 : stepIndex >= 56 ? 56 : stepIndex >= 49 ? 49 : stepIndex >= 20 ? 20 : stepIndex >= 10 ? 10 : stepIndex >= 5 ? 5 : 0
+        if (stepIndex >= 81) clearTutorialVenueId()
         saveTutorialStep(phaseStart)
         destroyActiveTour()
         devReset.mutate({ gameId: gameData.id, stepIndex })
@@ -118,8 +121,10 @@ export const Route = createFileRoute("/_authenticated")({
     if (!context.session.user.emailVerified) throw redirect({ to: "/verify-email" })
     installTutorialInteractionGuard()
 
-    // Setup and staff administration have their own authorization.
-    if (location.pathname === "/setup" || location.pathname === "/admin" || location.pathname.startsWith("/admin/")) {
+    // Only actual staff can leave the tutorial for administration.
+    if (location.pathname === "/admin" || location.pathname.startsWith("/admin/")) {
+      const roles = await trpcVanilla.admin.ops.players.myRoles.query()
+      if (!roles.length) throw redirect({ to: "/dashboard", replace: true })
       destroyActiveTour()
       setTutorialAccess({ restricted: false })
       return
@@ -127,7 +132,10 @@ export const Route = createFileRoute("/_authenticated")({
     const game = await trpcVanilla.admin.game.get.query()
     if (!game) return
     const player = await trpcVanilla.player.me.query({ gameId: game.id })
-    if (!player) throw redirect({ to: "/setup" })
+    if (!player) {
+      if (location.pathname === "/setup") { setTutorialAccess({ restricted: false }); return }
+      throw redirect({ to: "/setup" })
+    }
     if (player.seniority?.tutorialCompleted) {
       setTutorialAccess({ restricted: false })
       return
@@ -140,11 +148,33 @@ export const Route = createFileRoute("/_authenticated")({
       destroyActiveTour()
       return
     }
-    // An interrupted tour always re-enters through the dashboard dialog. Merely
-    // knowing a valid URL or a browser checkpoint never unlocks its controls.
-    if (!isTourRunning() || !isTutorialRouteAllowed(step, pair?.ancestorOneId, location.pathname, location.search)) {
+    const routeAllowed = isTutorialRouteAllowed(step, pair?.ancestorOneId, location.pathname, location.search)
+    if (!routeAllowed) {
       destroyActiveTour()
       throw redirect({ to: "/dashboard", replace: true })
+    }
+    // A reload clears Driver.js memory but keeps this tab's active-tour marker.
+    // Restore only the authoritative step on its valid route; other interrupted
+    // or manually opened pages still return to the dashboard dialog.
+    if (!isTourRunning()) {
+      const savedVenueId = readTutorialVenueId()
+      const venueMatches = !location.pathname.startsWith("/venue/") ||
+        location.pathname === `/venue/${savedVenueId}`
+      if (!wasTutorialRunning() || !venueMatches) {
+        destroyActiveTour()
+        throw redirect({ to: "/dashboard", replace: true })
+      }
+      startTutorial({
+        setStep: async index => { await trpcVanilla.tutorial.setDriverStep.mutate({ gameId: game.id, step: index }) },
+        recover: error => {
+          if (error) console.error("Tutorial recovery:", error)
+          setTutorialAccess({ recoveryMessage: error ? "The tutorial couldn't continue. Your progress is saved; use Continue Tutorial to retry." : null })
+          window.location.replace("/dashboard")
+        },
+        grantGold: amount => grantGold(game.id, amount),
+        grantPremium: () => grantPremium(game.id),
+        completeStep: async stepKey => { await trpcVanilla.tutorial.completeStep.mutate({ gameId: game.id, stepKey }) },
+      }, step)
     }
   },
   component: AuthenticatedLayout,

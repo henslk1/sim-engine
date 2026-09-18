@@ -251,8 +251,19 @@ function ConformationGenotypeCard({
   onTest: () => void
 }) {
   const phenotype = genotype.isTestedByOwner ? getPhenotype(genotype) : null
+  const hasTerrainMod = genotype.locus.expressionRules.some(r => r.terrainModifiers.length > 0)
+  const hasClimateMod = genotype.locus.expressionRules.some(r => r.climateModifiers.length > 0)
   return (
-    <div className="rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2">
+    <div className={cn(
+      "rounded-md border bg-secondary/30 px-2.5 py-2",
+      hasTerrainMod && hasClimateMod
+        ? "border-amber-500/60 ring-1 ring-sky-500/40"
+        : hasTerrainMod
+          ? "border-amber-500/60"
+          : hasClimateMod
+            ? "border-sky-500/60"
+            : "border-border/70"
+    )}>
       <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
         {genotype.locus.name}
       </p>

@@ -1,8 +1,8 @@
 import { useSyncExternalStore } from "react"
 import { getTutorialPolicy, isTutorialRouteAllowed } from "@sim-engine/trpc/tutorial-policy"
 
-type Access = { restricted: boolean; running: boolean; ready: boolean; step: number; mareId: string | null }
-let access: Access = { restricted: false, running: false, ready: false, step: 0, mareId: null }
+type Access = { restricted: boolean; running: boolean; ready: boolean; step: number; mareId: string | null; recoveryMessage: string | null; venueChoiceAcknowledged: boolean }
+let access: Access = { restricted: false, running: false, ready: false, step: 0, mareId: null, recoveryMessage: null, venueChoiceAcknowledged: false }
 const listeners = new Set<() => void>()
 export function getTutorialAccess() { return access }
 export function setTutorialAccess(update: Partial<Access>) {
@@ -14,9 +14,21 @@ export function useTutorialAccess() {
 }
 
 let storageKey = "tutorial_step"
+let venueStorageKey = "tutorial_venue"
+let runningStorageKey = "tutorial_running"
 export function configureTutorialStorage(userId: string, gameId: string) {
   storageKey = `tutorial_step:${userId}:${gameId}`
+  venueStorageKey = `tutorial_venue:${userId}:${gameId}`
+  runningStorageKey = `tutorial_running:${userId}:${gameId}`
 }
+export function saveTutorialRunning(running: boolean) {
+  if (running) sessionStorage.setItem(runningStorageKey, "true")
+  else sessionStorage.removeItem(runningStorageKey)
+}
+export function wasTutorialRunning() { return sessionStorage.getItem(runningStorageKey) === "true" }
+export function saveTutorialVenueId(venueId: string) { localStorage.setItem(venueStorageKey, venueId) }
+export function readTutorialVenueId() { return localStorage.getItem(venueStorageKey) }
+export function clearTutorialVenueId() { localStorage.removeItem(venueStorageKey) }
 export function readTutorialStep() {
   const raw = localStorage.getItem(storageKey) ?? localStorage.getItem("tutorial_step")
   const step = raw === null ? 0 : Number(raw)
@@ -26,6 +38,13 @@ export function saveTutorialStep(step: number) {
   localStorage.setItem(storageKey, String(step))
   // Retained for older step components/dev tooling during the migration.
   localStorage.setItem("tutorial_step", String(step))
+}
+
+export function clearTutorialStep() {
+  localStorage.removeItem(storageKey)
+  localStorage.removeItem("tutorial_step")
+  clearTutorialVenueId()
+  saveTutorialRunning(false)
 }
 
 let preparing = false
@@ -46,6 +65,7 @@ export function isTutorialElementAllowed(target: Element) {
   const search = Object.fromEntries(new URLSearchParams(window.location.search))
   if (!isTutorialRouteAllowed(access.step, access.mareId, window.location.pathname, search)) return false
   if (target.closest(".driver-popover")) return true
+  if (access.step === 84 && !access.venueChoiceAcknowledged) return false
   return getTutorialPolicy(access.step)?.controls?.some(selector => target.closest(selector)) ?? false
 }
 

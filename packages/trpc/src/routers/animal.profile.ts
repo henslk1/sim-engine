@@ -80,7 +80,14 @@ export const animalProfileRouter = router({
                 include: {
                   panelEntries: { include: { panelDef: true } },
                   expressionRules: {
-                    select: { alleleOneId: true, alleleTwoId: true, phenotype: true, ruleConditions: { select: { penetrance: true } } },
+                    select: {
+                      alleleOneId: true,
+                      alleleTwoId: true,
+                      phenotype: true,
+                      ruleConditions: { select: { penetrance: true } },
+                      terrainModifiers: { select: { terrain: true } },
+                      climateModifiers: { select: { climate: true } },
+                    },
                   },
                 },
               },

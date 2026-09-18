@@ -9,6 +9,8 @@ import {
   Snowflake, Info,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { TUTORIAL_CERTIFICATES } from "@sim-engine/trpc/tutorial-policy"
+import { useTutorialAccess } from "@/lib/tutorial/access"
 
 const SERVICE_KEYS: ServiceKey[] = ["diagnostics", "otc", "certificates", "euthanasia", "collect", "embryo-create", "embryo-implant", "insemination", "storage"]
 
@@ -362,10 +364,12 @@ function CertificatesPanel({
   balances: { currencyDef: { id: string }; balance: number }[] | undefined
 }) {
   const utils = trpc.useUtils()
+  const tutorialAccess = useTutorialAccess()
 
   const filteredAnimals = certDefs.length === 0
     ? aliveAnimals
     : aliveAnimals.filter(a =>
+        (tutorialAccess.restricted && a.id === tutorialAccess.mareId) ||
         certDefs.some(def => {
           const cert = a.healthCertificates.find(c => c.certDefId === def.id)
           return !cert || !cert.isValid || cert.expiresAtCycle <= a.ageInCycles
@@ -451,8 +455,8 @@ function CertificatesPanel({
                 </div>
                 <button
                   type="button"
-                  data-tutorial="cert-issue-btn"
-                  disabled={!effectiveAnimalId || !playerAccountId || isPending || !canAfford}
+                  data-tutorial={TUTORIAL_CERTIFICATES.includes(def.name) ? "cert-issue-btn" : undefined}
+                  disabled={!effectiveAnimalId || !playerAccountId || isPending || !canAfford || (tutorialAccess.restricted && !!isValid)}
                   onClick={() => playerAccountId && issueCert.mutate({ animalId: effectiveAnimalId, playerAccountId, certDefId: def.id })}
                   className={cn(
                     "shrink-0 rounded px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50",

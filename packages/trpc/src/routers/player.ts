@@ -61,6 +61,7 @@ export const playerRouter = router({
             data: { 
               playerAccountId: account.id,
               starterBreedOptionId: input.starterBreedOptionId,
+              tutorialDriverStep: 0,
               starterColorOptionId: input.starterColorOptionId,
               starterGender: input.starterGender, 
             } ,

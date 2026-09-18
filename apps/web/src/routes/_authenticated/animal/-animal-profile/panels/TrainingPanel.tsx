@@ -241,6 +241,11 @@ export function TrainingPanel({
                   key={stat.statDef.name}
                   className="rounded-md border border-border/70 bg-secondary/30 px-2 py-1.5"
                   data-tutorial={stat.statDef.id === tutorialTargetStatId ? "training-target-stat" : undefined}
+                  data-tutorial-training-sessions={animal.trainingLogs.filter(log =>
+                    log.cycleNumber === animal.ageInCycles &&
+                    log.trainingActionDef.statDef.name === stat.statDef.name &&
+                    log.intensityTierDef.name === tiers.find(t => t.tierIndex === maxTierIndex)?.name
+                  ).length}
                 >
                   <div className="mb-0.5 flex items-center justify-between">
                     <span className="text-[11px] font-semibold text-foreground">{stat.statDef.name}</span>

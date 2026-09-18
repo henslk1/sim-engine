@@ -4,7 +4,7 @@ import { grantGold } from "@/lib/tutorial/utils/grant-gold"
 import { grantPremium } from "@/lib/tutorial/utils/grant-premium"
 import { useEffect, useState } from "react"
 import { Dialog } from "@/components/game/ui"
-import { readTutorialStep, setTutorialAccess, useTutorialAccess } from "@/lib/tutorial/access"
+import { readTutorialStep, readTutorialVenueId, setTutorialAccess, useTutorialAccess } from "@/lib/tutorial/access"
 import { getTutorialPolicy, tutorialDestination } from "@sim-engine/trpc/tutorial-policy"
 import { startTutorial, setTourRunning, destroyActiveTour } from "@/lib/tutorial"
 import {
@@ -407,7 +407,6 @@ function DevLogPanel({ gameName }: { gameName: string }) {
 
 function DashboardPage() {
   const navigate = useNavigate()
-  const utils = trpc.useUtils()
 
   const [launching, setLaunching] = useState(false)
   const tutorialAccess = useTutorialAccess()
@@ -428,9 +427,7 @@ function DashboardPage() {
   const playerAccountId = me?.id
 
   // Show dialog whenever tutorial is incomplete — derived from seniority, not URL state.
-  // tutorialStarted hides it once the driver tour is launched (cleared on page reload).
-  // isTourRunning() hides it if Driver.js is actively running (module-level flag that resets on
-  // every full page load — unlike sessionStorage, it can't be left stale from a prior session).
+  // The live access state reopens it when a tour is stopped, including on this page.
   const tutorialComplete = me?.seniority?.tutorialCompleted ?? true
   const showWelcome = !meLoading && !tutorialComplete && !tutorialAccess.running
 
@@ -456,6 +453,7 @@ function DashboardPage() {
     if (!gameId || launching) return
     setLaunching(true)
     setTutorialError(null)
+    setTutorialAccess({ recoveryMessage: null })
     try {
       // Read the authoritative index on every re-entry (including another tab).
       const freshMe = await trpcVanilla.player.me.query({ gameId })
@@ -464,10 +462,17 @@ function DashboardPage() {
         .map(p => tutorialProgress.steps.find(s => s.id === p.stepDefId)?.stepKey))
       const checkpoint = completedKeys.has("step_mare_profile") ? 20 : completedKeys.has("step_purchased") ? 10 : completedKeys.has("step_shop") ? 5 : 0
       const resumeIndex = saved ?? Math.max(checkpoint, readTutorialStep())
-      const index = getTutorialPolicy(resumeIndex) ? resumeIndex : 0
+      let index = getTutorialPolicy(resumeIndex) ? resumeIndex : 0
+      const venueId = readTutorialVenueId()
+      // A different browser may lack the locally saved venue choice. Return to
+      // the pick step so the player can choose again instead of entering limbo.
+      if (getTutorialPolicy(index)?.page === "venue" && !venueId) {
+        index = 84
+        await trpcVanilla.tutorial.setDriverStep.mutate({ gameId, step: index })
+      }
       await setupMutation.mutateAsync({ gameId })
       const pair = await trpcVanilla.tutorial.pairIds.query({ gameId })
-      const destination = tutorialDestination(index, pair?.ancestorOneId)
+      const destination = tutorialDestination(index, pair?.ancestorOneId, venueId)
       if (destination.pathname === "/dashboard" && index !== 0) throw new Error("Your tutorial mare could not be loaded. Please try again.")
       setTutorialAccess({ restricted: true, step: index, mareId: pair?.ancestorOneId ?? null })
       setTourRunning(true)
@@ -478,6 +483,7 @@ function DashboardPage() {
         setStep: step => trpcVanilla.tutorial.setDriverStep.mutate({ gameId, step }),
         recover: error => {
           if (error) console.error("Tutorial recovery:", error)
+          setTutorialAccess({ recoveryMessage: error ? "The tutorial couldn't continue. Your progress is saved; use Continue Tutorial to retry." : null })
           void navigate({ to: "/dashboard", replace: true })
         },
         grantGold: amount => grantGold(gameId, amount),
@@ -562,7 +568,7 @@ function DashboardPage() {
         ) : (
           <p className="text-sm text-muted-foreground">Pick up where you left off.</p>
         )}
-        {tutorialError && <p role="alert" className="text-sm text-destructive">{tutorialError}</p>}
+        {(tutorialError || tutorialAccess.recoveryMessage) && <p role="alert" className="text-sm text-destructive">{tutorialError || tutorialAccess.recoveryMessage}</p>}
         <div className="flex justify-end">
           <button
             onClick={beginTutorial}

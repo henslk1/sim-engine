@@ -1,8 +1,15 @@
 import { test, mock, beforeEach, afterEach } from "node:test"
 import assert from "node:assert/strict"
-import { db } from "@sim-engine/db"
-import { guardTutorialMutation } from "../src/tutorial-guard.ts"
-import { publicProcedure, router } from "../src/trpc.ts"
+
+// Substitute the database before loading the router. No test can reach a real
+// account, including if a guard unexpectedly falls through.
+const db = {
+  playerAccount: { findMany: async () => [] as unknown[] },
+  healthCertificateDef: { findUnique: async (_input: unknown) => null as unknown },
+}
+Object.assign(globalThis, { prisma: db })
+const { guardTutorialMutation } = await import("../src/tutorial-guard.ts")
+const { publicProcedure, router } = await import("../src/trpc.ts")
 
 let step: number | null = 59
 let completed = false
@@ -10,7 +17,7 @@ beforeEach(() => {
   step = 59
   completed = false
   mock.method(db.playerAccount, "findMany", async () => [{ id: "player", gameId: "game", seniority: { tutorialCompleted: completed, tutorialDriverStep: step }, tutorialAnimalPair: { ancestorOneId: "mare" } }])
-  mock.method(db.healthCertificateDef, "findUnique", async ({ where }: { where: { id: string } }) => ({ id: where.id, gameId: "game", name: where.id }))
+  mock.method(db.healthCertificateDef, "findUnique", async ({ where }: { where: { id: string } }) => ({ id: where.id, gameId: "game", name: `${where.id} Certificate` }))
 })
 afterEach(() => mock.restoreAll())
 const forbidden = { code: "FORBIDDEN" }

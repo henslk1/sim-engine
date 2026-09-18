@@ -1,6 +1,6 @@
 import type { AnimalProfile } from "../types"
 import { Panel } from "@/components/game/ui"
-import { Ruler, TriangleAlert } from "lucide-react"
+import { Ruler, TriangleAlert, HelpCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { formatCycleAge } from "../utils"
 
@@ -69,11 +69,26 @@ export function ConformationPanel({ animal }: { animal: AnimalProfile }) {
 
   const risk = structuralRiskLabel(animal.structuralRisk ?? 0)
 
+  const terrainLocusIds = new Set(
+    (animal.genotypes ?? [])
+      .filter(g => g.locus.expressionRules.some(r => r.terrainModifiers.length > 0))
+      .map(g => g.locusId)
+  )
+  const climateLocusIds = new Set(
+    (animal.genotypes ?? [])
+      .filter(g => g.locus.expressionRules.some(r => r.climateModifiers.length > 0))
+      .map(g => g.locusId)
+  )
+  const terrainRevealed = terrainLocusIds.size > 0 &&
+    [...terrainLocusIds].every(id => animal.genotypes?.find(g => g.locusId === id)?.isTestedByOwner)
+  const climateRevealed = climateLocusIds.size > 0 &&
+    [...climateLocusIds].every(id => animal.genotypes?.find(g => g.locusId === id)?.isTestedByOwner)
+
   return (
-    <Panel title={title} icon={<Ruler className="size-4 text-chart-2" />} action={action}>
+    <Panel title={title} icon={<Ruler className="size-4 text-chart-2" />} action={action} data-tutorial="conformation-panel">
       <div className="space-y-3">
         {isCross ? (
-          <p className="text-[11px] text-muted-foreground">Conformation scoring applies to purebreds only</p>
+          <p className="text-[11px] text-muted-foreground">Conformation scoring is only available for purebred animals.</p>
         ) : awaitingAge ? (
           <p className="text-[11px] text-muted-foreground">
             {firstCompetingStage
@@ -124,22 +139,40 @@ export function ConformationPanel({ animal }: { animal: AnimalProfile }) {
           </div>
         )}
 
-        {overallScore && (
-          <div className="grid grid-cols-3 gap-2 border-t border-border/50 pt-3">
+        <div className={cn("grid gap-2 border-t border-border/50 pt-3", overallScore ? "grid-cols-3" : "grid-cols-2")}>
+          {overallScore && (
             <div className="rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2">
               <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Structural Risk</p>
               <p className={cn("text-sm font-semibold", risk.className)}>{risk.label}</p>
             </div>
-            <div className="rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2">
-              <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Terrain</p>
+          )}
+          <div className="rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2" data-tutorial="conformation-terrain">
+            <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Terrain</p>
+            {terrainRevealed ? (
               <p className="text-sm font-semibold text-foreground">{fmtEnumList(animal.preferredTerrain)}</p>
-            </div>
-            <div className="rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2">
-              <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Climate</p>
-              <p className="text-sm font-semibold text-foreground">{fmtEnumList(animal.preferredClimate)}</p>
-            </div>
+            ) : (
+              <div className="flex items-center gap-1">
+                <p className="text-sm italic text-muted-foreground/60">Untested</p>
+                <span title="Test all conformation traits in the Genetics tab to reveal terrain preference">
+                  <HelpCircle className="size-3 text-muted-foreground/40" />
+                </span>
+              </div>
+            )}
           </div>
-        )}
+          <div className="rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2" data-tutorial="conformation-climate">
+            <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Climate</p>
+            {climateRevealed ? (
+              <p className="text-sm font-semibold text-foreground">{fmtEnumList(animal.preferredClimate)}</p>
+            ) : (
+              <div className="flex items-center gap-1">
+                <p className="text-sm italic text-muted-foreground/60">Untested</p>
+                <span title="Test all conformation traits in the Genetics tab to reveal climate preference">
+                  <HelpCircle className="size-3 text-muted-foreground/40" />
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </Panel>
   )

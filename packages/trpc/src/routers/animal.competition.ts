@@ -10,6 +10,7 @@ export const animalCompetitionRouter = router({
       db.venue.findMany({
         where: { gameId: input.gameId },
         orderBy: [{ rotationOrder: "asc" }, { name: "asc" }],
+        include: { disciplines: { select: { disciplineDefId: true } } },
       })
     ),
 
