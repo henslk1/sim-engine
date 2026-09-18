@@ -336,7 +336,7 @@ export function venueSteps(ctrl: TutorialCtrl, _callbacks: TutorialCallbacks): D
     {
       popover: {
         title: "Keep Competing!",
-        description: "Continue competing until she's advanced to the next tier — she's nearly ready for breeding. Don't forget to watch her energy level and complete her daily care.",
+        description: "Continue competing until she's advanced to the next tier, she's nearly ready for breeding. Don't forget to watch her energy level and complete her daily care.",
         showButtons: ["next"],
         onNextClick: () => ctrl.moveNext(),
       },
