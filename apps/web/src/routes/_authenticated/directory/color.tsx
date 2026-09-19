@@ -1,7 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { useState } from "react"
 import { trpc } from "@/lib/trpc"
-import type { RouterOutputs } from "@/lib/trpc"
 import { RichTextRenderer } from "@/components/game/editor/RichTextRenderer"
 import { formatCoatPhenotype } from "@/lib/breedUtils"
 
@@ -9,7 +8,20 @@ export const Route = createFileRoute("/_authenticated/directory/color")({
   component: ColorDirectoryPage,
 })
 
-type LocusEntry = RouterOutputs["directory"]["listColor"][number]
+type LocusEntry = {
+  id: string
+  name: string
+  description: unknown
+  expressionRules: Array<{
+    id: string
+    phenotype: string
+    alleleOne: { symbol: string }
+    alleleTwo: { symbol: string }
+    ruleConditions: Array<{
+      healthConditionDef: { id: string; name: string }
+    }>
+  }>
+}
 type Rule = LocusEntry["expressionRules"][number]
 
 function LinkedConditions({ conditions }: { conditions: Rule["ruleConditions"] }) {
@@ -75,10 +87,11 @@ function ColorDirectoryPage() {
   const { data: gameData } = trpc.admin.game.get.useQuery()
   const gameId = gameData?.id ?? ""
 
-  const { data: loci, isLoading } = trpc.directory.listColor.useQuery(
+  const locusQuery = trpc.directory.listColor.useQuery(
     { gameId },
     { enabled: !!gameId }
-  )
+  ) as { data: LocusEntry[] | undefined; isLoading: boolean }
+  const { data: loci, isLoading } = locusQuery
 
   const [search, setSearch] = useState("")
 

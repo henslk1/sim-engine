@@ -1,7 +1,6 @@
 import { createFileRoute, Outlet, Link, useNavigate, redirect } from "@tanstack/react-router"
 import { trpcVanilla } from "@/lib/trpc"
 import { useState } from "react"
-import { cn } from "@/lib/utils"
 import { trpc } from "@/lib/trpc"
 import {
   LayoutDashboard, Users, MessageSquare, Bug, ShieldAlert,

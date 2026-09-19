@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ActionButton } from "./game/ui";
 import { trpc } from "@/lib/trpc";
-import { Coins } from "lucide-react";
+import { Coins, Gem } from "lucide-react";
 
 type Session = typeof authClient.$Infer.Session 
 
@@ -52,6 +52,7 @@ export function Header({ session }: { session: Session}) {
     { enabled: !!me?.id },
   )
   const goldBalance = balances?.find(b => b.currencyDef.currencyType === "BASE")?.balance
+  const premiumBalance = balances?.find(b => b.currencyDef.currencyType === "PREMIUM")
 
   return (
     <header className="border-b border-border bg-card">
@@ -71,6 +72,15 @@ export function Header({ session }: { session: Session}) {
             >
               <Coins className="size-3.5 text-chart-1" />
               {(goldBalance ?? 0).toLocaleString()}
+            </span>
+          )}
+          {me && premiumBalance !== undefined && (
+            <span
+              data-tutorial="premium-balance"
+              className="inline-flex items-center gap-1.5 rounded-full bg-card px-3 py-1 text-sm font-bold tabular-nums ring-1 ring-border"
+            >
+              <Gem className="size-3.5 text-violet-400" />
+              {(premiumBalance?.balance ?? 0).toLocaleString()}
             </span>
           )}
           <ActionButton

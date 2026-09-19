@@ -87,7 +87,7 @@ function TiersTab({ disciplineId, gameId }: { disciplineId: string; gameId: stri
   const [editingPrize, setEditingPrize] = useState<PrizeForm | null>(null)
 
   const { data: prizes } = trpc.admin.competitionTier.listPrizes.useQuery(
-    { competitionTierDefId: expandedTierId! },
+    { tierDefId: expandedTierId! },
     { enabled: !!expandedTierId }
   )
 
@@ -105,14 +105,14 @@ function TiersTab({ disciplineId, gameId }: { disciplineId: string; gameId: stri
   })
   const savePrize = trpc.admin.competitionTier.savePrize.useMutation({
     onSuccess: () => {
-      utils.admin.competitionTier.listPrizes.invalidate({ competitionTierDefId: expandedTierId! })
+      utils.admin.competitionTier.listPrizes.invalidate({ tierDefId: expandedTierId! })
       utils.admin.competitionTier.list.invalidate({ disciplineDefId: disciplineId })
       setEditingPrizeId(null); setEditingPrize(null); setNewPrize(emptyPrize())
     },
   })
   const removePrize = trpc.admin.competitionTier.removePrize.useMutation({
     onSuccess: () => {
-      utils.admin.competitionTier.listPrizes.invalidate({ competitionTierDefId: expandedTierId! })
+      utils.admin.competitionTier.listPrizes.invalidate({ tierDefId: expandedTierId! })
       utils.admin.competitionTier.list.invalidate({ disciplineDefId: disciplineId })
     },
   })
@@ -121,26 +121,28 @@ function TiersTab({ disciplineId, gameId }: { disciplineId: string; gameId: stri
     if (!editingTier || !editingTier.name.trim()) return
     saveTier.mutate({
       id: editingTierId ?? undefined,
+      gameId,
       disciplineDefId: disciplineId,
       name: editingTier.name.trim(),
       tierIndex: parseInt(editingTier.tierIndex) || 0,
       minConditionScore: editingTier.minConditionScore ? parseFloat(editingTier.minConditionScore) : null,
       advancementThreshold: editingTier.advancementThreshold ? parseFloat(editingTier.advancementThreshold) : null,
-      energyCost: editingTier.energyCost ? parseInt(editingTier.energyCost) : null,
-      entryFee: editingTier.entryFee ? parseFloat(editingTier.entryFee) : null,
-      minWeeklyPoints: editingTier.minWeeklyPoints ? parseInt(editingTier.minWeeklyPoints) : null,
+      energyCost: editingTier.energyCost ? parseInt(editingTier.energyCost) : 0,
+      entryFee: editingTier.entryFee ? parseInt(editingTier.entryFee) : 0,
+      minWeeklyPointsForInvitational: editingTier.minWeeklyPoints ? parseInt(editingTier.minWeeklyPoints) : null,
     })
   }
 
   function submitPrize(id?: string) {
     const form = id ? editingPrize : newPrize
-    if (!form || !expandedTierId || !form.currencyDefId || !form.amount) return
+    if (!form || !expandedTierId || !form.currencyDefId || !form.amount || !form.placement) return
     savePrize.mutate({
       id,
-      competitionTierDefId: expandedTierId,
+      tierDefId: expandedTierId,
       currencyDefId: form.currencyDefId,
-      amount: parseFloat(form.amount),
-      placement: form.placement ? parseInt(form.placement) : null,
+      amount: parseInt(form.amount),
+      placement: parseInt(form.placement),
+      isInvitational: false,
     })
   }
 
@@ -231,13 +233,13 @@ function TiersTab({ disciplineId, gameId }: { disciplineId: string; gameId: stri
                         setExpandedTierId(expandedTierId === t.id ? null : t.id)
                         setEditingPrizeId(null); setEditingPrize(null); setNewPrize(emptyPrize())
                       }}>
-                      {t._count?.prizes ?? 0} {expandedTierId === t.id ? "▲" : "▼"}
+                      {t._count.tierPrizes} {expandedTierId === t.id ? "▲" : "▼"}
                     </Button>
                   </td>
                   <td className="px-3 py-2 text-right space-x-1">
                     <Button size="sm" variant="ghost" onClick={() => {
                       setEditingTierId(t.id)
-                      setEditingTier({ name: t.name, tierIndex: t.tierIndex.toString(), minConditionScore: t.minConditionScore?.toString() ?? "", advancementThreshold: t.advancementThreshold?.toString() ?? "", energyCost: t.energyCost?.toString() ?? "", entryFee: t.entryFee?.toString() ?? "", minWeeklyPoints: t.minWeeklyPoints?.toString() ?? "" })
+                      setEditingTier({ name: t.name, tierIndex: t.tierIndex.toString(), minConditionScore: t.minConditionScore?.toString() ?? "", advancementThreshold: t.advancementThreshold?.toString() ?? "", energyCost: t.energyCost.toString(), entryFee: t.entryFee.toString(), minWeeklyPoints: t.minWeeklyPointsForInvitational?.toString() ?? "" })
                     }}>Edit</Button>
                     <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
                       onClick={() => { if (!confirm("Delete this tier?")) return; removeTier.mutate({ id: t.id }) }}>
@@ -283,10 +285,10 @@ function TiersTab({ disciplineId, gameId }: { disciplineId: string; gameId: stri
                               ) : (
                                 <tr key={p.id} className="border-b border-border last:border-0">
                                   <td className="py-1.5 pr-3 text-muted-foreground">{p.placement ?? "Any"}</td>
-                                  <td className="py-1.5 pr-3 text-foreground">{p.currencyDef.name}</td>
+                                  <td className="py-1.5 pr-3 text-foreground">{p.currencyDef?.name ?? "—"}</td>
                                   <td className="py-1.5 pr-3 text-muted-foreground">{p.amount}</td>
                                   <td className="py-1.5 text-right space-x-2">
-                                    <Button size="sm" variant="ghost" onClick={() => { setEditingPrizeId(p.id); setEditingPrize({ currencyDefId: p.currencyDefId, amount: p.amount.toString(), placement: p.placement?.toString() ?? "" }) }}>Edit</Button>
+                                    <Button size="sm" variant="ghost" onClick={() => { setEditingPrizeId(p.id); setEditingPrize({ currencyDefId: p.currencyDefId ?? "", amount: p.amount.toString(), placement: p.placement.toString() }) }}>Edit</Button>
                                     <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => removePrize.mutate({ id: p.id })}>Delete</Button>
                                   </td>
                                 </tr>
@@ -335,14 +337,20 @@ function DisciplinesPage() {
   const { gameId } = Route.useParams()
 
   const { data: disciplines } = trpc.admin.discipline.list.useQuery({ gameId: gameId! }, {})
-  const { data: stats } = trpc.admin.stat.list.useQuery({ gameId: gameId! }, {})
-  const { data: traits } = trpc.admin.personality.list.useQuery({ gameId: gameId! }, {})
-  const { data: items } = trpc.admin.item.list.useQuery({ gameId: gameId! }, {})
+  const { data: stats } = trpc.admin.stat.list.useQuery({ gameId: gameId! }, {}) as {
+    data: Array<{ id: string; name: string }> | undefined
+  }
+  const { data: traits } = trpc.admin.personality.list.useQuery({ gameId: gameId! }, {}) as {
+    data: Array<{ id: string; name: string }> | undefined
+  }
+  const { data: items } = trpc.admin.item.list.useQuery({ gameId: gameId! }, {}) as {
+    data: Array<{ id: string; name: string }> | undefined
+  }
 
   const utils = trpc.useUtils()
 
   const saveDiscipline = trpc.admin.discipline.save.useMutation({
-    onSuccess: (saved) => {
+    onSuccess: (saved: { id: string }) => {
       utils.admin.discipline.list.invalidate()
       setEditing((prev) => (prev ? { ...prev, id: saved.id } : null))
     },
@@ -368,7 +376,12 @@ function DisciplinesPage() {
   const { data: equipmentRequirements } = trpc.admin.discipline.listEquipmentRequirements.useQuery(
     { disciplineDefId: editing?.id! },
     { enabled: !!editing?.id }
-  )
+  ) as { data: Array<{
+    id: string
+    quantity: number
+    requirementGroup: string | null
+    itemDef: { id: string; name: string }
+  }> | undefined }
 
   const savePersonalityWeight = trpc.admin.discipline.savePersonalityWeight.useMutation({
     onSuccess: () => {

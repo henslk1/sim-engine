@@ -117,7 +117,7 @@ export async function generateFromTemplate(tx: Tx, opts: GenerateFromTemplateOpt
     : []
   const lifeModifierRules = allMatchingRules.filter(r => r.numericModifier !== null)
   const phenotypeRules = allMatchingRules.filter(
-    (r): r is ExpressionRuleForPhenotype => r.phenotype !== null
+    (r): r is typeof r & ExpressionRuleForPhenotype => r.phenotype !== null
   )
   const phenotypeDescription = computePhenotypeDescription(genotypes, phenotypeRules)
   const totalModifier = lifeModifierRules.reduce((s, r) => s + (r.numericModifier ?? 0), 0)

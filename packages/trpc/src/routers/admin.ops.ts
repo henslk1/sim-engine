@@ -1,4 +1,4 @@
-import { router, publicProcedure, protectedProcedure, staffProcedure, ownerProcedure } from "../trpc.js"
+import { router, protectedProcedure, staffProcedure, ownerProcedure } from "../trpc.js"
 import { db, Prisma } from "@sim-engine/db"
 import { z } from "zod"
 
@@ -17,6 +17,7 @@ const overviewRouter = router({
         bugGameBreaking,
         bugMajor,
         bugMinor,
+        exploitCount,
         pendingReports,
         activeBans,
         recentPlayers,
@@ -28,6 +29,7 @@ const overviewRouter = router({
         db.bugReport.count({ where: { ...gf, severity: "GAME_BREAKING", status: { notIn: ["RESOLVED", "CLOSED", "NOT_A_BUG"] } } }),
         db.bugReport.count({ where: { ...gf, severity: "MAJOR", status: { notIn: ["RESOLVED", "CLOSED", "NOT_A_BUG"] } } }),
         db.bugReport.count({ where: { ...gf, severity: "MINOR", status: { notIn: ["RESOLVED", "CLOSED", "NOT_A_BUG"] } } }),
+        db.bugReport.count({ where: { ...gf, isExploit: true, status: { notIn: ["RESOLVED", "CLOSED", "NOT_A_BUG"] } } }),
         db.userReport.count({ where: { ...gf, status: "PENDING" } }),
         db.banRecord.count({ where: { OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] } }),
         db.playerAccount.findMany({
@@ -62,7 +64,7 @@ const overviewRouter = router({
           orderBy: { startedAt: "desc" },
         }),
       ])
-      return { openTickets, inProgressTickets, bugGameBreaking, bugMajor, bugMinor, pendingReports, activeBans, recentPlayers, recentActions, lastNightlyLog }
+      return { openTickets, inProgressTickets, bugGameBreaking, bugMajor, bugMinor, exploitCount, pendingReports, activeBans, recentPlayers, recentActions, lastNightlyLog }
     }),
 })
 
@@ -147,7 +149,11 @@ const playersOpsRouter = router({
         where: { gameId: player.gameId, OR: [{ fromPlayerAccountId: player.id }, { toPlayerAccountId: player.id }] },
         orderBy: { createdAt: "desc" },
         take: 20,
-        include: { currencyDef: { select: { symbol: true, name: true } } },
+        include: {
+          currencyDef: { select: { symbol: true, name: true } },
+          fromPlayerAccount: { select: { username: true } },
+          toPlayerAccount: { select: { username: true } },
+        },
       })
 
       const reportsAgainst = await db.userReport.count({ where: { reportedPlayerId: player.id } })
@@ -542,20 +548,23 @@ const bugsOpsRouter = router({
       status: z.enum(["OPEN", "CONFIRMED", "IN_PROGRESS", "NEEDS_MORE_INFO", "NOT_A_BUG", "RESOLVED", "CLOSED"]).optional(),
       severity: z.enum(["MINOR", "MAJOR", "GAME_BREAKING"]).optional(),
       category: z.enum(["VISUAL", "TEXT", "UI", "GAMEPLAY", "ECONOMY", "PERFORMANCE"]).optional(),
+      exploitsOnly: z.boolean().optional(),
       cursor: z.string().optional(),
       limit: z.number().int().min(1).max(100).default(50),
     }))
     .query(async ({ input }) => {
-      const { gameId, status, severity, category, cursor, limit } = input
+      const { gameId, status, severity, category, exploitsOnly, cursor, limit } = input
       const reports = await db.bugReport.findMany({
         where: {
           gameId,
           ...(status && { status }),
           ...(severity && { severity }),
           ...(category && { category }),
+          ...(exploitsOnly && { isExploit: true }),
         },
         include: {
           author: { select: { id: true, username: true } },
+          claimedBy: { select: { id: true, name: true } },
           _count: { select: { upvotes: true, comments: true } },
         },
         orderBy: { createdAt: "desc" },
@@ -573,6 +582,7 @@ const bugsOpsRouter = router({
         where: { id: input.reportId },
         include: {
           author: { select: { id: true, username: true } },
+          claimedBy: { select: { id: true, name: true } },
           comments: {
             include: { author: { select: { id: true, username: true, user: { select: { staffRoles: true } } } } },
             orderBy: { createdAt: "asc" },

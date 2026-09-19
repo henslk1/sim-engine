@@ -1,7 +1,7 @@
 import { router, publicProcedure } from "../trpc.js"
 import { db } from "@sim-engine/db"
 import { z } from "zod"
-import { computePhenotypeDescription, computeCoatFromCodes } from "@sim-engine/engine"
+import { computeCoatFromCodes } from "@sim-engine/engine"
 
 export const animalTemplateAdminRouter = router({
   list: publicProcedure

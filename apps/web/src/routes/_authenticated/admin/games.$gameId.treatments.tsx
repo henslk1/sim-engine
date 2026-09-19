@@ -51,11 +51,11 @@ function TreatmentsPage() {
   const { data: conditions } = trpc.admin.health.list.useQuery(
     { gameId: gameId! },
     {}
-  )
+  ) as { data: Array<{ id: string; name: string }> | undefined }
   const { data: itemDefs } = trpc.admin.item.list.useQuery(
     { gameId: gameId! },
     {}
-  )
+  ) as { data: Array<{ id: string; name: string }> | undefined }
 
   const [selectedConditionId, setSelectedConditionId] = useState("")
   const [expandedTreatmentId, setExpandedTreatmentId] = useState<string | null>(null)

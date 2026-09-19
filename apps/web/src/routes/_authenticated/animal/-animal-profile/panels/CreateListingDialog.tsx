@@ -5,7 +5,17 @@ import { RichTextEditor } from "@/components/game/editor/RichTextEditor"
 import { trpc } from "@/lib/trpc"
 import { Loader2 } from "lucide-react"
 
-type Listing = NonNullable<AnimalProfile["breedingListings"][number]>
+type Listing = {
+  id: string
+  title: string | null
+  pureBredOnly: boolean
+  requiredTitleDefId: string | null
+  pricePerSlot: number
+  currencyDef: { id: string } | null
+  description: unknown
+  breedRestrictions: Array<{ breedId: string }>
+  statMinimums: Array<{ statDefId: string; minValue: number }>
+}
 
 export function CreateListingDialog({
   animal,

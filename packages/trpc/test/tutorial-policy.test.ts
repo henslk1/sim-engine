@@ -24,7 +24,7 @@ test("dashboard is always a fallback, including unknown or corrupt indexes", () 
   }
 })
 test("every step has a valid resume destination and rejects unrelated game routes", () => {
-  assert.equal(TUTORIAL_STEPS.length, 97)
+  assert.equal(TUTORIAL_STEPS.length, 136)
   for (let step = 0; step < TUTORIAL_STEPS.length; step++) {
     const destination = tutorialDestination(step, "mare", "chosen-venue")
     assert.equal(isTutorialRouteAllowed(step, "mare", destination.pathname, destination.search), true, `resume ${step}`)
@@ -85,4 +85,65 @@ test("the venue handoff is limited to the tutorial mare", () => {
   assert.deepEqual(tutorialDestination(85, "mare"), { pathname: "/dashboard", search: {} })
   assert.equal(isTutorialRouteAllowed(89, "mare", "/venues", { animalId: "mare", from: "animal" }), true)
   assert.equal(isTutorialRouteAllowed(90, "mare", "/animal/mare"), true)
+})
+
+test("unguided competition permits only the mare's care, age, venue, and entry actions", () => {
+  const search = { animalId: "mare", from: "animal" }
+  assert.equal(isTutorialRouteAllowed(96, "mare", "/animal/mare"), true)
+  assert.equal(isTutorialRouteAllowed(96, "mare", "/venues", search), true)
+  assert.equal(isTutorialRouteAllowed(96, "mare", "/venue/chosen-venue", search), true)
+  assert.equal(isTutorialRouteAllowed(96, "mare", "/shop"), false)
+  assert.equal(isTutorialRouteAllowed(97, "mare", "/venue/chosen-venue", search), false)
+  for (const path of ["tutorial.compete", "care.perform", "care.performLtc", "animal.advanceAge"]) {
+    assert.equal(isTutorialMutationAllowed(96, path, {}), true, path)
+    assert.equal(isTutorialMutationAllowed(97, path, {}), false, path)
+  }
+  assert.equal(isTutorialMutationAllowed(98, "animal.advanceAge", {}), true)
+})
+
+test("vet exam steps show all exams, grant credits, select, then run", () => {
+  const vet = { animalId: "mare" }
+  for (const step of [102, 103, 104, 105, 106]) {
+    assert.equal(isTutorialRouteAllowed(step, "mare", "/vet", vet), true)
+    assert.equal(isTutorialRouteAllowed(step, "mare", "/vet", { animalId: "other" }), false)
+  }
+  const allVenueSteps = venueSteps({} as Parameters<typeof venueSteps>[0], {} as Parameters<typeof venueSteps>[1])
+  const overviewIndex = allVenueSteps.findIndex(step => step.popover?.title === "Choosing an Exam")
+  const vetSteps = allVenueSteps.slice(overviewIndex, overviewIndex + 4)
+  assert.deepEqual(vetSteps.map(step => step.popover?.title), ["Choosing an Exam", "Exam Credits", "Pick Exam", "Run Exam"])
+  const examOverview = vetSteps[0]
+  assert.equal(examOverview?.element, '[data-tutorial="exam-service-list"]')
+  assert.equal(examOverview?.popover?.description, "The vet offers several exams. Each can identify different conditions, so the right choice depends on what you need to find out.")
+  assert.equal(getTutorialPolicy(102)?.controls?.length ?? 0, 0)
+  assert.equal(getTutorialPolicy(104)?.controls?.includes('[data-tutorial="comprehensive-exam-option"]'), true)
+  assert.equal(getTutorialPolicy(105)?.controls?.includes('[data-tutorial="run-exam-btn"]'), true)
+  assert.equal(isTutorialMutationAllowed(102, "vet.exam", {}), false)
+  assert.equal(isTutorialMutationAllowed(103, "tutorial.grantStartingPremium", {}), true)
+  assert.equal(isTutorialMutationAllowed(104, "tutorial.grantStartingPremium", {}), false)
+  assert.equal(isTutorialMutationAllowed(104, "vet.exam", {}), false)
+  assert.equal(isTutorialMutationAllowed(105, "vet.exam", {}), true)
+  assert.deepEqual(tutorialDestination(106, "mare"), { pathname: "/vet", search: { animalId: "mare" } })
+  assert.equal(isTutorialMutationAllowed(97, "tutorial.completeStep", { stepKey: "step_unguided_compete" }), true)
+  assert.equal(isTutorialMutationAllowed(99, "tutorial.completeStep", { stepKey: "step_ready_for_tomorrow" }), true)
+  assert.equal(getTutorialPolicy(106)?.page, "vet")
+  assert.equal(getTutorialPolicy(107)?.controls?.includes('[data-tutorial="vet-back-link"]'), true)
+  assert.equal(getTutorialPolicy(108)?.controls?.includes('[data-tutorial="health-treatment-option"]'), true)
+  assert.equal(isTutorialMutationAllowed(108, "vet.startTreatment", {}), true)
+  assert.equal(isTutorialMutationAllowed(109, "tutorial.completeStep", { stepKey: "step_visit_vet" }), true)
+})
+
+test("treatment and genetics checkpoints follow completed actions", () => {
+  assert.equal(isTutorialMutationAllowed(108, "vet.startTreatment", {}), true)
+  assert.equal(isTutorialMutationAllowed(109, "tutorial.completeStep", { stepKey: "step_visit_vet" }), true)
+  assert.equal(isTutorialMutationAllowed(111, "inventory.buy", {}), false)
+  assert.equal(isTutorialMutationAllowed(112, "inventory.buy", {}), true)
+  assert.equal(isTutorialMutationAllowed(116, "tutorial.completeStep", { stepKey: "step_genetics_done" }), false)
+  assert.equal(isTutorialMutationAllowed(125, "genetics.testLocus", {}), true)
+  assert.equal(isTutorialMutationAllowed(126, "genetics.testPanel", {}), true)
+  assert.equal(isTutorialMutationAllowed(127, "tutorial.completeStep", { stepKey: "step_genetics_done" }), true)
+  assert.equal(isTutorialMutationAllowed(128, "animal.advanceAge", {}), false)
+  assert.equal(isTutorialMutationAllowed(129, "animal.advanceAge", {}), true)
+  assert.equal(isTutorialMutationAllowed(130, "vet.administerTreatment", {}), false)
+  assert.equal(isTutorialMutationAllowed(131, "vet.administerTreatment", {}), true)
+  assert.equal(isTutorialMutationAllowed(132, "animal.advanceAge", {}), true)
 })

@@ -18,7 +18,13 @@ function SectionLabel({ label }: { label: string }) {
 }
 
 export function EquippedPanel({ animal }: { animal: AnimalProfile }) {
-  if (animal.equipment.length === 0) {
+  const equipment = animal.equipment as Array<{
+    id: string
+    itemDefId: string
+    itemDef: { name: string }
+  }>
+
+  if (equipment.length === 0) {
     return (
       <Panel title="Equipped" icon={<Package className="size-4 text-muted-foreground" />}>
         <p className="text-[11px] text-muted-foreground">No items equipped</p>
@@ -37,7 +43,7 @@ export function EquippedPanel({ animal }: { animal: AnimalProfile }) {
     return (
       <Panel title="Equipped" icon={<Package className="size-4 text-muted-foreground" />}>
         <div className="space-y-1.5">
-          {animal.equipment.map((eq) => <EquipItem key={eq.id} name={eq.itemDef.name} />)}
+          {equipment.map((eq) => <EquipItem key={eq.id} name={eq.itemDef.name} />)}
         </div>
       </Panel>
     )
@@ -45,8 +51,8 @@ export function EquippedPanel({ animal }: { animal: AnimalProfile }) {
 
   if (!disc2) {
     // Single discipline — one section + "Other"
-    const discItems = animal.equipment.filter(eq => d1Ids.has(eq.itemDefId))
-    const otherItems = animal.equipment.filter(eq => !d1Ids.has(eq.itemDefId))
+    const discItems = equipment.filter(eq => d1Ids.has(eq.itemDefId))
+    const otherItems = equipment.filter(eq => !d1Ids.has(eq.itemDefId))
     return (
       <Panel title="Equipped" icon={<Package className="size-4 text-muted-foreground" />}>
         <div className="space-y-2.5">
@@ -68,10 +74,10 @@ export function EquippedPanel({ animal }: { animal: AnimalProfile }) {
   }
 
   // Two disciplines — disc1-only / shared / disc2-only / other
-  const disc1Only = animal.equipment.filter(eq => d1Ids.has(eq.itemDefId) && !d2Ids.has(eq.itemDefId))
-  const disc2Only = animal.equipment.filter(eq => d2Ids.has(eq.itemDefId) && !d1Ids.has(eq.itemDefId))
-  const shared = animal.equipment.filter(eq => d1Ids.has(eq.itemDefId) && d2Ids.has(eq.itemDefId))
-  const other = animal.equipment.filter(eq => !d1Ids.has(eq.itemDefId) && !d2Ids.has(eq.itemDefId))
+  const disc1Only = equipment.filter(eq => d1Ids.has(eq.itemDefId) && !d2Ids.has(eq.itemDefId))
+  const disc2Only = equipment.filter(eq => d2Ids.has(eq.itemDefId) && !d1Ids.has(eq.itemDefId))
+  const shared = equipment.filter(eq => d1Ids.has(eq.itemDefId) && d2Ids.has(eq.itemDefId))
+  const other = equipment.filter(eq => !d1Ids.has(eq.itemDefId) && !d2Ids.has(eq.itemDefId))
 
   return (
     <Panel title="Equipped" icon={<Package className="size-4 text-muted-foreground" />}>

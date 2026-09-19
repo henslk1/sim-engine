@@ -36,7 +36,7 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
   )
 }
 
-function ProfileTab({ playerAccountId }: { playerAccountId: string }) {
+function ProfileTab() {
   const { data: gameData } = trpc.admin.game.get.useQuery()
   const { data: account } = trpc.player.getMyAccount.useQuery(
     { gameId: gameData?.id! },
@@ -309,7 +309,7 @@ function AccountPage() {
   const activePanel: React.ReactNode = (() => {
     if (!playerAccountId) return null
     switch (active) {
-      case "profile":       return <ProfileTab playerAccountId={playerAccountId} />
+      case "profile":       return <ProfileTab />
       case "subscription":  return <SubscriptionTab playerAccountId={playerAccountId} />
       case "notifications": return <NotificationsTab playerAccountId={playerAccountId} />
       case "privacy":       return <PrivacyTab playerAccountId={playerAccountId} />

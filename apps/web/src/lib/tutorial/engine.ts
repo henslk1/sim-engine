@@ -45,6 +45,9 @@ async function restoreStep(step: number, current: () => boolean) {
   if ([74, 75].includes(step)) await click('[data-tutorial="equip-action"]')
   if ([91, 92].includes(step)) await click('[data-tutorial="competition-history-tab"]')
   if ([93, 94, 95].includes(step)) await click('[data-tutorial="discipline-tab-2"]')
+  if (step === 105) await click('[data-tutorial="comprehensive-exam-option"]')
+  if (step >= 118 && step <= 126) await click('[data-tutorial="genetics-tab"]')
+  if (step >= 123 && step <= 126) await click('[data-tutorial="genetics-tab-health"]')
 }
 
 export function startTutorial(callbacks: TutorialCallbacks, startAtIndex: number, _onComplete?: () => void) {

@@ -5,12 +5,12 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 
 type FilterForm = {
-  name: string
+  displayLabel: string
   filterKey: string
   filterType: string
   sortOrder: string
 }
-const emptyForm = (): FilterForm => ({ name: "", filterKey: "", filterType: "SELECT", sortOrder: "" })
+const emptyForm = (): FilterForm => ({ displayLabel: "", filterKey: "", filterType: "SELECT", sortOrder: "" })
 
 function DirectoryFiltersPage() {
   const { gameId } = Route.useParams()
@@ -35,11 +35,11 @@ function DirectoryFiltersPage() {
   })
 
   function submit() {
-    if (!gameId || !editing.name.trim() || !editing.filterKey.trim()) return
+    if (!gameId || !editing.displayLabel.trim() || !editing.filterKey.trim()) return
     save.mutate({
       id: editingId ?? undefined,
       gameId,
-      name: editing.name.trim(),
+      displayLabel: editing.displayLabel.trim(),
       filterKey: editing.filterKey.trim(),
       filterType: editing.filterType,
       sortOrder: editing.sortOrder !== "" ? parseInt(editing.sortOrder) : 0,
@@ -60,8 +60,8 @@ function DirectoryFiltersPage() {
             <div className="flex flex-col gap-1">
               <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Name</label>
               <Input
-                value={editing.name}
-                onChange={(e) => setEditing({ ...editing, name: e.target.value })}
+                value={editing.displayLabel}
+                onChange={(e) => setEditing({ ...editing, displayLabel: e.target.value })}
                 placeholder="e.g. Breed"
                 className="h-8 text-sm"
               />
@@ -99,7 +99,7 @@ function DirectoryFiltersPage() {
               />
             </div>
             <div className="flex gap-2">
-              <Button size="sm" onClick={submit} disabled={save.isPending || !editing.name.trim() || !editing.filterKey.trim()}>
+              <Button size="sm" onClick={submit} disabled={save.isPending || !editing.displayLabel.trim() || !editing.filterKey.trim()}>
                 {editingId ? "Save" : "Add Filter"}
               </Button>
               <Button size="sm" variant="ghost" onClick={() => { setEditingId(null); setEditing(emptyForm()) }}>
@@ -130,14 +130,14 @@ function DirectoryFiltersPage() {
             <tbody>
               {filters?.map((f) => (
                 <tr key={f.id} className="border-b border-border last:border-0">
-                  <td className="px-3 py-2 font-medium text-foreground">{f.name}</td>
+                  <td className="px-3 py-2 font-medium text-foreground">{f.displayLabel}</td>
                   <td className="px-3 py-2 text-muted-foreground font-mono text-xs">{f.filterKey}</td>
                   <td className="px-3 py-2 text-muted-foreground">{f.filterType}</td>
                   <td className="px-3 py-2 text-muted-foreground">{f.sortOrder}</td>
                   <td className="px-3 py-2 text-right space-x-1">
                     <Button size="sm" variant="ghost" onClick={() => {
                       setEditingId(f.id)
-                      setEditing({ name: f.name, filterKey: f.filterKey, filterType: f.filterType, sortOrder: f.sortOrder.toString() })
+                      setEditing({ displayLabel: f.displayLabel, filterKey: f.filterKey, filterType: f.filterType, sortOrder: f.sortOrder?.toString() ?? "" })
                     }}>Edit</Button>
                     <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
                       onClick={() => { if (!confirm("Delete this filter?")) return; remove.mutate({ id: f.id }) }}>

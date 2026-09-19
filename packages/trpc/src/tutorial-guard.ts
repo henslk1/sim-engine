@@ -62,6 +62,15 @@ export async function guardTutorialMutation(userId: string | null, path: string,
       ? await db.disciplineEquipmentRequirement.findMany({ where: { disciplineDefId: mare.secondaryDisciplineDefId } }) : []
     const listing = path === "inventory.buy" ? await db.storeListing.findUnique({ where: { id: String(input.listingId) } }) : null
     const itemId = listing?.itemDefId ?? input.itemDefId
+    if (path === "inventory.buy" && step === 112) {
+      const activeTreatment = await db.animalTreatmentRecord.findFirst({
+        where: { animalId: pair.ancestorOneId, isActive: true },
+        select: { treatmentDef: { select: { items: { select: { itemDefId: true } } } } },
+      })
+      if (listing?.gameId !== player.gameId || (input.quantity ?? 1) !== 1 ||
+        !activeTreatment?.treatmentDef.items.some(item => item.itemDefId === itemId)) throw denied()
+      return
+    }
     if (!requirements.some(r => r.itemDefId === itemId)) throw denied()
     if (path === "inventory.buy" && (listing?.gameId !== player.gameId || (input.quantity ?? 1) !== 1)) throw denied()
   }

@@ -65,7 +65,7 @@ function BreedingPage() {
   }
 
   const offspringCOIColor = getCOIColor(offer.offspringCOI)
-  const isCrossBreed = offer.sire.breed.id !== offer.dam.breed.id
+  const isCrossBreed = offer.sire.breedId !== offer.dam.breedId
 
   if (result) {
     return (

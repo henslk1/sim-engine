@@ -55,7 +55,7 @@ export const breedingMaterialRouter = router({
             storageType: true,
             collectedAt: true,
             donorSnapshot: true,
-            animal: { select: { id: true, name: true, breed: { select: { name: true } } } },
+            animal: { select: { id: true, name: true, breedName: true, breed: { select: { name: true } } } },
           },
         }),
         db.playerCapacity.findUnique({

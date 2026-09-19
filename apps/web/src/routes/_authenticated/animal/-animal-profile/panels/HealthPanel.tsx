@@ -2,7 +2,7 @@ import { useState } from "react"
 import type { AnimalProfile } from "../types"
 import { cn } from "@/lib/utils"
 import { Panel, Badge, ActionButton, Dialog } from "@/components/game/ui"
-import { Stethoscope, ShieldCheck, ShieldAlert, CalendarClock, Pill, FlaskConical, Footprints, CheckCircle2, HelpCircle, AlertTriangle } from "lucide-react"
+import { Stethoscope, ShieldCheck, ShieldAlert, Pill, FlaskConical, Footprints, CheckCircle2, HelpCircle, AlertTriangle } from "lucide-react"
 import { Link } from "@tanstack/react-router"
 import { trpc } from "@/lib/trpc"
 import { Button } from "@/components/ui/button"
@@ -48,6 +48,7 @@ export function HealthPanel({
     onSuccess: () => {
       utils.animalProfile.get.invalidate({ animalId: animal.id })
       if (playerAccountId) utils.inventory.mine.invalidate({ playerAccountId })
+      window.dispatchEvent(new Event("tutorial:treatmentAdministered"))
     },
   })
 
@@ -57,9 +58,10 @@ export function HealthPanel({
     onSuccess: (result) => {
       utils.animalProfile.get.invalidate({ animalId: animal.id })
       if (playerAccountId) utils.inventory.mine.invalidate({ playerAccountId })
-      if (result.diedFromProcedure) {
+      window.dispatchEvent(new Event("tutorial:treatmentStarted"))
+      if ("diedFromProcedure" in result && result.diedFromProcedure) {
         setProcedureOutcome({ type: "death", conditionName: result.conditionName })
-      } else if (result.triggeredCondition) {
+      } else if ("triggeredCondition" in result && result.triggeredCondition) {
         setProcedureOutcome({ type: "episode", conditionName: result.triggeredCondition })
       }
     },
@@ -98,7 +100,7 @@ export function HealthPanel({
             })
             const showRed = !administeredToday
             return (
-              <div key={record.id} className={cn("overflow-hidden rounded-md border", showRed ? "border-destructive/25" : "border-border")}>
+              <div key={record.id} className={cn("overflow-hidden rounded-md border", showRed ? "border-destructive/25" : "border-border")} data-tutorial={!record.diagnosedAt ? "health-unknown-illness" : "health-diagnosed-condition"} data-condition-name={record.conditionDef.name}>
                 <div className={cn("flex items-center justify-between gap-2 px-3 py-2", showRed ? "bg-destructive/10" : "bg-secondary/40")}>
                   <div className="flex items-center gap-2">
                     {record.diagnosedAt ? (
@@ -137,6 +139,7 @@ export function HealthPanel({
                           variant="soft"
                           className="flex-1 justify-between"
                           disabled={startTreatment.isPending}
+                          data-tutorial="health-treatment-option"
                           onClick={() => startTreatment.mutate({ animalId: animal.id, playerAccountId, healthRecordId: record.id, treatmentDefId: treatment.id })}
                         >
                           <span>{treatment.name}</span>
@@ -145,6 +148,7 @@ export function HealthPanel({
                             {treatment.durationCycles != null
                               ? ` · ${treatment.durationCycles} cycles`
                               : treatment.treatmentType !== "VET_PROCEDURE" ? " · Lifelong" : ""}
+                            {treatment.items.length > 0 ? ` · ${treatment.items.map(i => i.itemDef.name).join(", ")}` : ""}
                           </span>
                         </ActionButton>
                         {treatment.treatmentType === "VET_PROCEDURE" && (
@@ -168,15 +172,15 @@ export function HealthPanel({
                   const missing = missingItems(items)
 
                   return (
-                    <div key={t.id} className={cn("border-t px-3 py-2", isUntreated ? "border-destructive/15 bg-destructive/5" : "border-border/50 bg-transparent")}>
+                    <div key={t.id} className={cn("border-t px-3 py-2", isUntreated ? "border-destructive/15 bg-destructive/5" : "border-border/50 bg-transparent")} data-tutorial="health-active-treatment" data-treatment-item={items[0]?.itemDef.name ?? ""} data-treatment-duration={t.treatmentDef.durationCycles ?? ""}>
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-[11px] font-medium text-foreground">{t.treatmentDef.name}</span>
+                        <span className="text-[11px] font-medium text-foreground" data-tutorial="treatment-required-item">{t.treatmentDef.name}</span>
                         <Badge tone="muted">{TREATMENT_LABEL[treatmentType]}</Badge>
                       </div>
                       {t.treatmentDef.durationCycles != null ? (() => {
                         const remaining = (t.startedCycle + t.treatmentDef.durationCycles) - animal.ageInCycles
                         return (
-                          <p className="mt-0.5 text-[11px] text-muted-foreground">
+                          <p className="mt-0.5 text-[11px] text-muted-foreground" data-tutorial="treatment-duration">
                             {remaining} cycle{remaining !== 1 ? "s" : ""} remaining
                           </p>
                         )
@@ -228,7 +232,7 @@ export function HealthPanel({
                                 <p className="text-[11px] text-destructive">
                                   Missing: {missing.map((m) => m.itemDef.name).join(", ")}
                                 </p>
-                                <Link to="/vet" search={{ animalId: animal.id, service: "otc" }}>
+                                <Link to="/vet" search={{ animalId: animal.id, service: "otc" }} data-tutorial="buy-at-vet" onClick={() => sessionStorage.setItem("tutorial:treatment", JSON.stringify({ item: items[0]?.itemDef.name, duration: t.treatmentDef.durationCycles }))}>
                                   <ActionButton variant="soft" className="w-full justify-center">
                                     <FlaskConical className="size-3.5" /> Buy at Vet
                                   </ActionButton>
@@ -238,6 +242,7 @@ export function HealthPanel({
                               <ActionButton
                                 variant="soft"
                                 className="w-full justify-center"
+                                data-tutorial="administer-btn"
                                 disabled={isPending || (treatmentType === "OTC" && !canAdminister)}
                                 onClick={() =>
                                   administer.mutate({ treatmentRecordId: t.id, playerAccountId })
@@ -249,12 +254,15 @@ export function HealthPanel({
                                   <><FlaskConical className="size-3.5" /> Administer OTC</>
                                 ) : treatmentType === "PRESCRIPTION" ? (
                                   <><Pill className="size-3.5" /> Administer Rx</>
-                                ) : treatmentType === "VET_PROCEDURE" ? (
-                                  <><CalendarClock className="size-3.5" /> Book Procedure</>
                                 ) : (
                                   <><Footprints className="size-3.5" /> Perform Care</>
                                 )}
                               </ActionButton>
+                            )}
+                            {treatmentType === "OTC" && missing.length === 0 && (
+                              <Link to="/vet" search={{ animalId: animal.id, service: "otc" }} data-tutorial="buy-at-vet" onClick={() => sessionStorage.setItem("tutorial:treatment", JSON.stringify({ item: items[0]?.itemDef.name, duration: t.treatmentDef.durationCycles }))} className="mt-1 block text-center text-[11px] text-muted-foreground underline">
+                                Buy at Vet
+                              </Link>
                             )}
                           </div>
                         )

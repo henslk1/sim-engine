@@ -7,6 +7,25 @@ import { Link } from "@tanstack/react-router"
 
 const PAGE_SIZE = 10
 
+type TitleSummary = {
+  id: string
+  cycleNumber: number
+  titleDef: { name: string }
+}
+
+type CompetitionEntrySummary = {
+  id: string
+  competition: {
+    id: string
+    venue: { name: string }
+    disciplineDef: { name: string }
+    _count: { entries: number }
+    tutorialNpcData: unknown
+  }
+  tierDef: { name: string }
+  result: { score: number; placement: number | null } | null
+}
+
 export function CompHistoryTab({
   animal,
   cycleToAge,
@@ -15,15 +34,16 @@ export function CompHistoryTab({
   cycleToAge: (n: number) => string
 }) {
   const [page, setPage] = useState(0)
-  const entries = animal.competitionEntries
+  const titles = animal.titles as TitleSummary[]
+  const entries = animal.competitionEntries as CompetitionEntrySummary[]
   const pageCount = Math.ceil(entries.length / PAGE_SIZE)
   const pageEntries = entries.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
 
   return (
     <div>
-      {animal.titles.length > 0 && (
+      {titles.length > 0 && (
         <div className="mb-3 flex flex-wrap gap-1.5">
-          {animal.titles.map((t: AnimalProfile["titles"][number]) => (
+          {titles.map((t) => (
             <Badge key={t.id} tone="default">
               <Award className="size-3" /> {t.titleDef.name} · {cycleToAge(t.cycleNumber)}
             </Badge>
@@ -46,7 +66,7 @@ export function CompHistoryTab({
                 </tr>
               </thead>
               <tbody>
-                {pageEntries.map((entry: AnimalProfile["competitionEntries"][number], i) => (
+                {pageEntries.map((entry, i) => (
                   <tr key={entry.id} className="border-t border-border/60" data-tutorial={i === 0 && page === 0 ? "competition-result-first" : undefined}>
                     <td className="px-2 py-1 font-medium text-foreground">
                       <Link

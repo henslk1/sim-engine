@@ -10,6 +10,21 @@ import { Link, useNavigate } from "@tanstack/react-router"
 
 type BreedingTab = "info" | "covers"
 type StorageType = "PERSONAL" | "VET" | "GROUP"
+
+type GeneticStorageData = {
+  materials: Array<{
+    id: string
+    storageType: StorageType
+    materialType: "SPERM" | "EGG" | "EMBRYO"
+    donorSnapshot: unknown
+    animal: { name: string; breed: { name: string } | null } | null
+  }>
+  capacity: {
+    geneticStorageBase: number
+    geneticStorageSubscription: number
+    geneticStoragePurchased: number
+  } | null
+}
 type CoverTab = "own" | "player"
 
 export function BreedingPanel({
@@ -756,7 +771,10 @@ export function BreedingPanel({
 
 function StorageSummary({ playerAccountId, animalId }: { playerAccountId: string; animalId: string }) {
   const utils = trpc.useUtils()
-  const { data, refetch } = trpc.breeding.material.myStorage.useQuery({ playerAccountId })
+  const { data, refetch } = trpc.breeding.material.myStorage.useQuery({ playerAccountId }) as {
+    data: GeneticStorageData | undefined
+    refetch: () => unknown
+  }
   const { mutate: implant, isPending: implantPending, variables: implantVars } =
     trpc.breeding.material.implant.useMutation({
       onSettled: () => {
@@ -841,7 +859,7 @@ function GeneticMaterialSection({
   const { data, refetch } = trpc.breeding.material.myStorage.useQuery(
     { playerAccountId: animal.playerAccountId, storageType },
     { enabled: !!animal.playerAccountId }
-  )
+  ) as { data: GeneticStorageData | undefined; refetch: () => unknown }
   const materials = data?.materials ?? []
   const capacity = data?.capacity
   const personalMax = (capacity?.geneticStorageBase ?? 0) + (capacity?.geneticStorageSubscription ?? 0)

@@ -18,7 +18,7 @@ function ForgotPasswordPage() {
     e.preventDefault()
     setPending(true)
     setError(null)
-    const { error } = await authClient.forgetPassword({ email, redirectTo: "/reset-password" })
+    const { error } = await authClient.requestPasswordReset({ email, redirectTo: "/reset-password" })
     if (error) {
       setError(error.message ?? "Failed to send reset email")
       setPending(false)

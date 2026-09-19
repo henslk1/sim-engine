@@ -127,6 +127,7 @@ export function OwnerActionList({ animal, playerAccountId, onEquipOpen }: Props)
       <Link
         to="/vet"
         search={{ animalId: animal.id }}
+        data-tutorial="visit-vet"
         className="flex w-full items-center gap-3 px-3 py-3 text-left text-sm font-medium text-foreground transition-colors hover:bg-secondary/50"
       >
         <Stethoscope className="size-5 shrink-0 text-muted-foreground" />

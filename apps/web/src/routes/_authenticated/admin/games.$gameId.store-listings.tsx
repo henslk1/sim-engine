@@ -29,8 +29,12 @@ function StoreListingsPage() {
   const { gameId } = Route.useParams()
 
   const { data: listings } = trpc.admin.storeListing.list.useQuery({ gameId: gameId! }, {})
-  const { data: items } = trpc.admin.item.list.useQuery({ gameId: gameId! }, {})
-  const { data: currencies } = trpc.admin.currency.list.useQuery({ gameId: gameId! }, {})
+  const { data: items } = trpc.admin.item.list.useQuery({ gameId: gameId! }, {}) as {
+    data: Array<{ id: string; name: string }> | undefined
+  }
+  const { data: currencies } = trpc.admin.currency.list.useQuery({ gameId: gameId! }, {}) as {
+    data: Array<{ id: string; name: string; symbol: string | null }> | undefined
+  }
 
   const utils = trpc.useUtils()
   const invalidate = () => utils.admin.storeListing.list.invalidate({ gameId: gameId! })

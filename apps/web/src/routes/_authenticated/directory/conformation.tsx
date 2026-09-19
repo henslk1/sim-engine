@@ -1,14 +1,19 @@
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { useState } from "react"
 import { trpc } from "@/lib/trpc"
-import type { RouterOutputs } from "@/lib/trpc"
 import { RichTextRenderer } from "@/components/game/editor/RichTextRenderer"
 
 export const Route = createFileRoute("/_authenticated/directory/conformation")({
   component: ConformationDirectoryPage,
 })
 
-type LocusEntry = RouterOutputs["directory"]["listConformation"][number]
+type LocusEntry = {
+  id: string
+  name: string
+  minTestCycle: number | null
+  description: unknown
+  expressionRules: Array<{ phenotype: string }>
+}
 
 function ConformationCard({ locus }: { locus: LocusEntry }) {
   const phenotypes = [...new Set(locus.expressionRules.map(r => r.phenotype))].sort()
@@ -48,10 +53,11 @@ function ConformationDirectoryPage() {
   const { data: gameData } = trpc.admin.game.get.useQuery()
   const gameId = gameData?.id ?? ""
 
-  const { data: loci, isLoading } = trpc.directory.listConformation.useQuery(
+  const locusQuery = trpc.directory.listConformation.useQuery(
     { gameId },
     { enabled: !!gameId }
-  )
+  ) as { data: LocusEntry[] | undefined; isLoading: boolean }
+  const { data: loci, isLoading } = locusQuery
 
   const [search, setSearch] = useState("")
 

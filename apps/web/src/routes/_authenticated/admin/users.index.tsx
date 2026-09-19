@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { trpc } from "@/lib/trpc"
 import { useState } from "react"
-import { Search, CheckCircle2, Circle, ShieldAlert, ShieldBan, AlertTriangle } from "lucide-react"
+import { Search, CheckCircle2, Circle, ShieldBan, AlertTriangle } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export const Route = createFileRoute("/_authenticated/admin/users/")({
@@ -116,8 +116,8 @@ function OpsUsers() {
                     <div className="flex items-center gap-1.5">
                       <span className="text-muted-foreground">{p.user.email}</span>
                       {p.user.emailVerified
-                        ? <CheckCircle2 className="size-3.5 shrink-0 text-chart-2" title="Email verified" />
-                        : <Circle className="size-3.5 shrink-0 text-muted-foreground/40" title="Email not verified" />
+                        ? <CheckCircle2 className="size-3.5 shrink-0 text-chart-2" aria-label="Email verified" />
+                        : <Circle className="size-3.5 shrink-0 text-muted-foreground/40" aria-label="Email not verified" />
                       }
                     </div>
                   </td>

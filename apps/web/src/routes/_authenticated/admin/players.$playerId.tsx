@@ -10,8 +10,6 @@ export const Route = createFileRoute("/_authenticated/admin/players/$playerId")(
 function PlayerDetail() {
   const { playerId } = Route.useParams()
   const { data: gameData } = trpc.admin.game.get.useQuery()
-  const gameId = gameData?.id
-
   const { data, refetch } = trpc.admin.ops.players.getById.useQuery({ playerAccountId: playerId })
 
   const grantMutation = trpc.admin.ops.players.grantCurrency.useMutation({ onSuccess: () => refetch() })

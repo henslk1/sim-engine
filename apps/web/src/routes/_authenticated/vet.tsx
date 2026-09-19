@@ -79,17 +79,19 @@ function SelectInput({ value, onChange, children, className }: {
   )
 }
 
-function PrimaryButton({ onClick, disabled, children, variant = "primary" }: {
+function PrimaryButton({ onClick, disabled, children, variant = "primary", "data-tutorial": tutorialTag }: {
   onClick?: () => void
   disabled?: boolean
   children: React.ReactNode
   variant?: "primary" | "danger"
+  "data-tutorial"?: string
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
+      data-tutorial={tutorialTag}
       className={cn(
         "w-full rounded py-2.5 text-sm font-medium transition-opacity hover:opacity-90 disabled:opacity-40",
         variant === "danger"
@@ -107,7 +109,8 @@ function PrimaryButton({ onClick, disabled, children, variant = "primary" }: {
 type AliveAnimal = {
   id: string
   name: string
-  breed: { name: string }
+  breed: { name: string } | null
+  breedName: string | null
   sex: string
   lifeStage: { name: string }
   status: string
@@ -118,6 +121,14 @@ type AliveAnimal = {
   pregnancies: { id: string }[]
   _count: { healthRecords: number }
   healthCertificates: { certDefId: string; isValid: boolean; expiresAtCycle: number }[]
+}
+
+type StoredMaterial = {
+  id: string
+  materialType: string
+  storageType: string
+  collectedAt: string | Date
+  animal: { name: string; breed: { name: string } | null; breedName: string | null } | null
 }
 
 function DiagnosticsPanel({
@@ -138,7 +149,9 @@ function DiagnosticsPanel({
   const [serviceId, setServiceId] = useState("")
   const utils = trpc.useUtils()
 
-  const filteredAnimals = aliveAnimals.filter(a => a._count.healthRecords > 0)
+  // Keep a patient opened directly from their profile visible after an exam
+  // diagnoses their last unknown condition, including after a page refresh.
+  const filteredAnimals = aliveAnimals.filter(a => a._count.healthRecords > 0 || a.id === selectedAnimalId)
   const effectiveAnimalId = filteredAnimals.some(a => a.id === selectedAnimalId) ? selectedAnimalId : ""
 
   const { data: healthRecords, isLoading: healthLoading } = trpc.vet.animalHealth.useQuery(
@@ -147,9 +160,12 @@ function DiagnosticsPanel({
   )
 
   const exam = trpc.vet.exam.useMutation({
-    onSuccess: () => {
-      utils.vet.animalHealth.invalidate({ animalId: effectiveAnimalId })
-      utils.player.balances.invalidate({ playerAccountId: playerAccountId! })
+    onSuccess: async () => {
+      await Promise.all([
+        utils.vet.animalHealth.invalidate({ animalId: effectiveAnimalId }),
+        utils.player.balances.invalidate({ playerAccountId: playerAccountId! }),
+      ])
+      window.dispatchEvent(new Event("tutorial:examCompleted"))
     },
   })
 
@@ -206,7 +222,7 @@ function DiagnosticsPanel({
                       : "bg-destructive/15 text-destructive"
                   const statusLabel = !isDiagnosed ? "Undiagnosed" : hasTreatment ? "In treatment" : "Untreated"
                   return (
-                    <div key={r.id} className="flex items-center gap-2.5 rounded border border-border bg-card px-3 py-2">
+                    <div key={r.id} data-tutorial={isDiagnosed ? "diagnosed-condition-row" : undefined} className="flex items-center gap-2.5 rounded border border-border bg-card px-3 py-2">
                       <span className={cn("grid size-6 shrink-0 place-items-center rounded text-[10px] font-bold", statusColor)}>
                         {!isDiagnosed ? <AlertTriangle size={11} /> : hasTreatment ? <Check size={11} /> : <AlertTriangle size={11} />}
                       </span>
@@ -235,11 +251,12 @@ function DiagnosticsPanel({
         {examServices.length > 0 && (
           <div>
             <FieldLabel>Examination Type</FieldLabel>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2" data-tutorial="exam-service-list">
               {examServices.map((s) => (
                 <button
                   key={s.id}
                   type="button"
+                  data-tutorial={s.name === "Comprehensive Exam" ? "comprehensive-exam-option" : undefined}
                   onClick={() => setServiceId(s.id)}
                   className={cn(
                     "flex items-center justify-between rounded border px-3 py-2.5 text-sm transition-colors",
@@ -259,6 +276,7 @@ function DiagnosticsPanel({
         )}
 
         <PrimaryButton
+          data-tutorial="run-exam-btn"
           disabled={
             !effectiveAnimalId || !serviceId || exam.isPending || undiagnosedCount === 0 ||
             !!(selectedService?.baseCost && getBalance(selectedService.currencyDefId) < selectedService.baseCost)
@@ -289,6 +307,7 @@ function OTCPanel({
     onSuccess: () => {
       utils.inventory.mine.invalidate({ playerAccountId: playerAccountId! })
       utils.player.balances.invalidate({ playerAccountId: playerAccountId! })
+      window.dispatchEvent(new Event("tutorial:otcPurchased"))
     },
   })
 
@@ -309,10 +328,10 @@ function OTCPanel({
           const owned = playerInventory?.find((i) => i.itemDef.id === listing.itemDefId)?.quantity ?? 0
           const isPending = buyItem.isPending && buyItem.variables?.listingId === listing.id
           return (
-            <div key={listing.id} className="flex items-center gap-3 rounded border border-border bg-card px-3 py-2.5 transition-colors hover:border-primary/30">
+            <div key={listing.id} className="flex items-center gap-3 rounded border border-border bg-card px-3 py-2.5 transition-colors hover:border-primary/30" data-tutorial="otc-listing-card" data-owned={owned}>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-foreground">{listing.itemDef.name}</span>
+                  <span className="text-sm font-medium text-foreground" data-tutorial="otc-listing-name">{listing.itemDef.name}</span>
                   {listing.itemDef.category && (
                     <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono font-medium uppercase tracking-wider text-muted-foreground">
                       {listing.itemDef.category}
@@ -332,6 +351,7 @@ function OTCPanel({
                 </span>
                 <button
                   type="button"
+                  data-tutorial="otc-buy-btn"
                   disabled={!playerAccountId || isPending}
                   onClick={() => playerAccountId && buyItem.mutate({ listingId: listing.id, playerAccountId })}
                   className="inline-flex items-center gap-1 rounded border border-border px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-muted disabled:opacity-50"
@@ -570,7 +590,7 @@ function CollectPanel({
 }: {
   aliveAnimals: AliveAnimal[]
   playerAccountId: string | undefined
-  storedMaterials: { id: string; materialType: string; animal: { name: string; breed?: { name: string } } | null; collectedAt: string | Date; storageType: string }[]
+  storedMaterials: { id: string; materialType: string; animal: { name: string; breed: { name: string } | null; breedName: string | null } | null; collectedAt: string | Date; storageType: string }[]
   selectedAnimalId: string
   onSelectAnimal: (id: string) => void
 }) {
@@ -652,7 +672,7 @@ function CollectPanel({
               <div key={m.id} className="flex items-center justify-between border-b border-border/50 py-1.5 text-sm last:border-0">
                 <span className="font-medium text-foreground">{m.animal?.name ?? "Unknown"}</span>
                 <div className="flex items-center gap-3">
-                  {m.animal?.breed?.name && (
+                  {(m.animal?.breed?.name || m.animal?.breedName) && (
                     <span className="text-xs text-muted-foreground">{m.animal.breed?.name ?? m.animal.breedName ?? ""}</span>
                   )}
                   <span className="font-mono text-xs text-muted-foreground">
@@ -895,7 +915,7 @@ function AIPanel({
 function StorageSectionList({
   materials,
 }: {
-  materials: { id: string; materialType: string; animal: { name: string; breed?: { name: string } } | null; collectedAt: string | Date }[]
+  materials: { id: string; materialType: string; animal: { name: string; breed: { name: string } | null; breedName: string | null } | null; collectedAt: string | Date }[]
 }) {
   if (materials.length === 0) return <p className="text-xs text-muted-foreground">No material stored.</p>
   return (
@@ -904,7 +924,7 @@ function StorageSectionList({
         <div key={m.id} className="flex items-center gap-3 border-b border-border/50 py-1.5 text-sm last:border-0">
           <Snowflake size={12} className="shrink-0 text-muted-foreground/60" />
           <span className="flex-1 font-medium text-foreground">{m.animal?.name ?? "Unknown"}</span>
-          {m.animal?.breed?.name && (
+          {(m.animal?.breed?.name || m.animal?.breedName) && (
             <span className="text-xs text-muted-foreground">{m.animal.breed?.name ?? m.animal.breedName ?? ""}</span>
           )}
           <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -940,7 +960,7 @@ function StoragePanel({
   storageLoading,
 }: {
   storage: { capacity: { geneticStorageBase: number | null; geneticStorageSubscription: number | null; geneticStoragePurchased: number | null } | null } | undefined
-  storedMaterials: { id: string; materialType: string; animal: { name: string; breed?: { name: string } } | null; collectedAt: string | Date; storageType: string }[]
+  storedMaterials: { id: string; materialType: string; animal: { name: string; breed: { name: string } | null; breedName: string | null } | null; collectedAt: string | Date; storageType: string }[]
   storageLoading: boolean
 }) {
   const cap = storage?.capacity
@@ -1023,7 +1043,7 @@ function VetPage() {
     { enabled: !!playerAccountId },
   )
 
-  const storedMaterials = storage?.materials ?? []
+  const storedMaterials = (storage?.materials ?? []) as StoredMaterial[]
   const storedSperm = storedMaterials.filter((m) => m.materialType === "SPERM")
   const storedEggs = storedMaterials.filter((m) => m.materialType === "EGG")
   const storedEmbryos = storedMaterials.filter((m) => m.materialType === "EMBRYO")

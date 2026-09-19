@@ -40,18 +40,18 @@ type ActivityForm = { name: string; traitDefId: string; traitEffect: string; ene
 const emptyActivity = (): ActivityForm => ({ name: "", traitDefId: "", traitEffect: "", energyCost: "", description: "" })
 
 function StageActivitiesSection({ stageId, gameId }: { stageId: string; gameId: string }) {
-  const { data: activities } = trpc.admin.stageActivity.listByStage.useQuery({ lifeStageDefId: stageId })
+  const { data: activities } = trpc.admin.stageActivity.listByStage.useQuery({ lifeStageId: stageId })
   const { data: traits } = trpc.admin.personality.list.useQuery({ gameId }, {})
   const utils = trpc.useUtils()
 
   const saveActivity = trpc.admin.stageActivity.save.useMutation({
     onSuccess: () => {
-      utils.admin.stageActivity.listByStage.invalidate({ lifeStageDefId: stageId })
+      utils.admin.stageActivity.listByStage.invalidate({ lifeStageId: stageId })
       setEditingId(null); setEditingForm(null); setNewForm(emptyActivity())
     },
   })
   const removeActivity = trpc.admin.stageActivity.remove.useMutation({
-    onSuccess: () => utils.admin.stageActivity.listByStage.invalidate({ lifeStageDefId: stageId }),
+    onSuccess: () => utils.admin.stageActivity.listByStage.invalidate({ lifeStageId: stageId }),
   })
 
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -60,14 +60,15 @@ function StageActivitiesSection({ stageId, gameId }: { stageId: string; gameId: 
 
   function submitActivity(id?: string) {
     const form = id ? editingForm : newForm
-    if (!form || !form.name.trim()) return
+    if (!form || !form.name.trim() || !form.traitDefId) return
     saveActivity.mutate({
       id,
-      lifeStageDefId: stageId,
+      gameId,
+      lifeStageId: stageId,
       name: form.name.trim(),
-      traitDefId: form.traitDefId || null,
-      traitEffect: form.traitEffect ? parseFloat(form.traitEffect) : null,
-      energyCost: form.energyCost ? parseFloat(form.energyCost) : null,
+      traitDefId: form.traitDefId,
+      traitEffect: form.traitEffect ? parseFloat(form.traitEffect) : 0,
+      energyCost: form.energyCost ? parseFloat(form.energyCost) : 0,
       description: form.description.trim() || null,
     })
   }

@@ -9,8 +9,8 @@ export type AlleleFreqForPhenotypes = {
       panelEntries: { panelDef: { panelType: string; colorRole: string | null } }[]
       sectionEntries: { section: { id: string; name: string; displayOrder: number } }[]
     }
-    expressionRulesAsAlleleOne: { alleleTwoId: string; phenotype: string }[]
-    expressionRulesAsAlleleTwo: { alleleOneId: string; phenotype: string }[]
+    expressionRulesAsAlleleOne: { alleleTwoId: string; phenotype: string | null }[]
+    expressionRulesAsAlleleTwo: { alleleOneId: string; phenotype: string | null }[]
   }
 }
 

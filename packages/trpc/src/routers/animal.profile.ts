@@ -47,6 +47,7 @@ export const animalProfileRouter = router({
                   image: true,
                   bornAt: true,
                   inbreedingCoefficient: true,
+                  breedName: true,
                   breed: { select: { id: true, name: true } },
                 },
               },
@@ -117,7 +118,10 @@ export const animalProfileRouter = router({
               conditionDef: {
                 include: {
                   treatments: {
-                    select: { id: true, name: true, treatmentType: true, durationCycles: true },
+                    select: {
+                      id: true, name: true, treatmentType: true, durationCycles: true,
+                      items: { select: { itemDef: { select: { name: true } } } },
+                    },
                   },
                 },
               },
@@ -367,6 +371,8 @@ export const animalProfileRouter = router({
                   maxBreedingSlots: true,
                   conformationInspectionMinCycle: true,
                   overworkInjuryThreshold: true,
+                  energyLowCareThreshold: true,
+                  energyLowCarePenalty: true,
                 },
               },
               lifeStageDefs: {

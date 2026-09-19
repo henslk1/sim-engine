@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 
 const SERVICE_TYPES = ["EXAM", "PANEL_TEST", "GENETIC_COLLECTION", "GENETIC_STORAGE", "CASTRATION", "ULTRASOUND", "NATURAL_COVER", "PREGNANCY_ABORT"] as const
 type ServiceType = typeof SERVICE_TYPES[number]
+type HealthConditionSummary = { id: string; name: string; conditionType: string }
 
 const PANEL_TYPES = ["COLOR", "HEALTH", "CONFORMATION"] as const
 
@@ -50,7 +51,7 @@ function VetServicesPage() {
   const { data: allConditions } = trpc.admin.health.list.useQuery(
     { gameId: gameId! },
     {}
-  )
+  ) as { data: HealthConditionSummary[] | undefined }
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editing, setEditing] = useState<VetServiceForm | null>(null)

@@ -26,10 +26,21 @@ function DailyAllowancePage() {
   const invalidateCurrencies = () => utils.admin.game.listDailyAllowanceCurrencies.invalidate({ gameId })
   const invalidateItems = () => utils.admin.game.listDailyAllowanceItems.invalidate({ gameId })
 
-  const { data: currencyRows } = trpc.admin.game.listDailyAllowanceCurrencies.useQuery({ gameId })
-  const { data: itemRows } = trpc.admin.game.listDailyAllowanceItems.useQuery({ gameId })
-  const { data: currencies } = trpc.admin.currency.list.useQuery({ gameId })
-  const { data: items } = trpc.admin.item.list.useQuery({ gameId })
+  type CurrencyRow = { id: string; amount: number; subscriberOnly: boolean; currencyDef: { id: string; name: string } }
+  type ItemRow = { id: string; quantity: number; subscriberOnly: boolean; itemDef: { id: string; name: string } }
+
+  const { data: currencyRows } = trpc.admin.game.listDailyAllowanceCurrencies.useQuery({ gameId }) as {
+    data: CurrencyRow[] | undefined
+  }
+  const { data: itemRows } = trpc.admin.game.listDailyAllowanceItems.useQuery({ gameId }) as {
+    data: ItemRow[] | undefined
+  }
+  const { data: currencies } = trpc.admin.currency.list.useQuery({ gameId }) as {
+    data: Array<{ id: string; name: string }> | undefined
+  }
+  const { data: items } = trpc.admin.item.list.useQuery({ gameId }) as {
+    data: Array<{ id: string; name: string }> | undefined
+  }
 
   const upsertCurrency = trpc.admin.game.upsertDailyAllowanceCurrency.useMutation({ onSuccess: () => { invalidateCurrencies(); setCurrencyForm(emptyCurrencyForm()) } })
   const deleteCurrency = trpc.admin.game.deleteDailyAllowanceCurrency.useMutation({ onSuccess: invalidateCurrencies })
@@ -58,7 +69,7 @@ function DailyAllowancePage() {
     return !usedItemIds.has(i.id)
   })
 
-  function startEditCurrency(row: NonNullable<typeof currencyRows>[number]) {
+  function startEditCurrency(row: CurrencyRow) {
     setEditingCurrencyId(row.id)
     setCurrencyForm({ currencyDefId: row.currencyDef.id, amount: String(row.amount), subscriberOnly: row.subscriberOnly })
   }
@@ -70,7 +81,7 @@ function DailyAllowancePage() {
     setEditingCurrencyId(null)
   }
 
-  function startEditItem(row: NonNullable<typeof itemRows>[number]) {
+  function startEditItem(row: ItemRow) {
     setEditingItemId(row.id)
     setItemForm({ itemDefId: row.itemDef.id, quantity: String(row.quantity), subscriberOnly: row.subscriberOnly })
   }

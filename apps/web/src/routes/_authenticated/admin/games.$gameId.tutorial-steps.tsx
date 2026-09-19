@@ -16,7 +16,16 @@ type StepForm = {
   venueId: string
   grantCurrencyDefId: string
   grantCurrencyAmount: string
+  completionCondition: string
+  completionTarget: string
 }
+
+const COMPLETION_CONDITIONS = [
+  { value: "TRAINING_CAPPED", label: "Training Capped" },
+  { value: "COMPETITION_TIER", label: "Competition Tier" },
+  { value: "PREGNANCY_COMPLETE", label: "Pregnancy Complete" },
+  { value: "LIFE_STAGE", label: "Life Stage" },
+] as const
 
 const emptyForm = (): StepForm => ({
   name: "",
@@ -29,17 +38,29 @@ const emptyForm = (): StepForm => ({
   venueId: "",
   grantCurrencyDefId: "",
   grantCurrencyAmount: "",
+  completionCondition: "",
+  completionTarget: "",
 })
 
 function TutorialStepsPage() {
   const { gameId } = Route.useParams()
 
   const { data: steps } = trpc.admin.tutorialStep.list.useQuery({ gameId: gameId! })
-  const { data: disciplines } = trpc.admin.discipline.list.useQuery({ gameId: gameId! })
-  const { data: conditions } = trpc.admin.health.list.useQuery({ gameId: gameId! })
-  const { data: venues } = trpc.admin.venue.list.useQuery({ gameId: gameId! })
-  const { data: currencies } = trpc.admin.currency.list.useQuery({ gameId: gameId! })
-  const { data: items } = trpc.admin.item.list.useQuery({ gameId: gameId! })
+  const { data: disciplines } = trpc.admin.discipline.list.useQuery({ gameId: gameId! }) as {
+    data: Array<{ id: string; name: string }> | undefined
+  }
+  const { data: conditions } = trpc.admin.health.list.useQuery({ gameId: gameId! }) as {
+    data: Array<{ id: string; name: string }> | undefined
+  }
+  const { data: venues } = trpc.admin.venue.list.useQuery({ gameId: gameId! }) as {
+    data: Array<{ id: string; name: string }> | undefined
+  }
+  const { data: currencies } = trpc.admin.currency.list.useQuery({ gameId: gameId! }) as {
+    data: Array<{ id: string; name: string }> | undefined
+  }
+  const { data: items } = trpc.admin.item.list.useQuery({ gameId: gameId! }) as {
+    data: Array<{ id: string; name: string }> | undefined
+  }
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editing, setEditing] = useState<StepForm>(emptyForm())
@@ -73,6 +94,8 @@ function TutorialStepsPage() {
       venueId: editing.venueId || null,
       grantCurrencyDefId: editing.grantCurrencyDefId || null,
       grantCurrencyAmount: editing.grantCurrencyAmount !== "" ? parseInt(editing.grantCurrencyAmount) : null,
+      completionCondition: (editing.completionCondition || null) as "TRAINING_CAPPED" | "COMPETITION_TIER" | "PREGNANCY_COMPLETE" | "LIFE_STAGE" | null,
+      completionTarget: editing.completionTarget !== "" ? parseInt(editing.completionTarget) : null,
     })
   }
 
@@ -93,6 +116,8 @@ function TutorialStepsPage() {
       venueId: s.venueId ?? "",
       grantCurrencyDefId: s.grantCurrencyDefId ?? "",
       grantCurrencyAmount: s.grantCurrencyAmount?.toString() ?? "",
+      completionCondition: s.completionCondition ?? "",
+      completionTarget: s.completionTarget?.toString() ?? "",
     })
     setGrantItemDefId("")
     setGrantQuantity("1")
@@ -165,6 +190,23 @@ function TutorialStepsPage() {
                   <option value="">— none —</option>
                   {conditions?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
+              </div>
+
+              <div className="border-t border-border pt-3 space-y-2">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Completion Condition</p>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Condition</label>
+                  <select value={editing.completionCondition} onChange={(e) => set("completionCondition", e.target.value)} className="h-8 rounded-md border border-input bg-background px-2 text-sm">
+                    <option value="">— none —</option>
+                    {COMPLETION_CONDITIONS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                  </select>
+                </div>
+                {editing.completionCondition && (
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Target</label>
+                    <Input type="number" min="0" value={editing.completionTarget} onChange={(e) => set("completionTarget", e.target.value)} placeholder="e.g. 1" className="h-8 text-sm" />
+                  </div>
+                )}
               </div>
 
               <div className="border-t border-border pt-3 space-y-2">
@@ -242,6 +284,7 @@ function TutorialStepsPage() {
                 <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Name</th>
                 <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Key</th>
                 <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Competition</th>
+                <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Completion</th>
                 <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Grants</th>
                 <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
               </tr>
@@ -255,6 +298,11 @@ function TutorialStepsPage() {
                   <td className="px-3 py-2 text-muted-foreground text-xs">
                     {s.competitionDiscipline
                       ? `${s.competitionDiscipline.name} ×${s.competitionNpcCount ?? "?"} @ ${s.venue?.name ?? "no venue"}`
+                      : "—"}
+                  </td>
+                  <td className="px-3 py-2 text-muted-foreground text-xs">
+                    {s.completionCondition
+                      ? `${COMPLETION_CONDITIONS.find(c => c.value === s.completionCondition)?.label ?? s.completionCondition}${s.completionTarget != null ? ` → ${s.completionTarget}` : ""}`
                       : "—"}
                   </td>
                   <td className="px-3 py-2 text-xs text-muted-foreground">

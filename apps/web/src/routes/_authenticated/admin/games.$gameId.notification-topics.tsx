@@ -6,10 +6,10 @@ import { Button } from "@/components/ui/button"
 
 type TopicForm = {
   name: string
-  description: string
-  isDefaultOn: boolean
+  topicKey: string
+  isDefaultEnabled: boolean
 }
-const emptyForm = (): TopicForm => ({ name: "", description: "", isDefaultOn: true })
+const emptyForm = (): TopicForm => ({ name: "", topicKey: "", isDefaultEnabled: true })
 
 function NotificationTopicsPage() {
   const { gameId } = Route.useParams()
@@ -34,13 +34,13 @@ function NotificationTopicsPage() {
   })
 
   function submit() {
-    if (!gameId || !editing.name.trim()) return
+    if (!gameId || !editing.name.trim() || !editing.topicKey.trim()) return
     save.mutate({
       id: editingId ?? undefined,
       gameId,
       name: editing.name.trim(),
-      description: editing.description.trim() || null,
-      isDefaultOn: editing.isDefaultOn,
+      topicKey: editing.topicKey.trim(),
+      isDefaultEnabled: editing.isDefaultEnabled,
     })
   }
 
@@ -60,29 +60,29 @@ function NotificationTopicsPage() {
               <Input
                 value={editing.name}
                 onChange={(e) => setEditing({ ...editing, name: e.target.value })}
-                placeholder="e.g. breeding_update"
+                placeholder="e.g. Breeding Updates"
                 className="h-8 text-sm"
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Description</label>
+              <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Topic Key</label>
               <Input
-                value={editing.description}
-                onChange={(e) => setEditing({ ...editing, description: e.target.value })}
-                placeholder="Shown to players"
-                className="h-8 text-sm"
+                value={editing.topicKey}
+                onChange={(e) => setEditing({ ...editing, topicKey: e.target.value })}
+                placeholder="e.g. breeding_update"
+                className="h-8 text-sm font-mono"
               />
             </div>
             <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
               <input
                 type="checkbox"
-                checked={editing.isDefaultOn}
-                onChange={(e) => setEditing({ ...editing, isDefaultOn: e.target.checked })}
+                checked={editing.isDefaultEnabled}
+                onChange={(e) => setEditing({ ...editing, isDefaultEnabled: e.target.checked })}
               />
               Default On
             </label>
             <div className="flex gap-2">
-              <Button size="sm" onClick={submit} disabled={save.isPending || !editing.name.trim()}>
+              <Button size="sm" onClick={submit} disabled={save.isPending || !editing.name.trim() || !editing.topicKey.trim()}>
                 {editingId ? "Save" : "Add Topic"}
               </Button>
               <Button size="sm" variant="ghost" onClick={() => { setEditingId(null); setEditing(emptyForm()) }}>
@@ -104,7 +104,7 @@ function NotificationTopicsPage() {
             <thead>
               <tr className="border-b border-border">
                 <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Name</th>
-                <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Description</th>
+                <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Topic Key</th>
                 <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Default On</th>
                 <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
               </tr>
@@ -113,14 +113,14 @@ function NotificationTopicsPage() {
               {topics?.map((t) => (
                 <tr key={t.id} className="border-b border-border last:border-0">
                   <td className="px-3 py-2 font-medium text-foreground">{t.name}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{t.description ?? "—"}</td>
+                  <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{t.topicKey}</td>
                   <td className="px-3 py-2 text-center">
-                    {t.isDefaultOn ? <span className="text-primary">✓</span> : <span className="text-muted-foreground">—</span>}
+                    {t.isDefaultEnabled ? <span className="text-primary">✓</span> : <span className="text-muted-foreground">—</span>}
                   </td>
                   <td className="px-3 py-2 text-right space-x-1">
                     <Button size="sm" variant="ghost" onClick={() => {
                       setEditingId(t.id)
-                      setEditing({ name: t.name, description: t.description ?? "", isDefaultOn: t.isDefaultOn })
+                      setEditing({ name: t.name, topicKey: t.topicKey, isDefaultEnabled: t.isDefaultEnabled })
                     }}>Edit</Button>
                     <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
                       onClick={() => { if (!confirm("Delete this topic?")) return; remove.mutate({ id: t.id }) }}>

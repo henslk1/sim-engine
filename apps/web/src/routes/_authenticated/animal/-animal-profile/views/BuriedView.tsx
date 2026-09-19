@@ -60,7 +60,7 @@ export function BuriedView({ animal }: { animal: AnimalProfile }) {
                       {a.depth === 1 ? "Parent" : "Grandparent"}
                     </span>
                     <span className="flex-1 font-medium text-foreground">{a.ancestor.name}</span>
-                    <span className="text-muted-foreground">{a.ancestor.breed.name}</span>
+                    <span className="text-muted-foreground">{a.ancestor.breed?.name ?? a.ancestor.breedName ?? "Unknown"}</span>
                   </div>
                 ))}
             </div>

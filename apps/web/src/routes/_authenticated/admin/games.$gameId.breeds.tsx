@@ -81,8 +81,6 @@ function II({ value, onChange, onBlur, step, min, max, disabled }: {
 
 // ── Stat Row ──────────────────────────────────────────────────────────────────
 
-type StatProfile = { id: string; statDefId: string; weight: number }
-
 function StatRow({ stat, values, onChange }: {
   stat: { id: string; name: string }
   values: { weight: string }
@@ -114,8 +112,6 @@ function PersonalityRow({ trait, values, onChange }: {
 }
 
 // ── Allele Freq Row ───────────────────────────────────────────────────────────
-
-type AlleleFreq = { id: string; alleleId: string; frequency: number; isDq: boolean }
 
 function AlleleFreqRow({ allele, values, onFreqChange }: {
   allele: { id: string; symbol: string }
@@ -779,9 +775,6 @@ function BreedsPage() {
   const removeCoatDqSelectionMut = trpc.admin.breed.removeCoatDqSelection.useMutation({
     onSuccess: () => utils.admin.breed.listCoatDqSelections.invalidate(),
   })
-  const savePersonalityProfile = trpc.admin.breed.savePersonalityProfile.useMutation({
-    onSuccess: () => utils.admin.breed.listPersonalityProfiles.invalidate(),
-  })
   const saveAllPersonalityProfiles = trpc.admin.breed.saveAllPersonalityProfiles.useMutation({
     onSuccess: () => utils.admin.breed.listPersonalityProfiles.invalidate(),
   })
@@ -842,11 +835,6 @@ function BreedsPage() {
     saveCoatDqSelectionMut.mutate({ breedId: editing.id, expression, colorRole })
   }
 
-  function handleSavePersonalityProfile(traitDefId: string, id: string | undefined, data: { naturalMin: number; naturalMax: number; baseline: number }) {
-    if (!editing?.id) return
-    savePersonalityProfile.mutate({ id, breedId: editing.id, traitDefId, ...data })
-  }
-
   function handlePersonalityChange(traitDefId: string, field: string, value: string) {
     setPersonalityValues(prev => ({ ...prev, [traitDefId]: { ...prev[traitDefId]!, [field]: value } }))
   }
@@ -871,10 +859,6 @@ function BreedsPage() {
     setFreqValues(prev => ({ ...prev, [alleleId]: { ...prev[alleleId]!, frequency: value } }))
   }
 
-  function handleDqChange(alleleId: string, isDq: boolean) {
-    setFreqValues(prev => ({ ...prev, [alleleId]: { ...prev[alleleId]!, isDq } }))
-  }
-
   function handleSaveAllAlleleFreqs() {
     if (!editing?.id || !alleles) return
     saveAllAlleleFreqs.mutate({
@@ -887,7 +871,7 @@ function BreedsPage() {
   }
 
   const locusAlleleGroups = useMemo(() => {
-    const map = new Map<string, { locus: { id: string; name: string; panelEntries: { panelDef: { panelType: string } }[] }; alleles: LocusAllele[] }>()
+    const map = new Map<string, { locus: { id: string; name: string; isHiddenModifier: boolean; panelEntries: { panelDef: { panelType: string } }[] }; alleles: LocusAllele[] }>()
     for (const a of alleles ?? []) {
       if (!map.has(a.locus.id)) map.set(a.locus.id, { locus: a.locus, alleles: [] })
       map.get(a.locus.id)!.alleles.push(a)

@@ -147,10 +147,10 @@ function AlertsSection({
 }: {
   needsAttention: {
     id: string; name: string
-    breed: { name: string }; lifeStage: { name: string }
+    breed: { name: string } | null; breedName: string | null; lifeStage: { name: string }
     _count: { healthRecords: number }
   }[]
-  pregnant: { id: string; name: string; breed: { name: string } }[]
+  pregnant: { id: string; name: string; breed: { name: string } | null; breedName: string | null }[]
 }) {
   const allAlerts = [
     ...needsAttention.map((a) => ({ type: "health" as const, animal: a })),
@@ -222,6 +222,25 @@ function AlertsSection({
 type CompEntry = {
   id: string; animalName: string; discipline: string
   venue: string; tier: string; expiresAt: Date | string
+}
+
+type DashboardCompetition = {
+  id: string
+  expiresAt: Date | string
+  venue: { id: string; name: string }
+  disciplineDef: { name: string } | null
+  tierDef: { name: string } | null
+  entries: Array<{
+    animal: { id: string; name: string }
+    playerAccount: { username: string }
+  }>
+}
+
+type DashboardVenue = {
+  id: string
+  name: string
+  climate: string | null
+  terrain: string | null
 }
 
 function EntriesSection({ entries }: { entries: CompEntry[] }) {
@@ -513,6 +532,9 @@ function DashboardPage() {
     { enabled: !!gameId },
   )
 
+  const competitionSummaries = openComps as DashboardCompetition[]
+  const venueSummaries = allVenues as DashboardVenue[]
+
   if (gameLoading || (gameId && meLoading)) {
     return <div className="flex h-dvh items-center justify-center text-sm text-muted-foreground">Loading…</div>
   }
@@ -523,7 +545,7 @@ function DashboardPage() {
 
   const myUsername = me?.username
   const myEntries: CompEntry[] = myUsername
-    ? openComps.flatMap((comp) =>
+    ? competitionSummaries.flatMap((comp) =>
         comp.entries
           .filter((e) => e.playerAccount.username === myUsername)
           .map((e) => ({
@@ -537,9 +559,9 @@ function DashboardPage() {
       )
     : []
 
-  const venueDetailMap = new Map(allVenues.map((v) => [v.id, v]))
+  const venueDetailMap = new Map(venueSummaries.map((venue) => [venue.id, venue]))
   const venueCountMap = new Map<string, number>()
-  for (const comp of openComps) {
+  for (const comp of competitionSummaries) {
     venueCountMap.set(comp.venue.id, (venueCountMap.get(comp.venue.id) ?? 0) + 1)
   }
   const venues: VenueRow[] = Array.from(venueCountMap.entries()).map(([id, count]) => {

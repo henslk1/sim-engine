@@ -124,6 +124,7 @@ export function RichTextEditor({
   }
 
   function openLinkInsert() {
+    if (!editor) return
     const existing = editor.getAttributes("link").href ?? ""
     setInsertUrl(existing)
     setInsertMode("link")

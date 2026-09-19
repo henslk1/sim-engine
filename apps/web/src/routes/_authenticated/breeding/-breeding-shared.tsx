@@ -46,7 +46,8 @@ export function ParentCard({ label, grade, animal }: {
     name: string
     fertility: number
     inbreedingCoefficient: number
-    breed: { name: string }
+    breed: { name: string } | null
+    breedName: string | null
     playerAccount: { username: string }
     lifeStage: { name: string }
     mood: { value: number } | null

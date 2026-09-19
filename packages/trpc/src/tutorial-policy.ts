@@ -8,6 +8,8 @@ type StepPolicy = {
   mutations?: string[]
   checkpoint?: string
   gold?: number
+  premium?: boolean
+  vetService?: "certificates" | "otc"
 }
 const control = (...names: string[]) => names.map(name => `[data-tutorial="${name}"]`)
 const trainingControls = ['[data-tutorial="training-panel"] [data-energy-cost]', '[data-tutorial-train="true"] > button']
@@ -70,10 +72,10 @@ export const TUTORIAL_STEPS: readonly StepPolicy[] = [
   { page: "mare", checkpoint: "step_training_complete" },
   { page: "mare", checkpoint: "step_competition_transition" },
   { page: "mare" },
-  { page: "mare", destinations: ["vet"], controls: control("book-cert-testing") },
-  { page: "vet", gold: 100 },
-  { page: "vet", controls: control("cert-issue-btn"), mutations: ["vet.issueCert"], checkpoint: "step_health_certs" },
-  { page: "vet", destinations: ["mare"], controls: control("vet-back-link") }, // 60
+  { page: "mare", destinations: ["vet"], controls: control("book-cert-testing"), vetService: "certificates" },
+  { page: "vet", gold: 100, vetService: "certificates" },
+  { page: "vet", controls: control("cert-issue-btn"), mutations: ["vet.issueCert"], checkpoint: "step_health_certs", vetService: "certificates" },
+  { page: "vet", destinations: ["mare"], controls: control("vet-back-link"), vetService: "certificates" }, // 60
   { page: "mare" },
   { page: "mare" },
   { page: "mare", controls: control("add-second-discipline") },
@@ -109,7 +111,67 @@ export const TUTORIAL_STEPS: readonly StepPolicy[] = [
   { page: "mare", controls: control("discipline-tab-2") }, // 93: secondary discipline tab
   { page: "mare" }, // 94: progress bar
   { page: "mare" }, // 95: full page popover / unguided transition
-  { page: "mare" }, // 96: devPauseStep proxy
+  // 96: unguided competing phase — allowed pages, all care + compete + age mutations, no nav bar
+  {
+    page: "mare",
+    destinations: ["venues", "venue"],
+    controls: [
+      '[data-tutorial="daily-care-perform"]',
+      '[data-tutorial="care-groom"]',
+      '[data-tutorial="ltc-perform"]',
+      '[data-tutorial="advance-age"]',
+      '[data-tutorial="view-venues-btn"]',
+      '[data-tutorial="tutorial-venue-card"]',
+      '[data-tutorial="venue-card-first"]',
+      '[data-tutorial="tutorial-discipline-section-btn"]',
+      '[data-tutorial="tutorial-compete-btn"]',
+      '[data-tutorial="venue-back-link"]',
+      '[data-tutorial="venues-back-link"]',
+      '[data-tutorial="competition-history-tab"]',
+      '[data-tutorial="discipline-tab-1"]',
+      '[data-tutorial="discipline-tab-2"]',
+    ],
+    mutations: ["tutorial.compete", "care.perform", "care.performLtc", "animal.advanceAge"],
+  },
+  { page: "mare", checkpoint: "step_unguided_compete" }, // 97: "A New Tier" modal
+  { page: "mare", controls: control("advance-age"), mutations: ["animal.advanceAge"] }, // 98: "Ready for Tomorrow" — advance age (triggers illness server-side)
+  { page: "mare", checkpoint: "step_ready_for_tomorrow" }, // 99: "Something's Wrong" — illness banner spotlight
+  { page: "mare" }, // 100: "Unknown Illness" — health panel spotlight
+  { page: "mare", destinations: ["vet"], controls: control("visit-vet") }, // 101: visit vet button
+  { page: "vet" }, // 102: Choosing an Exam — overview of all exams
+  { page: "vet", premium: true }, // 103: Exam Credits — premium grant
+  { page: "vet", controls: control("comprehensive-exam-option") }, // 104: Pick Exam
+  { page: "vet", controls: control("run-exam-btn"), mutations: ["vet.exam"] }, // 105: Run Exam
+  { page: "vet" }, // 106: Diagnosed — spotlight result
+  { page: "vet", destinations: ["mare"], controls: control("vet-back-link") }, // 107: Return to mare
+  { page: "mare", controls: control("health-treatment-option"), mutations: ["vet.startTreatment"] }, // 108: Choose treatment
+  { page: "mare", checkpoint: "step_visit_vet" }, // 109: Treatment Active — spotlight active treatment block
+  { page: "mare", destinations: ["vet"], controls: control("buy-at-vet"), vetService: "otc" }, // 110: Buy at Vet link
+  { page: "vet" }, // 111: Purchase Prompt — full-page popover on vet OTC page
+  { page: "vet", controls: control("otc-buy-required"), mutations: ["inventory.buy"] }, // 112: OTC Purchase
+  { page: "vet", destinations: ["mare"], controls: control("vet-back-link") }, // 113: Return to mare
+  { page: "mare", controls: control("administer-btn"), mutations: ["vet.administerTreatment"] }, // 114: Administer OTC
+  { page: "mare" }, // 115: Treatment Started
+  { page: "mare" }, // 116: Looking Beyond Today — full-page
+  { page: "mare" }, // 117: Genetics workspace overview
+  { page: "mare" }, // 118: Color Genetics info
+  { page: "mare" }, // 119: Health Genetics info
+  { page: "mare" }, // 120: Conformation Genetics info
+  { page: "mare" }, // 121: Stat Genetics info
+  { page: "mare", controls: control("genetics-tab-health") }, // 122: Require health tab click
+  { page: "mare" }, // 123: Genetic Progress
+  { page: "mare" }, // 124: Testing Methods
+  { page: "mare", controls: control("genetics-test-locus-target"), mutations: ["genetics.testLocus"] }, // 125: Individual Test
+  { page: "mare", controls: control("genetics-test-panel-target"), mutations: ["genetics.testPanel"] }, // 126: Panel Test
+  { page: "mare", checkpoint: "step_genetics_done" }, // 127: Genetics Complete transition
+  { page: "mare", controls: [...control("daily-care-perform", "care-groom", "ltc-perform"), '[data-tutorial="care-action-btn"]'], mutations: ["care.perform", "care.performLtc"] }, // 128: Back to Her Care
+  { page: "mare", controls: control("advance-age"), mutations: ["animal.advanceAge"] }, // 129: Continue Her Recovery
+  { page: "mare", controls: [...control("daily-care-perform", "care-groom", "ltc-perform"), '[data-tutorial="care-action-btn"]'], mutations: ["care.perform", "care.performLtc"] }, // 130: Daily Care
+  { page: "mare", controls: control("administer-btn"), mutations: ["vet.administerTreatment"] }, // 131: Continue Treatment
+  { page: "mare", controls: control("advance-age"), mutations: ["animal.advanceAge"] }, // 132: Finish Her Recovery (listens for conditionResolved)
+  { page: "mare" }, // 133: Recovered — full-page popover
+  { page: "mare", checkpoint: "step_legacy_begins" }, // 134: A Legacy Begins — full-page popover
+  { page: "mare" }, // 135: devPauseStep
 ]
 
 export function getTutorialPolicy(step: number): StepPolicy | undefined {
@@ -119,7 +181,12 @@ export function getTutorialPolicy(step: number): StepPolicy | undefined {
 export function tutorialDestination(step: number, mareId?: string | null, venueId?: string | null) {
   const page = getTutorialPolicy(step)?.page
   if (!page || (page === "mare" && !mareId) || (page === "vet" && !mareId) || (page === "venues" && !mareId) || (page === "venue" && !mareId)) return { pathname: "/dashboard", search: {} }
-  if (page === "vet") return { pathname: "/vet", search: { animalId: mareId!, service: "certificates" as const } }
+  if (page === "vet") {
+    const vs = getTutorialPolicy(step)?.vetService
+    return vs
+      ? { pathname: "/vet", search: { animalId: mareId!, service: vs as "certificates" | "otc" } }
+      : { pathname: "/vet", search: { animalId: mareId! } }
+  }
   if (page === "venues") return { pathname: "/venues", search: { animalId: mareId!, from: "animal" as const } }
   if (page === "venue") return venueId
     ? { pathname: `/venue/${venueId}`, search: { animalId: mareId!, from: "animal" as const } }
@@ -136,7 +203,11 @@ export function isTutorialRouteAllowed(step: number, mareId: string | null | und
   if (!policy) return false
   return [policy.page, ...(policy.destinations ?? [])].some(page => {
     if (page === "mare") return !!mareId && pathname === `/animal/${mareId}`
-    if (page === "vet") return !!mareId && pathname === "/vet" && search.animalId === mareId && search.service === "certificates"
+    if (page === "vet") {
+      if (!mareId || pathname !== "/vet" || search.animalId !== mareId) return false
+      if (policy.vetService) return search.service === policy.vetService
+      return true
+    }
     if (page === "venues") return !!mareId && pathname === "/venues" && search.animalId === mareId && search.from === "animal"
     if (page === "venue") return !!mareId && /^\/venue\/[^/]+$/.test(pathname) && search.animalId === mareId && search.from === "animal"
     return pathname === `/${page}`
@@ -155,6 +226,7 @@ export function isTutorialMutationAllowed(step: number, path: string, input: Rec
   const policy = getTutorialPolicy(step)
   if (!policy) return false
   if (path === "tutorial.grantStartingGold") return policy.gold !== undefined && input.amount === policy.gold
+  if (path === "tutorial.grantStartingPremium") return policy.premium === true
   if (path === "tutorial.completeStep") return policy.checkpoint !== undefined && input.stepKey === policy.checkpoint
   return policy.mutations?.includes(path) ?? false
 }

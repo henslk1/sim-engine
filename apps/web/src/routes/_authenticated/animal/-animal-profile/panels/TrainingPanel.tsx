@@ -233,7 +233,6 @@ export function TrainingPanel({
                 : maxAllowedTierIndex != null && tier != null && tier.tierIndex > maxAllowedTierIndex ? "Vet restriction"
                 : null
 
-              const isTargetStat = targetStat?.statDef.id === stat.statDef.id
               const isFirstStat = animal.stats[0]?.statDef.id === stat.statDef.id
 
               return (

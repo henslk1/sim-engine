@@ -15,22 +15,31 @@ const emptySection = (): SectionForm => ({ name: "", displayOrder: "0" })
 type EntryRow = { locusId: string; displayOrder: string }
 const emptyEntry = (): EntryRow => ({ locusId: "", displayOrder: "0" })
 
+type SectionSummary = { id: string; name: string; displayOrder: number; _count: { entries: number } }
+type SectionEntrySummary = { id: string; displayOrder: number; locus: { name: string } }
+type LocusSummary = {
+  id: string
+  name: string
+  panelEntries: Array<{ panelDef: { panelType: string } }>
+  _count: { sectionEntries: number }
+}
+
 function ConformationSectionsPage() {
   const { gameId } = Route.useParams()
 
   const { data: sections } = trpc.admin.conformation.listSections.useQuery(
     { gameId: gameId! },
     {}
-  )
+  ) as { data: SectionSummary[] | undefined }
   const { data: loci } = trpc.admin.locus.list.useQuery(
     { gameId: gameId! },
     {}
-  )
+  ) as { data: LocusSummary[] | undefined }
 
   const utils = trpc.useUtils()
 
   const saveSection = trpc.admin.conformation.saveSection.useMutation({
-    onSuccess: (saved) => {
+    onSuccess: (saved: { id: string }) => {
       utils.admin.conformation.listSections.invalidate()
       setEditing((prev) => (prev ? { ...prev, id: saved.id } : null))
     },
@@ -47,7 +56,7 @@ function ConformationSectionsPage() {
   const { data: entries } = trpc.admin.conformation.listEntries.useQuery(
     { sectionId: editing?.id! },
     { enabled: !!editing?.id }
-  )
+  ) as { data: SectionEntrySummary[] | undefined }
   const saveEntry = trpc.admin.conformation.saveEntry.useMutation({
     onSuccess: () => {
       utils.admin.conformation.listEntries.invalidate({ sectionId: editing?.id })
@@ -66,7 +75,7 @@ function ConformationSectionsPage() {
 
   const [newEntry, setNewEntry] = useState<EntryRow>(emptyEntry())
 
-  function openEdit(section: NonNullable<typeof sections>[number]) {
+  function openEdit(section: SectionSummary) {
     setEditing({ id: section.id, name: section.name, displayOrder: section.displayOrder.toString() })
     setNewEntry(emptyEntry())
   }
@@ -165,7 +174,7 @@ function ConformationSectionsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {entries?.map((e: NonNullable<typeof entries>[number]) => (
+                  {entries?.map((e) => (
                     <tr key={e.id} className="border-b border-border last:border-0">
                       <td className="px-3 py-2 font-medium text-foreground">{e.locus.name}</td>
                       <td className="px-3 py-2 text-muted-foreground">{e.displayOrder}</td>

@@ -45,6 +45,11 @@ const CONDITIONS: Record<string, Record<string, string>> = {
   TEMPERATE: { FLAT: "Temperate & Soft Turf", COASTAL: "Temperate & Open Coast", HILLY: "Temperate & Rolling Fields", MOUNTAIN: "Temperate & High Ground" },
 }
 
+type CompetitionSummary = {
+  venue: { id: string }
+  disciplineDef: { id: string; name: string }
+}
+
 function TerrainIcon({ terrain, size = 80 }: { terrain: string | null; size?: number }) {
   if (terrain === "COASTAL") return <Waves size={size} strokeWidth={0.8} />
   if (terrain === "MOUNTAIN" || terrain === "HILLY") return <Mountain size={size} strokeWidth={0.8} />
@@ -81,17 +86,22 @@ function VenuesPage() {
 
   const [filterDisciplineId, setFilterDisciplineId] = useState("")
 
-  const infoByVenue = competitions?.reduce<Record<string, { count: number; disciplines: Set<string>; disciplineIds: Set<string> }>>((acc, comp) => {
+  const competitionSummaries = (competitions ?? []) as CompetitionSummary[]
+
+  const infoByVenue = competitionSummaries.reduce<Record<string, { count: number; disciplines: Set<string>; disciplineIds: Set<string> }>>((acc, comp) => {
     if (!acc[comp.venue.id]) acc[comp.venue.id] = { count: 0, disciplines: new Set(), disciplineIds: new Set() }
     acc[comp.venue.id].count++
     acc[comp.venue.id].disciplines.add(comp.disciplineDef.name)
     acc[comp.venue.id].disciplineIds.add(comp.disciplineDef.id)
     return acc
-  }, {}) ?? {}
+  }, {})
 
-  const disciplineOptions = competitions
-    ? [...new Map(competitions.map((c) => [c.disciplineDef.id, c.disciplineDef.name])).entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name))
-    : []
+  const disciplineOptions = [...new Map(competitionSummaries.map((competition) => [
+    competition.disciplineDef.id,
+    competition.disciplineDef.name,
+  ])).entries()]
+    .map(([id, name]) => ({ id, name }))
+    .sort((a, b) => a.name.localeCompare(b.name))
 
   const filteredVenues = isTutorialMode
     ? venues?.filter(v => isTutorialVenueEligible(v, tutorialInfo?.secondaryDisciplineId))

@@ -16,7 +16,7 @@ export const Route = createFileRoute("/_authenticated/admin/games/$gameId/geneti
 type PanelForm = {
   id?: string
   name: string
-  panelType: "HEALTH" | "CONFORMATION" | "COLOR"
+  panelType: "HEALTH" | "CONFORMATION" | "COLOR" | "VARIANCE"
   colorRole: string | null
   testCost: string
 }
@@ -63,6 +63,7 @@ type LocusRecord = {
   description: unknown
   isHiddenModifier: boolean
   inheritanceWeight: number
+  _count: { alleles: number }
 }
 
 function LocusEditor({ locus, gameId }: { locus: LocusRecord; gameId: string }) {
@@ -96,7 +97,9 @@ function LocusEditor({ locus, gameId }: { locus: LocusRecord; gameId: string }) 
   })
 
   const { data: conditionLinks } = trpc.admin.expression.listConditionLinksByLocus.useQuery({ locusId })
-  const { data: allConditions } = trpc.admin.health.list.useQuery({ gameId })
+  const { data: allConditions } = trpc.admin.health.list.useQuery({ gameId }) as {
+    data: Array<{ id: string; name: string }> | undefined
+  }
   const addLinkByPhenotype = trpc.admin.expression.addConditionLinkByPhenotype.useMutation({
     onSuccess: () => utils.admin.expression.listConditionLinksByLocus.invalidate({ locusId }),
   })
@@ -452,8 +455,12 @@ function LocusEditor({ locus, gameId }: { locus: LocusRecord; gameId: string }) 
 
 function GenesTab({ panelId, gameId }: { panelId: string; gameId: string }) {
   const utils = trpc.useUtils()
-  const { data: allLoci } = trpc.admin.locus.list.useQuery({ gameId })
-  const { data: panelLoci } = trpc.admin.panel.listPanelLoci.useQuery({ panelDefId: panelId })
+  const { data: allLoci } = trpc.admin.locus.list.useQuery({ gameId }) as {
+    data: LocusRecord[] | undefined
+  }
+  const { data: panelLoci } = trpc.admin.panel.listPanelLoci.useQuery({ panelDefId: panelId }) as {
+    data: Array<{ id: string; locusId: string }> | undefined
+  }
 
   const addPanelLocus = trpc.admin.panel.addPanelLocus.useMutation({
     onSuccess: () => {
@@ -469,7 +476,7 @@ function GenesTab({ panelId, gameId }: { panelId: string; gameId: string }) {
     },
   })
   const saveLocus = trpc.admin.locus.save.useMutation({
-    onSuccess: async (saved) => {
+    onSuccess: async (saved: { id: string }) => {
       await utils.admin.locus.list.invalidate()
       addPanelLocus.mutate({ panelDefId: panelId, locusId: saved.id })
       setExpandedLocusId(saved.id)

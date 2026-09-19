@@ -6,6 +6,10 @@ import assert from "node:assert/strict"
 const db = {
   playerAccount: { findMany: async () => [] as unknown[] },
   healthCertificateDef: { findUnique: async (_input: unknown) => null as unknown },
+  animal: { findUnique: async (_input: unknown) => ({ secondaryDisciplineDefId: null }) },
+  disciplineEquipmentRequirement: { findMany: async (_input: unknown) => [] as unknown[] },
+  storeListing: { findUnique: async (_input: unknown) => ({ gameId: "game", itemDefId: "medicine" }) },
+  animalTreatmentRecord: { findFirst: async (_input: unknown) => ({ treatmentDef: { items: [{ itemDefId: "medicine" }] } }) },
 }
 Object.assign(globalThis, { prisma: db })
 const { guardTutorialMutation } = await import("../src/tutorial-guard.ts")
@@ -46,4 +50,12 @@ test("middleware protects new unlisted procedures before their resolver runs", a
   assert.equal(calls, 0)
   completed = true
   assert.equal(await caller.futureAction(), 1)
+})
+
+test("the OTC step permits only the active treatment's medication", async () => {
+  step = 112
+  await guardTutorialMutation("user", "inventory.buy", { playerAccountId: "player", listingId: "medicine-listing" })
+  mock.method(db.storeListing, "findUnique", async () => ({ gameId: "game", itemDefId: "other" }))
+  await assert.rejects(guardTutorialMutation("user", "inventory.buy", { playerAccountId: "player", listingId: "other-listing" }), forbidden)
+  await assert.rejects(guardTutorialMutation("user", "inventory.buy", { playerAccountId: "player", listingId: "other-listing", quantity: 2 }), forbidden)
 })

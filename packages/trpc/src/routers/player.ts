@@ -193,6 +193,7 @@ export const playerRouter = router({
               id: true,
               name: true,
               image: true,
+              breedName: true,
               subContainerId: true,
               ageInCycles: true,
               breed: { select: { name: true, species: { select: { name: true } } } },
@@ -259,7 +260,7 @@ export const playerRouter = router({
             where: { isActive: true },
             select: {
               id: true,
-              animal: { select: { id: true, name: true, image: true, breed: { select: { name: true } } } },
+              animal: { select: { id: true, name: true, image: true, breedName: true, breed: { select: { name: true } } } },
             },
             take: 12,
           },

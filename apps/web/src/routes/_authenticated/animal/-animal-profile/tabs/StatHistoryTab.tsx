@@ -17,7 +17,6 @@ export function StatHistoryTab({
         <thead className="bg-secondary/50 text-muted-foreground">
           <tr>
             <th className="px-2 py-1 font-medium">Stat</th>
-            <th className="px-2 py-1 text-right font-medium">Innate</th>
             <th className="px-2 py-1 text-right font-medium">Trained</th>
             <th className="px-2 py-1 text-right font-medium">Cycle</th>
           </tr>
@@ -26,7 +25,6 @@ export function StatHistoryTab({
           {data.map((h: RouterOutputs["animalProfile"]["getStatHistory"][number]) => (
             <tr key={h.id} className="border-t border-border/60">
               <td className="px-2 py-1 font-medium text-foreground">{h.statDef.name}</td>
-              <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{Math.round(h.innateValue)}</td>
               <td className="px-2 py-1 text-right tabular-nums text-foreground">{Math.round(h.trainedValue)}</td>
               <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{h.cycleNumber}</td>
             </tr>

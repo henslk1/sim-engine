@@ -5,6 +5,63 @@ import { cn } from "@/lib/utils"
 
 type VitalChange = { label: string; value: number }
 
+type DailyEvent = {
+  id: string
+  cycleNumber: number | null
+  eventType: string
+  context: unknown
+  outcome: string | null
+  partner: { name: string } | null
+  createdAt: Date | string
+}
+
+type CareEvent = {
+  id: string
+  cycleNumber: number
+  createdAt: Date | string
+  careActionDef: { name: string; energyRestore: number; moodBoost: number }
+}
+
+type TrainingEvent = {
+  id: string
+  cycleNumber: number
+  createdAt: Date | string
+  statGained: number
+  reachedCap: boolean
+  energyUsed: number
+  trainingActionDef: { name: string; statDef: { name: string } }
+  intensityTierDef: { name: string }
+}
+
+type VetEvent = {
+  id: string
+  visitCycle: number
+  visitedAt: Date | string
+  notes: string | null
+  vetServiceDef: { name: string; baseCost: number } | null
+  conditionDef: { name: string } | null
+}
+
+type StageActivityEvent = {
+  id: string
+  cycleNumber: number
+  createdAt: Date | string
+  stageActivityDef: {
+    name: string
+    energyCost: number
+    traitEffect: number
+    traitDef: { name: string }
+  }
+}
+
+type CompetitionEvent = {
+  id: string
+  cycleNumber: number | null
+  enteredAt: Date | string
+  tierDef: { name: string }
+  competition: { disciplineDef: { name: string }; venue: { name: string } }
+}
+
 type LogEntry =
   | { key: string; cycleNumber: number; createdAt: Date; type: "care"; label: string; vitals: VitalChange[] }
   | { key: string; cycleNumber: number; createdAt: Date; type: "training"; label: string; subLabel: string; statGained: number; reachedCap: boolean; statName: string; vitals: VitalChange[] }
@@ -26,24 +83,30 @@ const DOT: Record<string, string> = {
 
 export function DailyLogPanel({ animal }: { animal: AnimalProfile }) {
   const cycle = animal.ageInCycles
+  const dailyLogs = animal.dailyLogs as DailyEvent[]
+  const careLogs = animal.careLogs as CareEvent[]
+  const trainingLogs = animal.trainingLogs as TrainingEvent[]
+  const vetVisitLogs = animal.vetVisitLogs as VetEvent[]
+  const stageActivityLogs = animal.stageActivityLogs as StageActivityEvent[]
+  const competitionEntries = animal.competitionEntries as CompetitionEvent[]
 
   const entries: LogEntry[] = [
-    ...animal.dailyLogs
+    ...dailyLogs
       .filter((l) => l.cycleNumber === cycle && l.eventType === "LTC_PERFORMED")
-      .map((l: AnimalProfile["dailyLogs"][number]) => {
+      .map((l) => {
         const ctx = l.context as { name?: string; nextDueCycle?: number } | null
         return {
           key: `ltc-${l.id}`,
-          cycleNumber: l.cycleNumber,
+          cycleNumber: l.cycleNumber ?? cycle,
           createdAt: new Date(l.createdAt),
           type: "care" as const,
           label: ctx?.name ?? "Long-term care",
           vitals: [] as VitalChange[],
         }
       }),
-    ...animal.dailyLogs
+    ...dailyLogs
       .filter((l) => l.cycleNumber === cycle && ["COVER_SENT", "COVER_ACCEPTED", "COVER_DECLINED"].includes(l.eventType))
-      .map((l: AnimalProfile["dailyLogs"][number]) => {
+      .map((l) => {
         const ctx = l.context as { price?: number } | null
         const label =
           l.eventType === "COVER_SENT" ? "Cover Sent"
@@ -56,7 +119,7 @@ export function DailyLogPanel({ animal }: { animal: AnimalProfile }) {
           : l.partner?.name
         return {
           key: `breeding-${l.id}`,
-          cycleNumber: l.cycleNumber,
+          cycleNumber: l.cycleNumber ?? cycle,
           createdAt: new Date(l.createdAt),
           type: "breeding" as const,
           label,
@@ -64,9 +127,9 @@ export function DailyLogPanel({ animal }: { animal: AnimalProfile }) {
           vitals: (ctx?.price ?? 0) > 0 ? [{ label: "G", value: -(ctx!.price!) }] : [] as VitalChange[],
         }
       }),
-    ...animal.careLogs
+    ...careLogs
       .filter((l) => l.cycleNumber === cycle)
-      .map((l: AnimalProfile["careLogs"][number]) => ({
+      .map((l) => ({
         key: `care-${l.id}`,
         cycleNumber: l.cycleNumber,
         createdAt: new Date(l.createdAt),
@@ -77,9 +140,9 @@ export function DailyLogPanel({ animal }: { animal: AnimalProfile }) {
           ...(l.careActionDef.moodBoost > 0 ? [{ label: "mood", value: l.careActionDef.moodBoost }] : []),
         ],
       })),
-    ...animal.trainingLogs
+    ...trainingLogs
       .filter((l) => l.cycleNumber === cycle)
-      .map((l: AnimalProfile["trainingLogs"][number]) => ({
+      .map((l) => ({
         key: `train-${l.id}`,
         cycleNumber: l.cycleNumber,
         createdAt: new Date(l.createdAt),
@@ -91,9 +154,9 @@ export function DailyLogPanel({ animal }: { animal: AnimalProfile }) {
         statName: l.trainingActionDef.statDef.name,
         vitals: l.energyUsed > 0 ? [{ label: "energy", value: -l.energyUsed }] : [],
       })),
-    ...animal.vetVisitLogs
+    ...vetVisitLogs
       .filter((l) => l.visitCycle === cycle)
-      .map((l: AnimalProfile["vetVisitLogs"][number]) => ({
+      .map((l) => ({
         key: `vet-${l.id}`,
         cycleNumber: l.visitCycle,
         createdAt: new Date(l.visitedAt),
@@ -104,9 +167,9 @@ export function DailyLogPanel({ animal }: { animal: AnimalProfile }) {
           ? [{ label: "G", value: -(l.vetServiceDef!.baseCost) }]
           : [] as VitalChange[],
       })),
-    ...animal.stageActivityLogs
+    ...stageActivityLogs
       .filter((l) => l.cycleNumber === cycle)
-      .map((l: AnimalProfile["stageActivityLogs"][number]) => ({
+      .map((l) => ({
         key: `activity-${l.id}`,
         cycleNumber: l.cycleNumber,
         createdAt: new Date(l.createdAt),
@@ -117,24 +180,24 @@ export function DailyLogPanel({ animal }: { animal: AnimalProfile }) {
           { label: l.stageActivityDef.traitDef.name, value: l.stageActivityDef.traitEffect },
         ],
       })),
-    ...animal.competitionEntries
+    ...competitionEntries
       .filter((e) => e.cycleNumber === cycle)
-      .map((e: AnimalProfile["competitionEntries"][number]) => ({
+      .map((e) => ({
         key: `comp-${e.id}`,
-        cycleNumber: e.cycleNumber,
+        cycleNumber: e.cycleNumber ?? cycle,
         createdAt: new Date(e.enteredAt),
         type: "competition" as const,
         label: `${e.competition.disciplineDef.name} — ${e.tierDef.name}`,
         subLabel: e.competition.venue.name,
         vitals: [] as VitalChange[],
       })),
-    ...animal.dailyLogs
+    ...dailyLogs
       .filter((l) => l.cycleNumber === cycle && l.eventType === "TIER_ADVANCED")
-      .map((l: AnimalProfile["dailyLogs"][number]) => {
+      .map((l) => {
         const ctx = l.context as { newTierName?: string; disciplineName?: string } | null
         return {
           key: `tier-${l.id}`,
-          cycleNumber: l.cycleNumber,
+          cycleNumber: l.cycleNumber ?? cycle,
           createdAt: new Date(l.createdAt),
           type: "competition" as const,
           label: `Advanced to ${ctx?.newTierName ?? "next tier"}`,
@@ -142,13 +205,13 @@ export function DailyLogPanel({ animal }: { animal: AnimalProfile }) {
           vitals: [] as VitalChange[],
         }
       }),
-    ...animal.dailyLogs
+    ...dailyLogs
       .filter((l) => l.cycleNumber === cycle && l.eventType === "EMBRYO_IMPLANTED")
-      .map((l: AnimalProfile["dailyLogs"][number]) => {
+      .map((l) => {
         const ctx = l.context as { sireName?: string; biologicalDamName?: string } | null
         return {
           key: `implant-${l.id}`,
-          cycleNumber: l.cycleNumber,
+          cycleNumber: l.cycleNumber ?? cycle,
           createdAt: new Date(l.createdAt),
           type: "breeding" as const,
           label: "Embryo Implanted",
@@ -158,14 +221,14 @@ export function DailyLogPanel({ animal }: { animal: AnimalProfile }) {
           vitals: [] as VitalChange[],
         }
       }),
-    ...animal.dailyLogs
+    ...dailyLogs
       .filter((l) => l.cycleNumber === cycle && l.eventType === "BIRTH")
-      .map((l: AnimalProfile["dailyLogs"][number]) => {
+      .map((l) => {
         const ctx = l.context as { offspringCount?: number } | null
         const count = ctx?.offspringCount ?? 1
         return {
           key: `birth-${l.id}`,
-          cycleNumber: l.cycleNumber,
+          cycleNumber: l.cycleNumber ?? cycle,
           createdAt: new Date(l.createdAt),
           type: "birth" as const,
           label: count === 1 ? "Gave birth" : `Gave birth to ${count} foals`,

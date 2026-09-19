@@ -48,12 +48,28 @@ function AnimalTemplatesPage() {
   const utils = trpc.useUtils()
 
   const { data: templates = [] } = trpc.admin.animalTemplate.list.useQuery({ gameId: gameId! })
-  const { data: allBreeds = [] } = trpc.admin.breed.list.useQuery({ gameId: gameId! })
-  const { data: allStats = [] } = trpc.admin.stat.list.useQuery({ gameId: gameId! })
-  const { data: allDisciplines = [] } = trpc.admin.discipline.list.useQuery({ gameId: gameId! })
-  const { data: allLoci = [] } = trpc.admin.locus.list.useQuery({ gameId: gameId! })
-  const { data: allTraits = [] } = trpc.admin.personality.list.useQuery({ gameId: gameId! })
-  const { data: allCompTierDefs = [] } = trpc.admin.competitionTier.listByGame.useQuery({ gameId: gameId! })
+  const { data: allBreeds = [] } = trpc.admin.breed.list.useQuery({ gameId: gameId! }) as {
+    data: Array<{ id: string; name: string }> | undefined
+  }
+  const { data: allStats = [] } = trpc.admin.stat.list.useQuery({ gameId: gameId! }) as {
+    data: Array<{ id: string; name: string }> | undefined
+  }
+  const { data: allDisciplines = [] } = trpc.admin.discipline.list.useQuery({ gameId: gameId! }) as {
+    data: Array<{ id: string; name: string }> | undefined
+  }
+  const { data: allLoci = [] } = trpc.admin.locus.list.useQuery({ gameId: gameId! }) as {
+    data: Array<{
+      id: string
+      name: string
+      panelEntries: Array<{ panelDef: { panelType: string } }>
+    }> | undefined
+  }
+  const { data: allTraits = [] } = trpc.admin.personality.list.useQuery({ gameId: gameId! }) as {
+    data: Array<{ id: string; name: string }> | undefined
+  }
+  const { data: allCompTierDefs = [] } = trpc.admin.competitionTier.listByGame.useQuery({ gameId: gameId! }) as {
+    data: Array<{ id: string; disciplineDefId: string; tierIndex: number; name: string }> | undefined
+  }
 
   const tiersByDiscipline = allCompTierDefs.reduce<Record<string, typeof allCompTierDefs>>((acc, t) => {
     ;(acc[t.disciplineDefId] ??= []).push(t)
@@ -81,7 +97,7 @@ function AnimalTemplatesPage() {
 
   const template = templates.find(t => t.id === editing?.id)
   const existingStatIds = new Set(template?.stats.map(s => s.statDefId) ?? [])
-  const existingDisciplineIds = new Set(template?.compTiers.map(c => c.disciplineId) ?? [])
+  const existingDisciplineIds = new Set(template?.compTiers.map(c => c.disciplineDefId) ?? [])
   const existingLocusIds = new Set(template?.genotype.map(g => g.locusId) ?? [])
   const existingTraitIds = new Set(template?.personalityValues.map(p => p.traitDefId) ?? [])
   const availableStats = allStats.filter(s => !existingStatIds.has(s.id))
@@ -92,7 +108,7 @@ function AnimalTemplatesPage() {
   const baseTemplatesForSelector = templates.filter(t => t.isTutorialBase && t.sex === editing?.sex && t.id !== editing?.id)
 
   const save = trpc.admin.animalTemplate.save.useMutation({
-    onSuccess: (saved) => {
+    onSuccess: (saved: { id: string }) => {
       utils.admin.animalTemplate.list.invalidate({ gameId: gameId! })
       setEditing(prev => prev ? { ...prev, id: saved.id } : null)
     },

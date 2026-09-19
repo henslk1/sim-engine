@@ -28,8 +28,14 @@ export const locusAdminRouter = router({
       inheritanceWeight: z.number().min(0).max(1).optional(),
     }))
     .mutation(({ input }) => {
-      const { id, gameId, minTestCycle, description, ...rest } = input
-      const data = { ...rest, minTestCycle: minTestCycle ?? null, description: description != null ? (description as Prisma.InputJsonValue) : Prisma.DbNull }
+      const { id, gameId, minTestCycle, description, isHiddenModifier, inheritanceWeight, ...rest } = input
+      const data = {
+        ...rest,
+        minTestCycle: minTestCycle ?? null,
+        description: description != null ? (description as Prisma.InputJsonValue) : Prisma.DbNull,
+        ...(isHiddenModifier !== undefined ? { isHiddenModifier } : {}),
+        ...(inheritanceWeight !== undefined ? { inheritanceWeight } : {}),
+      }
       if (id) return db.locus.update({ where: { id }, data })
       return db.locus.upsert({
         where: { gameId_name: { gameId, name: data.name } },

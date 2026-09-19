@@ -63,6 +63,7 @@ export const animalCompetitionRouter = router({
                 select: {
                   id: true,
                   name: true,
+                  breedName: true,
                   breed: { select: { name: true } },
                   conformationScores: {
                     select: { score: true, breedId: true },
@@ -166,7 +167,7 @@ export const animalCompetitionRouter = router({
           entries: {
             orderBy: [{ result: { placement: "asc" } }, { enteredAt: "asc" }],
             include: {
-              animal: { select: { id: true, name: true, sex: true, breed: { select: { name: true } } } },
+              animal: { select: { id: true, name: true, sex: true, breedName: true, breed: { select: { name: true } } } },
               playerAccount: { select: { id: true, username: true } },
               tierDef: { select: { name: true } },
               result: true,

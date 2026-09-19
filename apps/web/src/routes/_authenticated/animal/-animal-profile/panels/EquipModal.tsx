@@ -10,6 +10,18 @@ import { isTourRunning } from "@/lib/tutorial"
 const EQUIPPABLE_CATEGORIES = ["EQUIPMENT", "BREEDING", "MISC"] as const
 type EquippableCategory = typeof EQUIPPABLE_CATEGORIES[number]
 
+type EquippedItem = {
+  id: string
+  itemDefId: string
+  itemDef: { name: string }
+}
+
+type InventoryItem = {
+  id: string
+  quantity: number
+  itemDef: { id: string; name: string; category: string }
+}
+
 const CATEGORY_LABEL: Record<EquippableCategory, string> = {
   EQUIPMENT: "Equipment",
   BREEDING:  "Breeding",
@@ -22,7 +34,9 @@ export function EquipModal({ animal, playerAccountId, onClose }: {
   onClose: () => void
 }) {
   const utils = trpc.useUtils()
-  const { data: inventory } = trpc.inventory.mine.useQuery({ playerAccountId })
+  const { data: inventory } = trpc.inventory.mine.useQuery({ playerAccountId }) as {
+    data: InventoryItem[] | undefined
+  }
   const { data: requiredItemIds } = trpc.tutorial.requiredEquipmentItemIds.useQuery(
     { gameId: animal.gameId }, { enabled: isTourRunning() },
   )
@@ -35,7 +49,8 @@ export function EquipModal({ animal, playerAccountId, onClose }: {
   const equip = trpc.inventory.equip.useMutation({ onSuccess: invalidate })
   const unequip = trpc.inventory.unequip.useMutation({ onSuccess: invalidate })
 
-  const equippedMap = new Map(animal.equipment.map((eq) => [eq.itemDefId, eq]))
+  const equippedItems = animal.equipment as EquippedItem[]
+  const equippedMap = new Map(equippedItems.map((equipment) => [equipment.itemDefId, equipment]))
 
   const unequippedItems = inventory?.filter(
     (inv) => !equippedMap.has(inv.itemDef.id) && (EQUIPPABLE_CATEGORIES as readonly string[]).includes(inv.itemDef.category)
@@ -73,11 +88,11 @@ export function EquipModal({ animal, playerAccountId, onClose }: {
         {/* Left — currently equipped */}
         <div data-tutorial="equipped-list" className="flex flex-col gap-3 overflow-y-auto p-5">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Equipped</p>
-          {animal.equipment.length === 0 ? (
+          {equippedItems.length === 0 ? (
             <p className="text-xs text-muted-foreground/70">Nothing equipped yet.</p>
           ) : (
             <div className="space-y-2">
-              {animal.equipment.map((eq: AnimalProfile["equipment"][number]) => (
+              {equippedItems.map((eq) => (
                 <div
                   key={eq.id}
                   className="flex items-center justify-between rounded-lg border border-border/60 bg-secondary/40 px-3 py-2"

@@ -1,7 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { useState } from "react"
 import { trpc } from "@/lib/trpc"
-import type { RouterOutputs } from "@/lib/trpc"
 import { RichTextRenderer } from "@/components/game/editor/RichTextRenderer"
 import { cn } from "@/lib/utils"
 
@@ -9,7 +8,16 @@ export const Route = createFileRoute("/_authenticated/directory/diseases")({
   component: DiseaseDirectoryPage,
 })
 
-type Disease = RouterOutputs["directory"]["listDiseases"][number]
+type Disease = {
+  id: string
+  name: string
+  conditionType: "ILLNESS" | "INJURY"
+  isGenetic: boolean
+  isFatal: boolean
+  isEpisodic: boolean
+  onsetMinCycle: number | null
+  description: unknown
+}
 
 function formatOnsetAge(cycle: number, cpy: number): string {
   const y = Math.floor(cycle / cpy)
@@ -64,10 +72,11 @@ function DiseaseDirectoryPage() {
   const gameId = gameData?.id ?? ""
   const cyclesPerYear = gameData?.gameConfig?.cyclesPerYear ?? 12
 
-  const { data: diseases, isLoading } = trpc.directory.listDiseases.useQuery(
+  const diseaseQuery = trpc.directory.listDiseases.useQuery(
     { gameId },
     { enabled: !!gameId }
-  )
+  ) as { data: Disease[] | undefined; isLoading: boolean }
+  const { data: diseases, isLoading } = diseaseQuery
 
   const [search, setSearch] = useState("")
   const [typeFilter, setTypeFilter] = useState<"" | "ILLNESS" | "INJURY">("")

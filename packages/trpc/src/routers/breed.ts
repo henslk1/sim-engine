@@ -6,12 +6,15 @@ import { computeCoatFromCodes } from "@sim-engine/engine"
 function* cartesianGen(arrays: (string | null)[][]): Generator<(string | null)[]> {
   const n = arrays.length
   if (n === 0) { yield []; return }
+  if (arrays.some((array) => array.length === 0)) return
   const indices = new Array<number>(n).fill(0)
   while (true) {
-    yield indices.map((idx, i) => arrays[i][idx])
+    yield indices.map((idx, i) => arrays[i]![idx]!)
     let pos = n - 1
     while (pos >= 0) {
-      if (++indices[pos] < arrays[pos].length) break
+      const nextIndex = indices[pos]! + 1
+      indices[pos] = nextIndex
+      if (nextIndex < arrays[pos]!.length) break
       indices[pos--] = 0
     }
     if (pos < 0) break
@@ -117,7 +120,7 @@ export const breedRouter = router({
                     locus: {
                       include: {
                         panelEntries: {
-                          include: { panelDef: { select: { panelType: true } } },
+                          include: { panelDef: { select: { panelType: true, colorRole: true } } },
                         },
                         sectionEntries: {
                           include: { section: { select: { id: true, name: true, displayOrder: true } } },
@@ -391,11 +394,13 @@ export const breedRouter = router({
 
       function stdIntersectionLabel(perBaseAdded: Set<string>[], perBaseCoat: string[]): string | null {
         if (perBaseAdded.length === 0) return null
-        const common = perBaseAdded.reduce<Set<string>>((acc, s) => {
+        const firstCoat = perBaseCoat[0]
+        if (!firstCoat) return null
+        const common = perBaseAdded.slice(1).reduce<Set<string>>((acc, s) => {
           const r = new Set<string>(); for (const w of acc) if (s.has(w)) r.add(w); return r
-        })
+        }, new Set(perBaseAdded[0]))
         if (common.size === 0) return null
-        return perBaseCoat[0].split(" ").filter(w => common.has(w)).join(" ")
+        return firstCoat.split(" ").filter(w => common.has(w)).join(" ")
       }
 
       function stdRemoveSupersets(names: string[]): string[] {

@@ -12,12 +12,24 @@ function OpsSeasons() {
   const { data: seasons } = trpc.admin.ops.seasons.list.useQuery(
     { gameId: gameId! },
     {},
-  )
+  ) as { data: Array<{
+    id: string
+    name: string
+    startsAt: Date | string | null
+    endsAt: Date | string | null
+    _count: { rankings: number }
+  }> | undefined }
 
   const { data: competitions } = trpc.admin.ops.seasons.getCompetitions.useQuery(
     { gameId: gameId!, status: "OPEN" },
     {},
-  )
+  ) as { data: Array<{
+    id: string
+    status: string
+    createdAt: Date | string
+    venue: { name: string }
+    _count: { entries: number }
+  }> | undefined }
 
   const now = new Date()
 
@@ -57,7 +69,7 @@ function OpsSeasons() {
                     </td>
                     <td className="px-3 py-2 text-xs text-muted-foreground">{s.startsAt ? new Date(s.startsAt).toLocaleDateString() : "—"}</td>
                     <td className="px-3 py-2 text-xs text-muted-foreground">{s.endsAt ? new Date(s.endsAt).toLocaleDateString() : "—"}</td>
-                    <td className="px-3 py-2 tabular-nums text-muted-foreground">{s._count.seasonRankings}</td>
+                    <td className="px-3 py-2 tabular-nums text-muted-foreground">{s._count.rankings}</td>
                   </tr>
                 )
               })}
@@ -88,7 +100,7 @@ function OpsSeasons() {
                   <td className="px-3 py-2">
                     <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">{c.status}</span>
                   </td>
-                  <td className="px-3 py-2 tabular-nums text-muted-foreground">{c._count.competitionEntries}</td>
+                  <td className="px-3 py-2 tabular-nums text-muted-foreground">{c._count.entries}</td>
                   <td className="px-3 py-2 text-xs text-muted-foreground">{new Date(c.createdAt).toLocaleString()}</td>
                 </tr>
               ))}

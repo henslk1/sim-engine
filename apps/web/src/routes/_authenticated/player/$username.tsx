@@ -622,7 +622,7 @@ function PlayerProfilePage() {
   const showFriends = isOwn || getVisible("FRIENDS")
   const friendCount = profile._count.friendshipsAsPlayerOne + profile._count.friendshipsAsPlayerTwo
 
-  const speciesName = profile.animalsOwned[0]?.breed.species.name
+  const speciesName = profile.animalsOwned[0]?.breed?.species.name
   const speciesNamePlural = speciesName ? `${speciesName}s` : "Animals"
 
   const memberSince = new Date(profile.createdAt).toLocaleDateString(undefined, {

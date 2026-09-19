@@ -19,6 +19,23 @@ const emptyLocus = (): LocusForm => ({ name: "", biasTarget: "NONE", minTestCycl
 type AlleleRow = { symbol: string; isAvailable: boolean }
 const emptyAllele = (): AlleleRow => ({ symbol: "", isAvailable: false })
 
+type LocusSummary = {
+  id: string
+  name: string
+  biasTarget: "FAVORABILITY" | "RARITY" | "NONE"
+  minTestCycle: number | null
+  description: unknown
+  isHiddenModifier: boolean
+  inheritanceWeight: number
+  panelEntries: Array<{
+    id: string
+    panelDef: { id: string; name: string; panelType: string }
+  }>
+  _count: { alleles: number }
+}
+
+type PanelSummary = { id: string; name: string; panelType: string }
+
 const PANEL_TYPE_LABELS: Record<string, string> = {
   HEALTH: "Health",
   CONFORMATION: "Conformation",
@@ -28,8 +45,12 @@ const PANEL_TYPE_LABELS: Record<string, string> = {
 function LociPage() {
   const { gameId } = Route.useParams()
 
-  const { data: loci } = trpc.admin.locus.list.useQuery({ gameId: gameId! }, {})
-  const { data: allPanels } = trpc.admin.panel.list.useQuery({ gameId: gameId! }, {})
+  const { data: loci } = trpc.admin.locus.list.useQuery({ gameId: gameId! }, {}) as {
+    data: LocusSummary[] | undefined
+  }
+  const { data: allPanels } = trpc.admin.panel.list.useQuery({ gameId: gameId! }, {}) as {
+    data: PanelSummary[] | undefined
+  }
 
   const utils = trpc.useUtils()
   const saveLocus = trpc.admin.locus.save.useMutation({
@@ -74,7 +95,7 @@ function LociPage() {
   const [newAllele, setNewAllele] = useState<AlleleRow>(emptyAllele())
   const [selectedPanelId, setSelectedPanelId] = useState("")
 
-  function openEdit(locus: NonNullable<typeof loci>[number]) {
+  function openEdit(locus: LocusSummary) {
     setEditing({ id: locus.id, name: locus.name, biasTarget: locus.biasTarget, minTestCycle: locus.minTestCycle ?? null, description: (locus.description as object | null) ?? null, isHiddenModifier: locus.isHiddenModifier, inheritanceWeight: locus.inheritanceWeight })
     setRightTab("alleles")
     setEditingAlleleId(null)
@@ -108,8 +129,8 @@ function LociPage() {
   }
 
   // Build grouped loci for list view
-  const panelGroups = new Map<string, { id: string; name: string; panelType: string; loci: NonNullable<typeof loci> }>()
-  const uncategorized: NonNullable<typeof loci> = []
+  const panelGroups = new Map<string, { id: string; name: string; panelType: string; loci: LocusSummary[] }>()
+  const uncategorized: LocusSummary[] = []
   for (const locus of loci ?? []) {
     if (locus.panelEntries.length === 0) {
       uncategorized.push(locus)
@@ -352,7 +373,7 @@ function LociPage() {
 
   const COLS = 5
 
-  function LocusRows({ rows }: { rows: NonNullable<typeof loci> }) {
+  function LocusRows({ rows }: { rows: LocusSummary[] }) {
     return (
       <>
         {rows.map((l) => (

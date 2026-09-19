@@ -46,6 +46,8 @@ export function OwnerView({ animal, animalId, playerAccountId }: { animal: Anima
   const { mutate: advanceAge, isPending: advancePending } = trpc.animal.advanceAge.useMutation({
     onSuccess: (data) => {
       if (data?.pregnancyCompleted) setBirthPregnancyId(data.pregnancyCompleted)
+      if (data?.tutorialConditionResolved) window.dispatchEvent(new Event("tutorial:conditionResolved"))
+      window.dispatchEvent(new Event("tutorial:ageAdvanced"))
       invalidate()
     },
   })
@@ -97,7 +99,7 @@ export function OwnerView({ animal, animalId, playerAccountId }: { animal: Anima
           <div className="grid w-full max-w-lg grid-cols-5 gap-x-4 gap-y-2">
           {(
             [
-              { label: "Energy", value: animal.energy?.currentEnergy ?? 0, max: animal.energy?.maxEnergy ?? 100, tone: "energy" as const, threshold: config.overworkInjuryThreshold > 0 ? config.overworkInjuryThreshold : undefined },
+              { label: "Energy", value: animal.energy?.currentEnergy ?? 0, max: animal.energy?.maxEnergy ?? 100, tone: "energy" as const, threshold: (config?.overworkInjuryThreshold ?? 0) > 0 ? config?.overworkInjuryThreshold ?? undefined : undefined },
               { label: "Mood", value: animal.mood?.value ?? 0, max: 100, tone: "mood" as const },
               { label: "Condition", value: animal.condition?.value ?? 0, max: 100, tone: "condition" as const },
               { label: "Care", value: animal.careScore?.score ?? 0, max: 100, tone: "care" as const },

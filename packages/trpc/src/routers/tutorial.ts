@@ -980,7 +980,7 @@ export const tutorialRouter = router({
       })
       if (!premiumCurrency) throw new Error("No premium currency configured")
 
-      const AMOUNT = 2
+      const AMOUNT = 3
 
       const existing = await db.playerBalance.findUnique({
         where: { playerAccountId_currencyDefId: { playerAccountId: player.id, currencyDefId: premiumCurrency.id } },
@@ -1088,7 +1088,7 @@ export const tutorialRouter = router({
     .query(async ({ ctx, input }) => {
       const player = await db.playerAccount.findUnique({
         where: { userId_gameId: { userId: ctx.userId, gameId: input.gameId } },
-        select: { id: true, tutorialAnimalPair: { select: { ancestorOneId: true } } },
+        select: { id: true, seniority: { select: { tutorialDriverStep: true } }, tutorialAnimalPair: { select: { ancestorOneId: true } } },
       })
       if (!player?.tutorialAnimalPair) throw new TRPCError({ code: "NOT_FOUND" })
       const mare = await db.animal.findUniqueOrThrow({
@@ -1129,7 +1129,8 @@ export const tutorialRouter = router({
         preferredTerrain: mare.preferredTerrain as string[],
         preferredClimate: mare.preferredClimate as string[],
         currentTier: tier?.tierDef ?? null,
-        hasCompeted: !!priorCompetition,
+        hasCompeted: !!priorCompetition && player.seniority?.tutorialDriverStep !== 96,
+        isUnguidedPhase: player.seniority?.tutorialDriverStep === 96,
         competitionNpcCount: competitionStep?.competitionNpcCount ?? 4,
       }
     }),
@@ -1141,15 +1142,19 @@ export const tutorialRouter = router({
 
       const player = await db.playerAccount.findUnique({
         where: { userId_gameId: { userId: ctx.userId, gameId } },
-        select: { id: true },
+        select: { id: true, seniority: { select: { tutorialDriverStep: true } } },
       })
       if (!player) throw new Error("Player not found")
 
-      const priorCompetition = await db.competition.findFirst({
-        where: { tutorialPlayerAccountId: player.id },
-        select: { id: true },
-      })
-      if (priorCompetition) return { competitionId: priorCompetition.id, alreadyEntered: true }
+      const isUnguidedPhase = player.seniority?.tutorialDriverStep === 96
+
+      if (!isUnguidedPhase) {
+        const priorCompetition = await db.competition.findFirst({
+          where: { tutorialPlayerAccountId: player.id },
+          select: { id: true },
+        })
+        if (priorCompetition) return { competitionId: priorCompetition.id, alreadyEntered: true }
+      }
 
       const pair = await db.tutorialAnimalPair.findUnique({
         where: { playerAccountId: player.id },
@@ -1168,11 +1173,21 @@ export const tutorialRouter = router({
       })
       if (!mare.secondaryDisciplineDefId) throw new Error("Mare has no secondary discipline")
 
-      const stepDef = await db.tutorialStepDef.findFirst({
-        where: { gameId, competitionNpcCount: { not: null } },
-        orderBy: { stepIndex: "desc" },
-        select: { competitionNpcCount: true, completionTarget: true },
-      })
+      const [competitionStep, tierTargetStep] = await Promise.all([
+        db.tutorialStepDef.findFirst({
+          where: { gameId, competitionNpcCount: { not: null } },
+          orderBy: { stepIndex: "desc" },
+          select: { competitionNpcCount: true },
+        }),
+        db.tutorialStepDef.findFirst({
+          where: { gameId, completionCondition: "COMPETITION_TIER" },
+          orderBy: { stepIndex: "desc" },
+          select: { completionTarget: true },
+        }),
+      ])
+      if (isUnguidedPhase && tierTargetStep?.completionTarget == null) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Set a competition tier completion target for the tutorial before continuing." })
+      }
 
       const venue = await db.venue.findFirst({
         where: { id: venueId, gameId },
@@ -1216,6 +1231,20 @@ export const tutorialRouter = router({
       const energy = await db.animalEnergy.findUniqueOrThrow({ where: { animalId: mare.id } })
       if (energy.currentEnergy < energyCost) throw new Error("Not enough energy to compete")
 
+      if (isUnguidedPhase) {
+        const gameConfig = await db.gameConfig.findFirstOrThrow({ where: { gameId }, select: { overworkInjuryThreshold: true } })
+        if (energy.currentEnergy - energyCost < gameConfig.overworkInjuryThreshold) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Your mare needs rest before competing again. Advance her age to restore energy." })
+        }
+        const [careTotal, careDone] = await Promise.all([
+          db.careActionDef.count({ where: { gameId } }),
+          db.careLog.count({ where: { animalId: mare.id, cycleNumber: mare.ageInCycles } }),
+        ])
+        if (careTotal > 0 && careDone < careTotal) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Complete her daily care before entering another competition." })
+        }
+      }
+
       const entryFee = animalTier.tierDef.entryFee
       let baseCurrencyId: string | null = null
       if (entryFee > 0) {
@@ -1244,7 +1273,7 @@ export const tutorialRouter = router({
         }, 0) * 100,
       )
 
-      const npcCount = stepDef?.competitionNpcCount ?? 4
+      const npcCount = competitionStep?.competitionNpcCount ?? 4
       const npcEntries = Array.from({ length: npcCount }, (_, i) => {
         const npcStats = discipline.statWeights.map(w => {
           const mareVal = Math.max(mareStatMap.get(w.statDefId) ?? 0, 1)
@@ -1269,12 +1298,16 @@ export const tutorialRouter = router({
 
       return db.$transaction(async (tx) => {
         // Seed 3 historical competition results so comp history tab looks populated.
+        // Guard with an existence check so repeated unguided-phase calls don't duplicate them.
+        const existingHistoricalCount = await tx.competition.count({
+          where: { tutorialPlayerAccountId: player.id, status: "COMPLETED" },
+        })
         const historicalVariants = [
           { daysAgo: 21, placement: 2, scoreMult: 0.88 },
           { daysAgo: 14, placement: 1, scoreMult: 0.94 },
           { daysAgo: 7,  placement: 3, scoreMult: 0.91 },
         ]
-        for (const v of historicalVariants) {
+        if (existingHistoricalCount === 0) for (const v of historicalVariants) {
           const pastDate = new Date(now.getTime() - v.daysAgo * 24 * 3600 * 1000)
           const histComp = await tx.competition.create({
             data: {
@@ -1393,7 +1426,6 @@ export const tutorialRouter = router({
           where: { animalId_disciplineDefId_weekStart: { animalId: mare.id, disciplineDefId: discipline.id, weekStart } },
         })
 
-        let advanced = false
         let newTierIndex: number | null = null
 
         if (animalTier!.tierDef.advancementThreshold !== null && weeklyRecord.points >= animalTier!.tierDef.advancementThreshold) {
@@ -1415,37 +1447,25 @@ export const tutorialRouter = router({
                 context: { newTierName: nextTier.name, disciplineName: discipline.name },
               },
             })
-            advanced = true
             newTierIndex = nextTier.tierIndex
           }
         }
 
-        // Create 9 additional open competitions for the unguided competing phase.
-        const openExpiresAt = new Date(now.getTime() + 7 * 24 * 3600 * 1000)
-        for (let i = 0; i < 9; i++) {
-          await tx.competition.create({
-            data: {
-              gameId,
-              venueId: venue.id,
-              disciplineDefId: discipline.id,
-              tierDefId: animalTier!.tierDefId,
-              name: `${discipline.name} — ${animalTier!.tierDef.name}`,
-              maxEntries: npcCount + 10,
-              maxWaitHours: 168,
-              status: "OPEN",
-              tutorialPlayerAccountId: player.id,
-              expiresAt: openExpiresAt,
-            },
-          })
-        }
+        // The first guided entry may already have reached the target tier.
+        // Signal completion once the mare is at or beyond the configured target.
+        const tutorialTierReached = isUnguidedPhase &&
+          tierTargetStep?.completionTarget !== null &&
+          tierTargetStep?.completionTarget !== undefined &&
+          (newTierIndex ?? animalTier!.tierDef.tierIndex) >= tierTargetStep.completionTarget
 
         return {
           competitionId: competition.id,
           placement: 1,
           score: Math.round(mareScore * 100) / 100,
           npcEntries,
-          advanced,
+          advanced: tutorialTierReached,
           newTierIndex,
+          disciplineName: discipline.name,
           prizesAwarded,
         }
       })

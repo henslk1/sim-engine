@@ -60,6 +60,7 @@ export const animalAnimalRouter = router({
           ageInCycles: true,
           diedAt: true,
           causeOfDeath: true,
+          breedName: true,
           breed: { select: { id: true, name: true } },
           lifeStage: { select: { name: true } },
         },
@@ -139,7 +140,70 @@ export const animalAnimalRouter = router({
 
     advanceAge: publicProcedure
       .input(z.object({ animalId: z.string() }))
-      .mutation(({ input }) => advanceAnimalAging(db, input.animalId)),
+      .mutation(async ({ input }) => {
+        // Tutorial illness trigger: at step 98 ("Ready for Tomorrow") the next
+        // aging creates an unknown illness to introduce the vet exam flow.
+        const animalInfo = await db.animal.findUnique({
+          where: { id: input.animalId },
+          select: {
+            isTutorialAnimal: true,
+            gameId: true,
+            playerAccountId: true,
+            ageInCycles: true,
+            healthRecords: {
+              where: { isActive: true },
+              select: {
+                id: true,
+                treatmentRecords: {
+                  where: { isActive: true },
+                  select: { startedCycle: true, treatmentDef: { select: { durationCycles: true } } },
+                },
+              },
+            },
+          },
+        })
+        let triggerConditionDefId: string | null = null
+        if (animalInfo?.isTutorialAnimal && animalInfo.playerAccountId) {
+          const player = await db.playerAccount.findUnique({
+            where: { id: animalInfo.playerAccountId },
+            select: { seniority: { select: { tutorialDriverStep: true } } },
+          })
+          if (player?.seniority?.tutorialDriverStep === 98) {
+            const stepDef = await db.tutorialStepDef.findUnique({
+              where: { gameId_stepKey: { gameId: animalInfo.gameId, stepKey: "step_ready_for_tomorrow" } },
+              select: { triggerConditionDefId: true },
+            })
+            if (!stepDef?.triggerConditionDefId) throw new Error("The tutorial illness is not configured. Choose a trigger condition for Ready for Tomorrow.")
+            triggerConditionDefId = stepDef.triggerConditionDefId
+          }
+        }
+
+        let potentiallyResolvedRecordIds: string[] = []
+        if (animalInfo?.isTutorialAnimal) {
+          const newAge = (animalInfo.ageInCycles ?? 0) + 1
+          potentiallyResolvedRecordIds = animalInfo.healthRecords?.filter(hr =>
+            hr.treatmentRecords.some(t =>
+              t.treatmentDef.durationCycles != null && newAge >= t.startedCycle + t.treatmentDef.durationCycles
+            )
+          ).map(hr => hr.id) ?? []
+        }
+
+        const result = await advanceAnimalAging(db, input.animalId)
+        const tutorialConditionResolved = potentiallyResolvedRecordIds.length > 0 &&
+          await db.animalHealthRecord.count({ where: { id: { in: potentiallyResolvedRecordIds }, isActive: false } }) > 0
+        if (triggerConditionDefId) {
+          const existing = await db.animalHealthRecord.findFirst({
+            where: { animalId: input.animalId, conditionDefId: triggerConditionDefId, isActive: true },
+          })
+          if (!existing) {
+            await db.animalHealthRecord.create({
+              data: { animalId: input.animalId, conditionDefId: triggerConditionDefId, isActive: true },
+            })
+          }
+        }
+
+        return { ...result, tutorialConditionResolved }
+      }),
 
     castrate: publicProcedure
       .input(z.object({ animalId: z.string() }))

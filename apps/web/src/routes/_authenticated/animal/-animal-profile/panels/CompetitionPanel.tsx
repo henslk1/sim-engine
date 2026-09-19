@@ -8,7 +8,23 @@ import { isTourRunning } from "@/lib/tutorial"
 import { cn } from "@/lib/utils"
 import { getActiveRestrictions } from "../utils"
 
-type Cert = AnimalProfile["healthCertificates"][number]
+type Cert = {
+  isValid: boolean
+  expiresAtCycle: number
+  certDef: { id: string }
+}
+
+type EquippedItem = { itemDef: { id: string } }
+type EquipmentRequirement = {
+  id: string
+  quantity: number
+  itemDef: { id: string; name: string }
+}
+type CompetitionTier = {
+  disciplineDefId: string
+  disciplineDef: { equipmentRequirements: EquipmentRequirement[] }
+  tierDef: { name: string; advancementThreshold: number | null }
+}
 
 function InfoCard({ label, value }: { label: string; value: string }) {
   return (
@@ -58,8 +74,11 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
 
   const disc1 = animal.disciplineDef
   const disc2 = animal.secondaryDisciplineDef
-  const disc1Tier = disc1 ? animal.compTiers.find((t) => t.disciplineDefId === disc1.id) : null
-  const disc2Tier = disc2 ? animal.compTiers.find((t) => t.disciplineDefId === disc2.id) : null
+  const compTiers = animal.compTiers as CompetitionTier[]
+  const equippedItems = animal.equipment as EquippedItem[]
+  const healthCertificates = animal.healthCertificates as Cert[]
+  const disc1Tier = disc1 ? compTiers.find((tier) => tier.disciplineDefId === disc1.id) : null
+  const disc2Tier = disc2 ? compTiers.find((tier) => tier.disciplineDefId === disc2.id) : null
 
   const isPurebred = !!animal.breed && !animal.breed.isUnregistered
   const isInspected = animal.conformationScores.length > 0
@@ -79,7 +98,7 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
 
   function renderDiscipline(
     disc: { id: string; name: string; isConformation: boolean },
-    tier: AnimalProfile["compTiers"][number] | null | undefined,
+    tier: CompetitionTier | null | undefined,
     isSecondary = false
   ) {
     const weeklyPts = animal.weeklyPoints.find((p) => p.disciplineDefId === disc.id)?.points
@@ -151,10 +170,10 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
 
     // Sport discipline
     const allEquipmentMet = (tier?.disciplineDef.equipmentRequirements ?? []).every(
-      (req) => animal.equipment.filter((eq) => eq.itemDef.id === req.itemDef.id).length >= req.quantity
+      (req) => equippedItems.filter((equipment) => equipment.itemDef.id === req.itemDef.id).length >= req.quantity
     )
     const allCertsMet = requiredCertDefs.every((def) => {
-      const cert = animal.healthCertificates.find((c: Cert) => c.certDef.id === def.id)
+      const cert = healthCertificates.find((certificate) => certificate.certDef.id === def.id)
       return !!cert && cert.isValid && cert.expiresAtCycle > animal.ageInCycles
     })
 
@@ -166,9 +185,9 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
               <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Equipment</h4>
               <div className="space-y-1">
                 {tier!.disciplineDef.equipmentRequirements.map(
-                  (req: AnimalProfile["compTiers"][number]["disciplineDef"]["equipmentRequirements"][number]) => {
-                    const equipped = animal.equipment.filter(
-                      (eq: AnimalProfile["equipment"][number]) => eq.itemDef.id === req.itemDef.id
+                  (req) => {
+                    const equipped = equippedItems.filter(
+                      (equipment) => equipment.itemDef.id === req.itemDef.id
                     ).length
                     const met = equipped >= req.quantity
                     return (
@@ -196,7 +215,7 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
               <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Certificates</h4>
               <div className="space-y-1">
                 {requiredCertDefs.map((def) => {
-                  const cert = animal.healthCertificates.find((c: Cert) => c.certDef.id === def.id)
+                  const cert = healthCertificates.find((certificate) => certificate.certDef.id === def.id)
                   const met = !!cert && cert.isValid && cert.expiresAtCycle > animal.ageInCycles
                   return (
                     <div key={def.id} className="flex items-center gap-1.5 text-[11px]">

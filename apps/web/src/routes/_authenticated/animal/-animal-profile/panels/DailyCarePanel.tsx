@@ -1,7 +1,7 @@
 import { useState } from "react"
 import type { AnimalProfile } from "../types"
 import { Badge, ActionButton } from "@/components/game/ui"
-import { Heart, CheckCircle, Ban, CalendarClock, AlertTriangle, Loader2, CheckCircle2, Store } from "lucide-react"
+import { Heart, CheckCircle, Ban, AlertTriangle, Loader2, CheckCircle2, Store } from "lucide-react"
 import { getActiveRestrictions } from "../utils"
 import { cn } from "@/lib/utils"
 import { trpc } from "@/lib/trpc"

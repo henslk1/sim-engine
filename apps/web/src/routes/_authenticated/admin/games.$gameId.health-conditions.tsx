@@ -77,13 +77,41 @@ const emptyCreateRule = (): CreateRuleForm => ({ locusId: "", alleleOneId: "", a
 type CreateItemForm = { name: string; itemType: ItemType; category: ItemCategory }
 const emptyCreateItem = (): CreateItemForm => ({ name: "", itemType: "OTC_MEDICATION", category: "HEALTH" })
 
+type ConditionSummary = {
+  id: string
+  name: string
+  conditionType: "ILLNESS" | "INJURY"
+  isGenetic: boolean
+  isEpisodic: boolean
+  isFatal: boolean
+  moodEffect: number | null
+  energyEffect: number | null
+  onsetMinCycle: number | null
+  fatalityChance: number | null
+  fatalMaxCycle: number | null
+  flareupCooldownCycles: number | null
+  procedureFatalityRisk: number | null
+  suppressionItemDefId: string | null
+  baseWeight: number | null
+  description: unknown
+  _count: { behaviors: number }
+}
+
 function HealthConditionsPage() {
   const { gameId } = Route.useParams()
 
-  const { data: conditions } = trpc.admin.health.list.useQuery({ gameId: gameId! }, {})
-  const { data: careActions } = trpc.admin.care.list.useQuery({ gameId: gameId! }, {})
-  const { data: itemDefs } = trpc.admin.item.list.useQuery({ gameId: gameId! }, {})
-  const { data: loci } = trpc.admin.locus.list.useQuery({ gameId: gameId! })
+  const { data: conditions } = trpc.admin.health.list.useQuery({ gameId: gameId! }, {}) as {
+    data: ConditionSummary[] | undefined
+  }
+  const { data: careActions } = trpc.admin.care.list.useQuery({ gameId: gameId! }, {}) as {
+    data: Array<{ id: string; name: string }> | undefined
+  }
+  const { data: itemDefs } = trpc.admin.item.list.useQuery({ gameId: gameId! }, {}) as {
+    data: Array<{ id: string; name: string }> | undefined
+  }
+  const { data: loci } = trpc.admin.locus.list.useQuery({ gameId: gameId! }) as {
+    data: Array<{ id: string; name: string }> | undefined
+  }
   const { data: currencies } = trpc.admin.currency.list.useQuery({ gameId: gameId! })
 
   const utils = trpc.useUtils()
@@ -165,7 +193,7 @@ function HealthConditionsPage() {
   })
 
   // Genetics state
-  const [linkRuleId, setLinkRuleId] = useState("")
+  const [, setLinkRuleId] = useState("")
   const [linkLocusId, setLinkLocusId] = useState("")
   const [linkPhenotype, setLinkPhenotype] = useState("")
   const [linkEnvRisk, setLinkEnvRisk] = useState("0")
@@ -207,18 +235,14 @@ function HealthConditionsPage() {
     { conditionDefId: editing?.id! },
     { enabled: !!editing?.id && rightTab === "genetics" }
   )
-  const { data: availableRules } = trpc.admin.expression.listAvailableForCondition.useQuery(
-    { gameId: gameId!, conditionDefId: editing?.id! },
-    { enabled: !!editing?.id && rightTab === "genetics" }
-  )
   const { data: allLoci } = trpc.admin.locus.list.useQuery(
     { gameId: gameId! },
     { enabled: !!editing?.id && rightTab === "genetics" }
-  )
+  ) as { data: Array<{ id: string; name: string }> | undefined }
   const { data: linkLocusRules } = trpc.admin.expression.listByLocus.useQuery(
     { locusId: linkLocusId },
     { enabled: !!linkLocusId }
-  )
+  ) as { data: Array<{ phenotype: string }> | undefined }
   const addConditionLink = trpc.admin.expression.addConditionLink.useMutation({
     onSuccess: () => {
       utils.admin.expression.listByCondition.invalidate({ conditionDefId: editing?.id })
@@ -271,11 +295,11 @@ function HealthConditionsPage() {
     },
   })
   const saveItemInline = trpc.admin.item.save.useMutation({
-    onSuccess: (saved) => {
+    onSuccess: (saved: { id: string }) => {
       utils.admin.item.list.invalidate({ gameId: gameId! })
       setCreatingItem(false)
       setCreateItemForm(emptyCreateItem())
-      setNewItem({ itemDefId: saved.id, quantity: "1" })
+      setNewItem({ itemDefId: saved.id, quantity: "1", requiresEquipped: false })
     },
   })
 
@@ -310,7 +334,7 @@ function HealthConditionsPage() {
     },
   })
 
-  function openEdit(condition: NonNullable<typeof conditions>[number]) {
+  function openEdit(condition: ConditionSummary) {
     setEditing({
       id: condition.id, name: condition.name, conditionType: condition.conditionType,
       isGenetic: condition.isGenetic, isEpisodic: condition.isEpisodic, isFatal: condition.isFatal,

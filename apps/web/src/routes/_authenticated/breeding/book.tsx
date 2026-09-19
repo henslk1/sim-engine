@@ -54,7 +54,7 @@ function BookBreedingPage() {
   )
 
   const { mutate: acceptCover, isPending: acceptPending, error: acceptError } = trpc.breeding.cover.accept.useMutation({
-    onSuccess: (data, vars) => {
+    onSuccess: (data) => {
       utils.animalProfile.get.invalidate()
       const dam = dams.find((d) => d.id === selectedDamId)
       setResult({ conceived: data.conceived, damId: selectedDamId!, damName: dam?.name ?? "" })

@@ -16,7 +16,18 @@ function OpsEvents() {
   const { data: events, refetch } = trpc.admin.ops.events.list.useQuery(
     { gameId: gameId! },
     {},
-  )
+  ) as {
+    data: Array<{
+      id: string
+      eventType: string
+      configOverrides: unknown
+      startsAt: Date | string
+      endsAt: Date | string
+      isActive: boolean
+      isTemplate: boolean
+    }> | undefined
+    refetch: () => unknown
+  }
 
   const createMutation = trpc.admin.ops.events.create.useMutation({ onSuccess: () => { refetch(); setShowForm(false); resetForm() } })
   const updateMutation = trpc.admin.ops.events.update.useMutation({ onSuccess: () => { refetch() } })

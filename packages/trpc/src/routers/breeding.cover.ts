@@ -1,7 +1,7 @@
 import { db } from "@sim-engine/db"
 import { router, publicProcedure } from "../trpc.js"
 import { z } from "zod"
-import { generateOffspring, computePhenotypeDescription, computePhenotypeCodes, computeBreedingQuality, computeCOI, computeFixedFields, type ParentData } from "@sim-engine/engine"
+import { generateOffspring, computePhenotypeDescription, computePhenotypeCodes, computeBreedingQuality, computeCOI, computeFixedFields } from "@sim-engine/engine"
 
 async function buildBreedFreqMap(
   sireComp: Array<{ breedId: string; percentage: number }>,

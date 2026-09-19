@@ -13,8 +13,10 @@ export function NotesPanel({
   animalId: string
   readonly?: boolean
 }) {
+  const rawNotes = (animal as unknown as { notes: unknown }).notes
+  const notes = typeof rawNotes === "string" ? rawNotes : ""
   const [editing, setEditing] = useState(false)
-  const [value, setValue] = useState(animal.notes ?? "")
+  const [value, setValue] = useState(notes)
 
   const utils = trpc.useUtils()
   const { mutate: updateNotes, isPending } = trpc.animal.updateNotes.useMutation({
@@ -29,7 +31,7 @@ export function NotesPanel({
   }
 
   function handleCancel() {
-    setValue(animal.notes ?? "")
+    setValue(notes)
     setEditing(false)
   }
 
@@ -80,8 +82,8 @@ export function NotesPanel({
             </ActionButton>
           </div>
         </div>
-      ) : animal.notes ? (
-        <p className="whitespace-pre-wrap text-[11px] text-foreground">{animal.notes}</p>
+      ) : notes ? (
+        <p className="whitespace-pre-wrap text-[11px] text-foreground">{notes}</p>
       ) : (
         <p className="text-[11px] text-muted-foreground/60">No notes added yet.</p>
       )}

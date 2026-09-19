@@ -9,6 +9,7 @@ export const competitionTierAdminRouter = router({
       db.competitionTierDef.findMany({
         where: { disciplineDefId: input.disciplineDefId },
         orderBy: { tierIndex: "asc" },
+        include: { _count: { select: { tierPrizes: true } } },
       })
     ),
 

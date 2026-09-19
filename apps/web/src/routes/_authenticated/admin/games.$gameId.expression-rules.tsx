@@ -16,24 +16,37 @@ const emptyRule = (): RuleForm => ({ alleleOneId: "", alleleTwoId: "", phenotype
 const CLIMATES = ["HOT", "WARM", "COLD", "TEMPERATE"] as const
 const TERRAINS = ["FLAT", "COASTAL", "HILLY", "MOUNTAIN"] as const
 
+type AlleleSummary = { id: string; symbol: string }
+type ExpressionRuleSummary = {
+  id: string
+  alleleOneId: string
+  alleleTwoId: string
+  phenotype: string
+  numericModifier: number | null
+  alleleOne: { symbol: string }
+  alleleTwo: { symbol: string }
+  climateModifiers: Array<{ id: string; climate: string; modifier: number }>
+  terrainModifiers: Array<{ id: string; terrain: string; modifier: number }>
+}
+
 function ExpressionRulesPage() {
   const { gameId } = Route.useParams()
 
   const { data: loci } = trpc.admin.locus.list.useQuery(
     { gameId: gameId! },
     {}
-  )
+  ) as { data: Array<{ id: string; name: string }> | undefined }
 
   const [selectedLocusId, setSelectedLocusId] = useState<string | null>(null)
 
   const { data: alleles } = trpc.admin.locus.listAlleles.useQuery(
     { locusId: selectedLocusId! },
     { enabled: !!selectedLocusId }
-  )
+  ) as { data: AlleleSummary[] | undefined }
   const { data: rules } = trpc.admin.expression.listByLocus.useQuery(
     { locusId: selectedLocusId! },
     { enabled: !!selectedLocusId }
-  )
+  ) as { data: ExpressionRuleSummary[] | undefined }
 
   const utils = trpc.useUtils()
   const invalidateRules = () =>

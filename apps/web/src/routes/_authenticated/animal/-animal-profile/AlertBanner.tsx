@@ -17,6 +17,13 @@ const toneClass = {
   accent: "border-accent/30 bg-accent/10 text-accent-foreground",
 }
 
+type EquippedItem = { itemDef: { id: string } }
+type HealthCertificate = {
+  isValid: boolean
+  expiresAtCycle: number
+  certDef: { id: string }
+}
+
 function Banner({
   tone,
   icon,
@@ -43,7 +50,7 @@ export function AlertBanner({ animal }: { animal: AnimalProfile }) {
   const undiagnosedConditions = animal.healthRecords.filter((r) => r.isActive && !r.diagnosedAt)
   if (undiagnosedConditions.length > 0) {
     banners.push(
-      <Banner key="health" tone="danger" icon={<Stethoscope className="size-3.5 shrink-0" />}>
+      <Banner key="health" tone="danger" icon={<Stethoscope className="size-3.5 shrink-0" />} tutorialId="illness-alert-banner">
         Unknown illness
         {undiagnosedConditions.length > 1 && ` +${undiagnosedConditions.length - 1} more`}
         {" — "}Visit the vet
@@ -96,10 +103,9 @@ export function AlertBanner({ animal }: { animal: AnimalProfile }) {
   // Priority 4: Missing competition equipment
   const currentTier = animal.compTiers[0]
   if (animal.disciplineDef && currentTier) {
+    const equippedItems = animal.equipment as EquippedItem[]
     const missingEquipment = currentTier.disciplineDef.equipmentRequirements.filter((req) => {
-      const equipped = animal.equipment.filter(
-        (eq: AnimalProfile["equipment"][number]) => eq.itemDef.id === req.itemDef.id
-      ).length
+      const equipped = equippedItems.filter((equipment) => equipment.itemDef.id === req.itemDef.id).length
       return equipped < req.quantity
     })
     if (missingEquipment.length > 0) {
@@ -113,11 +119,10 @@ export function AlertBanner({ animal }: { animal: AnimalProfile }) {
 
   // Priority 5: Missing or expired health certificates
   if (animal.disciplineDef) {
+    const healthCertificates = animal.healthCertificates as HealthCertificate[]
     const requiredCertDefs = animal.game.healthCertificateDefs.filter((d) => d.requiredForCompetition)
     const missingCerts = requiredCertDefs.filter((def) => {
-      const cert = animal.healthCertificates.find(
-        (c: AnimalProfile["healthCertificates"][number]) => c.certDef.id === def.id
-      )
+      const cert = healthCertificates.find((certificate) => certificate.certDef.id === def.id)
       return !cert || !cert.isValid || cert.expiresAtCycle <= animal.ageInCycles
     })
     if (missingCerts.length > 0) {

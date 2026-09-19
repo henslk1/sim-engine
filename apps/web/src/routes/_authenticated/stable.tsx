@@ -20,7 +20,8 @@ type Animal = {
   sex: string
   image: string | null
   isPinned: boolean
-  breed: { id: string; name: string }
+  breed: { id: string; name: string } | null
+  breedName: string | null
   lifeStage: { name: string }
   subContainerId: string | null
   ageInCycles: number

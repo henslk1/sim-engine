@@ -43,7 +43,8 @@ type Competition = {
     animal: {
       id: string
       name: string
-      breed: { name: string }
+      breed: { name: string } | null
+      breedName: string | null
       conformationScores: { score: number; breedId: string }[]
     }
     entryStats: { trainedValue: number; statDef: { id: string } }[]
@@ -56,7 +57,8 @@ type AliveAnimal = {
   name: string
   status: string
   sex: string
-  breed: { id: string; name: string; isUnregistered: boolean }
+  breed: { id: string; name: string; isUnregistered: boolean } | null
+  breedName: string | null
   lifeStage: { name: string; stageIndex: number }
   disciplineDefId: string | null
   secondaryDisciplineDefId: string | null
@@ -412,7 +414,8 @@ function VenueDetailPage() {
     { gameId: gameId!, disciplineDefId: isConformation ? undefined : disciplineDefId, isConformation: isConformation ?? undefined },
     { enabled: !!gameId },
   )
-  const venueComps = (competitions?.filter((c) => c.venue.id === venueId) ?? []) as Competition[]
+  const competitionSummaries = (competitions ?? []) as Competition[]
+  const venueComps = competitionSummaries.filter((competition) => competition.venue.id === venueId)
 
   const utils = trpc.useUtils()
   const inspect = trpc.competition.inspect.useMutation({
@@ -426,9 +429,13 @@ function VenueDetailPage() {
     onError: (err) => setInspectError(err.message),
   })
   const compete = trpc.tutorial.compete.useMutation({
-    onSuccess: () => {
+    onSuccess: async (data) => {
       utils.animal.list.invalidate({ playerAccountId: playerAccountId! })
       utils.tutorial.venueInfo.invalidate({ gameId: gameId! })
+      if ("advanced" in data && data.advanced && initialAnimalId) {
+        await navigate({ to: "/animal/$animalId", params: { animalId: initialAnimalId } })
+        window.dispatchEvent(new CustomEvent("tutorial:tierAdvanced", { detail: { disciplineName: data.disciplineName } }))
+      }
     },
     onError: (err) => {
       setRowErrors(prev => ({ ...prev, 'tutorial-compete': err.message }))
@@ -577,8 +584,8 @@ function VenueDetailPage() {
 
   // Sports filter options
   const sportsDisciplineOptions = Object.entries(sportingByDiscipline).map(([id, comps]) => ({ id, name: comps[0].disciplineDef.name }))
-  const sportsSourceComps = sportsFilterDisciplineId ? (sportingByDiscipline[sportsFilterDisciplineId] ?? []) : Object.values(sportingByDiscipline).flat()
-  const sportsTierOptions = sportsSourceComps.reduce((acc, comp) => {
+  const sportsSourceComps: Competition[] = sportsFilterDisciplineId ? (sportingByDiscipline[sportsFilterDisciplineId] ?? []) : Object.values(sportingByDiscipline).flat()
+  const sportsTierOptions: { id: string; name: string; tierIndex: number }[] = sportsSourceComps.reduce((acc, comp) => {
     if (comp.tierDef && !acc.find((t) => t.id === comp.tierDef!.id)) acc.push(comp.tierDef)
     return acc
   }, [] as { id: string; name: string; tierIndex: number }[]).sort((a, b) => a.tierIndex - b.tierIndex)
@@ -744,16 +751,16 @@ function VenueDetailPage() {
                     <button
                       type="button"
                       data-tutorial="tutorial-compete-btn"
-                      disabled={compete.isPending || compete.isSuccess || tutorialInfo.hasCompeted || !playerAccountId}
+                      disabled={compete.isPending || (!tutorialInfo.isUnguidedPhase && compete.isSuccess) || tutorialInfo.hasCompeted || !playerAccountId}
                       onClick={() => { if (gameId && playerAccountId) compete.mutate({ gameId, venueId }) }}
                       className={cn(
                         "rounded-md px-3.5 py-1.5 text-xs font-semibold transition-colors disabled:opacity-40",
-                        compete.isSuccess || tutorialInfo.hasCompeted
+                        (!tutorialInfo.isUnguidedPhase && compete.isSuccess) || tutorialInfo.hasCompeted
                           ? "bg-chart-2/15 text-chart-2"
                           : "bg-primary text-primary-foreground hover:bg-primary/90",
                       )}
                     >
-                      {compete.isPending ? "Entering…" : compete.isSuccess || tutorialInfo.hasCompeted ? "Entered ✓" : "Enter"}
+                      {compete.isPending ? "Entering…" : (!tutorialInfo.isUnguidedPhase && compete.isSuccess) || tutorialInfo.hasCompeted ? "Entered ✓" : "Enter"}
                     </button>
                     {rowErrors['tutorial-compete'] && (
                       <span className="text-[10px] text-destructive">{rowErrors['tutorial-compete']}</span>

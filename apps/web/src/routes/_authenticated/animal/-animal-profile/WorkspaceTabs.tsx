@@ -9,6 +9,7 @@ import { GeneticsTab } from "./tabs/GeneticsTab"
 import { CompHistoryTab } from "./tabs/CompHistoryTab"
 import { OffspringTab } from "./tabs/OffspringTab"
 import { StatHistoryTab } from "./tabs/StatHistoryTab"
+import { getTutorialAccess } from "@/lib/tutorial/access"
 
 type WorkspaceTab = "pedigree" | "genetics" | "comp-history" | "offspring" | "stat-history" | "lore"
 
@@ -39,7 +40,11 @@ export function WorkspaceTabs({
   ]
   const visibleTabs = allTabs.filter((t) => !hideTabs.includes(t.id))
   const [activeTab, setActiveTab] = useState<WorkspaceTab>(
-    animal.lore ? "lore" : hideTabs.includes("genetics") ? (visibleTabs[0]?.id ?? "pedigree") : "genetics"
+    () => {
+      const tutorial = getTutorialAccess()
+      if (tutorial.restricted && tutorial.step >= 118 && tutorial.step <= 126) return "genetics"
+      return animal.lore ? "lore" : hideTabs.includes("genetics") ? (visibleTabs[0]?.id ?? "pedigree") : "genetics"
+    }
   )
 
   const { data: offspring, isLoading: offspringLoading } = trpc.animalProfile.getOffspring.useQuery(
@@ -52,14 +57,14 @@ export function WorkspaceTabs({
   )
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+    <div data-tutorial="genetics-workspace" className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm">
       <div className="flex shrink-0 flex-wrap items-center justify-center gap-1 border-b border-border bg-secondary/40 px-2 py-1.5">
         {visibleTabs.map(({ id, label, Icon }) => (
           <button
             key={id}
             type="button"
             onClick={() => setActiveTab(id)}
-            data-tutorial={id === "comp-history" ? "competition-history-tab" : undefined}
+            data-tutorial={id === "comp-history" ? "competition-history-tab" : id === "genetics" ? "genetics-tab" : undefined}
             className={cn(
               "inline-flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors",
               activeTab === id

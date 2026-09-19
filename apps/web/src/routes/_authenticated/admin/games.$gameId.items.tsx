@@ -11,6 +11,18 @@ const EFFECT_TYPES = ["IMMORTALITY", "SEX_CHANGE", "FREE_AGING", "BREEDING_SLOT_
 type ItemType = typeof ITEM_TYPES[number]
 type ItemCategory = typeof ITEM_CATEGORIES[number]
 
+type ItemSummary = {
+  id: string
+  name: string
+  description: string | null
+  itemType: string
+  category: string
+  effectType: string | null
+  effects: unknown
+  prizeEligible: boolean
+  isSellable: boolean
+}
+
 type ItemForm = {
   name: string
   description: string
@@ -38,7 +50,7 @@ function ItemsPage() {
   const { data: items } = trpc.admin.item.list.useQuery(
     { gameId: gameId! },
     {}
-  )
+  ) as { data: ItemSummary[] | undefined }
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editing, setEditing] = useState<ItemForm>(emptyForm())

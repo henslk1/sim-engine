@@ -1,6 +1,5 @@
 import type { ReactNode } from "react"
 import type { AnimalProfile } from "./types"
-import { Badge } from "@/components/game/ui"
 import { cn } from "@/lib/utils"
 import { GitBranch, Trophy, Award, Star } from "lucide-react"
 import { BREEDING_GRADE_COLOR, BREEDING_GRADE_BG, displaySex } from "./utils"

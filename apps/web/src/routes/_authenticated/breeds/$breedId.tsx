@@ -76,18 +76,6 @@ function SectionGroup({ name, children }: { name: string; children: React.ReactN
   )
 }
 
-function groupBySection<T extends { locus: { sectionEntries: { section: { id: string; name: string; displayOrder: number } }[] } }>(items: T[]) {
-  const map = new Map<string, { section: { id: string; name: string; displayOrder: number }; items: T[] }>()
-  for (const item of items) {
-    const se = item.locus.sectionEntries[0]
-    const key = se ? se.section.id : "__other"
-    const section = se ? se.section : { id: "__other", name: "Other", displayOrder: 999 }
-    if (!map.has(key)) map.set(key, { section, items: [] })
-    map.get(key)!.items.push(item)
-  }
-  return [...map.values()].sort((a, b) => a.section.displayOrder - b.section.displayOrder)
-}
-
 function HistoryTab({ breed, lifeExpectancyYears }: { breed: Breed; lifeExpectancyYears: number | null }) {
   const hasVitals = lifeExpectancyYears != null || breed.immunityMin != null || breed.preferredClimate || breed.preferredTerrain
 
@@ -124,7 +112,6 @@ function PersonalityRangeBar({
   min,
   max,
   baseline,
-  labelRanges,
 }: {
   min: number
   max: number
@@ -275,7 +262,6 @@ const COAT_ROLE_LABELS: Record<string, string> = {
 type CoatStandardDisplay = { role: string; names: string[] }[]
 
 function StandardTab({ breed, coatStandardDisplay }: { breed: Breed; coatStandardDisplay: CoatStandardDisplay }) {
-  const dqSections = groupBySection(breed.dqTraits)
 
   type LocusEntry = {
     locusId: string
