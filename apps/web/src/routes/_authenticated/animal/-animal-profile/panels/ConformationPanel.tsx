@@ -3,6 +3,8 @@ import { Panel } from "@/components/game/ui"
 import { Ruler, TriangleAlert, HelpCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { formatCycleAge } from "../utils"
+import { Link } from "@tanstack/react-router"
+import { useTutorialAccess } from "@/lib/tutorial/access"
 
 function letterGrade(score: number) {
   if (score >= 90) return "A"
@@ -24,7 +26,13 @@ function fmtEnumList(values: string[]): string {
   return values.map(v => v.charAt(0) + v.slice(1).toLowerCase()).join(" / ")
 }
 
-export function ConformationPanel({ animal }: { animal: AnimalProfile }) {
+export function ConformationPanel({ animal, readonly = false }: { animal: AnimalProfile; readonly?: boolean }) {
+  const tutorialAccess = useTutorialAccess()
+  // A visitor cannot inspect someone else's animal, and the tutorial never
+  // routes the player to an inspection show for the mare — in both cases the
+  // prompt below points at something they cannot do.
+  const isTutorialMare = !!tutorialAccess.mareId && tutorialAccess.mareId === animal.id
+  const hideInspectionPrompt = readonly || isTutorialMare
   const isCross = animal.breedComposition.length > 1
   const overallScore = animal.conformationScores[0]
   const minCycle = animal.game.gameConfig?.conformationInspectionMinCycle ?? 0
@@ -62,7 +70,7 @@ export function ConformationPanel({ animal }: { animal: AnimalProfile }) {
   )
 
   const action = !isCross && overallScore ? (
-    <span className="text-xs tabular-nums text-muted-foreground">
+    <span className="text-xs tabular-nums text-muted-foreground" data-tutorial="conformation-overall-score">
       <span className="font-semibold text-foreground">{overallScore.score.toFixed(1)}</span> / 100
     </span>
   ) : undefined
@@ -89,6 +97,8 @@ export function ConformationPanel({ animal }: { animal: AnimalProfile }) {
       <div className="space-y-3">
         {isCross ? (
           <p className="text-[11px] text-muted-foreground">Conformation scoring is only available for purebred animals.</p>
+        ) : !overallScore && hideInspectionPrompt ? (
+          <p className="text-[11px] text-muted-foreground">This horse has yet to be inspected.</p>
         ) : awaitingAge ? (
           <p className="text-[11px] text-muted-foreground">
             {firstCompetingStage
@@ -97,15 +107,25 @@ export function ConformationPanel({ animal }: { animal: AnimalProfile }) {
             }
           </p>
         ) : eligibleForInspection ? (
-          <p className="text-[11px] text-muted-foreground">
-            Visit a venue to enter the inspection show and reveal this animal's conformation score.
-          </p>
+          <div className="space-y-2">
+            <p className="text-[11px] text-muted-foreground">
+              Visit a venue to enter the inspection show and reveal this animal's conformation score.
+            </p>
+            <Link
+              to="/venues"
+              search={{ animalId: animal.id, isConformation: true, from: "animal" }}
+              data-tutorial="find-inspection-show"
+              className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary underline-offset-2 hover:underline"
+            >
+              Find an inspection show →
+            </Link>
+          </div>
         ) : !overallScore ? (
           <p className="text-[11px] text-muted-foreground">No section scores recorded</p>
         ) : sectionScores.length === 0 ? (
           <p className="text-[11px] text-muted-foreground">No section scores recorded</p>
         ) : (
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 gap-2" data-tutorial="conformation-section-scores">
             {sectionScores.map((ss) => {
               const grade = letterGrade(ss.score)
               const dqInSection = ss.section.entries

@@ -149,7 +149,7 @@ export function EquipModal({ animal, playerAccountId, onClose }: {
                 )
               })}
             </div>
-            <Link to="/shop" className="flex items-center gap-1 text-[10px] text-muted-foreground transition-colors hover:text-foreground">
+            <Link to="/shop" data-tutorial="shop-nav" className="flex items-center gap-1 text-[10px] text-muted-foreground transition-colors hover:text-foreground">
               <ShoppingBag className="size-3" />
               Shop
             </Link>
@@ -163,7 +163,7 @@ export function EquipModal({ animal, playerAccountId, onClose }: {
                 <p className="text-sm text-muted-foreground">
                   {availableTabs.length === 0 ? "No items in inventory." : `No ${CATEGORY_LABEL[activeCategory].toLowerCase()} items.`}
                 </p>
-                <Link to="/shop" className="mt-1 text-xs text-primary hover:underline">Visit the shop</Link>
+                <Link to="/shop" data-tutorial="shop-nav" className="mt-1 text-xs text-primary hover:underline">Visit the shop</Link>
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-2.5">

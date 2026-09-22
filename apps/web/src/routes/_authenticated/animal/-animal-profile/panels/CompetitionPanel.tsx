@@ -7,6 +7,7 @@ import { trpc } from "@/lib/trpc"
 import { isTourRunning } from "@/lib/tutorial"
 import { cn } from "@/lib/utils"
 import { getActiveRestrictions } from "../utils"
+import { useTutorialAccess } from "@/lib/tutorial/access"
 
 type Cert = {
   isValid: boolean
@@ -18,6 +19,7 @@ type EquippedItem = { itemDef: { id: string } }
 type EquipmentRequirement = {
   id: string
   quantity: number
+  requirementGroup: string | null
   itemDef: { id: string; name: string }
 }
 type CompetitionTier = {
@@ -26,9 +28,19 @@ type CompetitionTier = {
   tierDef: { name: string; advancementThreshold: number | null }
 }
 
-function InfoCard({ label, value }: { label: string; value: string }) {
+// Monday-based UTC week, matching how the engine buckets points in competition/run.ts.
+function currentWeekStart() {
+  const now = new Date()
+  const day = now.getUTCDay()
+  const start = new Date(now)
+  start.setUTCDate(now.getUTCDate() - (day === 0 ? 6 : day - 1))
+  start.setUTCHours(0, 0, 0, 0)
+  return start.getTime()
+}
+
+function InfoCard({ label, value, tutorialKey }: { label: string; value: string; tutorialKey?: string }) {
   return (
-    <div className="rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2">
+    <div className="rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2" data-tutorial={tutorialKey}>
       <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
       <p className="text-sm font-semibold text-foreground">{value}</p>
     </div>
@@ -55,6 +67,7 @@ function VenuesButton({ to, search, disabled, tutorialKey }: { to: string; searc
 }
 
 export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalProfile; readonly?: boolean }) {
+  const tutorialAccess = useTutorialAccess()
   const canCompete = animal.lifeStage.canCompete
   const [activeTabIndex, setActiveTabIndex] = useState<0 | 1>(0)
   const [selectedDisciplineId, setSelectedDisciplineId] = useState("")
@@ -71,9 +84,17 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
     (d.minLifeStageIndex === null || stageIndex >= d.minLifeStageIndex) &&
     (d.maxLifeStageIndex === null || stageIndex <= d.maxLifeStageIndex)
   )
+  const selectablePrimaryDisciplines = tutorialAccess.restricted && tutorialAccess.step === 192
+    ? disciplinesForStage?.filter(d => d.isConformation && d.name === "Weanling Halter")
+    : disciplinesForStage
 
   const disc1 = animal.disciplineDef
   const disc2 = animal.secondaryDisciplineDef
+  // The discipline tab bar only renders with two disciplines, and its active
+  // label already names the discipline — so the Discipline card directly below
+  // it is pure duplication. Dropping it gives the remaining cards ~143px each
+  // instead of 92px, which is what was wrapping the longer names.
+  const hasDisciplineTabs = !!disc1 && !!disc2
   const compTiers = animal.compTiers as CompetitionTier[]
   const equippedItems = animal.equipment as EquippedItem[]
   const healthCertificates = animal.healthCertificates as Cert[]
@@ -91,6 +112,7 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
     onSuccess: () => { setIsAddingSecond(false); setSelectedSecondDisciplineId(""); invalidate() },
   })
 
+  const weekStart = currentWeekStart()
   const restrictions = getActiveRestrictions(animal)
   const isRestricted = restrictions.has("COMPETITION") || restrictions.has("ALL")
 
@@ -101,8 +123,78 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
     tier: CompetitionTier | null | undefined,
     isSecondary = false
   ) {
-    const weeklyPts = animal.weeklyPoints.find((p) => p.disciplineDefId === disc.id)?.points
+    // Only this week's row counts — the query returns prior weeks too, and without
+    // the week check a discipline the animal hasn't competed in since last week
+    // would show that week's stale total. Weekly points drive invitational
+    // eligibility, so they are shown as their own figure.
+    const weeklyPts = animal.weeklyPoints.find(
+      (p) => p.disciplineDefId === disc.id && new Date(p.weekStart).getTime() === weekStart
+    )?.points
+    // Tier progress is the career total in the discipline, matching how the
+    // server advances tiers. Using the weekly figure here made the bar reset
+    // every Monday and disagree with the animal's own competition history.
+    const careerPts = animal.competitionEntries.reduce(
+      (sum, e) => e.competition.disciplineDef.id === disc.id ? sum + (e.result?.score ?? 0) : sum,
+      0
+    )
     const startingTierDef = allDisciplines?.find((d) => d.id === disc.id)?.compTierDefs?.[0]
+    const equipmentRequirements = tier?.disciplineDef.equipmentRequirements ?? []
+    const individualRequirements = equipmentRequirements.filter(req => !req.requirementGroup)
+    const groupedRequirements = new Map<string, EquipmentRequirement[]>()
+    for (const requirement of equipmentRequirements) {
+      if (!requirement.requirementGroup) continue
+      groupedRequirements.set(requirement.requirementGroup, [...(groupedRequirements.get(requirement.requirementGroup) ?? []), requirement])
+    }
+    const requirementMet = (req: EquipmentRequirement) => equippedItems.filter((equipment) => equipment.itemDef.id === req.itemDef.id).length >= req.quantity
+    const allEquipmentMet = individualRequirements.every(requirementMet) && [...groupedRequirements.values()].every(group => group.some(requirementMet))
+    const allCertsMet = requiredCertDefs.every((def) => {
+      const cert = healthCertificates.find((certificate) => certificate.certDef.id === def.id)
+      return !!cert && cert.isValid && cert.expiresAtCycle >= animal.ageInCycles
+    })
+
+    // Equipment and certificates are the owner's to satisfy. For a visitor this
+    // collapses to null so the views below fall through to the discipline, tier
+    // and progress cards — seeing another animal's progress is the point.
+    const missingRequirements = !readonly && (!allEquipmentMet || !allCertsMet) ? (
+      <div className="space-y-3" data-tutorial={isSecondary ? "secondary-missing-equipment" : "competition-missing-requirements"}>
+        {equipmentRequirements.length > 0 && (
+          <div data-tutorial={isSecondary ? "secondary-equipment-section" : "competition-equipment-requirements"}>
+            <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Equipment</h4>
+            <div className="space-y-1">
+              {equipmentRequirements.map((req) => {
+                const equipped = equippedItems.filter((equipment) => equipment.itemDef.id === req.itemDef.id).length
+                const met = equipped >= req.quantity
+                return (
+                  <div key={req.id} className="flex items-center gap-1.5 text-[11px]">
+                    {met ? <CheckCircle className="size-3.5 shrink-0 text-chart-2" /> : <XCircle className="size-3.5 shrink-0 text-destructive" />}
+                    <span className={met ? "text-foreground" : "text-destructive"}>{req.itemDef.name}</span>
+                    {req.quantity > 1 && <span className="ml-auto tabular-nums text-muted-foreground">{equipped}/{req.quantity}</span>}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+        {requiredCertDefs.length > 0 && (
+          <div data-tutorial="competition-cert-requirements">
+            <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Certificates</h4>
+            <div className="space-y-1">
+              {requiredCertDefs.map((def) => {
+                const cert = healthCertificates.find((certificate) => certificate.certDef.id === def.id)
+                const met = !!cert && cert.isValid && cert.expiresAtCycle >= animal.ageInCycles
+                return (
+                  <div key={def.id} className="flex items-center gap-1.5 text-[11px]">
+                    {met ? <CheckCircle className="size-3.5 shrink-0 text-chart-2" /> : <XCircle className="size-3.5 shrink-0 text-destructive" />}
+                    <span className={met ? "text-foreground" : "text-destructive"}>{def.name}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+        {!readonly && <ActionButton variant="soft" className="w-full justify-center" disabled><MapPin className="size-3.5" />Browse Venues</ActionButton>}
+      </div>
+    ) : null
 
     if (disc.isConformation) {
       if (!isPurebred) {
@@ -115,8 +207,8 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
               Enter an inspection show at a venue to reveal this animal's conformation score.
             </p>
             <div className="pointer-events-none opacity-40">
-              <div className="grid grid-cols-3 gap-2">
-                <InfoCard label="Discipline" value={disc.name} />
+              <div className={cn("grid gap-2", hasDisciplineTabs ? "grid-cols-2" : "grid-cols-3")}>
+                {!hasDisciplineTabs && <InfoCard label="Discipline" value={disc.name} />}
                 <InfoCard label="Current Tier" value="—" />
                 <InfoCard label="Weekly Points" value="— pts" />
               </div>
@@ -139,112 +231,42 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
           </div>
         )
       }
+      if (missingRequirements) return missingRequirements
       const tierName = tier?.tierDef.name ?? startingTierDef?.name
       const threshold = tier?.tierDef.advancementThreshold ?? startingTierDef?.advancementThreshold
       return (
         <div className="space-y-2">
-          <div className="grid grid-cols-3 gap-2">
-            <InfoCard label="Discipline" value={disc.name} />
-            <InfoCard label="Current Tier" value={tierName ?? "—"} />
+          <div className={cn("grid gap-2", hasDisciplineTabs ? "grid-cols-2" : "grid-cols-3")}>
+            {!hasDisciplineTabs && <InfoCard label="Discipline" value={disc.name} />}
+            <InfoCard label="Current Tier" value={tierName ?? "—"} tutorialKey="tutorial-compete-tier-info" />
             <InfoCard label="Weekly Points" value={weeklyPts !== undefined ? `${Math.round(weeklyPts)} pts` : "—"} />
           </div>
           {threshold != null && (
-            <div className="rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2">
+            <div className="rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2" data-tutorial="tutorial-tier-progress">
               <div className="mb-1.5 flex items-center justify-between">
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                   Progress to Next Tier
                 </p>
                 <span className="text-[11px] tabular-nums text-muted-foreground">
-                  {weeklyPts !== undefined ? Math.round(weeklyPts) : 0} / {Math.round(threshold)}
+                  {Math.round(careerPts)} / {Math.round(threshold)}
                 </span>
               </div>
-              <Meter value={weeklyPts ?? 0} max={threshold} tone="condition" className="h-1.5" />
+              <Meter value={careerPts} max={threshold} tone="condition" className="h-1.5" />
             </div>
           )}
           {!readonly && (
-            <VenuesButton to="/venues" search={{ animalId: animal.id, from: "animal" }} disabled={isRestricted} tutorialKey={isSecondary ? "view-venues-btn" : undefined} />
+            <VenuesButton to="/venues" search={{ animalId: animal.id, from: "animal" }} disabled={isRestricted} tutorialKey="view-venues-btn" />
           )}
         </div>
       )
     }
 
-    // Sport discipline
-    const allEquipmentMet = (tier?.disciplineDef.equipmentRequirements ?? []).every(
-      (req) => equippedItems.filter((equipment) => equipment.itemDef.id === req.itemDef.id).length >= req.quantity
-    )
-    const allCertsMet = requiredCertDefs.every((def) => {
-      const cert = healthCertificates.find((certificate) => certificate.certDef.id === def.id)
-      return !!cert && cert.isValid && cert.expiresAtCycle > animal.ageInCycles
-    })
-
-    if (!allEquipmentMet || !allCertsMet) {
-      return (
-        <div className="space-y-3" data-tutorial={isSecondary ? "secondary-missing-equipment" : undefined}>
-          {(tier?.disciplineDef.equipmentRequirements.length ?? 0) > 0 && (
-            <div data-tutorial={isSecondary ? "secondary-equipment-section" : undefined}>
-              <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Equipment</h4>
-              <div className="space-y-1">
-                {tier!.disciplineDef.equipmentRequirements.map(
-                  (req) => {
-                    const equipped = equippedItems.filter(
-                      (equipment) => equipment.itemDef.id === req.itemDef.id
-                    ).length
-                    const met = equipped >= req.quantity
-                    return (
-                      <div key={req.id} className="flex items-center gap-1.5 text-[11px]">
-                        {met ? (
-                          <CheckCircle className="size-3.5 shrink-0 text-chart-2" />
-                        ) : (
-                          <XCircle className="size-3.5 shrink-0 text-destructive" />
-                        )}
-                        <span className={met ? "text-foreground" : "text-destructive"}>{req.itemDef.name}</span>
-                        {req.quantity > 1 && (
-                          <span className="ml-auto tabular-nums text-muted-foreground">
-                            {equipped}/{req.quantity}
-                          </span>
-                        )}
-                      </div>
-                    )
-                  }
-                )}
-              </div>
-            </div>
-          )}
-          {requiredCertDefs.length > 0 && (
-            <div data-tutorial="competition-cert-requirements">
-              <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Certificates</h4>
-              <div className="space-y-1">
-                {requiredCertDefs.map((def) => {
-                  const cert = healthCertificates.find((certificate) => certificate.certDef.id === def.id)
-                  const met = !!cert && cert.isValid && cert.expiresAtCycle > animal.ageInCycles
-                  return (
-                    <div key={def.id} className="flex items-center gap-1.5 text-[11px]">
-                      {met ? (
-                        <CheckCircle className="size-3.5 shrink-0 text-chart-2" />
-                      ) : (
-                        <XCircle className="size-3.5 shrink-0 text-destructive" />
-                      )}
-                      <span className={met ? "text-foreground" : "text-destructive"}>{def.name}</span>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-          {!readonly && (
-            <ActionButton variant="soft" className="w-full justify-center" disabled>
-              <MapPin className="size-3.5" />
-              Browse Venues
-            </ActionButton>
-          )}
-        </div>
-      )
-    }
+    if (missingRequirements) return missingRequirements
 
     return (
       <div className="space-y-2">
-        <div className="grid grid-cols-3 gap-2">
-          <InfoCard label="Discipline" value={disc.name} />
+        <div className={cn("grid gap-2", hasDisciplineTabs ? "grid-cols-2" : "grid-cols-3")}>
+          {!hasDisciplineTabs && <InfoCard label="Discipline" value={disc.name} />}
           <InfoCard label="Current Tier" value={tier?.tierDef.name ?? "—"} />
           <InfoCard label="Weekly Points" value={weeklyPts !== undefined ? `${Math.round(weeklyPts)} pts` : "—"} />
         </div>
@@ -258,12 +280,12 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
                 Progress to Next Tier
               </p>
               <span className="text-[11px] tabular-nums text-muted-foreground">
-                {weeklyPts !== undefined ? Math.round(weeklyPts) : 0} /{" "}
+                {Math.round(careerPts)} /{" "}
                 {Math.round(tier.tierDef.advancementThreshold)}
               </span>
             </div>
             <Meter
-              value={weeklyPts ?? 0}
+              value={careerPts}
               max={tier.tierDef.advancementThreshold}
               tone="condition"
               className="h-1.5"
@@ -275,7 +297,7 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
             to="/venues"
             search={{ animalId: animal.id, from: "animal" }}
             disabled={isRestricted}
-            tutorialKey={isSecondary ? "view-venues-btn" : undefined}
+            tutorialKey="view-venues-btn"
           />
         )}
       </div>
@@ -304,16 +326,18 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
                 <p className="text-[11px] text-muted-foreground">No discipline assigned yet.</p>
                 <div className="flex gap-2">
                   <select
+                    data-tutorial="discipline-select"
                     value={selectedDisciplineId}
                     onChange={(e) => setSelectedDisciplineId(e.target.value)}
                     className="flex-1 rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                   >
                     <option value="">Choose discipline…</option>
-                    {disciplinesForStage?.map((d) => (
+                    {selectablePrimaryDisciplines?.map((d) => (
                       <option key={d.id} value={d.id}>{d.name}</option>
                     ))}
                   </select>
                   <ActionButton
+                    data-tutorial="discipline-confirm"
                     variant="soft"
                     disabled={!selectedDisciplineId || setDiscipline.isPending}
                     onClick={() => selectedDisciplineId && setDiscipline.mutate({ animalId: animal.id, disciplineDefId: selectedDisciplineId })}
@@ -383,6 +407,7 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
             <>
               <div className="mb-3 flex gap-0.5 rounded-md border border-border bg-secondary/30 p-0.5">
                 <button
+                  data-tutorial="discipline-tab-1"
                   onClick={() => setActiveTabIndex(0)}
                   className={cn(
                     "flex-1 rounded px-2 py-1 text-[11px] font-medium transition-colors",

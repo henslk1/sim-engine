@@ -4,6 +4,7 @@ import { useState } from "react"
 import { isTutorialVenueEligible } from "@/lib/tutorial/utils/tutorial-venue-filter"
 import { ChevronLeft, Mountain, Waves, Wind, ArrowRight } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useTutorialAccess } from "@/lib/tutorial/access"
 
 export const Route = createFileRoute("/_authenticated/venues")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -79,9 +80,15 @@ function VenuesPage() {
   )
 
   const isTutorialMode = from === "animal" && !!animalId
+  const tutorialAccess = useTutorialAccess()
+  const isFoalTutorial = tutorialAccess.restricted && tutorialAccess.step >= 164
   const { data: tutorialInfo } = trpc.tutorial.venueInfo.useQuery(
     { gameId: gameId! },
-    { enabled: !!gameId && isTutorialMode },
+    { enabled: !!gameId && isTutorialMode && !isFoalTutorial },
+  )
+  const { data: foalInfo } = trpc.tutorial.foalAnimal.useQuery(
+    { gameId: gameId! },
+    { enabled: !!gameId && isTutorialMode && isFoalTutorial },
   )
 
   const [filterDisciplineId, setFilterDisciplineId] = useState("")
@@ -103,8 +110,11 @@ function VenuesPage() {
     .map(([id, name]) => ({ id, name }))
     .sort((a, b) => a.name.localeCompare(b.name))
 
+  const tutorialDisciplineId = isFoalTutorial ? foalInfo?.disciplineDefId : tutorialInfo?.secondaryDisciplineId
   const filteredVenues = isTutorialMode
-    ? venues?.filter(v => isTutorialVenueEligible(v, tutorialInfo?.secondaryDisciplineId))
+    ? venues?.filter(v => isConformation
+      ? (infoByVenue[v.id]?.count ?? 0) > 0
+      : isTutorialVenueEligible(v, tutorialDisciplineId))
     : venues?.filter(v => !filterDisciplineId || infoByVenue[v.id]?.disciplineIds.has(filterDisciplineId))
 
   return (
@@ -178,9 +188,13 @@ function VenuesPage() {
               const conditions = venue.climate && venue.terrain ? CONDITIONS[venue.climate]?.[venue.terrain] : null
 
               const isFirst = cardIndex === 0
-              const isTutorialCard = isTutorialMode && isTutorialVenueEligible(venue, tutorialInfo?.secondaryDisciplineId)
-              const terrainMatches = isTutorialMode && !!venue.terrain && (tutorialInfo?.preferredTerrain ?? []).includes(venue.terrain)
-              const climateMatches = isTutorialMode && !!venue.climate && (tutorialInfo?.preferredClimate ?? []).includes(venue.climate)
+              const isTutorialCard = isTutorialMode && (isConformation
+                ? (infoByVenue[venue.id]?.count ?? 0) > 0
+                : isTutorialVenueEligible(venue, tutorialDisciplineId))
+              const preferredTerrain = isFoalTutorial ? (foalInfo?.preferredTerrain ?? []) : (tutorialInfo?.preferredTerrain ?? [])
+              const preferredClimate = isFoalTutorial ? (foalInfo?.preferredClimate ?? []) : (tutorialInfo?.preferredClimate ?? [])
+              const terrainMatches = isTutorialMode && !!venue.terrain && preferredTerrain.includes(venue.terrain)
+              const climateMatches = isTutorialMode && !!venue.climate && preferredClimate.includes(venue.climate)
 
               return (
                 <Link

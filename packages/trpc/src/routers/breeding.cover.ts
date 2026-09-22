@@ -920,7 +920,9 @@ export const breedingCoverRouter = router({
         sireGrade: computeAnimalGrade(sire, ctp),
         damGrade: computeAnimalGrade(dam, ctp),
         offspringCOI: computeCOI(sire.id, sire.inbreedingCoefficient, sire.ancestors, dam.id, dam.inbreedingCoefficient, dam.ancestors),
-        conceptionChance: Math.round(Math.max(10, Math.min(100, base + personalityOffset))),
+        // Floored, not rounded: a pairing at 99.6% displaying as 100% and then
+        // failing is the one outcome a player would read as a bug.
+        conceptionChance: Math.floor(Math.max(10, Math.min(100, base + personalityOffset))),
         predictorQuota: {
           used: predictorUsage?.usageCount ?? 0,
           limit: gameConfig?.predictorDailyLimitFree ?? 0,
@@ -976,7 +978,8 @@ export const breedingCoverRouter = router({
 
       return {
         ...offer,
-        conceptionChance: Math.round(conceptionChance),
+        // Floored for the same reason as the predictor above.
+        conceptionChance: Math.floor(conceptionChance),
         offspringCOI,
         sireGrade: computeAnimalGrade(offer.sire, ctp),
         damGrade: computeAnimalGrade(offer.dam, ctp),

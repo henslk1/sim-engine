@@ -530,8 +530,11 @@ model GameConfig {
   tutorialMaleBaseTemplateId      String?
   tutorialFemaleBaseTemplateId    String?
   tutorialFemalePrice             Int             @default(0)
+  completeProfileTestCost          Int             @default(0)
+  completeProfileTestCurrencyDefId String?
   tutorialMaleBaseTemplate        AnimalTemplate? @relation("GameConfigTutorialMale", fields: [tutorialMaleBaseTemplateId], references: [id])
   tutorialFemaleBaseTemplate      AnimalTemplate? @relation("GameConfigTutorialFemale", fields: [tutorialFemaleBaseTemplateId], references: [id])
+  completeProfileTestCurrency     CurrencyDef?    @relation("CompletePrfCurrency", fields: [completeProfileTestCurrencyDefId], references: [id])
   game                            Game            @relation(fields: [gameId], references: [id])
   createdAt                       DateTime        @default(now())
   updatedAt                       DateTime        @updatedAt

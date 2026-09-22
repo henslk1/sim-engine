@@ -40,6 +40,7 @@ import { Route as AuthenticatedSupportTicketIdRouteImport } from './routes/_auth
 import { Route as AuthenticatedSupportTicketsNewRouteImport } from './routes/_authenticated/support-tickets/new'
 import { Route as AuthenticatedSupportTicketsTicketIdRouteImport } from './routes/_authenticated/support-tickets/$ticketId'
 import { Route as AuthenticatedPlayerUsernameRouteImport } from './routes/_authenticated/player/$username'
+import { Route as AuthenticatedDirectoryPersonalityRouteImport } from './routes/_authenticated/directory/personality'
 import { Route as AuthenticatedDirectoryDiseasesRouteImport } from './routes/_authenticated/directory/diseases'
 import { Route as AuthenticatedDirectoryConformationRouteImport } from './routes/_authenticated/directory/conformation'
 import { Route as AuthenticatedDirectoryColorRouteImport } from './routes/_authenticated/directory/color'
@@ -269,6 +270,12 @@ const AuthenticatedPlayerUsernameRoute =
   AuthenticatedPlayerUsernameRouteImport.update({
     id: '/player/$username',
     path: '/player/$username',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedDirectoryPersonalityRoute =
+  AuthenticatedDirectoryPersonalityRouteImport.update({
+    id: '/directory/personality',
+    path: '/directory/personality',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedDirectoryDiseasesRoute =
@@ -696,6 +703,7 @@ export interface FileRoutesByFullPath {
   '/directory/color': typeof AuthenticatedDirectoryColorRoute
   '/directory/conformation': typeof AuthenticatedDirectoryConformationRoute
   '/directory/diseases': typeof AuthenticatedDirectoryDiseasesRoute
+  '/directory/personality': typeof AuthenticatedDirectoryPersonalityRoute
   '/player/$username': typeof AuthenticatedPlayerUsernameRoute
   '/support-tickets/$ticketId': typeof AuthenticatedSupportTicketsTicketIdRoute
   '/support-tickets/new': typeof AuthenticatedSupportTicketsNewRoute
@@ -789,6 +797,7 @@ export interface FileRoutesByTo {
   '/directory/color': typeof AuthenticatedDirectoryColorRoute
   '/directory/conformation': typeof AuthenticatedDirectoryConformationRoute
   '/directory/diseases': typeof AuthenticatedDirectoryDiseasesRoute
+  '/directory/personality': typeof AuthenticatedDirectoryPersonalityRoute
   '/player/$username': typeof AuthenticatedPlayerUsernameRoute
   '/support-tickets/$ticketId': typeof AuthenticatedSupportTicketsTicketIdRoute
   '/support-tickets/new': typeof AuthenticatedSupportTicketsNewRoute
@@ -887,6 +896,7 @@ export interface FileRoutesById {
   '/_authenticated/directory/color': typeof AuthenticatedDirectoryColorRoute
   '/_authenticated/directory/conformation': typeof AuthenticatedDirectoryConformationRoute
   '/_authenticated/directory/diseases': typeof AuthenticatedDirectoryDiseasesRoute
+  '/_authenticated/directory/personality': typeof AuthenticatedDirectoryPersonalityRoute
   '/_authenticated/player/$username': typeof AuthenticatedPlayerUsernameRoute
   '/_authenticated/support-tickets/$ticketId': typeof AuthenticatedSupportTicketsTicketIdRoute
   '/_authenticated/support-tickets/new': typeof AuthenticatedSupportTicketsNewRoute
@@ -986,6 +996,7 @@ export interface FileRouteTypes {
     | '/directory/color'
     | '/directory/conformation'
     | '/directory/diseases'
+    | '/directory/personality'
     | '/player/$username'
     | '/support-tickets/$ticketId'
     | '/support-tickets/new'
@@ -1079,6 +1090,7 @@ export interface FileRouteTypes {
     | '/directory/color'
     | '/directory/conformation'
     | '/directory/diseases'
+    | '/directory/personality'
     | '/player/$username'
     | '/support-tickets/$ticketId'
     | '/support-tickets/new'
@@ -1176,6 +1188,7 @@ export interface FileRouteTypes {
     | '/_authenticated/directory/color'
     | '/_authenticated/directory/conformation'
     | '/_authenticated/directory/diseases'
+    | '/_authenticated/directory/personality'
     | '/_authenticated/player/$username'
     | '/_authenticated/support-tickets/$ticketId'
     | '/_authenticated/support-tickets/new'
@@ -1464,6 +1477,13 @@ declare module '@tanstack/react-router' {
       path: '/player/$username'
       fullPath: '/player/$username'
       preLoaderRoute: typeof AuthenticatedPlayerUsernameRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/directory/personality': {
+      id: '/_authenticated/directory/personality'
+      path: '/directory/personality'
+      fullPath: '/directory/personality'
+      preLoaderRoute: typeof AuthenticatedDirectoryPersonalityRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/directory/diseases': {
@@ -2158,6 +2178,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedDirectoryColorRoute: typeof AuthenticatedDirectoryColorRoute
   AuthenticatedDirectoryConformationRoute: typeof AuthenticatedDirectoryConformationRoute
   AuthenticatedDirectoryDiseasesRoute: typeof AuthenticatedDirectoryDiseasesRoute
+  AuthenticatedDirectoryPersonalityRoute: typeof AuthenticatedDirectoryPersonalityRoute
   AuthenticatedPlayerUsernameRoute: typeof AuthenticatedPlayerUsernameRoute
   AuthenticatedSupportTicketsTicketIdRoute: typeof AuthenticatedSupportTicketsTicketIdRoute
   AuthenticatedSupportTicketsNewRoute: typeof AuthenticatedSupportTicketsNewRoute
@@ -2196,6 +2217,8 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedDirectoryConformationRoute:
     AuthenticatedDirectoryConformationRoute,
   AuthenticatedDirectoryDiseasesRoute: AuthenticatedDirectoryDiseasesRoute,
+  AuthenticatedDirectoryPersonalityRoute:
+    AuthenticatedDirectoryPersonalityRoute,
   AuthenticatedPlayerUsernameRoute: AuthenticatedPlayerUsernameRoute,
   AuthenticatedSupportTicketsTicketIdRoute:
     AuthenticatedSupportTicketsTicketIdRoute,

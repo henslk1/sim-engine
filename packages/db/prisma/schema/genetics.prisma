@@ -154,6 +154,7 @@ model AnimalConformationScore {
   breedId      String
   score        Float
   isCoatDq     Boolean  @default(false)
+  isTraitDq    Boolean  @default(false)
   calculatedAt DateTime @default(now())
   animal       Animal   @relation(fields: [animalId], references: [id])
   breed        Breed    @relation(fields: [breedId], references: [id])

@@ -190,6 +190,7 @@ export const animalProfileRouter = router({
                     select: {
                       id: true,
                       quantity: true,
+                      requirementGroup: true,
                       itemDef: { select: { id: true, name: true } },
                     },
                   },
@@ -218,7 +219,7 @@ export const animalProfileRouter = router({
               competition: {
                 include: {
                   venue: { select: { name: true } },
-                  disciplineDef: { select: { name: true } },
+                  disciplineDef: { select: { id: true, name: true } },
                   _count: { select: { entries: true } },
                 },
               },
@@ -373,6 +374,9 @@ export const animalProfileRouter = router({
                   overworkInjuryThreshold: true,
                   energyLowCareThreshold: true,
                   energyLowCarePenalty: true,
+                  completeProfileTestCost: true,
+                  completeProfileTestCurrencyDefId: true,
+                  completeProfileTestCurrency: { select: { id: true, name: true, symbol: true } },
                 },
               },
               lifeStageDefs: {

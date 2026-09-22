@@ -1,4 +1,5 @@
-import { router, publicProcedure } from "../trpc.js"
+import { TRPCError } from "@trpc/server"
+import { router, publicProcedure, protectedProcedure } from "../trpc.js"
 import { db } from "@sim-engine/db"
 import { z } from "zod"
 
@@ -128,6 +129,85 @@ export const animalGeneticsRouter = router({
         })
 
         return { tested: eligibleGenotypes.length, cost: totalCost }
+      })
+    }),
+
+  testCompleteProfile: protectedProcedure
+    .input(z.object({ animalId: z.string(), panelType: z.enum(["COLOR", "HEALTH", "CONFORMATION"]) }))
+    .mutation(async ({ ctx, input }) => {
+      return db.$transaction(async (tx) => {
+        const animal = await tx.animal.findUniqueOrThrow({
+          where: { id: input.animalId },
+          select: { ageInCycles: true, gameId: true, playerAccountId: true, playerAccount: { select: { userId: true } } },
+        })
+        if (animal.playerAccount.userId !== ctx.userId) throw new TRPCError({ code: "FORBIDDEN", message: "You do not own this animal" })
+
+        const config = await tx.gameConfig.findUniqueOrThrow({
+          where: { gameId: animal.gameId },
+          select: { completeProfileTestCost: true, completeProfileTestCurrencyDefId: true },
+        })
+
+        const untestedGenotypes = await tx.animalGenotype.findMany({
+          where: {
+            animalId: input.animalId,
+            isTestedByOwner: false,
+            locus: {
+              isHiddenModifier: false,
+              panelEntries: { some: { panelDef: { panelType: input.panelType } } },
+            },
+          },
+          select: { locusId: true, locus: { select: { minTestCycle: true } } },
+        })
+
+        const eligible = untestedGenotypes.filter(
+          (g) => g.locus.minTestCycle == null || animal.ageInCycles >= g.locus.minTestCycle
+        )
+
+        if (eligible.length === 0) return { tested: 0, cost: 0 }
+
+        const cost = config.completeProfileTestCost
+
+        if (cost > 0 && config.completeProfileTestCurrencyDefId) {
+          const balance = await tx.playerBalance.findUnique({
+            where: {
+              playerAccountId_currencyDefId: {
+                playerAccountId: animal.playerAccountId,
+                currencyDefId: config.completeProfileTestCurrencyDefId,
+              },
+            },
+            select: { balance: true },
+          })
+          if (!balance || balance.balance < cost) throw new TRPCError({ code: "BAD_REQUEST", message: "Insufficient funds for this genetic test" })
+          await tx.playerBalance.update({
+            where: {
+              playerAccountId_currencyDefId: {
+                playerAccountId: animal.playerAccountId,
+                currencyDefId: config.completeProfileTestCurrencyDefId,
+              },
+            },
+            data: { balance: { decrement: cost } },
+          })
+
+          await tx.transaction.create({
+            data: {
+              gameId: animal.gameId,
+              fromPlayerAccountId: animal.playerAccountId,
+              currencyDefId: config.completeProfileTestCurrencyDefId,
+              amount: cost,
+              txnType: "VET_SERVICE_FEE",
+            },
+          })
+        }
+
+        await tx.animalGenotype.updateMany({
+          where: {
+            animalId: input.animalId,
+            locusId: { in: eligible.map((g) => g.locusId) },
+          },
+          data: { isTestedByOwner: true, testedAt: new Date() },
+        })
+
+        return { tested: eligible.length, cost }
       })
     }),
 })

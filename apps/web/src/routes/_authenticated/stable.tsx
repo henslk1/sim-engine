@@ -4,10 +4,11 @@ import { useEffect, useRef, useState } from "react"
 import {
   Plus, Pencil, Trash2, Check, X,
   AlertTriangle, MoveRight, FolderOpen,
-  Baby, Search, SlidersHorizontal, Pin,
+  Baby, Search, SlidersHorizontal, Pin, Loader2,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { DisciplineBadge } from "@/components/discipline-badge"
+import { useTutorialAccess } from "@/lib/tutorial/access"
 
 export const Route = createFileRoute("/_authenticated/stable")({
   component: StablePage,
@@ -387,6 +388,7 @@ function CreateSubContainerTab({
 
 function StablePage() {
   const navigate = useNavigate()
+  const utils = trpc.useUtils()
   const { data: gameData, isLoading: gameLoading } = trpc.admin.game.get.useQuery()
   const gameId = gameData?.id
   const stableLabel = gameData?.gameConfig?.containerLabel ?? "My Stable"
@@ -424,6 +426,19 @@ function StablePage() {
     { enabled: !!gameId },
   )
   const tutorialMareId = tutorialPair?.ancestorOneId
+  const tutorialAccess = useTutorialAccess()
+  const showReturnMareBtn = tutorialAccess.restricted && tutorialAccess.step === 163
+  const { data: tutorialFoalInfo } = trpc.tutorial.foalAnimal.useQuery(
+    { gameId: gameId! },
+    { enabled: !!gameId },
+  )
+  const tutorialFoalId = tutorialFoalInfo?.id ?? null
+  const returnMare = trpc.tutorial.returnMare.useMutation({
+    onSuccess: () => {
+      window.dispatchEvent(new Event("tutorial:mareReturned"))
+      utils.animal.list.invalidate()
+    },
+  })
   const [selected, setSelected] = useState<Selection>("all")
   const [nameFilter, setNameFilter] = useState("")
   const [sortBy, setSortBy] = useState<SortBy>("name")
@@ -692,6 +707,23 @@ function StablePage() {
         )}
       </div>
 
+      {/* ── Tutorial: Return Mare ─────────────────────────────────────────── */}
+      {showReturnMareBtn && gameId && (
+        <div className="shrink-0 flex items-center justify-between gap-3 border-b border-amber-500/30 bg-amber-500/10 px-6 py-3">
+          <p className="text-sm text-foreground">Your mare's time with your stable is complete. Return her to her breeder and receive 300G from the return agreement.</p>
+          <button
+            type="button"
+            data-tutorial="tutorial-return-mare-btn"
+            disabled={returnMare.isPending}
+            onClick={() => returnMare.mutate({ gameId })}
+            className="flex shrink-0 items-center gap-1.5 rounded-md bg-amber-600 px-3.5 py-1.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+          >
+            {returnMare.isPending ? <Loader2 className="size-3.5 animate-spin" /> : null}
+            Return Mare · +300G
+          </button>
+        </div>
+      )}
+
       {/* ── Animals grid ─────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto px-8 py-6">
         {animalsLoading ? (
@@ -721,7 +753,7 @@ function StablePage() {
                 subContainers={subContainers}
                 cycleToAge={cycleToAge}
                 conformationName={conformationName}
-                tutorialAttr={a.id === tutorialMareId ? "tutorial-mare-stable-card" : undefined}
+                tutorialAttr={a.id === tutorialMareId ? "tutorial-mare-stable-card" : a.id === tutorialFoalId ? "tutorial-foal-stable-card" : undefined}
               />
             ))}
           </div>

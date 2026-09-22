@@ -78,6 +78,8 @@ function GameConfigPage() {
     tutorialMaleBaseTemplateId: "",
     tutorialFemaleBaseTemplateId: "",
     tutorialFemalePrice: 0,
+    completeProfileTestCost: 0,
+    completeProfileTestCurrencyDefId: "",
   })
 
   function n(key: keyof typeof cf, float = false) {
@@ -145,12 +147,15 @@ function GameConfigPage() {
           tutorialMaleBaseTemplateId: g.tutorialMaleBaseTemplateId ?? "",
           tutorialFemaleBaseTemplateId: g.tutorialFemaleBaseTemplateId ?? "",
           tutorialFemalePrice: g.tutorialFemalePrice ?? 0,
+          completeProfileTestCost: g.completeProfileTestCost ?? 0,
+          completeProfileTestCurrencyDefId: g.completeProfileTestCurrencyDefId ?? "",
         })
       }
     }
   }, [data])
 
   const { data: templates = [] } = trpc.admin.animalTemplate.list.useQuery({ gameId: gameId! })
+  const { data: currencies = [] } = trpc.admin.currency.list.useQuery({ gameId: gameId! })
   const saveGame = trpc.admin.game.saveGame.useMutation({ onSuccess: () => utils.admin.game.get.invalidate() })
   const saveConfig = trpc.admin.game.saveConfig.useMutation({ onSuccess: () => utils.admin.game.get.invalidate() })
 
@@ -165,6 +170,8 @@ function GameConfigPage() {
       tutorialMaleBaseTemplateId: cf.tutorialMaleBaseTemplateId || null,
       tutorialFemaleBaseTemplateId: cf.tutorialFemaleBaseTemplateId || null,
       tutorialFemalePrice: cf.tutorialFemalePrice,
+      completeProfileTestCost: cf.completeProfileTestCost,
+      completeProfileTestCurrencyDefId: cf.completeProfileTestCurrencyDefId || null,
     })
   }
 
@@ -284,6 +291,26 @@ function GameConfigPage() {
                 <F label="Recovery Rate"><Input type="number" step="0.001" {...n("immunityRecoveryRate", true)} /></F>
                 <F label="Min"><Input type="number" step="0.1" {...n("immunityMin", true)} /></F>
                 <F label="Max"><Input type="number" step="0.1" {...n("immunityMax", true)} /></F>
+              </div>
+            </Panel>
+
+            <Panel title="Genetics">
+              <div className="space-y-2">
+                <F label="Complete Profile Test Cost">
+                  <Input type="number" step="1" min="0" {...n("completeProfileTestCost")} />
+                </F>
+                <F label="Complete Profile Currency">
+                  <select
+                    className="h-8 rounded-md border border-input bg-background px-2 text-sm text-foreground"
+                    value={cf.completeProfileTestCurrencyDefId}
+                    onChange={e => setCf(prev => ({ ...prev, completeProfileTestCurrencyDefId: e.target.value }))}
+                  >
+                    <option value="">— None (free) —</option>
+                    {currencies.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}{c.symbol ? ` (${c.symbol})` : ""}</option>
+                    ))}
+                  </select>
+                </F>
               </div>
             </Panel>
 

@@ -28,7 +28,8 @@ export async function guardTutorialMutation(userId: string | null, path: string,
   if (step == null || !isTutorialMutationAllowed(step, path, input)) throw denied()
   const pair = player.tutorialAnimalPair
   if (!pair) throw denied()
-  if (input.animalId !== undefined && input.animalId !== pair.ancestorOneId) throw denied()
+  const tutorialAnimalId = step >= 164 ? pair.embryoId : pair.ancestorOneId
+  if (input.animalId !== undefined && input.animalId !== tutorialAnimalId) throw denied()
 
   if (path === "care.perform") {
     const action = await db.careActionDef.findUnique({ where: { id: String(input.careActionDefId) } })
@@ -36,7 +37,7 @@ export async function guardTutorialMutation(userId: string | null, path: string,
   }
   if (path === "care.performLtc") {
     const record = await db.animalLongTermCareRecord.findUnique({ where: { id: String(input.ltcRecordId) } })
-    if (record?.animalId !== pair.ancestorOneId) throw denied()
+    if (record?.animalId !== tutorialAnimalId) throw denied()
   }
   if (path === "training.perform") {
     const [action, tier] = await Promise.all([
@@ -50,26 +51,79 @@ export async function guardTutorialMutation(userId: string | null, path: string,
   }
   if (path === "vet.issueCert") {
     const cert = await db.healthCertificateDef.findUnique({ where: { id: String(input.certDefId) } })
-    if (cert?.gameId !== player.gameId || !TUTORIAL_CERTIFICATES.includes(cert.name)) throw denied()
+    const validTutorialCert = step >= 164 ? cert?.requiredForCompetition === true : !!cert && TUTORIAL_CERTIFICATES.includes(cert.name)
+    if (cert?.gameId !== player.gameId || !validTutorialCert) throw denied()
   }
   if (path === "animal.setSecondaryDiscipline") {
     const discipline = await db.disciplineDef.findUnique({ where: { id: String(input.disciplineDefId) } })
     if (discipline?.gameId !== player.gameId || !discipline.isTutorialSelectable) throw denied()
   }
+  if (path === "animal.setDiscipline") {
+    const discipline = await db.disciplineDef.findUnique({ where: { id: String(input.disciplineDefId) } })
+    if (discipline?.gameId !== player.gameId || !discipline.isConformation || discipline.name !== "Weanling Halter") throw denied()
+  }
+  if (path === "genetics.testLocus") {
+    const locus = await db.locus.findUnique({
+      where: { id: String(input.locusId) },
+      select: { gameId: true, panelEntries: { select: { panelDef: { select: { panelType: true } } } } },
+    })
+    const requiredType = step === 125 ? "HEALTH" : "COLOR"
+    if (locus?.gameId !== player.gameId || !locus.panelEntries.some(entry => entry.panelDef.panelType === requiredType)) throw denied()
+  }
+  if (path === "genetics.testPanel") {
+    const panel = await db.geneticPanelDef.findUnique({
+      where: { id: String(input.panelDefId) },
+      select: { gameId: true, panelType: true },
+    })
+    const requiredType = step === 126 ? "HEALTH" : "COLOR"
+    if (panel?.gameId !== player.gameId || panel.panelType !== requiredType) throw denied()
+  }
+  if (path === "breeding.cover.send") {
+    if (input.sireId !== pair.ancestorTwoId || input.damId !== pair.ancestorOneId || input.fromListing !== true || input.price !== 0) throw denied()
+  }
+  if (path === "breeding.cover.accept") {
+    const offer = await db.coverOffer.findUnique({
+      where: { id: String(input.offerId) },
+      select: { sireId: true, damId: true },
+    })
+    if (offer?.sireId !== pair.ancestorTwoId || offer.damId !== pair.ancestorOneId) throw denied()
+  }
+  if (path === "breeding.pregnancy.ultrasound") {
+    const pregnancy = await db.pregnancy.findUnique({
+      where: { id: String(input.pregnancyId) },
+      select: { animalId: true },
+    })
+    if (pregnancy?.animalId !== pair.ancestorOneId) throw denied()
+  }
+  if (path === "breeding.pregnancy.birth") {
+    const pregnancy = await db.pregnancy.findUnique({
+      where: { id: String(input.pregnancyId) },
+      select: { animalId: true, offspring: { select: { animalId: true } } },
+    })
+    const names = Array.isArray(input.names) ? input.names as Array<{ animalId?: unknown; name?: unknown }> : []
+    const foalName = names.find(entry => entry.animalId === pair.embryoId)?.name
+    if (pregnancy?.animalId !== pair.ancestorOneId || !pregnancy.offspring.some(entry => entry.animalId === pair.embryoId) || typeof foalName !== "string" || !foalName.trim()) throw denied()
+  }
+  if (path === "genetics.testCompleteProfile" && input.panelType !== "CONFORMATION") throw denied()
   if (path === "inventory.buy" || path === "inventory.equip") {
-    const mare = await db.animal.findUnique({ where: { id: pair.ancestorOneId } })
-    const requirements = mare?.secondaryDisciplineDefId
-      ? await db.disciplineEquipmentRequirement.findMany({ where: { disciplineDefId: mare.secondaryDisciplineDefId } }) : []
+    const animal = await db.animal.findUnique({ where: { id: tutorialAnimalId } })
+    const disciplineDefId = step >= 164 ? animal?.disciplineDefId : animal?.secondaryDisciplineDefId
+    const requirements = disciplineDefId
+      ? await db.disciplineEquipmentRequirement.findMany({ where: { disciplineDefId } }) : []
     const listing = path === "inventory.buy" ? await db.storeListing.findUnique({ where: { id: String(input.listingId) } }) : null
     const itemId = listing?.itemDefId ?? input.itemDefId
-    if (path === "inventory.buy" && step === 112) {
+    if (path === "inventory.buy") {
+      // Buying the animal's own active-treatment item (OTC medicine) is a separate,
+      // always-available path from buying discipline equipment — not step-gated,
+      // since illness can strike the foal on any unguided growth step.
       const activeTreatment = await db.animalTreatmentRecord.findFirst({
-        where: { animalId: pair.ancestorOneId, isActive: true },
+        where: { animalId: tutorialAnimalId, isActive: true },
         select: { treatmentDef: { select: { items: { select: { itemDefId: true } } } } },
       })
-      if (listing?.gameId !== player.gameId || (input.quantity ?? 1) !== 1 ||
-        !activeTreatment?.treatmentDef.items.some(item => item.itemDefId === itemId)) throw denied()
-      return
+      if (activeTreatment?.treatmentDef.items.some(item => item.itemDefId === itemId)) {
+        if (listing?.gameId !== player.gameId || (input.quantity ?? 1) !== 1) throw denied()
+        return
+      }
     }
     if (!requirements.some(r => r.itemDefId === itemId)) throw denied()
     if (path === "inventory.buy" && (listing?.gameId !== player.gameId || (input.quantity ?? 1) !== 1)) throw denied()

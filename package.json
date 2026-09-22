@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "cross-env NODE_OPTIONS=--max-old-space-size=8192 turbo run dev",
     "build": "turbo run build",
-    "test:tutorial": "node --import tsx --test packages/trpc/test/tutorial-policy.test.ts packages/trpc/test/tutorial-guard.test.ts"
+    "test:tutorial": "node --import tsx --test packages/trpc/test/tutorial-policy.test.ts packages/trpc/test/tutorial-guard.test.ts packages/trpc/test/tutorial-markers.test.ts"
   },
   "devDependencies": {
     "cross-env": "^7.0.3",

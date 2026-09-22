@@ -1,15 +1,21 @@
-import { useState } from "react"
+import { createContext, useContext, useState } from "react"
 import { cn } from "@/lib/utils"
 import type { AnimalProfile } from "../types"
 import { getTrainingCap, formatCycleAge } from "../utils"
 import { ActionButton, Badge } from "@/components/game/ui"
-import { FlaskConical, Loader2, ChevronDown } from "lucide-react"
+import { FlaskConical, Loader2, ChevronDown, Dna } from "lucide-react"
 import { trpc } from "@/lib/trpc"
 import { getTutorialAccess } from "@/lib/tutorial/access"
 
 type Genotype = NonNullable<AnimalProfile["genotypes"]>[number]
 type PanelDef = Genotype["locus"]["panelEntries"][number]["panelDef"]
 type GeneticsSubTab = "color" | "health" | "conformation" | "stats"
+
+// Testing is an owner action. Visitors see the same tested/untested loci but
+// none of the affordances to change them, so every button checks this rather
+// than the prop being threaded through GenotypeCard/PanelCard/ColorPanelMerged.
+const GeneticsReadonly = createContext(false)
+const useGeneticsReadonly = () => useContext(GeneticsReadonly)
 
 const GENETICS_SUB_TABS: { id: GeneticsSubTab; label: string }[] = [
   { id: "color", label: "Color" },
@@ -66,6 +72,7 @@ function GenotypeCard({
   onTest: () => void
   compact?: boolean
 }) {
+  const readonly = useGeneticsReadonly()
   const alleleColor = compact ? healthColor(genotype) : "text-chart-5"
   return (
     <div className={cn("rounded-md border border-border/70 bg-secondary/30", compact ? "px-2 py-1" : "px-2.5 py-2")}>
@@ -77,6 +84,7 @@ function GenotypeCard({
       ) : (
         <div className="flex items-center justify-between">
           <span className={cn("italic text-muted-foreground/60", compact ? "text-xs" : "text-sm")}>?/?</span>
+          {!readonly && (
           <ActionButton
             variant="soft"
             disabled={isAgeGated || testsRemaining === 0 || isTestingThis}
@@ -92,6 +100,7 @@ function GenotypeCard({
               "Test"
             )}
           </ActionButton>
+          )}
         </div>
       )}
     </div>
@@ -136,6 +145,7 @@ function PanelGroup({
   )
   const totalCost = eligibleUntested.length * panelDef.testCost
   const isPending = testingPanelId === panelDef.id
+  const readonly = useGeneticsReadonly()
 
   return (
     <div className="rounded-md border border-border bg-card" data-tutorial={dataTutorial}>
@@ -143,7 +153,7 @@ function PanelGroup({
         <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           {panelDef.name}
         </span>
-        {eligibleUntested.length > 0 && (
+        {!readonly && eligibleUntested.length > 0 && (
           <ActionButton
             variant="soft"
             className="h-6 px-2 text-[11px]"
@@ -206,16 +216,17 @@ function ColorPanelMerged({
     )
     return sum + eligible.length * p.panelDef.testCost
   }, 0)
+  const readonly = useGeneticsReadonly()
   const hasEligible = panels.some((p) =>
     p.genotypes.some((g) => !g.isTestedByOwner && (g.locus.minTestCycle == null || ageInCycles >= g.locus.minTestCycle))
   )
 
   return (
-    <div className="rounded-md border border-border bg-card">
+    <div className="rounded-md border border-border bg-card" data-tutorial="genetics-color-content">
       <div className="flex items-center justify-between border-b border-border/60 px-3 py-2">
         <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Color Panel</span>
-        {hasEligible && (
-          <ActionButton variant="soft" className="h-6 px-2 text-[11px]" disabled={isPending} onClick={onTestPanels}>
+        {!readonly && hasEligible && (
+          <ActionButton data-tutorial="genetics-test-panel-btn" variant="soft" className="h-6 px-2 text-[11px]" disabled={isPending} onClick={onTestPanels}>
             {isPending ? <Loader2 className="size-3 animate-spin" /> : <FlaskConical className="size-3" />}
             {totalCost === 0 ? "Test Panel · Free" : `Test Panel · ${totalCost}g`}
           </ActionButton>
@@ -259,16 +270,21 @@ function ConformationGenotypeCard({
   const hasTerrainMod = genotype.locus.expressionRules.some(r => r.terrainModifiers.length > 0)
   const hasClimateMod = genotype.locus.expressionRules.some(r => r.climateModifiers.length > 0)
   return (
-    <div className={cn(
-      "rounded-md border bg-secondary/30 px-2.5 py-2",
-      hasTerrainMod && hasClimateMod
-        ? "border-amber-500/60 ring-1 ring-sky-500/40"
-        : hasTerrainMod
-          ? "border-amber-500/60"
-          : hasClimateMod
-            ? "border-sky-500/60"
-            : "border-border/70"
-    )}>
+    <div
+      data-tutorial-terrain={hasTerrainMod}
+      data-tutorial-climate={hasClimateMod}
+      className={cn(
+        "rounded-md border bg-secondary/30 px-2.5 py-2",
+        // Amber = terrain, sky = climate, purple = a locus that feeds both.
+        hasTerrainMod && hasClimateMod
+          ? "border-purple-500/60"
+          : hasTerrainMod
+            ? "border-amber-500/60"
+            : hasClimateMod
+              ? "border-sky-500/60"
+              : "border-border/70"
+      )}
+    >
       <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
         {genotype.locus.name}
       </p>
@@ -316,24 +332,36 @@ function ConformationAccordion({
   onTestLocus: (locusId: string) => void
   onTestPanel: (panelDefId: string) => void
 }) {
-  const [openId, setOpenId] = useState<string | null>(panels[0]?.panelDef.id ?? null)
+  // Empty by default (all collapsed) — a locus's terrain/climate relevance can fall in
+  // any section, so more than one may need to be open at once (see ConformationGenotypeCard).
+  const [openIds, setOpenIds] = useState<Set<string>>(() => new Set())
 
   return (
-    <div className="overflow-hidden rounded-md border border-border divide-y divide-border">
+    <div className="overflow-hidden rounded-md border border-border divide-y divide-border" data-tutorial="conformation-accordion">
       {panels.map(({ panelDef, genotypes }) => {
-        const isOpen = openId === panelDef.id
+        const isOpen = openIds.has(panelDef.id)
         const testedCount = genotypes.filter((g) => g.isTestedByOwner).length
         const eligibleUntested = genotypes.filter(
           (g) => !g.isTestedByOwner && (g.locus.minTestCycle == null || ageInCycles >= g.locus.minTestCycle)
         )
         const totalCost = eligibleUntested.length * panelDef.testCost
         const isPending = testingPanelId === panelDef.id
+        const hasTerrainLocus = genotypes.some(g => g.locus.expressionRules.some(r => r.terrainModifiers.length > 0))
+        const hasClimateLocus = genotypes.some(g => g.locus.expressionRules.some(r => r.climateModifiers.length > 0))
 
         return (
           <div key={panelDef.id}>
             <button
               type="button"
-              onClick={() => setOpenId(isOpen ? null : panelDef.id)}
+              data-tutorial="conformation-section-btn"
+              data-section-open={isOpen}
+              data-terrain-section={hasTerrainLocus}
+              data-climate-section={hasClimateLocus}
+              onClick={() => setOpenIds(prev => {
+                const next = new Set(prev)
+                if (isOpen) next.delete(panelDef.id); else next.add(panelDef.id)
+                return next
+              })}
               className="flex w-full items-center gap-2 px-3 py-2.5 text-left transition-colors hover:bg-secondary/40"
             >
               <ChevronDown
@@ -389,6 +417,47 @@ function ConformationAccordion({
   )
 }
 
+function computeProfileCost(panels: { panelDef: PanelDef; genotypes: Genotype[] }[], ageInCycles: number) {
+  let cost = 0
+  let hasEligible = false
+  for (const { panelDef, genotypes } of panels) {
+    const eligible = genotypes.filter(
+      (g) => !g.isTestedByOwner && (g.locus.minTestCycle == null || ageInCycles >= g.locus.minTestCycle)
+    )
+    if (eligible.length > 0) hasEligible = true
+    cost += eligible.length * panelDef.testCost
+  }
+  return { cost, hasEligible }
+}
+
+function CompleteProfileButton({
+  cost,
+  currencyLabel,
+  hasEligible,
+  isPending,
+  onClick,
+  tutorialKey,
+}: {
+  cost: number
+  currencyLabel: string
+  hasEligible: boolean
+  isPending: boolean
+  onClick: () => void
+  tutorialKey?: string
+}) {
+  const readonly = useGeneticsReadonly()
+  if (readonly) return null
+  if (!hasEligible) return null
+  return (
+    <div className="border-t border-border/60 pt-3">
+      <ActionButton variant="soft" className="w-full justify-center" disabled={isPending} onClick={onClick} data-tutorial={tutorialKey}>
+        {isPending ? <Loader2 className="size-3.5 animate-spin" /> : <Dna className="size-3.5" />}
+        Complete Genetic Profile{cost > 0 ? ` · ${cost}${currencyLabel}` : " · Free"}
+      </ActionButton>
+    </div>
+  )
+}
+
 function InnateStats({ animal, config }: { animal: AnimalProfile; config: AnimalProfile["game"]["gameConfig"] }) {
   return (
     <div>
@@ -415,10 +484,12 @@ function InnateStats({ animal, config }: { animal: AnimalProfile; config: Animal
 
 export function GeneticsTab({
   animal,
+  readonly = false,
   config,
 }: {
   animal: AnimalProfile
   config: AnimalProfile["game"]["gameConfig"]
+  readonly?: boolean
 }) {
   const cycleToAge = (n: number) => formatCycleAge(n, config)
   const [subTab, setSubTab] = useState<GeneticsSubTab>(() => {
@@ -433,6 +504,8 @@ export function GeneticsTab({
     trpc.genetics.testLocus.useMutation({ onSuccess: () => { invalidate(); window.dispatchEvent(new CustomEvent("tutorial:geneticTestComplete", { detail: "locus" })) } })
   const { mutate: testPanel, isPending: testPanelPending, variables: testPanelVars } =
     trpc.genetics.testPanel.useMutation({ onSuccess: () => { invalidate(); window.dispatchEvent(new CustomEvent("tutorial:geneticTestComplete", { detail: "panel" })) } })
+  const { mutate: testCompleteProfile, isPending: completeProfilePending } =
+    trpc.genetics.testCompleteProfile.useMutation({ onSuccess: () => invalidate() })
 
   const testingLocusId = testLocusPending ? (testLocusVars?.locusId ?? null) : null
   const testingPanelId = testPanelPending ? (testPanelVars?.panelDefId ?? null) : null
@@ -455,8 +528,15 @@ export function GeneticsTab({
   const conformationPanels = groupByPanel(animal.genotypes, "CONFORMATION")
     .sort((a, b) => (sectionOrder.get(a.panelDef.name) ?? 999) - (sectionOrder.get(b.panelDef.name) ?? 999))
 
+  const flatCost = config?.completeProfileTestCost ?? 0
+  const profileCurrency = config?.completeProfileTestCurrency?.symbol || config?.completeProfileTestCurrency?.name || ""
+  const colorProfileEligible = computeProfileCost(colorPanels, animal.ageInCycles).hasEligible
+  const healthProfileEligible = computeProfileCost(healthPanels, animal.ageInCycles).hasEligible
+  const conformationProfileEligible = computeProfileCost(conformationPanels, animal.ageInCycles).hasEligible
+
   return (
-    <div className="space-y-3">
+    <GeneticsReadonly.Provider value={readonly}>
+    <div className="space-y-3" data-tutorial="genetics-panel">
       <div className="flex items-center justify-between border-b border-border/60 pb-2">
         <div className="flex gap-0.5">
           {GENETICS_SUB_TABS.map(({ id, label }) => (
@@ -476,8 +556,8 @@ export function GeneticsTab({
             </button>
           ))}
         </div>
-        {subTab !== "stats" && (
-          <Badge tone="muted" data-tutorial="genetics-tests-remaining">{testsRemaining} test{testsRemaining !== 1 ? "s" : ""} left</Badge>
+        {!readonly && subTab !== "stats" && (
+          <Badge tone="muted" tutorialKey="genetics-tests-remaining">{testsRemaining} test{testsRemaining !== 1 ? "s" : ""} left</Badge>
         )}
       </div>
 
@@ -496,6 +576,9 @@ export function GeneticsTab({
             onTestPanels={handleTestColorPanels}
           />
         )
+      )}
+      {subTab === "color" && (
+        <CompleteProfileButton cost={flatCost} currencyLabel={profileCurrency} hasEligible={colorProfileEligible} isPending={completeProfilePending} onClick={() => testCompleteProfile({ animalId: animal.id, panelType: "COLOR" })} />
       )}
 
       {subTab === "health" && (
@@ -532,9 +615,12 @@ export function GeneticsTab({
           </div>
         )
       )}
+      {subTab === "health" && (
+        <CompleteProfileButton cost={flatCost} currencyLabel={profileCurrency} hasEligible={healthProfileEligible} isPending={completeProfilePending} onClick={() => testCompleteProfile({ animalId: animal.id, panelType: "HEALTH" })} />
+      )}
 
-      {subTab === "conformation" && (
-        conformationPanels.length === 0 ? (
+      {subTab === "conformation" && <div data-tutorial="conformation-genetics-results">
+        {conformationPanels.length === 0 ? (
           <p className="text-[11px] text-muted-foreground/60">No conformation panels</p>
         ) : (
           <ConformationAccordion
@@ -547,10 +633,14 @@ export function GeneticsTab({
             onTestLocus={(locusId) => testLocus({ animalId: animal.id, locusId })}
             onTestPanel={(panelDefId) => testPanel({ animalId: animal.id, panelDefId })}
           />
-        )
+        )}
+      </div>}
+      {subTab === "conformation" && (
+        <CompleteProfileButton cost={flatCost} currencyLabel={profileCurrency} hasEligible={conformationProfileEligible} isPending={completeProfilePending} onClick={() => testCompleteProfile({ animalId: animal.id, panelType: "CONFORMATION" })} tutorialKey="genetics-complete-profile-btn" />
       )}
 
       {subTab === "stats" && <InnateStats animal={animal} config={config} />}
     </div>
+    </GeneticsReadonly.Provider>
   )
 }

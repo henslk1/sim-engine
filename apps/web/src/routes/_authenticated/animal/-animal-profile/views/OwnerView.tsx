@@ -28,7 +28,6 @@ export function OwnerView({ animal, animalId, playerAccountId }: { animal: Anima
   const cycleToAge = (n: number) => formatCycleAge(n, config)
   const breedingGrade = computeBreedingGrade(animal, config)
   const activeConditions = animal.healthRecords.filter((r) => r.isActive)
-
   const [birthPregnancyId, setBirthPregnancyId] = useState<string | null>(null)
   const [equipOpen, setEquipOpen] = useState(false)
 
@@ -40,6 +39,10 @@ export function OwnerView({ animal, animalId, playerAccountId }: { animal: Anima
     if (pending) setBirthPregnancyId(pending.id)
   }, [animal.id])
 
+  useEffect(() => {
+    if (birthPregnancyId) window.dispatchEvent(new Event("tutorial:birthDialogOpen"))
+  }, [birthPregnancyId])
+
   const utils = trpc.useUtils()
   const invalidate = () => utils.animalProfile.get.invalidate({ animalId })
 
@@ -47,7 +50,8 @@ export function OwnerView({ animal, animalId, playerAccountId }: { animal: Anima
     onSuccess: (data) => {
       if (data?.pregnancyCompleted) setBirthPregnancyId(data.pregnancyCompleted)
       if (data?.tutorialConditionResolved) window.dispatchEvent(new Event("tutorial:conditionResolved"))
-      window.dispatchEvent(new Event("tutorial:ageAdvanced"))
+      if (data?.lifeStageAdvanced) window.dispatchEvent(new Event("tutorial:lifeStageAdvanced"))
+      window.dispatchEvent(new CustomEvent("tutorial:ageAdvanced", { detail: { ageInCycles: data?.ageInCycles } }))
       invalidate()
     },
   })
@@ -73,7 +77,12 @@ export function OwnerView({ animal, animalId, playerAccountId }: { animal: Anima
 
       {/* Header + info strip */}
       <div className="flex shrink-0 flex-col items-center border-b border-border bg-card px-4 pt-4">
-        <div data-tutorial="animal-header" className="flex w-full max-w-5xl flex-col items-center gap-3">
+        <div
+          data-tutorial="animal-header"
+          data-age-cycles={animal.ageInCycles}
+          data-cycles-per-year={config?.cyclesPerYear ?? 12}
+          className="flex w-full max-w-5xl flex-col items-center gap-3"
+        >
           <div className="flex flex-wrap items-center justify-center gap-2">
             <h1 className="font-serif text-2xl font-semibold tracking-tight text-foreground">{animal.name}</h1>
             <Badge tone="success">{animal.status}</Badge>

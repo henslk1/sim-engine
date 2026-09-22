@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router"
+import { useTutorialAccess } from "@/lib/tutorial/access"
 import { trpc } from "@/lib/trpc"
 import { ActionButton } from "@/components/game/ui"
 import { ArrowLeft, Dna, Loader2, Sparkles } from "lucide-react"
@@ -35,8 +36,13 @@ function BookBreedingPage() {
   const [selectedDamId, setSelectedDamId] = useState<string | null>(initialDamId ?? null)
   const [result, setResult] = useState<{ conceived: boolean; damId: string; damName: string } | null>(null)
 
+  const tutorialAccess = useTutorialAccess()
+  const isTutorialMode = tutorialAccess.running && tutorialAccess.step >= 142 && tutorialAccess.step <= 152
+  const recoveringTutorialResult = isTutorialMode && tutorialAccess.step >= 151 && !!tutorialAccess.mareId
+
   const { data: gameData } = trpc.admin.game.get.useQuery()
   const gameId = gameData?.id
+  const tutorialGameId = isTutorialMode ? gameId : null
   const { data: me } = trpc.player.me.useQuery({ gameId: gameId! }, { enabled: !!gameId })
   const playerAccountId = me?.id
 
@@ -52,12 +58,17 @@ function BookBreedingPage() {
     { sireId: listing?.animal.id ?? "", damId: selectedDamId!, playerAccountId: playerAccountId!, gameId: gameId! },
     { enabled: !!listing && !!selectedDamId && !!playerAccountId && !!gameId },
   )
+  const { data: tutorialDam } = trpc.animalProfile.get.useQuery(
+    { animalId: tutorialAccess.mareId! },
+    { enabled: recoveringTutorialResult },
+  )
 
   const { mutate: acceptCover, isPending: acceptPending, error: acceptError } = trpc.breeding.cover.accept.useMutation({
     onSuccess: (data) => {
       utils.animalProfile.get.invalidate()
       const dam = dams.find((d) => d.id === selectedDamId)
       setResult({ conceived: data.conceived, damId: selectedDamId!, damName: dam?.name ?? "" })
+      if (data.conceived) window.dispatchEvent(new Event("tutorial:breedingComplete"))
     },
   })
 
@@ -77,20 +88,25 @@ function BookBreedingPage() {
     return <div className="p-8 text-sm text-muted-foreground">Listing not found.</div>
   }
 
-  if (result) {
+  const recoveredResult = !result && tutorialDam?.pregnancies.some(pregnancy => !pregnancy.isCompleted)
+    ? { conceived: true, damId: tutorialDam.id, damName: tutorialDam.name }
+    : null
+  const displayedResult = result ?? recoveredResult
+
+  if (displayedResult) {
     return (
       <div className="mx-auto max-w-2xl p-8 space-y-6">
-        <div className={cn(
+        <div data-tutorial="breeding-result" className={cn(
           "rounded-lg border p-6 text-center space-y-2",
-          result.conceived
+          displayedResult.conceived
             ? "border-chart-2/40 bg-chart-2/10"
             : "border-muted-foreground/20 bg-secondary/30"
         )}>
-          {result.conceived ? (
+          {displayedResult.conceived ? (
             <>
               <Sparkles className="mx-auto size-8 text-chart-2" />
               <p className="font-serif text-xl font-semibold text-foreground">Conception Successful</p>
-              <p className="text-sm text-muted-foreground">{result.damName} is pregnant.</p>
+              <p className="text-sm text-muted-foreground">{displayedResult.damName} is pregnant.</p>
             </>
           ) : (
             <>
@@ -101,9 +117,9 @@ function BookBreedingPage() {
             </>
           )}
         </div>
-        <Link to="/animal/$animalId" params={{ animalId: result.damId }}>
+        <Link to="/animal/$animalId" params={{ animalId: displayedResult.damId }} data-tutorial="breeding-go-to-mare-btn">
           <ActionButton variant="soft">
-            <ArrowLeft className="size-3.5" /> Go to {result.damName}
+            <ArrowLeft className="size-3.5" /> Go to {displayedResult.damName}
           </ActionButton>
         </Link>
       </div>
@@ -147,8 +163,17 @@ function BookBreedingPage() {
           <p className="text-[11px] text-muted-foreground">No eligible females available.</p>
         ) : (
           <select
+            data-tutorial="breeding-female-select"
             value={selectedDamId ?? ""}
-            onChange={(e) => setSelectedDamId(e.target.value || null)}
+            onChange={(e) => {
+              const damId = e.target.value || null
+              setSelectedDamId(damId)
+              void navigate({
+                to: "/breeding/book",
+                search: { listingId, ...(damId ? { damId } : {}) },
+                replace: true,
+              })
+            }}
             className="w-full rounded-xl border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
           >
             <option value="">Choose a female…</option>
@@ -169,7 +194,7 @@ function BookBreedingPage() {
           </div>
         ) : preview ? (
           <>
-            <div className="flex gap-3">
+            <div data-tutorial="breeding-parent-cards" className="flex gap-3">
               <ParentCard label="Sire" grade={preview.sireGrade} animal={preview.sire} />
               <ParentCard label="Dam" grade={preview.damGrade} animal={preview.dam} />
             </div>
@@ -177,11 +202,11 @@ function BookBreedingPage() {
             <div className="rounded-lg border border-border bg-card px-4 py-3 space-y-2">
               <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pair Summary</h2>
               <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-0.5">
+                <div data-tutorial="breeding-conception-chance" className="space-y-0.5">
                   <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Conception chance</p>
                   <p className="text-sm font-semibold text-foreground">{preview.conceptionChance}%</p>
                 </div>
-                <div className="space-y-0.5">
+                <div data-tutorial="breeding-offspring-coi" className="space-y-0.5">
                   <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Offspring COI</p>
                   <p className={cn("text-sm font-semibold", offspringCOIColor)}>
                     {(preview.offspringCOI * 100).toFixed(2)}%
@@ -196,7 +221,7 @@ function BookBreedingPage() {
               </div>
 
               {listing.pricePerSlot > 0 && (
-                <div className="flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5 text-[11px] text-amber-700 dark:text-amber-400">
+                <div data-tutorial="breeding-stud-fee" className="flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5 text-[11px] text-amber-700 dark:text-amber-400">
                   <Dna className="size-3.5 shrink-0" />
                   Stud fee: {listing.pricePerSlot}g will be charged on confirmation
                 </div>
@@ -206,6 +231,7 @@ function BookBreedingPage() {
             <PredictorSection
               runInput={{ sireId: listing.animal.id, damId: selectedDamId, playerAccountId: playerAccountId!, gameId: gameId! }}
               predictorQuota={preview.predictorQuota}
+              tutorialGameId={tutorialGameId}
             />
           </>
         ) : null
@@ -218,6 +244,7 @@ function BookBreedingPage() {
       <ActionButton
         variant="primary"
         className="w-full justify-center"
+        data-tutorial="breeding-confirm-btn"
         disabled={!selectedDamId || isPending || listing._count.slots === 0}
         onClick={() => {
           if (selectedDamId) sendCover({

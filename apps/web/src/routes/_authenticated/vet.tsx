@@ -475,7 +475,7 @@ function CertificatesPanel({
                 </div>
                 <button
                   type="button"
-                  data-tutorial={TUTORIAL_CERTIFICATES.includes(def.name) ? "cert-issue-btn" : undefined}
+                  data-tutorial={(tutorialAccess.step >= 164 ? def.requiredForCompetition : TUTORIAL_CERTIFICATES.includes(def.name)) ? "cert-issue-btn" : undefined}
                   disabled={!effectiveAnimalId || !playerAccountId || isPending || !canAfford || (tutorialAccess.restricted && !!isValid)}
                   onClick={() => playerAccountId && issueCert.mutate({ animalId: effectiveAnimalId, playerAccountId, certDefId: def.id })}
                   className={cn(

@@ -71,13 +71,13 @@ export function VisitorView({ animal, animalId }: { animal: AnimalProfile; anima
         <div className="grid min-h-0 gap-3 grid-cols-1 min-[1400px]:h-full min-[1400px]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,2.6fr)_minmax(0,1.15fr)_minmax(0,0.85fr)]">
 
           {/* Col 1 — Breeding / Health */}
-          <div className="flex min-h-0 flex-col gap-3 min-[1400px]:grid min-[1400px]:grid-rows-[auto_minmax(0,1fr)]">
+          <div className="flex min-h-0 flex-col gap-3 min-[1400px]:grid min-[1400px]:grid-rows-[auto_auto] min-[1400px]:content-start">
             <BreedingPanel animal={animal} breedingGrade={breedingGrade} readonly />
             <HealthPanel animal={animal} readonly />
           </div>
 
           {/* Col 2 — Training / Competition / Equipped */}
-          <div className="flex min-h-0 flex-col gap-3 min-[1400px]:grid min-[1400px]:grid-rows-[auto_auto_minmax(0,1fr)]">
+          <div className="flex min-h-0 flex-col gap-3 min-[1400px]:grid min-[1400px]:grid-rows-[auto_auto_auto] min-[1400px]:content-start">
             <TrainingPanel animal={animal} config={config} readonly />
             <CompetitionPanel animal={animal} readonly />
             <EquippedPanel animal={animal} />
@@ -99,23 +99,26 @@ export function VisitorView({ animal, animalId }: { animal: AnimalProfile; anima
               cycleToAge={cycleToAge}
               config={config}
               hideTabs={["stat-history"]}
+              readonly
             />
           </div>
 
           {/* Col 4+5 — Owner Info / Conformation / Personality */}
-          <div className="flex min-h-0 flex-col gap-3 min-[1400px]:col-span-2 min-[1400px]:grid min-[1400px]:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] min-[1400px]:grid-rows-[auto_auto_minmax(0,1fr)]">
+          <div className="flex min-h-0 flex-col gap-3 min-[1400px]:col-span-2 min-[1400px]:grid min-[1400px]:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] min-[1400px]:grid-rows-[auto_auto_auto] min-[1400px]:content-start">
             <div className="min-[1400px]:col-span-2">
               <OwnerInfoPanel animal={animal} />
             </div>
 
-            <ConformationPanel animal={animal} />
-            <div className="min-[1400px]:row-span-2 min-[1400px]:min-h-0">
+            {/* Conformation and Notes share a grid row, so they stretch to a
+                matching height. Personality sits beneath, spanning both. */}
+            <ConformationPanel animal={animal} readonly />
+            <NotesPanel animal={animal} animalId={animalId} readonly />
+
+            <div className="min-[1400px]:col-span-2 min-[1400px]:min-h-0">
               {(animal.lifeStage.canTrain || !animal.lifeStage.hasUniqueActionSet) && (
                 <PersonalityPanel animal={animal} />
               )}
             </div>
-
-            <NotesPanel animal={animal} animalId={animalId} readonly />
           </div>
 
         </div>

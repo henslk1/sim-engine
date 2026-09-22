@@ -5,7 +5,7 @@ import { trpc, trpcVanilla } from "@/lib/trpc"
 import { MessagingWidget } from "@/components/messaging-widget"
 import { authClient } from "@/lib/auth-client"
 import { isTourRunning, destroyActiveTour, startTutorial } from "@/lib/tutorial"
-import { clearTutorialStep, clearTutorialVenueId, configureTutorialStorage, getTutorialAccess, installTutorialInteractionGuard, readTutorialStep, readTutorialVenueId, saveTutorialStep, setTutorialAccess, useTutorialAccess, wasTutorialRunning } from "@/lib/tutorial/access"
+import { clearTutorialStep, clearTutorialVenueId, configureTutorialStorage, getTutorialAccess, installTutorialInteractionGuard, readTutorialListingId, readTutorialStallionId, readTutorialStep, readTutorialVenueId, saveTutorialStep, setTutorialAccess, useTutorialAccess, wasTutorialRunning } from "@/lib/tutorial/access"
 import { isTutorialRouteAllowed } from "@sim-engine/trpc/tutorial-policy"
 import { grantGold } from "@/lib/tutorial/utils/grant-gold"
 import { grantPremium } from "@/lib/tutorial/utils/grant-premium"
@@ -141,14 +141,28 @@ export const Route = createFileRoute("/_authenticated")({
       return
     }
     configureTutorialStorage(context.session.user.id, game.id)
-    const pair = await trpcVanilla.tutorial.pairIds.query({ gameId: game.id })
+    const [pair, foalInfo] = await Promise.all([
+      trpcVanilla.tutorial.pairIds.query({ gameId: game.id }),
+      trpcVanilla.tutorial.foalAnimal.query({ gameId: game.id }),
+    ])
+    const foalId = foalInfo?.id ?? null
     const step = isTourRunning() ? getTutorialAccess().step : (player.seniority?.tutorialDriverStep ?? readTutorialStep())
-    setTutorialAccess({ restricted: true, step, mareId: pair?.ancestorOneId ?? null })
+    const foalBreedId = foalInfo?.breed?.id ?? null
+    setTutorialAccess({ restricted: true, step, mareId: pair?.ancestorOneId ?? null, foalId, foalBreedId })
     if (location.pathname === "/dashboard") {
       destroyActiveTour()
       return
     }
-    const routeAllowed = isTutorialRouteAllowed(step, pair?.ancestorOneId, location.pathname, location.search)
+    const routeAllowed = isTutorialRouteAllowed(
+      step,
+      pair?.ancestorOneId,
+      foalId,
+      location.pathname,
+      location.search,
+      readTutorialStallionId(),
+      readTutorialListingId(),
+      foalBreedId,
+    )
     if (!routeAllowed) {
       destroyActiveTour()
       throw redirect({ to: "/dashboard", replace: true })

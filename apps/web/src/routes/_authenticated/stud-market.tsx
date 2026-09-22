@@ -157,9 +157,10 @@ function InfoChip({ children }: { children: React.ReactNode }) {
 
 // ─── Listing card (left panel) ────────────────────────────────────────────────
 
-function ListingCard({ listing, isSelected, onSelect, onBook, cycleToAge }: {
+function ListingCard({ listing, isSelected, onSelect, onBook, cycleToAge, dataTutorial }: {
   listing: Listing; isSelected: boolean
   onSelect: () => void; onBook: () => void; cycleToAge: (n: number) => string
+  dataTutorial?: string
 }) {
   const breed = listing.animal.breed?.name ?? listing.animal.breedName ?? "Unknown"
   const slots = listing._count.slots
@@ -170,6 +171,8 @@ function ListingCard({ listing, isSelected, onSelect, onBook, cycleToAge }: {
   return (
     <div
       role="button" tabIndex={0}
+      data-tutorial={dataTutorial}
+      data-listing-id={listing.id}
       onClick={onSelect} onKeyDown={(e) => e.key === "Enter" && onSelect()}
       className={cn(
         "flex gap-4 rounded-xl border p-4 cursor-pointer transition-all duration-150",
@@ -225,11 +228,12 @@ function ListingCard({ listing, isSelected, onSelect, onBook, cycleToAge }: {
             {listing.requiredTitleDef && <Badge>Title req.</Badge>}
             <Link
               to="/animal/$animalId" params={{ animalId: listing.animal.id }}
+              data-tutorial="stud-card-view-page"
               className="inline-flex items-center rounded-md border border-border px-2.5 py-1 text-[11px] font-medium text-foreground transition-colors hover:bg-muted/50"
             >
               View page
             </Link>
-            <ActionButton variant="primary" disabled={slots === 0} onClick={onBook}>
+            <ActionButton variant="primary" data-tutorial="stud-card-book-btn" disabled={slots === 0} onClick={onBook}>
               {slots === 0 ? "No slots" : "Book"}
             </ActionButton>
           </div>
@@ -253,7 +257,7 @@ function DetailPanel({ listing, cycleToAge, onEdit }: {
   const hasRestr = listing.breedRestrictions.length > 0 || listing.pureBredOnly || listing.statMinimums.length > 0 || listing.requiredTitleDef
 
   return (
-    <div>
+    <div data-tutorial="stud-detail-panel">
 
         {/* ── Title ────────────────────────────────────────── */}
         <div className="px-8 pt-7 pb-5">
@@ -313,7 +317,7 @@ function DetailPanel({ listing, cycleToAge, onEdit }: {
         </div>
 
         {/* ── Content panels ───────────────────────────────── */}
-        <div className="grid gap-3 px-5 pt-4 pb-5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))" }}>
+        <div className="grid gap-3 px-5 pt-4 pb-5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
 
           {/* Price */}
           <div className="rounded-2xl border border-border/40 bg-secondary/25 p-4">
@@ -384,9 +388,9 @@ function DetailPanel({ listing, cycleToAge, onEdit }: {
               <p className="mb-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground/80">Competition</p>
               <div className="space-y-1.5">
                 {listing.animal.compTiers.map((ct, i) => (
-                  <div key={i} className="flex items-center justify-between text-sm">
-                    <span className="text-foreground">{ct.disciplineDef.name}</span>
-                    <span className="rounded-md bg-secondary/70 px-2 py-0.5 text-xs font-semibold text-secondary-foreground">
+                  <div key={i} className="flex items-center justify-between gap-2 text-sm">
+                    <span className="min-w-0 text-foreground">{ct.disciplineDef.name}</span>
+                    <span className="shrink-0 whitespace-nowrap rounded-md bg-secondary/70 px-2 py-0.5 text-xs font-semibold text-secondary-foreground">
                       {ct.tierDef.name}
                     </span>
                   </div>
@@ -535,12 +539,13 @@ function StudMarketPage() {
             ) : filtered.length === 0 ? (
               <p className="p-8 text-center text-sm text-muted-foreground">No studs available.</p>
             ) : (
-              filtered.map((listing) => (
+              filtered.map((listing, index) => (
                 <ListingCard key={listing.id} listing={listing}
                   isSelected={selectedId === listing.id}
                   onSelect={() => setSelectedId((prev) => prev === listing.id ? null : listing.id)}
                   onBook={() => handleBook(listing)}
-                  cycleToAge={cycleToAge} />
+                  cycleToAge={cycleToAge}
+                  dataTutorial={index === 0 ? "tutorial-stud-listing-card" : undefined} />
               ))
             )}
           </div>
@@ -557,10 +562,12 @@ function StudMarketPage() {
               <div className="flex items-center justify-center gap-3 py-3">
                 <Link
                   to="/animal/$animalId" params={{ animalId: selected.animal.id }}
+                  data-tutorial="stud-view-animal-page"
                   className="inline-flex items-center rounded-xl border border-border/60 bg-card px-6 py-2.5 text-base font-medium text-foreground shadow-sm transition-colors hover:bg-secondary/40">
                   View animal page
                 </Link>
                 <ActionButton variant="primary" className="px-6 py-2.5 text-base"
+                  data-tutorial="stud-book-btn"
                   disabled={selected._count.slots === 0}
                   onClick={() => handleBook(selected)}>
                   {selected._count.slots === 0 ? "No slots" : "Book"}

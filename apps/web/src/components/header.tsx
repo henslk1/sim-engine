@@ -62,6 +62,7 @@ export function Header({ session }: { session: Session}) {
           <Link to="/stable" data-tutorial="stable-nav" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Stable</Link>
           <Link to="/town" data-tutorial="town-nav" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Town</Link>
           <Link to="/shop" data-tutorial="shop-nav" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Shop</Link>
+          <Link to="/directory" data-tutorial="directory-nav" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Directory</Link>
         </div>
         <div className="flex items-center gap-3">
           {me && gameId && <TestCurrencyButton playerAccountId={me.id} gameId={gameId} />}

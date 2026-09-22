@@ -76,4 +76,30 @@ export const directoryRouter = router({
         orderBy: { name: "asc" },
       })
     ),
+
+  listPersonality: protectedProcedure
+    .input(z.object({ gameId: z.string() }))
+    .query(({ input }) =>
+      db.personalityTraitDef.findMany({
+        where: { gameId: input.gameId },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          labelRanges: {
+            select: {
+              id: true,
+              label: true,
+              minValue: true,
+              maxValue: true,
+              trainingModifier: true,
+              moodModifier: true,
+              conceptionModifier: true,
+            },
+            orderBy: { minValue: "asc" },
+          },
+        },
+        orderBy: { name: "asc" },
+      })
+    ),
 })

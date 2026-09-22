@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import type { AnimalProfile } from "../types"
 import { Panel, Badge, Meter, ActionButton, Dialog } from "@/components/game/ui"
 import { Baby, Sparkles, Heart, Ban, Dna, Scissors, Send, Plus, Syringe, FlaskConical, Scan, Search, Loader2, ChevronDown, ChevronUp, X } from "lucide-react"
@@ -112,6 +112,12 @@ export function BreedingPanel({
   const ultrasoundWindowOpen = !!preg && preg.currentCycles >= openCycle
   const canUltrasound = !!preg && !preg.ultrasoundUsed && !isRestricted && ultrasoundWindowOpen
 
+  useEffect(() => {
+    if (preg && !preg.ultrasoundUsed && ultrasoundWindowOpen) {
+      window.dispatchEvent(new Event("tutorial:ultrasoundReady"))
+    }
+  }, [preg?.currentCycles, ultrasoundWindowOpen])
+
   return (
     <Panel
       title="Breeding"
@@ -153,7 +159,7 @@ export function BreedingPanel({
             {(animal.inbreedingCoefficient * 100).toFixed(2)}%
           </span>
         </span>
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        <span data-tutorial="breeding-quality" className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           Quality — <span className="font-bold">{breedingGrade}</span>
         </span>
         <span className="flex items-center gap-0.5" title={`Fertility: ${fertility.label}`}>
@@ -186,7 +192,7 @@ export function BreedingPanel({
           {/* Pregnancy block (female) */}
           {isFemale && (
             preg ? (
-              <div className="rounded-md border border-border/70 bg-secondary/30 px-3 py-2.5">
+              <div data-tutorial="active-pregnancy-block" className="rounded-md border border-border/70 bg-secondary/30 px-3 py-2.5">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs font-semibold text-foreground">Active Pregnancy</span>
@@ -236,14 +242,14 @@ export function BreedingPanel({
                 </div>
 
                 {preg.ultrasoundUsed && preg.offspring.length > 0 && (
-                  <div className="mt-2 space-y-1 border-t border-border/50 pt-2">
+                  <div className="mt-2 space-y-1 border-t border-border/50 pt-2" data-tutorial="ultrasound-result">
                     <span className="text-[11px] font-semibold text-muted-foreground">Ultrasound</span>
                     {preg.offspring.map((o) => (
                       <div key={o.animal.id} className="flex items-center gap-1.5 text-[11px]">
                         <Sparkles className="size-3 shrink-0 text-accent-foreground" />
                         <span className="font-medium capitalize text-foreground">{o.animal.sex.toLowerCase()}</span>
                         {o.animal.phenotypeDescription && (
-                          <span className="text-muted-foreground">· </span>
+                          <span className="text-muted-foreground">· {o.animal.phenotypeDescription}</span>
                         )}
                       </div>
                     ))}
@@ -256,6 +262,7 @@ export function BreedingPanel({
                       <ActionButton
                         variant="soft"
                         className="flex-1 justify-center"
+                        data-tutorial="flush-embryo-btn"
                         disabled={flushPending || isRestricted}
                         onClick={() => flushEmbryo({ pregnancyId: preg.id })}
                       >
@@ -268,6 +275,7 @@ export function BreedingPanel({
                     <ActionButton
                       variant="soft"
                       className="flex-1 justify-center"
+                      data-tutorial="ultrasound-btn"
                       disabled={!canUltrasound || ultrasoundPending}
                       title={!ultrasoundWindowOpen && !preg.ultrasoundUsed ? `Available at gestation cycle ${openCycle}` : undefined}
                       onClick={() => ultrasound({ pregnancyId: preg.id })}
@@ -324,7 +332,7 @@ export function BreedingPanel({
               <div className="space-y-2">
                 <p className="text-[11px] text-muted-foreground">Not pregnant</p>
                 {!readonly && (
-                  <Link to="/stud-market" search={{ fromAnimalId: animal.id, fromAnimalName: animal.name }} className="w-full">
+                  <Link to="/stud-market" search={{ fromAnimalId: animal.id, fromAnimalName: animal.name }} data-tutorial="browse-stud-market" className="w-full">
                     <ActionButton variant="soft" className="w-full justify-center">
                       <Search className="size-3.5" /> Browse Stud Market
                     </ActionButton>
@@ -336,7 +344,7 @@ export function BreedingPanel({
 
           {/* View stud ad — visitors only (owners see it inside the listing card) */}
           {isMale && readonly && listing?.isActive && (
-            <Link to="/stud-market" search={{ listingId: listing.id }} className="w-full">
+            <Link to="/stud-market" search={{ listingId: listing.id }} data-tutorial="view-stud-ad-btn" className="block w-full">
               <ActionButton variant="soft" className="w-full justify-center">
                 View Stud Ad
               </ActionButton>

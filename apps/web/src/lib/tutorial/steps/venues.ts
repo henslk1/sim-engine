@@ -1,6 +1,6 @@
 import type { DriveStep } from "driver.js"
 import type { TutorialCtrl, TutorialCallbacks } from "../types"
-import { prepareTutorialControl, saveTutorialVenueId, setTutorialAccess } from "../access"
+import { prepareTutorialControl, saveTutorialListingId, saveTutorialVenueId, saveTutorialStallionId, setTutorialAccess } from "../access"
 
 // Captured when tutorial:tierAdvanced fires during the unguided phase.
 // Used by step 97 to personalise the popover text.
@@ -64,6 +64,31 @@ function injectPulseStyle() {
 function removePulseStyle() {
   _pulseStyleEl?.remove()
   _pulseStyleEl = null
+}
+
+// The active-treatment block arrives on the refetch that startTreatment triggers
+// and re-renders again as the invalidation cascade settles, which throws away a
+// class set once on the node. Reapply on an interval so the highlighted detail
+// keeps pulsing, and drive both details through here so only one is ever lit.
+const TREATMENT_DETAILS = '[data-tutorial="treatment-required-item"],[data-tutorial="treatment-duration"]'
+let _treatmentPulseCleanup: (() => void) | null = null
+function pulseTreatmentDetail(selector: string) {
+  clearTreatmentPulse()
+  const apply = () => {
+    document.querySelectorAll(TREATMENT_DETAILS).forEach(el => {
+      el.classList.toggle("tutorial-pulse", el.matches(selector))
+    })
+  }
+  apply()
+  const timer = setInterval(apply, 300)
+  _treatmentPulseCleanup = () => {
+    clearInterval(timer)
+    document.querySelectorAll(TREATMENT_DETAILS).forEach(el => el.classList.remove("tutorial-pulse"))
+  }
+}
+function clearTreatmentPulse() {
+  _treatmentPulseCleanup?.()
+  _treatmentPulseCleanup = null
 }
 
 export function venueSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks): DriveStep[] {
@@ -238,7 +263,17 @@ export function venueSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks): Dr
     // Wait for the successful mutation to mark the button entered; a failed
     // request leaves this step active so the player can retry.
     {
-      element: '[data-tutorial="tutorial-compete-btn"]',
+      // Resuming mid-flow (reload, or right after entering) can land here with
+      // the discipline section collapsed again — its open/closed state isn't
+      // persisted. Expand it first, same as step [86], instead of failing to
+      // find a button that's simply hidden.
+      element: () => {
+        const btn = document.querySelector<HTMLElement>('[data-tutorial="tutorial-compete-btn"]')
+        if (btn) return btn
+        const sectionBtn = document.querySelector<HTMLElement>('[data-tutorial="tutorial-discipline-section-btn"]')
+        if (sectionBtn?.dataset.expanded === "false") sectionBtn.click()
+        return document.querySelector<HTMLElement>('[data-tutorial="tutorial-compete-btn"]') ?? undefined
+      },
       waitForElement: 3000,
       disableActiveInteraction: false,
       popover: {
@@ -443,25 +478,71 @@ export function venueSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks): Dr
       },
     },
 
-    // ── [98] "Ready for Tomorrow" — spotlight advance-age ─────────────────
+    // ── [98] "Ready for Tomorrow" — finish any pending care, then age ─────
+    // Full-page prompt rather than an advance-age spotlight: the player may
+    // still owe care for the cycle, and anchoring straight to the age button
+    // left them with no way to finish it. Dismissing the prompt with "Okay"
+    // hides the overlay and pulses whatever is still outstanding — the pending
+    // care actions and the age button — the same shape as the venue pick at [84].
     {
-      element: '[data-tutorial="advance-age"]',
-      waitForElement: 5000,
       disableActiveInteraction: false,
-      advanceOnClick: true,
       popover: {
         title: "Ready for Tomorrow",
         description: "She's taken care of for the day. Advance her age when you're ready.",
-        showButtons: [],
+        showButtons: ["next"],
+        nextBtnText: "Okay",
+        // The default line assumes the day's care is done. When any of it is
+        // still outstanding the pulses below will include those actions, so the
+        // prompt has to ask for them too.
+        onPopoverRender: (popover: { description: HTMLElement }) => {
+          const carePending = document.querySelector(
+            '[data-tutorial="daily-care-perform"],[data-tutorial="care-groom"],[data-tutorial="ltc-perform"]',
+          )
+          if (carePending) {
+            popover.description.textContent = "She's taken care of for the day. Finish her care and advance her age when you're ready."
+          }
+        },
+        onNextClick: () => {
+          // driver.js drops pointer events on the body while a step is active, so
+          // hiding the overlay is not enough on its own — main has to be restored
+          // too. The capture-phase interaction guard still blocks everything the
+          // step's policy doesn't allow, which here is care and the age button.
+          if (document.getElementById("tutorial-ready-tomorrow")) return
+          const styleEl = document.createElement("style")
+          styleEl.id = "tutorial-ready-tomorrow"
+          styleEl.textContent = `.driver-overlay,.driver-stage,.driver-popover{display:none!important}body.driver-active main *{pointer-events:auto!important}`
+          document.head.appendChild(styleEl)
+        },
       },
-      onHighlighted: (el?: Element) => {
-        if (!el) return
+      onHighlighted: () => {
         injectPulseStyle()
-        el.classList.add("tutorial-pulse")
+        // Completed care actions render "Done" in place of their button, so
+        // selecting the buttons themselves already limits this to what is still
+        // pending; the enabled check keeps mid-request rows from flashing.
+        const CARE_SEL = '[data-tutorial="daily-care-perform"],[data-tutorial="care-groom"],[data-tutorial="ltc-perform"]'
+        const AGE_SEL = '[data-tutorial="advance-age"]'
+        const pulse = () => {
+          document.querySelectorAll<HTMLButtonElement>(`${CARE_SEL},${AGE_SEL}`).forEach(el => {
+            el.classList.toggle("tutorial-pulse", !el.disabled)
+          })
+        }
+        pulse()
+        // Care rows unmount as they complete and the age button re-renders after
+        // each mutation, so re-apply on an interval rather than once.
+        const timer = setInterval(pulse, 300)
+        const onAdvanced = () => ctrl.moveNext()
+        window.addEventListener("tutorial:ageAdvanced", onAdvanced, { once: true })
+        ;(window as any).__tutorialReadyTomorrowCleanup = () => {
+          clearInterval(timer)
+          window.removeEventListener("tutorial:ageAdvanced", onAdvanced)
+          document.querySelectorAll(".tutorial-pulse").forEach(el => el.classList.remove("tutorial-pulse"))
+        }
       },
-      onDeselected: (el?: Element) => {
+      onDeselected: () => {
+        ;(window as any).__tutorialReadyTomorrowCleanup?.()
+        delete (window as any).__tutorialReadyTomorrowCleanup
+        document.getElementById("tutorial-ready-tomorrow")?.remove()
         removePulseStyle()
-        el?.classList.remove("tutorial-pulse")
       },
     },
 
@@ -522,6 +603,12 @@ export function venueSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks): Dr
       waitForElement: 5000,
       disableActiveInteraction: true,
       popover: {
+        // The exam grid sits low in a page that doesn't scroll, so only the space
+        // above it can hold the popover — left and right are too narrow and below
+        // is shorter than the popover. Left to pick a side itself, Driver lands on
+        // one of those and covers the very options the step is describing.
+        side: "top",
+        align: "start",
         title: "Choosing an Exam",
         description: "The vet offers several exams. Each can identify different conditions, so the right choice depends on what you need to find out.",
         showButtons: ["next"],
@@ -711,8 +798,7 @@ export function venueSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks): Dr
             const description = document.querySelector(".driver-popover-description")
             if (title) title.textContent = "Treatment Duration"
             if (description) description.textContent = `For ${capturedTreatmentDuration} cycle${capturedTreatmentDuration === 1 ? "" : "s"}.`
-            document.querySelector('[data-tutorial="treatment-required-item"]')?.classList.remove("tutorial-pulse")
-            document.querySelector('[data-tutorial="treatment-duration"]')?.classList.add("tutorial-pulse")
+            pulseTreatmentDetail('[data-tutorial="treatment-duration"]')
           } else ctrl.moveNext()
         },
       },
@@ -724,11 +810,11 @@ export function venueSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks): Dr
         sessionStorage.setItem("tutorial:treatment", JSON.stringify({ item: capturedTreatmentItem, duration: capturedTreatmentDuration }))
         treatmentDetailPhase = 0
         injectPulseStyle()
-        document.querySelector('[data-tutorial="treatment-required-item"]')?.classList.add("tutorial-pulse")
+        pulseTreatmentDetail('[data-tutorial="treatment-required-item"]')
       },
-      onDeselected: (el?: Element) => {
+      onDeselected: () => {
+        clearTreatmentPulse()
         removePulseStyle()
-        el?.querySelectorAll('[data-tutorial="treatment-required-item"],[data-tutorial="treatment-duration"]').forEach(target => target.classList.remove("tutorial-pulse"))
       },
     },
 
@@ -913,14 +999,14 @@ export function venueSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks): Dr
       },
     },
 
-    // ── [117] "Genetic Testing" — overview of the genetics workspace ─────
+    // ── [117] "Genetic Testing" — spotlight the Genetics tab ─────────────
     {
-      element: '[data-tutorial="genetics-workspace"]',
+      element: '[data-tutorial="genetics-tab"]',
       waitForElement: 5000,
       disableActiveInteraction: true,
       popover: {
         title: "Genetic Testing",
-        description: "Let's take a look at her genetic testing. Each panel reveals a different part of the genetics she can pass on to future offspring.",
+        description: "Let's take a look at her genetic testing.",
         showButtons: ["next"],
         onNextClick: () => {
           prepareTutorialControl('[data-tutorial="genetics-tab"]')
@@ -1025,8 +1111,11 @@ export function venueSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks): Dr
     },
 
     // ── [124] "Testing Methods" — pulse test btn + tests-remaining badge ──
+    // Spotlights the whole genetics panel rather than just the health grid, so
+    // the sub-tab row is inside the cutout — the "x tests left" badge lives
+    // there and is one of the things this step pulses.
     {
-      element: '[data-tutorial="genetics-health-content"]',
+      element: '[data-tutorial="genetics-panel"]',
       waitForElement: 3000,
       disableActiveInteraction: true,
       popover: {
@@ -1274,11 +1363,514 @@ export function venueSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks): Dr
     {
       popover: {
         title: "A Legacy Begins",
-        description: "Look how far she's come. You've developed her, proven her in competition, and improved her Breeding Grade through careful management. Now her role as an ancestor truly begins. Every breeding is a chance to carry forward her strengths, improve on her weaknesses, and shape the next generation.",
+        description: "She’s ready. You’ve developed her, cared for her, and proven her in competition.",
         showButtons: ["next"],
         onNextClick: () => ctrl.moveNext(),
       },
       onHighlighted: () => { callbacks.completeStep("step_legacy_begins").catch(console.error) },
+    },
+
+    // ── [135] Breeding Grade spotlight ───────────────────────────────────
+    {
+      element: '[data-tutorial="breeding-grade"]',
+      waitForElement: 5000,
+      disableActiveInteraction: true,
+      popover: {
+        title: "Her Breeding Grade",
+        description: "All that work has paid off. Her Breeding Grade has reached A. Now it’s time to begin the next generation.",
+        showButtons: ["next"],
+        onNextClick: () => ctrl.moveNext(),
+      },
+    },
+
+    // ── [136] Browse Stud Market nav ──────────────────────────────────────
+    {
+      element: '[data-tutorial="browse-stud-market"]',
+      waitForElement: 5000,
+      disableActiveInteraction: false,
+      advanceOnClick: true,
+      popover: {
+        title: "Find a Stallion",
+        description: "The Stud Market is where you'll find stud listings from other players. Let's browse and find a good match for her.",
+        showButtons: [],
+      },
+      onHighlighted: (el?: Element) => {
+        if (!el) return
+        injectPulseStyle()
+        el.classList.add("tutorial-pulse")
+      },
+      onDeselected: (el?: Element) => {
+        removePulseStyle()
+        el?.classList.remove("tutorial-pulse")
+      },
+    },
+
+    // ── [137] Stud Market — listing overview + checkpoint ─────────────────
+    {
+      popover: {
+        title: "The Stud Market",
+        description: "Each listing represents a stallion available for breeding. You can review his breed, generation, competition record, conformation score, and personality before making a choice.",
+        showButtons: ["next"],
+        onNextClick: () => ctrl.moveNext(),
+      },
+      onHighlighted: () => { callbacks.completeStep("step_stud_market").catch(console.error) },
+    },
+
+    // ── [138] Select the listing card ─────────────────────────────────────
+    {
+      element: '[data-tutorial="tutorial-stud-listing-card"]',
+      waitForElement: 8000,
+      disableActiveInteraction: false,
+      popover: {
+        title: "View the Listing",
+        description: "Select a listing to see the full stud advertisement.",
+        showButtons: [],
+      },
+      onHighlighted: (el?: Element) => {
+        if (!el) return
+        injectPulseStyle()
+        el.classList.add("tutorial-pulse")
+        const handler = (event: MouseEvent) => {
+          if (!(event.target instanceof Element)) return
+          const card = event.target.closest('[data-tutorial="tutorial-stud-listing-card"]')
+          if (!card) return
+          // The card toggles selection, so clicking an already-selected one closes the
+          // detail panel. The next step spotlights that panel, and advancing without it
+          // leaves Driver waiting out waitForElement for something that will never
+          // appear, then recovering to the dashboard. Only advance once it is open.
+          let attempts = 0
+          const advanceWhenOpen = () => {
+            if (!document.querySelector('[data-tutorial="stud-detail-panel"]')) {
+              if (attempts++ < 10) setTimeout(advanceWhenOpen, 50)
+              return
+            }
+            const listingId = card.getAttribute("data-listing-id")
+            if (listingId) saveTutorialListingId(listingId)
+            document.removeEventListener("click", handler, true)
+            ctrl.moveNext()
+          }
+          setTimeout(advanceWhenOpen, 0)
+        }
+        document.addEventListener("click", handler, true)
+        ;(el as any).__tutorialStudCardCleanup = () => document.removeEventListener("click", handler, true)
+      },
+      onDeselected: (el?: Element) => {
+        ;(el as any)?.__tutorialStudCardCleanup?.()
+        removePulseStyle()
+        el?.classList.remove("tutorial-pulse")
+      },
+    },
+
+    // ── [139] Stud Advertisement — detail panel info ───────────────────────
+    {
+      element: '[data-tutorial="stud-detail-panel"]',
+      waitForElement: 5000,
+      disableActiveInteraction: true,
+      popover: {
+        title: "Stud Advertisement",
+        description: "Here you can review the stallion's full advertisement — breed, generation, competition record, conformation, personality, and any breeding restrictions the owner has set.",
+        showButtons: ["next"],
+        onNextClick: () => ctrl.moveNext(),
+      },
+    },
+
+    // ── [140] Meet the Stud — navigate to stallion profile ────────────────
+    {
+      element: '[data-tutorial="stud-view-animal-page"]',
+      waitForElement: 5000,
+      disableActiveInteraction: false,
+      advanceOnClick: true,
+      popover: {
+        title: "Meet the Stud",
+        description: "Visit his animal page to review his full profile before committing to a booking.",
+        showButtons: [],
+      },
+      onHighlighted: (el?: Element) => {
+        if (!el) return
+        injectPulseStyle()
+        el.classList.add("tutorial-pulse")
+        const href = (el as HTMLAnchorElement).href ?? el.querySelector("a")?.href
+        if (href) {
+          const stallionId = new URL(href, location.origin).pathname.split("/")[2]
+          if (stallionId) saveTutorialStallionId(stallionId)
+        }
+      },
+      onDeselected: (el?: Element) => {
+        removePulseStyle()
+        el?.classList.remove("tutorial-pulse")
+      },
+    },
+
+    // ── [141] Review His Profile — full-page prompt, then free exploration ──
+    // Dismissing with "Okay" hides the prompt and overlay and leaves the page
+    // browsable, the same shape as the venue pick at [84]. The workspace tabs,
+    // the genetics sub-tabs and View Stud Ad are what the step's policy allows,
+    // so the interaction guard keeps everything else blocked without an overlay.
+    {
+      disableActiveInteraction: false,
+      popover: {
+        title: "Review His Profile",
+        description: "Take a look at his full profile — pedigree, genetics, competition history, and offspring. When you're ready, click View Stud Ad to return and book the breeding.",
+        showButtons: ["next"],
+        nextBtnText: "Okay",
+        onNextClick: () => {
+          if (document.getElementById("tutorial-profile-exploration")) return
+          const styleEl = document.createElement("style")
+          styleEl.id = "tutorial-profile-exploration"
+          styleEl.textContent = `.driver-overlay,.driver-stage,.driver-popover{display:none!important}body.driver-active main *{pointer-events:auto!important}`
+          document.head.appendChild(styleEl)
+        },
+      },
+      onHighlighted: () => {
+        injectPulseStyle()
+        // The button lives in a panel that re-renders as profile queries settle,
+        // which drops a class applied once — so reapply it on an interval.
+        const pulse = () => document.querySelectorAll('[data-tutorial="view-stud-ad-btn"]')
+          .forEach(el => el.classList.add("tutorial-pulse"))
+        pulse()
+        const timer = setInterval(pulse, 300)
+        const handler = (event: MouseEvent) => {
+          if (!(event.target instanceof Element)) return
+          const link = event.target.closest<HTMLAnchorElement>('[data-tutorial="view-stud-ad-btn"]')
+          if (!link) return
+          const listingId = new URL(link.href, location.origin).searchParams.get("listingId")
+          if (listingId) saveTutorialListingId(listingId)
+          document.removeEventListener("click", handler, true)
+          setTimeout(() => ctrl.moveNext(), 0)
+        }
+        document.addEventListener("click", handler, true)
+        ;(window as any).__tutorialViewStudAdCleanup = () => {
+          clearInterval(timer)
+          document.removeEventListener("click", handler, true)
+          document.querySelectorAll('[data-tutorial="view-stud-ad-btn"]').forEach(el => el.classList.remove("tutorial-pulse"))
+          document.getElementById("tutorial-profile-exploration")?.remove()
+        }
+      },
+      onDeselected: () => {
+        ;(window as any).__tutorialViewStudAdCleanup?.()
+        delete (window as any).__tutorialViewStudAdCleanup
+        removePulseStyle()
+      },
+    },
+
+    // ── [142] Book a Breeding — stud market book button ───────────────────
+    {
+      element: '[data-tutorial="stud-book-btn"]',
+      waitForElement: 8000,
+      disableActiveInteraction: false,
+      advanceOnClick: true,
+      popover: {
+        title: "Book a Breeding",
+        description: "Click Book to begin the breeding process.",
+        showButtons: [],
+      },
+      onHighlighted: (el?: Element) => {
+        if (!el) return
+        injectPulseStyle()
+        el.classList.add("tutorial-pulse")
+      },
+      onDeselected: (el?: Element) => {
+        removePulseStyle()
+        el?.classList.remove("tutorial-pulse")
+      },
+    },
+
+    // ── [143] Choose the Dam — female selector + checkpoint ───────────────
+    {
+      element: '[data-tutorial="breeding-female-select"]',
+      waitForElement: 8000,
+      disableActiveInteraction: false,
+      popover: {
+        // Anchored above: left to Driver this lands ~14px below the select, which
+        // is exactly where the native option list drops down. A click meant for an
+        // option then hits the popover instead, so the dropdown closes with nothing
+        // selected — the same trap as the naming step's Confirm button.
+        side: "top",
+        align: "start",
+        title: "Choose the Dam",
+        description: "Select your mare from the dropdown to pair her with the stallion.",
+        showButtons: [],
+      },
+      onHighlighted: (el?: Element) => {
+        if (!el) return
+        injectPulseStyle()
+        el.classList.add("tutorial-pulse")
+        callbacks.completeStep("step_breeding_page").catch(console.error)
+        // The dropdown's first option is the blank "Choose a female…" placeholder.
+        // Advancing on that change leaves the player on the next step with no dam,
+        // whose parent cards never render — Driver then times out and recovers to
+        // the dashboard, and the select is no longer an allowed control.
+        // A native select commits its choice on the trailing click that follows
+        // change. Advancing synchronously here flips the step before that click
+        // lands, so the guard — now on a step where this control is not allowed —
+        // preventDefault()s it and the browser reverts the selection to the
+        // placeholder. Wait for the parent cards instead: they only render once
+        // React has committed the dam, which is also what the next step spotlights.
+        const handler = (event: Event) => {
+          if (!(event.target as HTMLSelectElement).value) return
+          let attempts = 0
+          const advanceWhenReady = () => {
+            if (!document.querySelector('[data-tutorial="breeding-parent-cards"]')) {
+              if (attempts++ < 20) setTimeout(advanceWhenReady, 50)
+              return
+            }
+            el.removeEventListener("change", handler)
+            ctrl.moveNext()
+          }
+          setTimeout(advanceWhenReady, 0)
+        }
+        el.addEventListener("change", handler)
+        ;(el as any).__tutorialDamSelectCleanup = () => el.removeEventListener("change", handler)
+      },
+      onDeselected: (el?: Element) => {
+        ;(el as any)?.__tutorialDamSelectCleanup?.()
+        removePulseStyle()
+        el?.classList.remove("tutorial-pulse")
+      },
+    },
+
+    // ── [144] Compare the Pair — parent cards ─────────────────────────────
+    {
+      element: '[data-tutorial="breeding-parent-cards"]',
+      waitForElement: 8000,
+      disableActiveInteraction: true,
+      popover: {
+        title: "Compare the Pair",
+        description: "Here you can compare both parents — their fertility, mood, and COI all factor into the quality of offspring they can produce.",
+        showButtons: ["next"],
+        onNextClick: () => ctrl.moveNext(),
+      },
+    },
+
+    // ── [145] Conception Chance ───────────────────────────────────────────
+    {
+      element: '[data-tutorial="breeding-conception-chance"]',
+      waitForElement: 5000,
+      disableActiveInteraction: true,
+      popover: {
+        title: "Conception Chance",
+        description: "The probability this breeding results in a pregnancy, influenced by both parents' fertility and mood.",
+        showButtons: ["next"],
+        onNextClick: () => ctrl.moveNext(),
+      },
+    },
+
+    // ── [146] Offspring COI ───────────────────────────────────────────────
+    {
+      element: '[data-tutorial="breeding-offspring-coi"]',
+      waitForElement: 5000,
+      disableActiveInteraction: true,
+      popover: {
+        title: "Offspring COI",
+        description: "The coefficient of inbreeding for the expected offspring. Lower is generally healthier — it tells you how closely related the parents are.",
+        showButtons: ["next"],
+        onNextClick: () => ctrl.moveNext(),
+      },
+    },
+
+    // ── [147] Stud Fee — skip automatically if listing is free ───────────
+    {
+      popover: {
+        title: "Stud Fee",
+        description: "This breeding has a stud fee that will be charged when you confirm.",
+        showButtons: ["next"],
+        onNextClick: () => ctrl.moveNext(),
+      },
+      onHighlighted: () => {
+        if (!document.querySelector('[data-tutorial="breeding-stud-fee"]')) {
+          queueMicrotask(() => ctrl.moveNext())
+        }
+      },
+    },
+
+    // ── [148] Preview a Foal — run predictor ──────────────────────────────
+    {
+      element: '[data-tutorial="breeding-predictor"]',
+      waitForElement: 5000,
+      disableActiveInteraction: false,
+      popover: {
+        title: "Preview a Foal",
+        description: "The Breeding Predictor lets you simulate a sample offspring before committing. Click Run Predictor to see what this pairing could produce.",
+        showButtons: [],
+      },
+      onHighlighted: (el?: Element) => {
+        if (!el) return
+        injectPulseStyle()
+        document.querySelectorAll('[data-tutorial="breeding-predictor-btn"]').forEach(btn => btn.classList.add("tutorial-pulse"))
+        const onPredictorRun = () => ctrl.moveNext()
+        window.addEventListener("tutorial:predictorRun", onPredictorRun, { once: true })
+        ;(el as any).__tutorialPredictorCleanup = () => {
+          window.removeEventListener("tutorial:predictorRun", onPredictorRun)
+          document.querySelectorAll('[data-tutorial="breeding-predictor-btn"]').forEach(btn => btn.classList.remove("tutorial-pulse"))
+        }
+      },
+      onDeselected: (el?: Element) => {
+        ;(el as any)?.__tutorialPredictorCleanup?.()
+        removePulseStyle()
+      },
+    },
+
+    // ── [149] One Possible Foal — predictor result info ───────────────────
+    {
+      element: '[data-tutorial="breeding-predictor-result"]',
+      waitForElement: 5000,
+      disableActiveInteraction: true,
+      popover: {
+        title: "One Possible Foal",
+        description: "This is a sample foal from this pairing. Stats and sex vary with each run — the predictor shows potential, not certainty. Ready to commit?",
+        showButtons: ["next"],
+        onNextClick: () => ctrl.moveNext(),
+      },
+    },
+
+    // ── [150] Confirm the Pairing ──────────────────────────────────────────
+    {
+      element: '[data-tutorial="breeding-confirm-btn"]',
+      waitForElement: 5000,
+      disableActiveInteraction: false,
+      popover: {
+        title: "Confirm the Pairing",
+        description: "Click to confirm the breeding. If successful, your mare will become pregnant.",
+        showButtons: [],
+      },
+      onHighlighted: (el?: Element) => {
+        if (!el) return
+        injectPulseStyle()
+        el.classList.add("tutorial-pulse")
+        const onBreedingComplete = () => ctrl.moveNext()
+        window.addEventListener("tutorial:breedingComplete", onBreedingComplete, { once: true })
+        ;(el as any).__tutorialBreedingCleanup = () => window.removeEventListener("tutorial:breedingComplete", onBreedingComplete)
+      },
+      onDeselected: (el?: Element) => {
+        ;(el as any)?.__tutorialBreedingCleanup?.()
+        removePulseStyle()
+        el?.classList.remove("tutorial-pulse")
+      },
+    },
+
+    // ── [151] Conception Successful — waits for result card to render ──────
+    {
+      element: '[data-tutorial="breeding-result"]',
+      waitForElement: 10000,
+      disableActiveInteraction: true,
+      popover: {
+        title: "Conception Successful",
+        description: "The breeding was successful. Your mare is now pregnant. Head back to her page to monitor the pregnancy.",
+        showButtons: ["next"],
+        onNextClick: () => ctrl.moveNext(),
+      },
+    },
+
+    // ── [152] Go to mare ──────────────────────────────────────────────────
+    {
+      element: '[data-tutorial="breeding-go-to-mare-btn"]',
+      waitForElement: 5000,
+      disableActiveInteraction: false,
+      advanceOnClick: true,
+      popover: {
+        title: "Back to Her Page",
+        description: "Head back to your mare's page to check on her pregnancy.",
+        showButtons: [],
+      },
+      onHighlighted: (el?: Element) => {
+        if (!el) return
+        injectPulseStyle()
+        el.classList.add("tutorial-pulse")
+      },
+      onDeselected: (el?: Element) => {
+        removePulseStyle()
+        el?.classList.remove("tutorial-pulse")
+      },
+    },
+
+    // ── [153] Active Pregnancy — breeding panel spotlight + checkpoint ──────
+    {
+      element: '[data-tutorial="active-pregnancy-block"]',
+      waitForElement: 8000,
+      disableActiveInteraction: true,
+      popover: {
+        title: "Active Pregnancy",
+        description: "Your mare is pregnant. You can track gestation progress here — the bar shows how far along the pregnancy is.",
+        showButtons: ["next"],
+        onNextClick: () => ctrl.moveNext(),
+      },
+      onHighlighted: () => { callbacks.completeStep("step_pregnancy").catch(console.error) },
+    },
+
+    // ── [154] Embryo Flushing — info only, button visible but driver blocked
+    {
+      element: '[data-tutorial="flush-embryo-btn"]',
+      waitForElement: 3000,
+      disableActiveInteraction: true,
+      popover: {
+        title: "Embryo Flushing",
+        description: "This lets you flush the embryo for storage — useful if you'd rather use a surrogate or save it for later implantation. We won't use it this time.",
+        showButtons: ["next"],
+        onNextClick: () => ctrl.moveNext(),
+      },
+    },
+
+    // ── [155] Ultrasound — info only, locked until open cycle ─────────────
+    {
+      element: '[data-tutorial="ultrasound-btn"]',
+      waitForElement: 3000,
+      disableActiveInteraction: true,
+      popover: {
+        title: "Ultrasound",
+        description: "Once the pregnancy reaches a certain stage, you can use the ultrasound to reveal the foal's sex and coat color. It's not available yet — continue caring for her and it will unlock.",
+        showButtons: ["next"],
+        onNextClick: () => ctrl.moveNext(),
+      },
+    },
+
+    // ── [156] Unguided gestation — care + age freely, wait for ultrasoundReady
+    {
+      popover: { title: "", description: "", showButtons: [] },
+      onHighlighted: () => {
+        document.getElementById("tutorial-unguided-phase")?.remove()
+        const styleEl = document.createElement("style")
+        styleEl.id = "tutorial-unguided-phase"
+        styleEl.textContent = `.driver-overlay,.driver-stage,.driver-popover{display:none!important}body.driver-active header *,body.driver-active main *{pointer-events:auto!important}`
+        document.head.appendChild(styleEl)
+
+        const onUltrasoundReady = () => {
+          ;(window as any).__tutorialUltrasoundReadyCleanup?.()
+          ctrl.moveNext()
+        }
+        window.addEventListener("tutorial:ultrasoundReady", onUltrasoundReady)
+        ;(window as any).__tutorialUltrasoundReadyCleanup = () => {
+          window.removeEventListener("tutorial:ultrasoundReady", onUltrasoundReady)
+          document.getElementById("tutorial-unguided-phase")?.remove()
+        }
+        const ultrasound = document.querySelector<HTMLButtonElement>('[data-tutorial="ultrasound-btn"]')
+        if (ultrasound && !ultrasound.disabled) queueMicrotask(onUltrasoundReady)
+      },
+      onDeselected: () => {
+        ;(window as any).__tutorialUltrasoundReadyCleanup?.()
+        delete (window as any).__tutorialUltrasoundReadyCleanup
+      },
+    },
+
+    // ── [157] Ultrasound Available ────────────────────────────────────────
+    {
+      element: '[data-tutorial="ultrasound-btn"]',
+      waitForElement: 5000,
+      disableActiveInteraction: false,
+      advanceOnClick: true,
+      popover: {
+        title: "Ultrasound Available",
+        description: "The pregnancy has progressed far enough for an ultrasound. Click to reveal the foal's sex and coat color.",
+        showButtons: [],
+      },
+      onHighlighted: (el?: Element) => {
+        if (!el) return
+        injectPulseStyle()
+        el.classList.add("tutorial-pulse")
+      },
+      onDeselected: (el?: Element) => {
+        removePulseStyle()
+        el?.classList.remove("tutorial-pulse")
+      },
     },
 
   ]

@@ -62,13 +62,18 @@ export function Badge({
   children,
   tone = "muted",
   className,
+  tutorialKey,
 }: {
   children: ReactNode
   tone?: BadgeTone
   className?: string
+  // Rendered as data-tutorial so tutorial steps can target a badge. Passing
+  // data-tutorial directly does nothing — this component does not spread props.
+  tutorialKey?: string
 }) {
   return (
     <span
+      data-tutorial={tutorialKey}
       className={cn(
         "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium leading-none whitespace-nowrap",
         badgeTones[tone],

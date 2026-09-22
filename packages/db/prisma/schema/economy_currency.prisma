@@ -66,6 +66,7 @@ model CurrencyDef {
   tutorialStepGrants           TutorialStepDef[]
   dailyAllowanceCurrencies     DailyAllowanceCurrency[]
   healthCertificateDefs        HealthCertificateDef[]
+  completeProfileGameConfigs   GameConfig[]                 @relation("CompletePrfCurrency")
   game                         Game                         @relation(fields: [gameId], references: [id])
 
   @@unique([gameId, name])

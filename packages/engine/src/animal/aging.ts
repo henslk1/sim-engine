@@ -2,11 +2,15 @@ import { db } from "@sim-engine/db";
 
 type Client = typeof db
 
-export async function advanceAnimalAging(client: Client, animalId: string): Promise<{ pregnancyCompleted?: string | undefined }> {
+export async function advanceAnimalAging(client: Client, animalId: string): Promise<{ pregnancyCompleted?: string; lifeStageAdvanced?: boolean; ageInCycles?: number }> {
   return client.$transaction(async (tx) => {
     const animal = await tx.animal.findUniqueOrThrow({
       where: { id: animalId },
-      include: { lifeStage: true },
+      include: {
+        lifeStage: true,
+        disciplineDef: { select: { minLifeStageIndex: true, maxLifeStageIndex: true } },
+        secondaryDisciplineDef: { select: { minLifeStageIndex: true, maxLifeStageIndex: true } },
+      },
     })
 
     const [gameConfig, lifeStageDefs] = await Promise.all([
@@ -73,11 +77,25 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
     }
 
     // Survived
+    const lifeStageAdvanced = correctStage.id !== animal.lifeStageId
+    // A discipline scoped to a life-stage range (e.g. Weanling Halter) no longer
+    // applies once the animal ages out of it — drop the assignment so the player
+    // can pick fresh ones for the new stage. Earned titles are untouched; only
+    // the current assignment is cleared.
+    const outOfRange = (discipline: { minLifeStageIndex: number | null; maxLifeStageIndex: number | null } | null) =>
+      !!discipline && (
+        (discipline.minLifeStageIndex !== null && correctStage.stageIndex < discipline.minLifeStageIndex) ||
+        (discipline.maxLifeStageIndex !== null && correctStage.stageIndex > discipline.maxLifeStageIndex)
+      )
+    const clearPrimaryDiscipline = lifeStageAdvanced && outOfRange(animal.disciplineDef)
+    const clearSecondaryDiscipline = lifeStageAdvanced && outOfRange(animal.secondaryDisciplineDef)
     await tx.animal.update({
       where: { id: animalId },
       data: {
         ageInCycles: newAge,
-        ...(correctStage.id !== animal.lifeStageId && { lifeStageId: correctStage.id }),
+        ...(lifeStageAdvanced && { lifeStageId: correctStage.id }),
+        ...(clearPrimaryDiscipline && { disciplineDefId: null }),
+        ...(clearSecondaryDiscipline && { secondaryDisciplineDefId: null }),
       },
     })
 
@@ -434,6 +452,10 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
       }),
     ].filter(Boolean))
 
-    return { pregnancyCompleted }
+    return {
+      ...(pregnancyCompleted ? { pregnancyCompleted } : {}),
+      ...(lifeStageAdvanced ? { lifeStageAdvanced: true } : {}),
+      ageInCycles: newAge,
+    }
   })
 }

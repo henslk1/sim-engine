@@ -150,29 +150,45 @@ type PredictorInput =
 export function PredictorSection({
   runInput,
   predictorQuota,
+  tutorialGameId,
 }: {
   runInput: PredictorInput
   predictorQuota: { used: number; limit: number; cost: number }
+  tutorialGameId?: string | null
 }) {
   const [result, setResult] = useState<PredictorResult | null>(null)
   const [quotaUsed, setQuotaUsed] = useState(predictorQuota.used)
 
-  const { mutate: runPredictor, isPending, error } = trpc.breeding.cover.runPredictor.useMutation({
+  const { mutate: runPredictorNormal, isPending: isPendingNormal, error: errorNormal } = trpc.breeding.cover.runPredictor.useMutation({
     onSuccess: (data) => {
       setResult(data)
       setQuotaUsed(data.quotaUsed)
     },
   })
 
-  const remaining = predictorQuota.limit > 0 ? predictorQuota.limit - quotaUsed : null
+  const { mutate: runPredictorTutorial, isPending: isPendingTutorial, error: errorTutorial } = trpc.tutorial.runPredictor.useMutation({
+    onSuccess: (data) => {
+      setResult(data as PredictorResult)
+      setQuotaUsed((data as PredictorResult).quotaUsed)
+      window.dispatchEvent(new Event("tutorial:predictorRun"))
+    },
+  })
+
+  const runPredictor = tutorialGameId
+    ? () => runPredictorTutorial({ gameId: tutorialGameId })
+    : () => runPredictorNormal(runInput)
+  const isPending = tutorialGameId ? isPendingTutorial : isPendingNormal
+  const error = tutorialGameId ? errorTutorial : errorNormal
+
+  const remaining = !tutorialGameId && predictorQuota.limit > 0 ? predictorQuota.limit - quotaUsed : null
   const canRun = remaining === null || remaining > 0
-  const costLabel = predictorQuota.cost > 0 ? ` · ${predictorQuota.cost}g` : ""
+  const costLabel = !tutorialGameId && predictorQuota.cost > 0 ? ` · ${predictorQuota.cost}g` : ""
 
   return (
-    <div className="rounded-lg border border-border bg-card px-4 py-3 space-y-3">
+    <div data-tutorial="breeding-predictor" className="rounded-lg border border-border bg-card px-4 py-3 space-y-3">
       <div className="flex items-center justify-between">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Breeding Predictor</h2>
-        {predictorQuota.limit > 0 && (
+        {!tutorialGameId && predictorQuota.limit > 0 && (
           <span className="text-[11px] text-muted-foreground">
             {Math.max(0, remaining ?? 0)} of {predictorQuota.limit} uses today
           </span>
@@ -182,7 +198,7 @@ export function PredictorSection({
       {error && <p className="text-[11px] text-destructive">{error.message}</p>}
 
       {result ? (
-        <div className="space-y-2">
+        <div data-tutorial="breeding-predictor-result" className="space-y-2">
           {result.offspring.map((o, i) => (
             <OffspringCard key={i} offspring={o} />
           ))}
@@ -190,7 +206,7 @@ export function PredictorSection({
             <button
               type="button"
               disabled={isPending}
-              onClick={() => runPredictor(runInput)}
+              onClick={() => runPredictor()}
               className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-50 pt-1"
             >
               {isPending ? <Loader2 className="size-3 animate-spin" /> : <Dna className="size-3" />}
@@ -202,8 +218,9 @@ export function PredictorSection({
         <div className="flex flex-col items-center gap-2 py-2">
           <ActionButton
             variant="soft"
+            data-tutorial="breeding-predictor-btn"
             disabled={isPending || !canRun}
-            onClick={() => runPredictor(runInput)}
+            onClick={() => runPredictor()}
           >
             {isPending ? <Loader2 className="size-3.5 animate-spin" /> : <Dna className="size-3.5" />}
             {isPending ? "Running…" : canRun ? `Run Predictor${costLabel}` : "Daily limit reached"}

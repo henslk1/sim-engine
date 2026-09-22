@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { useState } from "react"
 import { trpc } from "@/lib/trpc"
 import type { RouterOutputs } from "@/lib/trpc"
+import { useTutorialAccess } from "@/lib/tutorial/access"
 
 export const Route = createFileRoute("/_authenticated/breeds/")({
   component: BreedDirectoryPage,
@@ -32,12 +33,13 @@ const TERRAIN_LABELS: Record<string, string> = {
   DESERT: "Desert",
 }
 
-function BreedCard({ breed }: { breed: BreedItem }) {
+function BreedCard({ breed, tutorialAttr }: { breed: BreedItem; tutorialAttr?: string }) {
   const navigate = useNavigate()
   const dateAdded = new Date(breed.createdAt).toLocaleDateString(undefined, { year: "numeric", month: "short" })
 
   return (
     <article
+      data-tutorial={tutorialAttr}
       onClick={() => navigate({ to: "/breeds/$breedId", params: { breedId: breed.id } })}
       className="group flex flex-col cursor-pointer overflow-hidden rounded-lg border border-border bg-card shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md hover:border-primary/40"
     >
@@ -96,6 +98,7 @@ function ProposalCard() {
 }
 
 function BreedDirectoryPage() {
+  const tutorialAccess = useTutorialAccess()
   const { data: gameData } = trpc.admin.game.get.useQuery()
   const gameId = gameData?.id ?? ""
 
@@ -152,7 +155,7 @@ function BreedDirectoryPage() {
         <div className="py-16 text-center text-sm text-muted-foreground">Loading breeds...</div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {filtered.map(b => <BreedCard key={b.id} breed={b} />)}
+          {filtered.map((b) => <BreedCard key={b.id} breed={b} tutorialAttr={tutorialAccess.restricted && tutorialAccess.step === 170 && b.id === tutorialAccess.foalBreedId ? "tutorial-breed-card" : undefined} />)}
           <ProposalCard />
         </div>
       )}

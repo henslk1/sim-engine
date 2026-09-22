@@ -3,6 +3,7 @@ import { trpc } from "@/lib/trpc"
 import { Dialog, ActionButton } from "@/components/game/ui"
 import { Sparkles, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useTutorialAccess } from "@/lib/tutorial/access"
 
 export function BirthDialog({
   pregnancyId,
@@ -15,6 +16,8 @@ export function BirthDialog({
 }) {
   const { data: pregnancy, isLoading } = trpc.breeding.pregnancy.getForBirth.useQuery({ pregnancyId })
   const [names, setNames] = useState<Record<string, string>>({})
+  const tutorialAccess = useTutorialAccess()
+  const requiresNames = tutorialAccess.restricted && tutorialAccess.step === 161
 
   useEffect(() => {
     if (!pregnancy) return
@@ -44,14 +47,15 @@ export function BirthDialog({
   }
 
   const unborn = pregnancy?.offspring.filter((o) => o.animal.status === "EMBRYO_STORED") ?? []
+  const allNamesEntered = unborn.length > 0 && unborn.every((o) => (names[o.animal.id] ?? "").trim().length > 0)
 
   return (
     <Dialog
       open
       onClose={onClose}
-      title={unborn.length === 1 ? "A foal has arrived" : `${unborn.length} foals have arrived`}
+      title={isLoading ? "Loading…" : unborn.length === 1 ? "A foal has arrived" : `${unborn.length} foals have arrived`}
     >
-      <div className="space-y-4 p-4">
+      <div className="space-y-4 p-4" data-tutorial="birth-dialog">
         {isLoading ? (
           <div className="flex items-center justify-center py-6">
             <Loader2 className="size-5 animate-spin text-muted-foreground" />
@@ -59,7 +63,7 @@ export function BirthDialog({
         ) : (
           <>
             <p className="text-[11px] text-muted-foreground">
-              Name your foals or leave blank to use the default name.
+              {requiresNames ? "Give your foal a name to begin their story." : "Name your foals or leave blank to use the default name."}
             </p>
 
             <div className="space-y-3">
@@ -82,6 +86,7 @@ export function BirthDialog({
                       maxLength={100}
                       onChange={(e) => setNames((prev) => ({ ...prev, [o.animal.id]: e.target.value }))}
                       placeholder="Unnamed Foal"
+                      data-tutorial={i === 0 ? "birth-name-input" : undefined}
                       className="w-full rounded border border-input bg-background px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-ring"
                     />
                   </div>
@@ -90,18 +95,21 @@ export function BirthDialog({
             </div>
 
             <div className="flex gap-2 border-t border-border pt-3">
-              <ActionButton
-                variant="soft"
-                className="flex-1 justify-center text-muted-foreground"
-                disabled={isPending}
-                onClick={() => submit(true)}
-              >
-                Skip naming
-              </ActionButton>
+              {!requiresNames && (
+                <ActionButton
+                  variant="soft"
+                  className="flex-1 justify-center text-muted-foreground"
+                  disabled={isPending}
+                  onClick={() => submit(true)}
+                >
+                  Skip naming
+                </ActionButton>
+              )}
               <ActionButton
                 variant="primary"
                 className="flex-1 justify-center"
-                disabled={isPending}
+                disabled={isPending || (requiresNames && !allNamesEntered)}
+                data-tutorial="birth-name-confirm"
                 onClick={() => submit(false)}
               >
                 {isPending ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}

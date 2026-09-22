@@ -47,7 +47,7 @@ export async function runCompetition(
             animal: {
               include: {
                 personality: true,
-                conformationScores: { select: { score: true, breedId: true, isCoatDq: true } },
+                conformationScores: { select: { score: true, breedId: true, isCoatDq: true, isTraitDq: true } },
               }
             }
           }
@@ -136,7 +136,7 @@ export async function runCompetition(
         const conformationScore = entry.animal.conformationScores.find(
           s => s.breedId === entry.animal.breedId
         )
-        const baseScore = (conformationScore?.isCoatDq) ? 0 : (conformationScore?.score ?? 0)
+        const baseScore = (conformationScore?.isCoatDq || conformationScore?.isTraitDq) ? 0 : (conformationScore?.score ?? 0)
         let personalityMultiplier = 1.0
         for (const weight of competition.disciplineDef.personalityWeights) {
           const trait = entry.animal.personality.find(p => p.traitDefId === weight.traitDefId)
@@ -268,7 +268,11 @@ export async function runCompetition(
       })
     }
 
-    // tier advancement — check every competing animal's weekly total against their tier's threshold
+    // tier advancement — check every competing animal's career total in the
+    // discipline against their tier's threshold. Deliberately not the weekly
+    // bucket written above: that exists for invitational eligibility and resets
+    // every Monday, which would wipe a horse's progress toward the next tier
+    // partway through earning it.
     const uniqueAnimalIds = [...new Set(allRanked.map((e) => e.animalId))]
     for (const animalId of uniqueAnimalIds) {
       const animalTier = await tx.animalCompetitionTier.findUnique({
@@ -279,10 +283,11 @@ export async function runCompetition(
       })
       if (!animalTier || animalTier.tierDef.advancementThreshold == null) continue
 
-      const weeklyRecord = await tx.animalWeeklyPoints.findUnique({
-        where: { animalId_disciplineDefId_weekStart: { animalId, disciplineDefId: competition.disciplineDefId, weekStart } },
+      const career = await tx.competitionResult.aggregate({
+        _sum: { score: true },
+        where: { entry: { animalId, competition: { disciplineDefId: competition.disciplineDefId } } },
       })
-      if (!weeklyRecord || weeklyRecord.points < animalTier.tierDef.advancementThreshold) continue
+      if ((career._sum.score ?? 0) < animalTier.tierDef.advancementThreshold) continue
 
       const nextTier = await tx.competitionTierDef.findFirst({
         where: {

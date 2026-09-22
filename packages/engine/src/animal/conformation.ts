@@ -75,6 +75,7 @@ export async function runConformationInspection(client: Client, animalId: string
           coatWeight: true,
           coatSelections: { select: { expression: true, colorRole: true } },
           coatDqSelections: { select: { expression: true } },
+          dqTraits: { select: { locusId: true, expression: true } },
         },
       }),
     ])
@@ -134,6 +135,28 @@ export async function runConformationInspection(client: Client, animalId: string
         })
       })())
 
+    // Trait-based DQ (BreedDqTrait — any non-coat genetic expression that disqualifies)
+    let isTraitDq = false
+    const dqTraits = breedCoat?.dqTraits ?? []
+    if (dqTraits.length > 0) {
+      const dqLocusIds = [...new Set(dqTraits.map(t => t.locusId))]
+      const dqExpressionRules = await tx.expressionRule.findMany({
+        where: { locusId: { in: dqLocusIds } },
+        select: { locusId: true, alleleOneId: true, alleleTwoId: true, phenotype: true },
+      })
+      const dqRuleMap = new Map<string, string>()
+      for (const r of dqExpressionRules) {
+        dqRuleMap.set(`${r.locusId}:${r.alleleOneId}:${r.alleleTwoId}`, r.phenotype)
+        dqRuleMap.set(`${r.locusId}:${r.alleleTwoId}:${r.alleleOneId}`, r.phenotype)
+      }
+      for (const trait of dqTraits) {
+        const genotype = genotypeMap.get(trait.locusId)
+        if (!genotype) continue
+        const phenotype = dqRuleMap.get(`${trait.locusId}:${genotype.alleleOneId}:${genotype.alleleTwoId}`)
+        if (phenotype === trait.expression) { isTraitDq = true; break }
+      }
+    }
+
     // Coat color scoring
     if (breedCoat?.coatWeight != null && breedCoat.coatSelections.length > 0) {
       totalSumWeights += breedCoat.coatWeight
@@ -189,7 +212,7 @@ export async function runConformationInspection(client: Client, animalId: string
     }
 
     await Promise.all([
-      tx.animalConformationScore.create({ data: { animalId, breedId, score: overallScore, isCoatDq } }),
+      tx.animalConformationScore.create({ data: { animalId, breedId, score: overallScore, isCoatDq, isTraitDq } }),
       ...sectionScores.map((s) =>
         tx.animalConformationSectionScore.create({
           data: { animalId, breedId, sectionId: s.sectionId, score: s.score },

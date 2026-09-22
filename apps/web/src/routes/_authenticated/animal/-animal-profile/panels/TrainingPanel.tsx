@@ -111,7 +111,7 @@ export function TrainingPanel({
 
   return (
     <Panel
-      data-tutorial={canTrainStage ? "training-panel" : undefined}
+      data-tutorial={canTrainStage ? "training-panel" : "bonding-panel"}
       title={canTrainStage ? "Training" : "Bonding"}
       icon={canTrainStage ? <Dumbbell className="size-4 text-chart-2" /> : <HeartHandshake className="size-4 text-chart-5" />}
       action={canTrainStage && config
@@ -130,14 +130,18 @@ export function TrainingPanel({
             <p className="mb-1.5 text-[11px] text-muted-foreground">Bonding activity done for today.</p>
           )}
 
-          {hasUniqueActionSet && animal.personality.map((trait: Personality) => {
+          {hasUniqueActionSet && animal.personality.map((trait: Personality, traitIndex: number) => {
             const traitActivities = activities.filter((a: StageActivity) => a.traitDef.id === trait.traitDef.id)
             const effectiveValue = trait.value + trait.personalityModifier
             const innateLabel = labelForValue(Math.round(trait.value), trait.traitDef.labelRanges)
             const currentLabel = labelForValue(Math.round(effectiveValue), trait.traitDef.labelRanges)
             const hasShifted = innateLabel !== currentLabel
             return (
-              <div key={trait.traitDef.id} className="rounded-md border border-border/70 bg-secondary/30 px-2 py-1.5">
+              <div
+                key={trait.traitDef.id}
+                data-tutorial={traitIndex === 0 ? "bonding-trait-first" : undefined}
+                className="rounded-md border border-border/70 bg-secondary/30 px-2 py-1.5"
+              >
                 <div className="mb-0.5 flex items-center justify-between">
                   <span className="text-xs font-semibold text-foreground">{trait.traitDef.name}</span>
                   <span className="text-[11px] text-muted-foreground">
@@ -177,6 +181,7 @@ export function TrainingPanel({
                               <ActionButton
                                 variant="soft"
                                 disabled={!canPerform}
+                                data-tutorial="stage-activity-btn"
                                 className="h-5 px-1.5 text-[10px]"
                                 onClick={() => {
                                   if (!canPerform) return

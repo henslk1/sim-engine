@@ -97,7 +97,13 @@ export function ArchivedView({ animal, animalId }: { animal: AnimalProfile; anim
                 </p>
               </div>
             </div>
-            <WorkspaceTabs animal={animal} animalId={animalId} cycleToAge={cycleToAge} config={config} />
+            <WorkspaceTabs
+              animal={animal}
+              animalId={animalId}
+              cycleToAge={cycleToAge}
+              config={config}
+              readonly
+            />
           </div>
 
           {/* Col 4+5 — Owner Info / Conformation / Personality / Notes */}
@@ -106,14 +112,16 @@ export function ArchivedView({ animal, animalId }: { animal: AnimalProfile; anim
               <OwnerInfoPanel animal={animal} />
             </div>
 
-            <ConformationPanel animal={animal} />
-            <div className="min-[1400px]:row-span-2 min-[1400px]:min-h-0">
+            {/* Conformation and Notes share a grid row, so they stretch to a
+                matching height. Personality sits beneath, spanning both. */}
+            <ConformationPanel animal={animal} readonly />
+            <NotesPanel animal={animal} animalId={animalId} readonly />
+
+            <div className="min-[1400px]:col-span-2 min-[1400px]:min-h-0">
               {(animal.lifeStage.canTrain || !animal.lifeStage.hasUniqueActionSet) && (
                 <PersonalityPanel animal={animal} />
               )}
             </div>
-
-            <NotesPanel animal={animal} animalId={animalId} readonly />
           </div>
 
         </div>

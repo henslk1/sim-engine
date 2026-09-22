@@ -292,7 +292,7 @@ function StandardTab({ breed, coatStandardDisplay }: { breed: Breed; coatStandar
   const hasHairSection = idealSections.some(s => s.section.name.toLowerCase().includes("hair"))
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-tutorial="breed-standard-content">
       {breed.conformationStandards.length > 0 ? (
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-2">
@@ -369,7 +369,7 @@ function StandardTab({ breed, coatStandardDisplay }: { breed: Breed; coatStandar
       )}
 
       {(breed.dqTraits.length > 0 || breed.coatDqSelections.length > 0) && (
-        <div className="space-y-2">
+        <div className="space-y-2" data-tutorial="breed-disqualifying-traits">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Disqualifying Traits</p>
           <div className="flex flex-wrap gap-1.5">
             {(breed.dqTraits as DqTrait[]).map(d => {
@@ -564,6 +564,7 @@ function BreedDetailPage() {
                   <button
                     key={t.id}
                     type="button"
+                    data-tutorial={t.id === "standard" ? "breed-standard-tab" : undefined}
                     onClick={() => setTab(t.id)}
                     className={cn(
                       "inline-flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors",

@@ -27,12 +27,14 @@ export function WorkspaceTabs({
   cycleToAge,
   config,
   hideTabs = [],
+  readonly = false,
 }: {
   animal: AnimalProfile
   animalId: string
   cycleToAge: (n: number) => string
   config: AnimalProfile["game"]["gameConfig"]
   hideTabs?: WorkspaceTab[]
+  readonly?: boolean
 }) {
   const allTabs: { id: WorkspaceTab; label: string; Icon: LucideIcon }[] = [
     ...(animal.lore ? [{ id: "lore" as const, label: "Lore", Icon: Scroll }] : []),
@@ -43,6 +45,8 @@ export function WorkspaceTabs({
     () => {
       const tutorial = getTutorialAccess()
       if (tutorial.restricted && tutorial.step >= 118 && tutorial.step <= 126) return "genetics"
+      if (tutorial.restricted && tutorial.step >= 185 && tutorial.step <= 190) return "genetics"
+      if (tutorial.restricted && tutorial.step >= 202 && tutorial.step <= 203) return "comp-history"
       return animal.lore ? "lore" : hideTabs.includes("genetics") ? (visibleTabs[0]?.id ?? "pedigree") : "genetics"
     }
   )
@@ -65,6 +69,7 @@ export function WorkspaceTabs({
             type="button"
             onClick={() => setActiveTab(id)}
             data-tutorial={id === "comp-history" ? "competition-history-tab" : id === "genetics" ? "genetics-tab" : undefined}
+            data-workspace-tab="true"
             className={cn(
               "inline-flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors",
               activeTab === id
@@ -82,7 +87,7 @@ export function WorkspaceTabs({
           <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{animal.lore}</p>
         )}
         {activeTab === "pedigree" && <PedigreeTab animal={animal} />}
-        {activeTab === "genetics" && <GeneticsTab animal={animal} config={config} />}
+        {activeTab === "genetics" && <GeneticsTab animal={animal} config={config} readonly={readonly} />}
         {activeTab === "comp-history" && <CompHistoryTab animal={animal} cycleToAge={cycleToAge} />}
         {activeTab === "offspring" && <OffspringTab data={offspring} isLoading={offspringLoading} cycleToAge={cycleToAge} />}
         {activeTab === "stat-history" && <StatHistoryTab data={statHistory} isLoading={statHistoryLoading} />}

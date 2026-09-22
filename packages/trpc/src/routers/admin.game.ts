@@ -76,9 +76,11 @@ export const gameAdminRouter = router({
         tutorialMaleBaseTemplateId: z.string().nullish(),
         tutorialFemaleBaseTemplateId: z.string().nullish(),
         tutorialFemalePrice: z.number().int().min(0).default(0),
+        completeProfileTestCost: z.number().int().min(0).default(0),
+        completeProfileTestCurrencyDefId: z.string().nullish(),
       }))
       .mutation(({ input }) => {
-        const { gameId, containerLabel, subContainerLabel, lifeExpectancyBaseline, maxBreedingSlots, tutorialMaleBaseTemplateId, tutorialFemaleBaseTemplateId, ...rest } = input
+        const { gameId, containerLabel, subContainerLabel, lifeExpectancyBaseline, maxBreedingSlots, tutorialMaleBaseTemplateId, tutorialFemaleBaseTemplateId, completeProfileTestCurrencyDefId, ...rest } = input
         const labels = {
           containerLabel: containerLabel ?? null,
           subContainerLabel: subContainerLabel ?? null,
@@ -88,6 +90,7 @@ export const gameAdminRouter = router({
           maxBreedingSlots: maxBreedingSlots ?? null,
           tutorialMaleBaseTemplateId: tutorialMaleBaseTemplateId ?? null,
           tutorialFemaleBaseTemplateId: tutorialFemaleBaseTemplateId ?? null,
+          completeProfileTestCurrencyDefId: completeProfileTestCurrencyDefId ?? null,
         }
         return db.gameConfig.upsert({
           where: { gameId },

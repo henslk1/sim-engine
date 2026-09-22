@@ -1,5 +1,6 @@
 import { db } from "@sim-engine/db"
-import { router, publicProcedure } from "../trpc.js"
+import { TRPCError } from "@trpc/server"
+import { router, protectedProcedure, publicProcedure } from "../trpc.js"
 import { z } from "zod"
 
 export const breedingPregnancyRouter = router({
@@ -345,20 +346,30 @@ export const breedingPregnancyRouter = router({
       })
     }),
 
-  abort: publicProcedure
+  abort: protectedProcedure
     .input(z.object({ pregnancyId: z.string() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       return db.$transaction(async (tx) => {
         const pregnancy = await tx.pregnancy.findUniqueOrThrow({
           where: { id: input.pregnancyId },
           select: {
             isCompleted: true,
             animalId: true,
-            animal: { select: { gameId: true, playerAccountId: true, ageInCycles: true } },
+            animal: {
+              select: {
+                gameId: true,
+                playerAccountId: true,
+                ageInCycles: true,
+                playerAccount: { select: { userId: true } },
+              },
+            },
             offspring: { select: { animalId: true } },
           },
         })
 
+        if (pregnancy.animal.playerAccount.userId !== ctx.userId) {
+          throw new TRPCError({ code: "FORBIDDEN" })
+        }
         if (pregnancy.isCompleted) throw new Error("Pregnancy is already completed")
 
         const { gameId, playerAccountId, ageInCycles } = pregnancy.animal

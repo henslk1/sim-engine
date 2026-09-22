@@ -4,8 +4,8 @@ import { grantGold } from "@/lib/tutorial/utils/grant-gold"
 import { grantPremium } from "@/lib/tutorial/utils/grant-premium"
 import { useEffect, useState } from "react"
 import { Dialog } from "@/components/game/ui"
-import { readTutorialStep, readTutorialVenueId, setTutorialAccess, useTutorialAccess } from "@/lib/tutorial/access"
-import { getTutorialPolicy, tutorialDestination } from "@sim-engine/trpc/tutorial-policy"
+import { readTutorialListingId, readTutorialStallionId, readTutorialStep, readTutorialVenueId, setTutorialAccess, useTutorialAccess } from "@/lib/tutorial/access"
+import { getTutorialPolicy, tutorialDestination, venueFlowRestartIndex, breedingFlowRestartIndex } from "@sim-engine/trpc/tutorial-policy"
 import { startTutorial, setTourRunning, destroyActiveTour } from "@/lib/tutorial"
 import {
   AlertTriangle, Baby, Trophy, Coins, PawPrint, ClipboardList,
@@ -463,10 +463,17 @@ function DashboardPage() {
   const isSetup = (tutorialProgress?.progress.length ?? 0) > 0
 
   // First incomplete step def — drives the contextual re-entry dialog.
-  const nextIncompleteStep = tutorialProgress?.steps.find((step) => {
-    const prog = tutorialProgress.progress.find((p) => p.stepDefId === step.id)
-    return !prog || prog.completedAt === null
-  })
+  const isStepDone = (step: { id: string }) =>
+    tutorialProgress?.progress.some((p) => p.stepDefId === step.id && p.completedAt !== null) ?? false
+  const firstIncompleteStep = tutorialProgress?.steps.find((step) => !isStepDone(step))
+  // A later phase already completed (e.g. a missed/skipped checkpoint left this one's
+  // progress row stale or absent) — fall through to the final catch-all phase instead
+  // of showing copy for a phase the player has clearly already moved past.
+  const nextIncompleteStep = firstIncompleteStep && tutorialProgress?.steps.some(
+    (s) => s.stepIndex > firstIncompleteStep.stepIndex && isStepDone(s),
+  )
+    ? tutorialProgress.steps.at(-1)
+    : firstIncompleteStep
 
   async function beginTutorial() {
     if (!gameId || launching) return
@@ -483,17 +490,31 @@ function DashboardPage() {
       const resumeIndex = saved ?? Math.max(checkpoint, readTutorialStep())
       let index = getTutorialPolicy(resumeIndex) ? resumeIndex : 0
       const venueId = readTutorialVenueId()
+      const stallionId = readTutorialStallionId()
+      const listingId = readTutorialListingId()
       // A different browser may lack the locally saved venue choice. Return to
       // the pick step so the player can choose again instead of entering limbo.
       if (getTutorialPolicy(index)?.page === "venue" && !venueId) {
-        index = 84
+        index = venueFlowRestartIndex(index)
+        await trpcVanilla.tutorial.setDriverStep.mutate({ gameId, step: index })
+      }
+      // The stud and listing are local navigation context. If another browser
+      // resumes without them, replay the listing selection instead of opening
+      // an unusable profile or booking page.
+      if ((index === 141 && !stallionId) || (index >= 139 && index <= 152 && !listingId)) {
+        index = breedingFlowRestartIndex(index)
         await trpcVanilla.tutorial.setDriverStep.mutate({ gameId, step: index })
       }
       await setupMutation.mutateAsync({ gameId })
-      const pair = await trpcVanilla.tutorial.pairIds.query({ gameId })
-      const destination = tutorialDestination(index, pair?.ancestorOneId, venueId)
-      if (destination.pathname === "/dashboard" && index !== 0) throw new Error("Your tutorial mare could not be loaded. Please try again.")
-      setTutorialAccess({ restricted: true, step: index, mareId: pair?.ancestorOneId ?? null })
+      const [pair, foalInfo] = await Promise.all([
+        trpcVanilla.tutorial.pairIds.query({ gameId }),
+        trpcVanilla.tutorial.foalAnimal.query({ gameId }),
+      ])
+      const foalId = foalInfo?.id ?? null
+      const foalBreedId = foalInfo?.breed?.id ?? null
+      const destination = tutorialDestination(index, pair?.ancestorOneId, foalId, venueId, stallionId, listingId, foalBreedId)
+      if (destination.pathname === "/dashboard" && index !== 0) throw new Error("The tutorial context could not be loaded. Please try again.")
+      setTutorialAccess({ restricted: true, step: index, mareId: pair?.ancestorOneId ?? null, foalId, foalBreedId })
       setTourRunning(true)
       if (destination.pathname !== "/dashboard") {
         await navigate({ to: destination.pathname, search: destination.search })
