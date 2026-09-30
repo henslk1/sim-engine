@@ -236,7 +236,7 @@ function ItemCard({
           </div>
           <button
             type="button"
-            {...(isTutorialItem ? { "data-tutorial": "tutorial-shop-buy" } : {})}
+            {...(isTutorialItem ? { "data-tutorial": "tutorial-shop-buy", "data-tutorial-owned": String((owned ?? 0) > 0) } : {})}
             disabled={!canAfford || isBuying}
             onClick={onBuy}
             className={cn(

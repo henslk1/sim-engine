@@ -63,7 +63,7 @@ type CompetitionEvent = {
 }
 
 type LogEntry =
-  | { key: string; cycleNumber: number; createdAt: Date; type: "care"; label: string; vitals: VitalChange[] }
+  | { key: string; cycleNumber: number; createdAt: Date; type: "care"; label: string; vitals: VitalChange[]; cost?: { amount: number; symbol: string } }
   | { key: string; cycleNumber: number; createdAt: Date; type: "training"; label: string; subLabel: string; statGained: number; reachedCap: boolean; statName: string; vitals: VitalChange[] }
   | { key: string; cycleNumber: number; createdAt: Date; type: "vet"; label: string; notes: string | null; vitals: VitalChange[] }
   | { key: string; cycleNumber: number; createdAt: Date; type: "activity"; label: string; vitals: VitalChange[] }
@@ -94,13 +94,15 @@ export function DailyLogPanel({ animal }: { animal: AnimalProfile }) {
     ...dailyLogs
       .filter((l) => l.cycleNumber === cycle && l.eventType === "LTC_PERFORMED")
       .map((l) => {
-        const ctx = l.context as { name?: string; nextDueCycle?: number } | null
+        const ctx = l.context as { name?: string; nextDueCycle?: number; cost?: number; currencySymbol?: string } | null
         return {
           key: `ltc-${l.id}`,
           cycleNumber: l.cycleNumber ?? cycle,
           createdAt: new Date(l.createdAt),
           type: "care" as const,
           label: ctx?.name ?? "Long-term care",
+          // Entries written before the cost was recorded simply omit it.
+          ...(ctx?.cost ? { cost: { amount: ctx.cost, symbol: ctx.currencySymbol ?? "" } } : {}),
           vitals: [] as VitalChange[],
         }
       }),
@@ -260,6 +262,9 @@ export function DailyLogPanel({ animal }: { animal: AnimalProfile }) {
                 color: v.value >= 0 ? "text-chart-2" : "text-muted-foreground",
               })
             )
+            if (e.type === "care" && e.cost) {
+              details.push({ text: `-${e.cost.amount}${e.cost.symbol ? ` ${e.cost.symbol}` : ""}`, color: "text-amber-500" })
+            }
             if (e.type === "vet" && e.notes) {
               details.push({ text: String(e.notes), color: "text-muted-foreground" })
             }

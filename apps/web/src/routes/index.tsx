@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate, useRouter } from '@tanstack/react-router'
 import { authClient } from '@/lib/auth-client'
 import { trpc, trpcVanilla } from '@/lib/trpc'
+import { endTutorialSession } from '@/lib/tutorial'
 
 function getInitials(name: string) {
   return name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
@@ -17,6 +18,7 @@ function LandingPage() {
   const { data: myRoles = [] } = trpc.admin.ops.players.myRoles.useQuery(undefined, { enabled: !!session })
 
   async function handleSignOut() {
+    endTutorialSession()
     await authClient.signOut()
     await router.invalidate()
   }

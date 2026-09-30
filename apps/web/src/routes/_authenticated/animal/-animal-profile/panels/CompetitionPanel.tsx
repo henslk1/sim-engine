@@ -2,12 +2,13 @@ import type { AnimalProfile } from "../types"
 import { Panel, ActionButton, Meter } from "@/components/game/ui"
 import { Trophy, CheckCircle, XCircle, Ban, MapPin } from "lucide-react"
 import { Link } from "@tanstack/react-router"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { trpc } from "@/lib/trpc"
 import { isTourRunning } from "@/lib/tutorial"
 import { cn } from "@/lib/utils"
 import { getActiveRestrictions } from "../utils"
 import { useTutorialAccess } from "@/lib/tutorial/access"
+import { setShowPrepRequirements } from "@/lib/tutorial/show-prep"
 
 type Cert = {
   isValid: boolean
@@ -36,6 +37,24 @@ function currentWeekStart() {
   start.setUTCDate(now.getUTCDate() - (day === 0 ? 6 : day - 1))
   start.setUTCHours(0, 0, 0, 0)
   return start.getTime()
+}
+
+// Shared by the rendered requirement list and by the snapshot published for the
+// tutorial's unguided prep step, so the two can't drift apart.
+function isEquipmentMet(requirements: EquipmentRequirement[], equipped: EquippedItem[]) {
+  const met = (req: EquipmentRequirement) => equipped.filter((item) => item.itemDef.id === req.itemDef.id).length >= req.quantity
+  const grouped = new Map<string, EquipmentRequirement[]>()
+  for (const req of requirements) {
+    if (!req.requirementGroup) continue
+    grouped.set(req.requirementGroup, [...(grouped.get(req.requirementGroup) ?? []), req])
+  }
+  return requirements.filter((req) => !req.requirementGroup).every(met)
+    && [...grouped.values()].every((group) => group.some(met))
+}
+
+function isCertMet(def: { id: string }, certs: Cert[], ageInCycles: number) {
+  const cert = certs.find((certificate) => certificate.certDef.id === def.id)
+  return !!cert && cert.isValid && cert.expiresAtCycle >= ageInCycles
 }
 
 function InfoCard({ label, value, tutorialKey }: { label: string; value: string; tutorialKey?: string }) {
@@ -118,6 +137,18 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
 
   const requiredCertDefs = animal.game.healthCertificateDefs.filter((d) => d.requiredForCompetition)
 
+  // The unguided "Prepare for the Show" step pulses only the controls that still
+  // have work behind them, and it has to do that from the shop and the vet, where
+  // this panel isn't mounted. Publish the primary discipline's state each render
+  // so the watcher always has the last thing the player actually saw.
+  useEffect(() => {
+    if (readonly) return
+    setShowPrepRequirements({
+      equipmentMet: isEquipmentMet(disc1Tier?.disciplineDef.equipmentRequirements ?? [], equippedItems),
+      certsMet: requiredCertDefs.every((def) => isCertMet(def, healthCertificates, animal.ageInCycles)),
+    })
+  })
+
   function renderDiscipline(
     disc: { id: string; name: string; isConformation: boolean },
     tier: CompetitionTier | null | undefined,
@@ -139,18 +170,8 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
     )
     const startingTierDef = allDisciplines?.find((d) => d.id === disc.id)?.compTierDefs?.[0]
     const equipmentRequirements = tier?.disciplineDef.equipmentRequirements ?? []
-    const individualRequirements = equipmentRequirements.filter(req => !req.requirementGroup)
-    const groupedRequirements = new Map<string, EquipmentRequirement[]>()
-    for (const requirement of equipmentRequirements) {
-      if (!requirement.requirementGroup) continue
-      groupedRequirements.set(requirement.requirementGroup, [...(groupedRequirements.get(requirement.requirementGroup) ?? []), requirement])
-    }
-    const requirementMet = (req: EquipmentRequirement) => equippedItems.filter((equipment) => equipment.itemDef.id === req.itemDef.id).length >= req.quantity
-    const allEquipmentMet = individualRequirements.every(requirementMet) && [...groupedRequirements.values()].every(group => group.some(requirementMet))
-    const allCertsMet = requiredCertDefs.every((def) => {
-      const cert = healthCertificates.find((certificate) => certificate.certDef.id === def.id)
-      return !!cert && cert.isValid && cert.expiresAtCycle >= animal.ageInCycles
-    })
+    const allEquipmentMet = isEquipmentMet(equipmentRequirements, equippedItems)
+    const allCertsMet = requiredCertDefs.every((def) => isCertMet(def, healthCertificates, animal.ageInCycles))
 
     // Equipment and certificates are the owner's to satisfy. For a visitor this
     // collapses to null so the views below fall through to the discipline, tier
@@ -180,8 +201,7 @@ export function CompetitionPanel({ animal, readonly = false }: { animal: AnimalP
             <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Certificates</h4>
             <div className="space-y-1">
               {requiredCertDefs.map((def) => {
-                const cert = healthCertificates.find((certificate) => certificate.certDef.id === def.id)
-                const met = !!cert && cert.isValid && cert.expiresAtCycle >= animal.ageInCycles
+                const met = isCertMet(def, healthCertificates, animal.ageInCycles)
                 return (
                   <div key={def.id} className="flex items-center gap-1.5 text-[11px]">
                     {met ? <CheckCircle className="size-3.5 shrink-0 text-chart-2" /> : <XCircle className="size-3.5 shrink-0 text-destructive" />}

@@ -2,10 +2,11 @@ import { createRootRouteWithContext, Outlet } from "@tanstack/react-router"
 import { QueryClientProvider } from "@tanstack/react-query"
 import { httpBatchLink } from "@trpc/client"
 import { tutorialMutationQueue } from "@/lib/tutorial/mutation-queue"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { trpc } from "@/lib/trpc"
 import { queryClient } from "@/lib/query-client"
 import { authClient } from "@/lib/auth-client"
+import { endTutorialSession } from "@/lib/tutorial"
 
 type Session = typeof authClient.$Infer.Session
 
@@ -35,6 +36,13 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 })
 
 function RootComponent() {
+  const { session } = Route.useRouteContext()
+  useEffect(() => {
+    // Covers expired sessions and other unauthenticated redirects in addition
+    // to the explicit sign-out buttons.
+    if (!session) endTutorialSession()
+  }, [session])
+
   const [trpcClient] = useState(() =>
     trpc.createClient({
       links: [tutorialMutationQueue, httpBatchLink({ 

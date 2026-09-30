@@ -10,10 +10,10 @@ import { Link } from "@tanstack/react-router"
 type CareAction = AnimalProfile["game"]["careActionDefs"][number]
 type LTRecord = AnimalProfile["longTermCareRecords"][number]
 
-function CostBadge({ action }: { action: CareAction }) {
+function CostBadge({ action, currencySymbol }: { action: CareAction; currencySymbol: string }) {
   if (action.costType === "FREE") return <Badge tone="muted">Free</Badge>
   if (action.costType === "CURRENCY" && action.currencyAmount)
-    return <Badge tone="outline">{action.currencyAmount}G</Badge>
+    return <Badge tone="outline">{action.currencyAmount} {currencySymbol}</Badge>
   if (action.costType === "ITEM" && action.items.length > 0)
     return (
       <Badge tone="outline">
@@ -24,12 +24,17 @@ function CostBadge({ action }: { action: CareAction }) {
 }
 
 export function DailyCarePanel({ animal, playerAccountId }: { animal: AnimalProfile; playerAccountId: string }) {
+  // The game defines its own base currency; "G" was hardcoded here.
+  const currencySymbol = animal.game.currencyDefs?.find((c) => c.currencyType === "BASE")?.symbol ?? "G"
   const [pendingId, setPendingId] = useState<string | null>(null)
   const [ltcPendingId, setLtcPendingId] = useState<string | null>(null)
   const utils = trpc.useUtils()
   const invalidate = () => {
     utils.animalProfile.get.invalidate({ animalId: animal.id })
     utils.inventory.mine.invalidate({ playerAccountId })
+    // Both care actions can charge currency; without this the header gold only
+    // catches up on a reload.
+    utils.player.balances.invalidate({ playerAccountId })
   }
   const { mutate: performCare } = trpc.care.perform.useMutation({
     onMutate: ({ careActionDefId }) => setPendingId(careActionDefId),
@@ -125,7 +130,7 @@ export function DailyCarePanel({ animal, playerAccountId }: { animal: AnimalProf
                       </span>
                     </div>
                     <div className="flex shrink-0 items-center gap-1.5">
-                      <CostBadge action={action} />
+                      <CostBadge action={action} currencySymbol={currencySymbol} />
                       {isDone ? (
                         <span className="text-[11px] font-medium text-chart-2">Done</span>
                       ) : !careRestricted && !hasItems(action) ? (
@@ -197,7 +202,7 @@ export function DailyCarePanel({ animal, playerAccountId }: { animal: AnimalProf
                           {ltcPendingId === record.id
                             ? <Loader2 className="size-3 animate-spin" />
                             : <CheckCircle2 className="size-3" />}
-                          Perform{record.longTermCareActionDef.currencyAmount != null && record.longTermCareActionDef.currencyAmount > 0 ? ` · ${record.longTermCareActionDef.currencyAmount}G` : ""}
+                          Perform{record.longTermCareActionDef.currencyAmount != null && record.longTermCareActionDef.currencyAmount > 0 ? ` · ${record.longTermCareActionDef.currencyAmount} ${currencySymbol}` : ""}
                         </ActionButton>
                       ) : (
                         <span className="text-[11px] font-medium text-chart-2">Done</span>

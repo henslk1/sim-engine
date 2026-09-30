@@ -11,6 +11,7 @@ import {
 import { ActionButton } from "./game/ui";
 import { trpc } from "@/lib/trpc";
 import { Coins, Gem } from "lucide-react";
+import { endTutorialSession } from "@/lib/tutorial";
 
 type Session = typeof authClient.$Infer.Session 
 
@@ -27,6 +28,7 @@ export function Header({ session }: { session: Session}) {
   const router = useRouter()
 
   async function handleSignOut() {
+    endTutorialSession()
     await authClient.signOut()
     await router.invalidate()
     router.navigate({ to: "/login" })
@@ -91,7 +93,7 @@ export function Header({ session }: { session: Session}) {
             Bug Report
           </ActionButton>
           <DropdownMenu>
-            <DropdownMenuTrigger className="flex items-center gap-2 rounded-md px-2 py-1 text-sm text-foreground hover:bg-muted outline-none">
+            <DropdownMenuTrigger data-tutorial-signout className="flex items-center gap-2 rounded-md px-2 py-1 text-sm text-foreground hover:bg-muted outline-none">
               <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground overflow-hidden">
                 {user.image ? (
                   <img src={user.image} alt={user.name ?? ""} className="h-full w-full object-cover" />
@@ -133,7 +135,7 @@ export function Header({ session }: { session: Session}) {
                   <DropdownMenuSeparator />
                 </>
               )}
-              <DropdownMenuItem onSelect={handleSignOut} className="cursor-pointer">
+              <DropdownMenuItem data-tutorial-signout onSelect={handleSignOut} className="cursor-pointer">
                 Sign out
               </DropdownMenuItem>
             </DropdownMenuContent>

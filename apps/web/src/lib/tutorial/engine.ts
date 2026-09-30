@@ -28,6 +28,20 @@ export function destroyActiveTour() {
   previous?.destroy()
 }
 
+// Signing out removes the authenticated layout without completing the tutorial.
+// Tear down both Driver.js and the in-memory interaction guard while preserving
+// the saved step so the same account can resume after signing back in.
+export function endTutorialSession() {
+  destroyActiveTour()
+  setTutorialAccess({
+    restricted: false,
+    mareId: null,
+    foalId: null,
+    foalBreedId: null,
+    recoveryMessage: null,
+  })
+}
+
 // Restore transient UI state lost on refresh/dashboard recovery. These clicks
 // only open panels or select tabs/intensities; they never perform game actions.
 async function restoreStep(step: number, current: () => boolean) {

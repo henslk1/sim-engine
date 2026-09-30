@@ -1,6 +1,8 @@
 import type { DriveStep } from "driver.js"
 import type { TutorialCtrl, TutorialCallbacks } from "../types"
 import { waitForElement } from "../utils/wait-for-element"
+import { getShowPrepRequirements } from "../show-prep"
+import { prepareTutorialControl, readTutorialLabel, saveTutorialLabel, saveTutorialVenueId } from "../access"
 
 // Captured from the foal's profile heading once first visited.
 let capturedFoalName = ""
@@ -9,14 +11,34 @@ let capturedBreedName = ""
 // Captured from the foal's competition tier display.
 let capturedTierName = ""
 
+// Captures are mirrored to storage: the module variables above are lost on a
+// refresh, and a step may need a name while on a page that never displays it.
+const FOAL_FALLBACK = "your foal"
+
 function foalName(): string {
-  const visible = document.querySelector('[data-tutorial="animal-header"] h1')?.textContent?.trim()
-  if (visible) capturedFoalName = visible
-  return capturedFoalName || "your foal"
+  const header = document.querySelector<HTMLElement>('[data-tutorial="animal-header"]')
+  const visible = header?.querySelector("h1")?.textContent?.trim()
+  if (visible) {
+    capturedFoalName = visible
+    saveTutorialLabel("foal", visible)
+  }
+  const visibleBreed = header?.dataset.breedName?.trim()
+  if (visibleBreed) {
+    capturedBreedName = visibleBreed
+    saveTutorialLabel("breed", visibleBreed)
+  }
+  return capturedFoalName || readTutorialLabel("foal") || FOAL_FALLBACK
+}
+
+// For step copy that opens a sentence with the name. The player's own
+// capitalization is left alone; only the fallback is adjusted.
+function foalNameAtStart(): string {
+  const name = foalName()
+  return name === FOAL_FALLBACK ? "Your foal" : name
 }
 
 function breedName(): string {
-  return capturedBreedName || "the breed"
+  return capturedBreedName || readTutorialLabel("breed") || "the breed"
 }
 
 let _pulseStyleEl: HTMLStyleElement | null = null
@@ -57,6 +79,22 @@ function unfocusConformationLoci() {
   delete (window as any).__tutorialConformationLociCleanup
 }
 
+// Prep-step pulse targets, grouped by the requirement each one leads to. The
+// player already knows how to prepare for a show at this point, so the step gives
+// no instructions — the pulse *is* the instruction, and a group goes quiet as soon
+// as its requirement is met so what's left is always what's still outstanding.
+const PREP_EQUIPMENT_TARGETS = [
+  '[data-tutorial="equip-action"]',
+  '[data-tutorial="shop-nav"]',
+  '[data-tutorial="tutorial-shop-buy"]',
+].join(", ")
+const PREP_CERT_TARGETS = [
+  '[data-tutorial="visit-vet"]',
+  '[data-tutorial="book-cert-testing"]',
+  '[data-tutorial="vet-service-nav"][data-service="certificates"][data-active="false"]',
+  '[data-tutorial="cert-issue-btn"]',
+].join(", ")
+
 // Shared by step [194]'s onNextClick (first visit, still on the foal's profile)
 // and its onHighlighted (resuming away from it) — see that step for why.
 function armPrepWatcher(ctrl: TutorialCtrl) {
@@ -67,23 +105,85 @@ function armPrepWatcher(ctrl: TutorialCtrl) {
   let finished = false
   const check = () => {
     const btn = document.querySelector<HTMLButtonElement>('[data-tutorial="view-venues-btn"]')
-    if (!finished && btn && !btn.disabled) {
-      finished = true
-      observer.disconnect()
-      ;(window as any).__tutorialPrepCleanup?.()
-      removeUnguidedStyle()
-      ctrl.moveNext()
-    }
+    if (finished || !btn || btn.disabled) return
+    finished = true
+    observer.disconnect()
+    ;(window as any).__tutorialPrepCleanup?.()
+    removeUnguidedStyle()
+    // The last requirement is usually equipping, done from a window that sits over
+    // the profile. Left open it covers the whole next step, with no way back out.
+    if (!prepareTutorialControl('[data-tutorial="equip-modal-close"]')) return ctrl.moveNext()
+    requestAnimationFrame(() => ctrl.moveNext())
   }
   const observer = new MutationObserver(check)
   observer.observe(document.body, { childList: true, subtree: true, attributes: true })
   injectPulseStyle()
-  const pulse = () => document.querySelectorAll('[data-tutorial="equip-action"], [data-tutorial="book-cert-testing"], [data-tutorial="visit-vet"], [data-tutorial="tutorial-shop-buy"], [data-tutorial="cert-issue-btn"]').forEach(el => el.classList.add("tutorial-pulse"))
+  const pulse = () => {
+    const { equipmentMet, certsMet } = getShowPrepRequirements()
+    const selector = [equipmentMet ? null : PREP_EQUIPMENT_TARGETS, certsMet ? null : PREP_CERT_TARGETS]
+      .filter(Boolean).join(", ")
+    const wanted = new Set<Element>()
+    if (selector) {
+      document.querySelectorAll(selector).forEach(el => {
+        // Nothing left behind this control: the vet's cert button becomes a disabled
+        // "Renew" once the certificate is valid, and the shop's buy button reports
+        // ownership — owning the item is all the shop can contribute.
+        if ((el as HTMLButtonElement).disabled) return
+        if (el.getAttribute("data-tutorial-owned") === "true") return
+        wanted.add(el)
+      })
+    }
+    document.querySelectorAll(".tutorial-pulse").forEach(el => { if (!wanted.has(el)) el.classList.remove("tutorial-pulse") })
+    wanted.forEach(el => el.classList.add("tutorial-pulse"))
+  }
   pulse()
   const pulseInterval = setInterval(pulse, 500)
   ;(window as any).__tutorialPrepCleanup = () => {
     observer.disconnect()
     clearInterval(pulseInterval)
+    document.querySelectorAll(".tutorial-pulse").forEach(el => el.classList.remove("tutorial-pulse"))
+    removeUnguidedStyle()
+    removePulseStyle()
+  }
+  check()
+}
+
+// Started by step [209]'s "Okay". The driver steps back and the pulse follows the
+// player instead: the Stable link while they're elsewhere, the foal's own card
+// once they're in the stable — pulsing the nav they just used points at nothing.
+function armExploreReturnWatcher(ctrl: TutorialCtrl) {
+  if ((window as any).__tutorialExploreReturnCleanup) return
+  injectUnguidedStyle()
+  injectPulseStyle()
+  const objective = document.createElement("div")
+  objective.id = "tutorial-return-objective"
+  objective.textContent = `Return to ${foalName()}`
+  objective.className = "fixed right-4 top-20 z-[10000] rounded-md border border-primary/40 bg-background/95 px-3 py-2 text-sm font-semibold text-foreground shadow-lg"
+  document.body.appendChild(objective)
+  const pulse = () => {
+    const target = document.querySelector('[data-tutorial="tutorial-foal-stable-card"]')
+      ?? document.querySelector('[data-tutorial="stable-nav"]')
+    document.querySelectorAll(".tutorial-pulse").forEach(el => { if (el !== target) el.classList.remove("tutorial-pulse") })
+    target?.classList.add("tutorial-pulse")
+  }
+  pulse()
+  // The stable list mounts a render after the navigation, and the header link is
+  // re-created by the layout — so re-resolve rather than pulsing once.
+  const pulseInterval = setInterval(pulse, 500)
+  let finished = false
+  const check = () => {
+    if (finished || !document.querySelector('[data-tutorial="animal-profile"]')) return
+    finished = true
+    observer.disconnect()
+    ;(window as any).__tutorialExploreReturnCleanup?.()
+    ctrl.moveNext()
+  }
+  const observer = new MutationObserver(check)
+  observer.observe(document.body, { childList: true, subtree: true })
+  ;(window as any).__tutorialExploreReturnCleanup = () => {
+    clearInterval(pulseInterval)
+    observer.disconnect()
+    objective.remove()
     document.querySelectorAll(".tutorial-pulse").forEach(el => el.classList.remove("tutorial-pulse"))
     removeUnguidedStyle()
     removePulseStyle()
@@ -113,6 +213,8 @@ function armYoungstockWatcher(ctrl: TutorialCtrl) {
   }
   queueMicrotask(() => onAdvanced())
 }
+
+const VENUE_CARDS = '[data-tutorial="tutorial-venue-card"], [data-tutorial="venue-card-first"]'
 
 function injectUnguidedStyle() {
   document.getElementById("tutorial-unguided-phase")?.remove()
@@ -192,8 +294,8 @@ export function foalSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks): Dri
 
     // ── [160] Birth Event — "A New Beginning" ─────────────────────────────
     {
-      element: '[data-tutorial="birth-dialog"]',
-      waitForElement: 8000,
+      // Full page: the birth dialog stays hidden until the naming step, so there
+      // is nothing to anchor to and its half-filled state is not on show.
       disableActiveInteraction: true,
       popover: {
         title: "A New Beginning",
@@ -207,7 +309,11 @@ export function foalSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks): Dri
     // Spotlights the name input in the birth dialog. Advances when the dialog
     // closes (birth mutation succeeds and dialog is unmounted).
     {
-      element: '[data-tutorial="birth-name-input"]',
+      // The overlay only cuts a hole around the spotlighted element, and Confirm
+      // sits below the input — clicks on it were landing on the overlay path and
+      // being blocked, so the foal could be named but never confirmed. Spotlight
+      // the dialog so both controls fall inside the cutout.
+      element: '[data-tutorial="birth-dialog"]',
       waitForElement: 8000,
       disableActiveInteraction: false,
       popover: {
@@ -220,7 +326,7 @@ export function foalSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks): Dri
       onHighlighted: (el?: Element) => {
         if (!el) return
         injectPulseStyle()
-        el.classList.add("tutorial-pulse")
+        document.querySelector('[data-tutorial="birth-name-input"]')?.classList.add("tutorial-pulse")
         document.querySelector('[data-tutorial="birth-name-confirm"]')?.classList.add("tutorial-pulse")
         let finished = false
         const check = () => {
@@ -234,12 +340,12 @@ export function foalSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks): Dri
         ;(el as any).__tutorialBirthNameCleanup = () => {
           observer.disconnect()
           document.querySelector('[data-tutorial="birth-name-confirm"]')?.classList.remove("tutorial-pulse")
+          document.querySelector('[data-tutorial="birth-name-input"]')?.classList.remove("tutorial-pulse")
         }
       },
       onDeselected: (el?: Element) => {
         ;(el as any)?.__tutorialBirthNameCleanup?.()
         removePulseStyle()
-        el?.classList.remove("tutorial-pulse")
       },
     },
 
@@ -456,7 +562,10 @@ export function foalSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks): Dri
           if (!card) return
           // Capture the breed name from the card heading
           const name = card.querySelector('h3')?.textContent?.trim()
-          if (name) capturedBreedName = name
+          if (name) {
+            capturedBreedName = name
+            saveTutorialLabel("breed", name)
+          }
           document.removeEventListener("click", handler, true)
           setTimeout(() => ctrl.moveNext(), 0)
         }
@@ -479,7 +588,10 @@ export function foalSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks): Dri
         onPopoverRender: (popover: { title: HTMLElement; description: HTMLElement }) => {
           // Capture breed name from the page heading if available
           const h1 = document.querySelector("h1")?.textContent?.trim()
-          if (h1) capturedBreedName = h1
+          if (h1) {
+            capturedBreedName = h1
+            saveTutorialLabel("breed", h1)
+          }
           const breed = breedName()
           popover.title.textContent = breed ? `The ${breed}` : "The Breed Profile"
           popover.description.textContent = "Each breed profile covers its history, characteristics, health concerns, and conformation standard."
@@ -598,7 +710,7 @@ export function foalSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks): Dri
         description: "Your foal is now eligible for a one-time inspection. This will reveal how closely their physical characteristics match the breed standard.",
         showButtons: ["next"],
         onPopoverRender: (popover: { description: HTMLElement }) => {
-          const name = foalName()
+          const name = foalNameAtStart()
           const breed = breedName()
           popover.description.textContent = `${name} is now eligible for a one-time inspection. This will reveal how closely their physical characteristics match the ${breed} standard.`
         },
@@ -909,7 +1021,7 @@ export function foalSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks): Dri
         description: "Your foal's conformation traits and preferences are now available. Knowing these traits can help you make informed decisions as you develop your breeding line.",
         showButtons: ["next"],
         onPopoverRender: (popover: { description: HTMLElement }) => {
-          const name = foalName()
+          const name = foalNameAtStart()
           popover.description.textContent = `${name}'s conformation traits and preferences are now available. Knowing these traits can help you make informed decisions as you develop your breeding line.`
         },
         onNextClick: () => ctrl.moveNext(),
@@ -926,7 +1038,7 @@ export function foalSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks): Dri
         description: "Your foal is old enough to begin competing in conformation events.",
         showButtons: ["next"],
         onPopoverRender: (popover: { description: HTMLElement }) => {
-          const name = foalName()
+          const name = foalNameAtStart()
           popover.description.textContent = `${name} is old enough to begin competing in conformation events.`
         },
         onNextClick: () => ctrl.moveNext(),
@@ -1017,7 +1129,7 @@ export function foalSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks): Dri
         description: "Your foal has everything required to enter a Weanling Halter competition. Now choose a suitable venue.",
         showButtons: ["next"],
         onPopoverRender: (popover: { description: HTMLElement }) => {
-          const name = foalName()
+          const name = foalNameAtStart()
           popover.description.textContent = `${name} has everything required to enter a Weanling Halter competition. Now choose a suitable venue.`
         },
         onNextClick: () => ctrl.moveNext(),
@@ -1051,16 +1163,53 @@ export function foalSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks): Dri
     },
 
     // ── [196] Compare Venues (spec 199) ───────────────────────────────────
+    // Unguided pick, the same shape as the mare phase's "Choose a Venue": Okay
+    // hands the page back to the player and the step advances on the card they
+    // pick. Advancing on Okay instead left the next step waiting on /venues for a
+    // venue-detail element that only exists once a venue is open, so it timed out.
     {
+      disableActiveInteraction: false,
       popover: {
         title: "Choose the Best Match",
         description: "Compare each venue's terrain and climate with your foal's preferences, then visit a suitable venue.",
         showButtons: ["next"],
+        nextBtnText: "Okay",
         onPopoverRender: (popover: { description: HTMLElement }) => {
           const name = foalName()
           popover.description.textContent = `Compare each venue's terrain and climate with ${name}'s preferences, then visit a suitable venue.`
         },
-        onNextClick: () => ctrl.moveNext(),
+        onNextClick: () => {
+          document.querySelector<HTMLElement>(".driver-popover")?.style.setProperty("display", "none")
+          document.querySelector<SVGElement>(".driver-overlay")?.style.setProperty("display", "none")
+          document.querySelectorAll<HTMLElement>(VENUE_CARDS).forEach(card => {
+            card.style.setProperty("pointer-events", "auto", "important")
+          })
+        },
+      },
+      onHighlighted: () => {
+        const handler = (event: MouseEvent) => {
+          const card = event.target instanceof Element
+            ? event.target.closest<HTMLAnchorElement>(VENUE_CARDS)
+            : null
+          if (!card) return
+          // Saved so a reload on the venue page resumes there instead of bouncing
+          // to the dashboard — see the route guard in _authenticated.tsx.
+          const venueId = new URL(card.href).pathname.split("/")[2]
+          if (venueId) saveTutorialVenueId(venueId)
+          document.removeEventListener("click", handler, true)
+          setTimeout(() => ctrl.moveNext(), 0)
+        }
+        document.addEventListener("click", handler, true)
+        ;(document as any).__tutorialFoalVenuePickCleanup = () => document.removeEventListener("click", handler, true)
+      },
+      onDeselected: () => {
+        document.querySelector<HTMLElement>(".driver-popover")?.style.removeProperty("display")
+        document.querySelector<SVGElement>(".driver-overlay")?.style.removeProperty("display")
+        document.querySelectorAll<HTMLElement>(VENUE_CARDS).forEach(card => {
+          card.style.removeProperty("pointer-events")
+        })
+        ;(document as any).__tutorialFoalVenuePickCleanup?.()
+        delete (document as any).__tutorialFoalVenuePickCleanup
       },
     },
 
@@ -1119,7 +1268,7 @@ export function foalSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks): Dri
         if (btn) return btn
         const sectionBtn = document.querySelector<HTMLElement>('[data-tutorial="tutorial-discipline-section-btn"]')
         if (sectionBtn?.dataset.expanded === "false") sectionBtn.click()
-        return document.querySelector<HTMLElement>('[data-tutorial="tutorial-compete-btn"]') ?? undefined
+        return document.querySelector<HTMLElement>('[data-tutorial="tutorial-compete-btn"]')!
       },
       waitForElement: 5000,
       disableActiveInteraction: false,
@@ -1172,7 +1321,7 @@ export function foalSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks): Dri
         description: "Your foal begins at the Rookie tier in Weanling Halter.",
         showButtons: ["next"],
         onPopoverRender: (popover: { description: HTMLElement }) => {
-          const name = foalName()
+          const name = foalNameAtStart()
           const tier = document.querySelector('[data-tutorial="tutorial-compete-tier-info"] .text-sm')?.textContent?.trim()
           if (tier) capturedTierName = tier
           popover.description.textContent = `${name} begins at the ${capturedTierName || "Rookie"} tier in Weanling Halter.`
@@ -1188,8 +1337,7 @@ export function foalSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks): Dri
     {
       element: () =>
         document.querySelector<HTMLElement>('[data-tutorial="tutorial-tier-progress"]')
-        ?? document.querySelector<HTMLElement>('[data-tutorial="competition-panel"]')
-        ?? undefined,
+        ?? document.querySelector<HTMLElement>('[data-tutorial="competition-panel"]')!,
       waitForElement: 5000,
       disableActiveInteraction: true,
       popover: {
@@ -1320,45 +1468,36 @@ export function foalSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks): Dri
     },
 
     // ── [209] Explore and Return (spec 213, unguided) ─────────────────────
-    // Driver hides. stable-nav pulses. Advances when the foal's profile loads
-    // (detected by [data-tutorial="animal-profile"] appearing in the DOM).
+    // States the objective against the Stable link before stepping back, rather
+    // than dismissing into a silent page with only a pulse to go on. The link is
+    // spotlighted but not clickable while the prompt is up; "Okay" hands the page
+    // over and starts the watch. Advances when the foal's profile loads.
     {
-      popover: { title: "", description: "", showButtons: [] },
-      onHighlighted: () => {
-        injectUnguidedStyle()
-        injectPulseStyle()
-        const objective = document.createElement("div")
-        objective.id = "tutorial-return-objective"
-        objective.textContent = `Return to ${foalName()}`
-        objective.className = "fixed right-4 top-20 z-[10000] rounded-md border border-primary/40 bg-background/95 px-3 py-2 text-sm font-semibold text-foreground shadow-lg"
-        document.body.appendChild(objective)
-        const pulse = () => {
-          document.querySelectorAll('[data-tutorial="stable-nav"]').forEach(el => el.classList.add("tutorial-pulse"))
-        }
-        pulse()
-        const pulseInterval = setInterval(pulse, 500)
-        let finished = false
-        const check = () => {
-          if (finished || !document.querySelector('[data-tutorial="animal-profile"]')) return
-          finished = true
-          observer.disconnect()
-          ;(window as any).__tutorialExploreReturnCleanup?.()
-          ctrl.moveNext()
-        }
-        const observer = new MutationObserver(check)
-        observer.observe(document.body, { childList: true, subtree: true })
-        ;(window as any).__tutorialExploreReturnCleanup = () => {
-          clearInterval(pulseInterval)
-          observer.disconnect()
-          objective.remove()
-          document.querySelectorAll('[data-tutorial="stable-nav"]').forEach(el => el.classList.remove("tutorial-pulse"))
-          removeUnguidedStyle()
-          removePulseStyle()
-        }
+      element: '[data-tutorial="stable-nav"]',
+      waitForElement: 5000,
+      disableActiveInteraction: true,
+      popover: {
+        title: "Explore and Return",
+        description: "Take a look around whenever you like. When you're finished, return to your foal through the Stable.",
+        showButtons: ["next"],
+        nextBtnText: "Okay",
+        onPopoverRender: (popover: { description: HTMLElement }) => {
+          const name = foalName()
+          popover.description.textContent = `Take a look around whenever you like. When you're finished, return to ${name} through the Stable.`
+        },
+        onNextClick: () => armExploreReturnWatcher(ctrl),
       },
-      onDeselected: () => {
+      onHighlighted: (el?: Element) => {
+        injectPulseStyle()
+        el?.classList.add("tutorial-pulse")
+        // Resuming with the foal's profile already open is the objective met.
+        if (document.querySelector('[data-tutorial="animal-profile"]')) queueMicrotask(() => ctrl.moveNext())
+      },
+      onDeselected: (el?: Element) => {
         ;(window as any).__tutorialExploreReturnCleanup?.()
         delete (window as any).__tutorialExploreReturnCleanup
+        removePulseStyle()
+        el?.classList.remove("tutorial-pulse")
       },
     },
 
@@ -1406,16 +1545,18 @@ export function foalSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks): Dri
     },
 
     // ── [212] Youngstock Reached (spec 216) ───────────────────────────────
+    // Centered popover, not a spotlight. The only marker covering the life
+    // stage badge is `animal-header`, which wraps the name, Advance Age, and
+    // the whole vitals grid, so highlighting it reads as a page-wide stage
+    // anyway. [211]'s watcher only advances while the profile is mounted, so
+    // this still lands on the foal page without an element to wait for.
     {
-      element: '[data-tutorial="animal-header"]',
-      waitForElement: 8000,
-      disableActiveInteraction: true,
       popover: {
         title: "A New Chapter",
         description: "Your foal has reached the Youngstock stage. Training and new competition opportunities will continue to open as they mature.",
         showButtons: ["next"],
         onPopoverRender: (popover: { description: HTMLElement }) => {
-          const name = foalName()
+          const name = foalNameAtStart()
           popover.description.textContent = `${name} has reached the Youngstock stage. Training and new competition opportunities will continue to open as they mature.`
         },
         onNextClick: () => ctrl.moveNext(),

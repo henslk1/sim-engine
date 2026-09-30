@@ -4,7 +4,7 @@ import { Header } from "@/components/header"
 import { trpc, trpcVanilla } from "@/lib/trpc"
 import { MessagingWidget } from "@/components/messaging-widget"
 import { authClient } from "@/lib/auth-client"
-import { isTourRunning, destroyActiveTour, startTutorial } from "@/lib/tutorial"
+import { isTourRunning, destroyActiveTour, endTutorialSession, startTutorial } from "@/lib/tutorial"
 import { clearTutorialStep, clearTutorialVenueId, configureTutorialStorage, getTutorialAccess, installTutorialInteractionGuard, readTutorialListingId, readTutorialStallionId, readTutorialStep, readTutorialVenueId, saveTutorialStep, setTutorialAccess, useTutorialAccess, wasTutorialRunning } from "@/lib/tutorial/access"
 import { isTutorialRouteAllowed } from "@sim-engine/trpc/tutorial-policy"
 import { grantGold } from "@/lib/tutorial/utils/grant-gold"
@@ -20,6 +20,7 @@ function SetupHeader({ session }: { session: Session }) {
   const router = useRouter()
 
   async function handleSignOut() {
+    endTutorialSession()
     await authClient.signOut()
     await router.invalidate()
     void router.navigate({ to: "/" })

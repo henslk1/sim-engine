@@ -3,10 +3,14 @@ import React, { useState } from "react";
 import { authClient } from "@/lib/auth-client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { endTutorialSession } from "@/lib/tutorial";
 
 export const Route = createFileRoute("/login")({
   beforeLoad: ({ context }) => {
     if (context.session) throw redirect({ to: "/" })
+    // Do this before the login page renders so a Driver.js overlay from the
+    // authenticated route can never flash over the form during sign-out.
+    endTutorialSession()
   },
   component: LoginPage,
 })

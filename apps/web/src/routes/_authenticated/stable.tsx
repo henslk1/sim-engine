@@ -437,6 +437,9 @@ function StablePage() {
     onSuccess: () => {
       window.dispatchEvent(new Event("tutorial:mareReturned"))
       utils.animal.list.invalidate()
+      // The return agreement pays out — without this the header still shows the
+      // old balance until something else happens to refetch it.
+      utils.player.balances.invalidate()
     },
   })
   const [selected, setSelected] = useState<Selection>("all")

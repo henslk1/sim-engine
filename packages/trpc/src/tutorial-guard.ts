@@ -104,7 +104,6 @@ export async function guardTutorialMutation(userId: string | null, path: string,
     const foalName = names.find(entry => entry.animalId === pair.embryoId)?.name
     if (pregnancy?.animalId !== pair.ancestorOneId || !pregnancy.offspring.some(entry => entry.animalId === pair.embryoId) || typeof foalName !== "string" || !foalName.trim()) throw denied()
   }
-  if (path === "genetics.testCompleteProfile" && input.panelType !== "CONFORMATION") throw denied()
   if (path === "inventory.buy" || path === "inventory.equip") {
     const animal = await db.animal.findUnique({ where: { id: tutorialAnimalId } })
     const disciplineDefId = step >= 164 ? animal?.disciplineDefId : animal?.secondaryDisciplineDefId

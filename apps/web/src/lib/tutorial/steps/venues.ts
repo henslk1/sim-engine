@@ -272,7 +272,7 @@ export function venueSteps(ctrl: TutorialCtrl, callbacks: TutorialCallbacks): Dr
         if (btn) return btn
         const sectionBtn = document.querySelector<HTMLElement>('[data-tutorial="tutorial-discipline-section-btn"]')
         if (sectionBtn?.dataset.expanded === "false") sectionBtn.click()
-        return document.querySelector<HTMLElement>('[data-tutorial="tutorial-compete-btn"]') ?? undefined
+        return document.querySelector<HTMLElement>('[data-tutorial="tutorial-compete-btn"]')!
       },
       waitForElement: 3000,
       disableActiveInteraction: false,

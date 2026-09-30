@@ -33,6 +33,8 @@ function BookBreedingPage() {
   const { listingId, damId: initialDamId } = Route.useSearch()
   const navigate = useNavigate()
   const utils = trpc.useUtils()
+  // Charged from the player's balance — refresh it or the header only updates on reload.
+  const refreshBalance = () => { if (playerAccountId) utils.player.balances.invalidate({ playerAccountId: playerAccountId }) }
   const [selectedDamId, setSelectedDamId] = useState<string | null>(initialDamId ?? null)
   const [result, setResult] = useState<{ conceived: boolean; damId: string; damName: string } | null>(null)
 
@@ -65,6 +67,7 @@ function BookBreedingPage() {
 
   const { mutate: acceptCover, isPending: acceptPending, error: acceptError } = trpc.breeding.cover.accept.useMutation({
     onSuccess: (data) => {
+      refreshBalance()
       utils.animalProfile.get.invalidate()
       const dam = dams.find((d) => d.id === selectedDamId)
       setResult({ conceived: data.conceived, damId: selectedDamId!, damName: dam?.name ?? "" })

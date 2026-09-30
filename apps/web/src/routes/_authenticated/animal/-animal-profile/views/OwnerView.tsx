@@ -81,6 +81,7 @@ export function OwnerView({ animal, animalId, playerAccountId }: { animal: Anima
           data-tutorial="animal-header"
           data-age-cycles={animal.ageInCycles}
           data-cycles-per-year={config?.cyclesPerYear ?? 12}
+          data-breed-name={animal.breed?.name ?? animal.breedName ?? ""}
           className="flex w-full max-w-5xl flex-col items-center gap-3"
         >
           <div className="flex flex-wrap items-center justify-center gap-2">

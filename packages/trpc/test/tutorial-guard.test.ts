@@ -118,8 +118,10 @@ test("post-birth mutations are limited to the exact tutorial foal", async () => 
   await assert.rejects(guardTutorialMutation("user", "care.performLtc", { animalId: "mare", ltcRecordId: "ltc" }), forbidden)
 
   step = 189
-  await guardTutorialMutation("user", "genetics.testCompleteProfile", { animalId: "foal", panelType: "CONFORMATION" })
-  await assert.rejects(guardTutorialMutation("user", "genetics.testCompleteProfile", { animalId: "foal", panelType: "COLOR" }), forbidden)
+  // The complete test reveals the foal's whole genotype — it is not scoped to a
+  // panel type. Step and animal are what constrain it.
+  await guardTutorialMutation("user", "genetics.testCompleteProfile", { animalId: "foal" })
+  await assert.rejects(guardTutorialMutation("user", "genetics.testCompleteProfile", { animalId: "mare" }), forbidden)
 
   step = 192
   await guardTutorialMutation("user", "animal.setDiscipline", { animalId: "foal", disciplineDefId: "halter" })

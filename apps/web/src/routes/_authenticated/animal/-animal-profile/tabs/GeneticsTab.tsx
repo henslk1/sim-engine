@@ -5,7 +5,7 @@ import { getTrainingCap, formatCycleAge } from "../utils"
 import { ActionButton, Badge } from "@/components/game/ui"
 import { FlaskConical, Loader2, ChevronDown, Dna } from "lucide-react"
 import { trpc } from "@/lib/trpc"
-import { getTutorialAccess } from "@/lib/tutorial/access"
+import { getTutorialAccess, useTutorialAccess } from "@/lib/tutorial/access"
 
 type Genotype = NonNullable<AnimalProfile["genotypes"]>[number]
 type PanelDef = Genotype["locus"]["panelEntries"][number]["panelDef"]
@@ -335,11 +335,16 @@ function ConformationAccordion({
   // Empty by default (all collapsed) — a locus's terrain/climate relevance can fall in
   // any section, so more than one may need to be open at once (see ConformationGenotypeCard).
   const [openIds, setOpenIds] = useState<Set<string>>(() => new Set())
+  // Several tutorial steps talk about loci that are spread across more than one
+  // section, and a collapsed section renders no cards at all. With five sections
+  // it isn't sensible to walk the player through opening each one, so while the
+  // tutorial is running every section stays open regardless of what they toggle.
+  const tutorialOpen = useTutorialAccess().restricted
 
   return (
     <div className="overflow-hidden rounded-md border border-border divide-y divide-border" data-tutorial="conformation-accordion">
       {panels.map(({ panelDef, genotypes }) => {
-        const isOpen = openIds.has(panelDef.id)
+        const isOpen = tutorialOpen || openIds.has(panelDef.id)
         const testedCount = genotypes.filter((g) => g.isTestedByOwner).length
         const eligibleUntested = genotypes.filter(
           (g) => !g.isTestedByOwner && (g.locus.minTestCycle == null || ageInCycles >= g.locus.minTestCycle)
@@ -452,7 +457,7 @@ function CompleteProfileButton({
     <div className="border-t border-border/60 pt-3">
       <ActionButton variant="soft" className="w-full justify-center" disabled={isPending} onClick={onClick} data-tutorial={tutorialKey}>
         {isPending ? <Loader2 className="size-3.5 animate-spin" /> : <Dna className="size-3.5" />}
-        Complete Genetic Profile{cost > 0 ? ` · ${cost}${currencyLabel}` : " · Free"}
+        Complete Genetic Profile{cost > 0 ? ` · ${cost} ${currencyLabel}` : " · Free"}
       </ActionButton>
     </div>
   )
@@ -498,7 +503,12 @@ export function GeneticsTab({
   })
 
   const utils = trpc.useUtils()
-  const invalidate = () => utils.animalProfile.get.invalidate({ animalId: animal.id })
+  const invalidate = () => {
+    utils.animalProfile.get.invalidate({ animalId: animal.id })
+    // Locus, panel and complete-profile tests can all charge a fee, so the
+    // header balance has to be refreshed or it only catches up on a reload.
+    utils.player.balances.invalidate({ playerAccountId: animal.playerAccountId })
+  }
 
   const { mutate: testLocus, isPending: testLocusPending, variables: testLocusVars } =
     trpc.genetics.testLocus.useMutation({ onSuccess: () => { invalidate(); window.dispatchEvent(new CustomEvent("tutorial:geneticTestComplete", { detail: "locus" })) } })
@@ -533,6 +543,8 @@ export function GeneticsTab({
   const colorProfileEligible = computeProfileCost(colorPanels, animal.ageInCycles).hasEligible
   const healthProfileEligible = computeProfileCost(healthPanels, animal.ageInCycles).hasEligible
   const conformationProfileEligible = computeProfileCost(conformationPanels, animal.ageInCycles).hasEligible
+  // One button, one fee, every locus — so it matches the label.
+  const anyProfileEligible = colorProfileEligible || healthProfileEligible || conformationProfileEligible
 
   return (
     <GeneticsReadonly.Provider value={readonly}>
@@ -578,7 +590,7 @@ export function GeneticsTab({
         )
       )}
       {subTab === "color" && (
-        <CompleteProfileButton cost={flatCost} currencyLabel={profileCurrency} hasEligible={colorProfileEligible} isPending={completeProfilePending} onClick={() => testCompleteProfile({ animalId: animal.id, panelType: "COLOR" })} />
+        <CompleteProfileButton cost={flatCost} currencyLabel={profileCurrency} hasEligible={anyProfileEligible} isPending={completeProfilePending} onClick={() => testCompleteProfile({ animalId: animal.id })} />
       )}
 
       {subTab === "health" && (
@@ -616,7 +628,7 @@ export function GeneticsTab({
         )
       )}
       {subTab === "health" && (
-        <CompleteProfileButton cost={flatCost} currencyLabel={profileCurrency} hasEligible={healthProfileEligible} isPending={completeProfilePending} onClick={() => testCompleteProfile({ animalId: animal.id, panelType: "HEALTH" })} />
+        <CompleteProfileButton cost={flatCost} currencyLabel={profileCurrency} hasEligible={anyProfileEligible} isPending={completeProfilePending} onClick={() => testCompleteProfile({ animalId: animal.id })} />
       )}
 
       {subTab === "conformation" && <div data-tutorial="conformation-genetics-results">
@@ -636,7 +648,7 @@ export function GeneticsTab({
         )}
       </div>}
       {subTab === "conformation" && (
-        <CompleteProfileButton cost={flatCost} currencyLabel={profileCurrency} hasEligible={conformationProfileEligible} isPending={completeProfilePending} onClick={() => testCompleteProfile({ animalId: animal.id, panelType: "CONFORMATION" })} tutorialKey="genetics-complete-profile-btn" />
+        <CompleteProfileButton cost={flatCost} currencyLabel={profileCurrency} hasEligible={anyProfileEligible} isPending={completeProfilePending} onClick={() => testCompleteProfile({ animalId: animal.id })} tutorialKey="genetics-complete-profile-btn" />
       )}
 
       {subTab === "stats" && <InnateStats animal={animal} config={config} />}

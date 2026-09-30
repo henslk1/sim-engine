@@ -467,18 +467,28 @@ export const vetRouter = router({
             }
           }
 
-          await tx.animalTreatmentRecord.update({
-            where: { id: treatmentRecord.id },
-            data: { isActive: false, completedCycle: animal.ageInCycles, completedAt: new Date() },
+          // The procedure is over, but its recovery restrictions are the other
+          // half of the same course. Closing here would strand them: the profile
+          // only reaches a restriction through an active treatment record, while
+          // the engine enforces it by animalId — invisible and still blocking.
+          // Leave the record open and let aging close it when recovery ends.
+          const recovering = await tx.activityRestriction.count({
+            where: { treatmentRecordId: treatmentRecord.id, isActive: true },
           })
-          const remaining = await tx.animalTreatmentRecord.count({
-            where: { healthRecordId: input.healthRecordId, isActive: true },
-          })
-          if (remaining === 0) {
-            await tx.animalHealthRecord.update({
-              where: { id: input.healthRecordId },
-              data: { isActive: false, resolvedCycle: animal.ageInCycles, resolvedAt: new Date() },
+          if (recovering === 0) {
+            await tx.animalTreatmentRecord.update({
+              where: { id: treatmentRecord.id },
+              data: { isActive: false, completedCycle: animal.ageInCycles, completedAt: new Date() },
             })
+            const remaining = await tx.animalTreatmentRecord.count({
+              where: { healthRecordId: input.healthRecordId, isActive: true },
+            })
+            if (remaining === 0) {
+              await tx.animalHealthRecord.update({
+                where: { id: input.healthRecordId },
+                data: { isActive: false, resolvedCycle: animal.ageInCycles, resolvedAt: new Date() },
+              })
+            }
           }
         }
 

@@ -18,12 +18,14 @@ let venueStorageKey = "tutorial_venue"
 let stallionStorageKey = "tutorial_stallion"
 let listingStorageKey = "tutorial_listing"
 let runningStorageKey = "tutorial_running"
+let labelKeyPrefix = "tutorial_label:"
 export function configureTutorialStorage(userId: string, gameId: string) {
   storageKey = `tutorial_step:${userId}:${gameId}`
   venueStorageKey = `tutorial_venue:${userId}:${gameId}`
   stallionStorageKey = `tutorial_stallion:${userId}:${gameId}`
   listingStorageKey = `tutorial_listing:${userId}:${gameId}`
   runningStorageKey = `tutorial_running:${userId}:${gameId}`
+  labelKeyPrefix = `tutorial_label:${userId}:${gameId}:`
 }
 export function saveTutorialRunning(running: boolean) {
   if (running) sessionStorage.setItem(runningStorageKey, "true")
@@ -39,6 +41,12 @@ export function clearTutorialStallionId() { localStorage.removeItem(stallionStor
 export function saveTutorialListingId(id: string) { localStorage.setItem(listingStorageKey, id) }
 export function readTutorialListingId() { return localStorage.getItem(listingStorageKey) }
 export function clearTutorialListingId() { localStorage.removeItem(listingStorageKey) }
+// Names the tutorial reads out of the page. Kept so a refresh mid-run does not
+// drop back to a generic placeholder in later step copy.
+export type TutorialLabel = "foal" | "breed"
+export function saveTutorialLabel(label: TutorialLabel, value: string) { localStorage.setItem(labelKeyPrefix + label, value) }
+export function readTutorialLabel(label: TutorialLabel) { return localStorage.getItem(labelKeyPrefix + label) ?? "" }
+export function clearTutorialLabels() { for (const label of ["foal", "breed"] as const) localStorage.removeItem(labelKeyPrefix + label) }
 export function readTutorialStep() {
   const raw = localStorage.getItem(storageKey) ?? localStorage.getItem("tutorial_step")
   const step = raw === null ? 0 : Number(raw)
@@ -56,6 +64,7 @@ export function clearTutorialStep() {
   clearTutorialVenueId()
   clearTutorialStallionId()
   clearTutorialListingId()
+  clearTutorialLabels()
   saveTutorialRunning(false)
 }
 

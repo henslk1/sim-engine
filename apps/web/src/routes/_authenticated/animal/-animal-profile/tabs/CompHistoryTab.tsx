@@ -103,7 +103,7 @@ export function CompHistoryTab({
           {pageCount > 1 && (
             <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground">
               <span>{entries.length} entries · page {page + 1} of {pageCount}</span>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1" data-tutorial="competition-history-pagination">
                 <button
                   type="button"
                   disabled={page === 0}

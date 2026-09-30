@@ -17,7 +17,12 @@ export function BirthDialog({
   const { data: pregnancy, isLoading } = trpc.breeding.pregnancy.getForBirth.useQuery({ pregnancyId })
   const [names, setNames] = useState<Record<string, string>>({})
   const tutorialAccess = useTutorialAccess()
-  const requiresNames = tutorialAccess.restricted && tutorialAccess.step === 161
+  // 160 announces the birth as a full-page step and 161 spotlights the name
+  // input, so the dialog stays closed for the former and naming is mandatory
+  // across both — otherwise "Skip naming" appears at 160 and vanishes at 161.
+  const inTutorialBirth = tutorialAccess.restricted && (tutorialAccess.step === 160 || tutorialAccess.step === 161)
+  const requiresNames = inTutorialBirth
+  const hiddenForAnnouncement = tutorialAccess.restricted && tutorialAccess.step === 160
 
   useEffect(() => {
     if (!pregnancy) return
@@ -51,7 +56,7 @@ export function BirthDialog({
 
   return (
     <Dialog
-      open
+      open={!hiddenForAnnouncement}
       onClose={onClose}
       title={isLoading ? "Loading…" : unborn.length === 1 ? "A foal has arrived" : `${unborn.length} foals have arrived`}
     >

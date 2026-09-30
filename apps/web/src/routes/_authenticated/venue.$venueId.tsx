@@ -386,6 +386,23 @@ function VenueDetailPage() {
           ? "foal-competition" as const
           : null
   const isFoalCompetePhase = venueScenario === "foal-competition"
+  // A guided visit renders the tutorial's own card for the one show that matters,
+  // so the venue's real listings are hidden behind it — otherwise the same
+  // Weanling Halter appears twice, once in the tutorial card and once in the
+  // registry below it. Unguided tutorial phases leave venueScenario null and see
+  // the venue exactly as any other player does.
+  const hideVenueListings = venueScenario !== null
+  // The step that expands the tutorial's discipline section, per scenario. Every
+  // step after it points at a control inside the section, so on a reload — which
+  // remounts this page with the section collapsed — those targets could never
+  // appear and the tutorial bounced to the dashboard. Past the expand step the
+  // section is open regardless of local state.
+  const expandStep = venueScenario === "mare-competition" ? 85
+    : venueScenario === "foal-competition" ? 197
+      : null
+  // The foal's entry step. Arriving on it with the show already entered is a dead
+  // end — see the recovery effect below the mutation.
+  const foalCompeteStep = 199
 
   const { data: tutorialInfo } = trpc.tutorial.venueInfo.useQuery(
     { gameId: gameId! },
@@ -409,6 +426,7 @@ function VenueDetailPage() {
     setExpandedSections((prev) => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n })
   }
   const [tutorialExpanded, setTutorialExpanded] = useState(false)
+  const tutorialSectionOpen = tutorialExpanded || (expandStep !== null && tutorialStep > expandStep)
 
   const [sportsFilterDisciplineId, setSportsFilterDisciplineIdRaw] = useState(() => sessionStorage.getItem("vf-sports-discipline") ?? "")
   const [sportsFilterTierId, setSportsFilterTierIdRaw] = useState(() => sessionStorage.getItem("vf-sports-tier") ?? "")
@@ -449,6 +467,8 @@ function VenueDetailPage() {
   }, [isTutorialMode, allVenues, venueScenario, tutorialInfo, foalVenueInfo, venue, venueComps, initialAnimalId, navigate])
 
   const utils = trpc.useUtils()
+  // Charged from the player's balance — refresh it or the header only updates on reload.
+  const refreshBalance = () => { if (playerAccountId) utils.player.balances.invalidate({ playerAccountId: playerAccountId }) }
   const inspect = trpc.competition.inspect.useMutation({
     onSuccess: (_, variables) => {
       const name = aliveAnimals.find((a) => a.id === variables.animalId)?.name ?? "Animal"
@@ -473,6 +493,7 @@ function VenueDetailPage() {
     onSuccess: async (data) => {
       utils.animal.list.invalidate({ playerAccountId: playerAccountId! })
       utils.tutorial.venueInfo.invalidate({ gameId: gameId! })
+      if (!("placement" in data)) return
       // The unguided phase deliberately reopens the competition after every run
       // (venueInfo reports hasCompeted: false while the player is on that step),
       // so the button and slot bar reset the moment the refetch lands. Without a
@@ -497,11 +518,16 @@ function VenueDetailPage() {
     onMutate: () => {
       setRowErrors((prev) => { const n = { ...prev }; delete n['tutorial-compete']; return n })
     },
-    onSuccess: async (data) => {
+    onSuccess: (data) => {
       utils.tutorial.foalVenueInfo.invalidate({ gameId: gameId!, venueId })
       if (initialAnimalId) {
-        await navigate({ to: "/animal/$animalId", params: { animalId: initialAnimalId } })
+        // Advance before navigating. The step listening for this event is anchored
+        // to a button on THIS page, so leaving first lets the highlight watchdog
+        // see that button detach and re-drive the step against the foal's profile,
+        // where it can never resolve — and the event arrives after the listener is
+        // already gone. The next step's own waitForElement covers the navigation.
         window.dispatchEvent(new CustomEvent("tutorial:tierAdvanced", { detail: { disciplineName: data.disciplineName } }))
+        void navigate({ to: "/animal/$animalId", params: { animalId: initialAnimalId } })
       }
     },
     onError: (err) => {
@@ -509,8 +535,25 @@ function VenueDetailPage() {
     },
   })
 
+  // Entering is a one-shot: the button disables itself once the show is recorded,
+  // and nothing but the mutation dispatches the event the step waits on. So any
+  // interruption between the mutation landing and the step advancing — a reload,
+  // or the redirect this step used to trigger — strands the player on a disabled
+  // button with no way forward. Replay the same handoff the mutation performs.
+  // `ready` means driver has highlighted the step and attached its listener, so
+  // this can't fire before there is anything to hear it.
+  useEffect(() => {
+    if (!isFoalCompetePhase || tutorialStep !== foalCompeteStep || !tutorialAccess.ready) return
+    if (!foalVenueInfo?.hasCompeted || !initialAnimalId) return
+    // The mutation's own success path is already doing this.
+    if (competeConformation.isSuccess) return
+    window.dispatchEvent(new CustomEvent("tutorial:tierAdvanced", { detail: { disciplineName: foalVenueInfo.disciplineName } }))
+    void navigate({ to: "/animal/$animalId", params: { animalId: initialAnimalId } })
+  }, [isFoalCompetePhase, tutorialStep, foalCompeteStep, tutorialAccess.ready, foalVenueInfo, initialAnimalId, competeConformation.isSuccess, navigate])
+
   const enter = trpc.competition.enter.useMutation({
     onSuccess: (_, variables) => {
+      refreshBalance()
       const pair = `${variables.competitionId}:${variables.animalId}`
       setEnteredPairs((prev) => new Set([...prev, pair]))
       setRowErrors((prev) => { const n = { ...prev }; delete n[variables.competitionId]; return n })
@@ -783,7 +826,7 @@ function VenueDetailPage() {
             <button
               type="button"
               data-tutorial="tutorial-discipline-section-btn"
-              data-expanded={tutorialExpanded}
+              data-expanded={tutorialSectionOpen}
               onClick={() => setTutorialExpanded(e => !e)}
               className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-secondary/30 transition-colors"
             >
@@ -791,9 +834,9 @@ function VenueDetailPage() {
                 <span className="text-base font-semibold text-foreground">{tutorialInfo.secondaryDisciplineName}</span>
                 <span className="rounded bg-chart-2/12 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-chart-2">Tutorial</span>
               </div>
-              <ChevronDown size={15} className={cn("text-muted-foreground transition-transform", tutorialExpanded && "rotate-180")} />
+              <ChevronDown size={15} className={cn("text-muted-foreground transition-transform", tutorialSectionOpen && "rotate-180")} />
             </button>
-            {tutorialExpanded && (
+            {tutorialSectionOpen && (
               <div className="border-t border-border" data-tutorial="tutorial-compete-section">
                 <div className="flex items-center gap-2 border-b border-border bg-secondary px-4 py-2.5" data-tutorial="tutorial-compete-tier">
                   <Trophy size={13} className="text-chart-3" />
@@ -847,7 +890,7 @@ function VenueDetailPage() {
             <button
               type="button"
               data-tutorial="tutorial-discipline-section-btn"
-              data-expanded={tutorialExpanded}
+              data-expanded={tutorialSectionOpen}
               onClick={() => setTutorialExpanded(e => !e)}
               className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-secondary/30 transition-colors"
             >
@@ -855,9 +898,9 @@ function VenueDetailPage() {
                 <span className="text-base font-semibold text-foreground">{foalVenueInfo.disciplineName}</span>
                 <span className="rounded bg-chart-2/12 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-chart-2">Tutorial</span>
               </div>
-              <ChevronDown size={15} className={cn("text-muted-foreground transition-transform", tutorialExpanded && "rotate-180")} />
+              <ChevronDown size={15} className={cn("text-muted-foreground transition-transform", tutorialSectionOpen && "rotate-180")} />
             </button>
-            {tutorialExpanded && (
+            {tutorialSectionOpen && (
               <div className="border-t border-border" data-tutorial="tutorial-compete-section">
                 <div className="flex items-center gap-2 border-b border-border bg-secondary px-4 py-2.5" data-tutorial="tutorial-compete-tier">
                   <Trophy size={13} className="text-chart-3" />
@@ -970,7 +1013,7 @@ function VenueDetailPage() {
         )}
 
         {/* Competition sections */}
-        {compsLoading ? (
+        {!hideVenueListings && (compsLoading ? (
           <div className="grid gap-5 lg:grid-cols-2">
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="h-44 animate-pulse rounded-2xl border border-border bg-muted/20" />
@@ -1010,8 +1053,8 @@ function VenueDetailPage() {
               </div>
             )}
 
-            {/* Sporting Disciplines — hidden in tutorial mode (tutorial block replaces this) */}
-            {hasSporting && !isTutorialMode && (!hasConformation || activeTab === "sporting") && (
+            {/* Sporting Disciplines */}
+            {hasSporting && (!hasConformation || activeTab === "sporting") && (
               <div>
                 {!hasConformation && (
                   <div className="mb-4 flex items-center gap-3">
@@ -1185,7 +1228,7 @@ function VenueDetailPage() {
             <p className="text-xl font-semibold text-foreground">No open competitions</p>
             <p className="mt-1.5 text-sm text-muted-foreground">Check back soon — new events are added regularly.</p>
           </div>
-        ) : null}
+        ) : null)}
           </div>{/* /competition content */}
         </div>{/* /unified card */}
       </div>

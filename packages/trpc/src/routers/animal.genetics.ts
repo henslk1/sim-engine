@@ -133,7 +133,10 @@ export const animalGeneticsRouter = router({
     }),
 
   testCompleteProfile: protectedProcedure
-    .input(z.object({ animalId: z.string(), panelType: z.enum(["COLOR", "HEALTH", "CONFORMATION"]) }))
+    // Reveals every untested locus for one flat fee. It is the tutorial's
+    // complete-genotype reveal as well as the paid option in normal play, so it
+    // is deliberately not scoped to a panel type.
+    .input(z.object({ animalId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       return db.$transaction(async (tx) => {
         const animal = await tx.animal.findUniqueOrThrow({
@@ -153,7 +156,7 @@ export const animalGeneticsRouter = router({
             isTestedByOwner: false,
             locus: {
               isHiddenModifier: false,
-              panelEntries: { some: { panelDef: { panelType: input.panelType } } },
+              panelEntries: { some: {} },
             },
           },
           select: { locusId: true, locus: { select: { minTestCycle: true } } },

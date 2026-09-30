@@ -24,6 +24,7 @@ const profileExplorationControls = [
   '[data-tutorial^="genetics-tab-"]',
   '[data-tutorial="genetics-color-content"] [data-tutorial="genetics-test-locus-btn"]',
   '[data-tutorial="genetics-color-content"] [data-tutorial="genetics-test-panel-btn"]',
+  '[data-tutorial="competition-history-pagination"]',
 ]
 const mareCareControls = control("daily-care-perform", "care-groom", "ltc-perform")
 const foalCareControls = [
@@ -347,6 +348,9 @@ const RAW_TUTORIAL_STEPS: readonly StepPolicy[] = [
       '[data-tutorial="tutorial-shop-buy"]',
       '[data-tutorial="visit-vet"]',
       '[data-tutorial="book-cert-testing"]',
+      // "Visit Vet" lands on the exam tab; without this the player can't reach the
+      // certificates tab they were sent there for.
+      '[data-tutorial="vet-service-nav"]',
       '[data-tutorial="cert-issue-btn"]',
       '[data-tutorial="vet-back-link"]',
       ...foalHealthControls,
@@ -358,7 +362,10 @@ const RAW_TUTORIAL_STEPS: readonly StepPolicy[] = [
   { page: "venues", destinations: ["venue"], controls: control("tutorial-venue-card", "venue-card-first") }, // 197 (spec 199): Compare Venues
   { page: "venue", controls: control("tutorial-discipline-section-btn") }, // 198 (spec 200): Expand discipline section
   { page: "venue" }, // 199 (spec 201): Explain Scoring
-  { page: "venue", controls: control("tutorial-compete-btn"), mutations: ["tutorial.competeConformation"] }, // 200 (spec 202): Enter the Show
+  // Entering navigates straight to the foal's profile, and the route guard runs on
+  // that navigation while this step is still current — without the destination it
+  // reads as the venue step leaving its own page and bounces to the dashboard.
+  { page: "venue", destinations: ["foal"], controls: control("tutorial-compete-btn"), mutations: ["tutorial.competeConformation"] }, // 200 (spec 202): Enter the Show
   { page: "foal" }, // 201 (spec 204): Current Tier — auto-redirect from venue (spec 203 skipped)
   { page: "foal" }, // 202 (spec 205): Progress and Points
   { page: "foal", controls: control("competition-history-tab") }, // 203 (spec 206): Open Competition History
@@ -401,6 +408,10 @@ const RAW_TUTORIAL_STEPS: readonly StepPolicy[] = [
       '[data-tutorial="competition-history-tab"]',
       '[data-tutorial="competition-section-btn"]',
       '[data-tutorial="competition-enter-btn"]',
+      // The confirmation banner entering leaves behind links back to the animal.
+      // It is an ordinary part of the venue page, not tutorial scaffolding, so
+      // blocking it makes a normal control look broken.
+      '[data-tutorial="competition-entered-banner"] a',
       '[data-tutorial="stage-activity-btn"]',
       '[data-tutorial="tutorial-foal-stable-card"] a',
       '[data-tutorial="visit-vet"]',

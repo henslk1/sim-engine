@@ -34,14 +34,14 @@ export function TrainingPanel({
   const utils = trpc.useUtils()
   const invalidate = () => utils.animalProfile.get.invalidate({ animalId: animal.id })
 
-  const { mutate: train } = trpc.training.perform.useMutation({
+  const train = trpc.training.perform.useMutation({
     onSettled: () => {
       setPendingStatId(null)
       invalidate()
     },
   })
 
-  const { mutate: perform } = trpc.stageActivity.perform.useMutation({
+  const perform = trpc.stageActivity.perform.useMutation({
     onSettled: () => {
       setPendingActivityId(null)
       invalidate()
@@ -186,7 +186,7 @@ export function TrainingPanel({
                                 onClick={() => {
                                   if (!canPerform) return
                                   setPendingActivityId(activity.id)
-                                  perform({ animalId: animal.id, stageActivityDefId: activity.id })
+                                  perform.mutate({ animalId: animal.id, stageActivityDefId: activity.id })
                                 }}
                               >
                                 {isPending ? <Loader2 className="size-3 animate-spin" /> : <><Zap className="size-3" /> Perform</>}
@@ -323,7 +323,7 @@ export function TrainingPanel({
                         onClick={() => {
                           if (!canTrain || !trainingDef || !tierId) return
                           setPendingStatId(stat.statDef.id)
-                          train({ animalId: animal.id, trainingActionDefId: trainingDef.id, intensityTierDefId: tierId })
+                          train.mutate({ animalId: animal.id, trainingActionDefId: trainingDef.id, intensityTierDefId: tierId })
                         }}
                       >
                         {isPending ? (
@@ -351,6 +351,12 @@ export function TrainingPanel({
             })()}
           </div>
         </>
+      )}
+
+      {(train.error ?? perform.error) && (
+        <p className="mt-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          {(train.error ?? perform.error)?.message}
+        </p>
       )}
     </Panel>
   )

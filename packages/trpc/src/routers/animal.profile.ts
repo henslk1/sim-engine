@@ -403,7 +403,7 @@ export const animalProfileRouter = router({
                 select: { id: true, name: true, validForCycles: true, requiredForCompetition: true },
               },
               currencyDefs: {
-                select: { id: true, name: true, symbol: true },
+                select: { id: true, name: true, symbol: true, currencyType: true },
               },
               breeds: {
                 select: { id: true, name: true },

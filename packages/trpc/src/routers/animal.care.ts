@@ -26,11 +26,13 @@ export const animalCareRouter = router({
         const def = record.longTermCareActionDef
         const effectivePlayer = input.playerAccountId ?? animal.playerAccountId
 
+        // Looked up regardless so the log can name the currency it was priced in.
+        const baseCurrency = await tx.currencyDef.findFirstOrThrow({
+          where: { gameId: animal.gameId, currencyType: "BASE" },
+          select: { id: true, symbol: true, name: true },
+        })
+
         if (def.currencyAmount && def.currencyAmount > 0) {
-          const baseCurrency = await tx.currencyDef.findFirstOrThrow({
-            where: { gameId: animal.gameId, currencyType: "BASE" },
-            select: { id: true },
-          })
           const balance = await tx.playerBalance.findUnique({
             where: { playerAccountId_currencyDefId: { playerAccountId: effectivePlayer!, currencyDefId: baseCurrency.id } },
             select: { balance: true },
@@ -64,7 +66,13 @@ export const animalCareRouter = router({
             animalId: input.animalId,
             cycleNumber: animal.ageInCycles,
             eventType: "LTC_PERFORMED",
-            context: { name: def.name, nextDueCycle },
+            context: {
+              name: def.name,
+              nextDueCycle,
+              cost: def.currencyAmount ?? 0,
+              currencySymbol: baseCurrency.symbol,
+              currencyName: baseCurrency.name,
+            },
           },
         })
 

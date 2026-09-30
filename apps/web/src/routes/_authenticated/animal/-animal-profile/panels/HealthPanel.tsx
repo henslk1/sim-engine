@@ -37,6 +37,8 @@ export function HealthPanel({
   readonly?: boolean
 }) {
   const utils = trpc.useUtils()
+  // Charged from the player's balance — refresh it or the header only updates on reload.
+  const refreshBalance = () => { if (playerAccountId) utils.player.balances.invalidate({ playerAccountId: playerAccountId }) }
   const activeConditions = animal.healthRecords.filter((r) => r.isActive)
 
   const { data: inventory } = trpc.inventory.mine.useQuery(
@@ -46,6 +48,7 @@ export function HealthPanel({
 
   const administer = trpc.vet.administerTreatment.useMutation({
     onSuccess: () => {
+      refreshBalance()
       utils.animalProfile.get.invalidate({ animalId: animal.id })
       if (playerAccountId) utils.inventory.mine.invalidate({ playerAccountId })
       window.dispatchEvent(new Event("tutorial:treatmentAdministered"))
@@ -56,6 +59,7 @@ export function HealthPanel({
 
   const startTreatment = trpc.vet.startTreatment.useMutation({
     onSuccess: (result) => {
+      refreshBalance()
       utils.animalProfile.get.invalidate({ animalId: animal.id })
       if (playerAccountId) utils.inventory.mine.invalidate({ playerAccountId })
       window.dispatchEvent(new Event("tutorial:treatmentStarted"))
@@ -75,6 +79,18 @@ export function HealthPanel({
       const inv = inventory.find((i) => i.itemDef.id === item.itemDef.id)
       return inv && inv.quantity >= item.quantity
     })
+  }
+
+  // True once the medication half of a course has finished but its restrictions
+  // are still running — the condition is recovering, not awaiting care. A
+  // restriction treatment is excluded: there the restriction IS the course.
+  function recoveryOnly(t: TreatmentRecord) {
+    const { treatmentType, durationCycles } = t.treatmentDef
+    if (treatmentType === "ACTIVITY_RESTRICTION") return false
+    const medicationDone = treatmentType === "VET_PROCEDURE"
+      ? true
+      : durationCycles != null && animal.ageInCycles >= t.startedCycle + durationCycles
+    return medicationDone && t.activityRestriction.some((r) => r.isActive)
   }
 
   function missingItems(items: TreatmentRecord["treatmentDef"]["items"]) {
@@ -98,7 +114,9 @@ export function HealthPanel({
               const isTimeBased = t.treatmentDef.treatmentType === "OTC" || t.treatmentDef.treatmentType === "PRESCRIPTION" || t.treatmentDef.treatmentType === "PLAYER_ACTION"
               return isTimeBased && (t as TreatmentRecord & { lastAdministeredCycle?: number | null }).lastAdministeredCycle === animal.ageInCycles
             })
-            const showRed = !administeredToday
+            const isRecovering = activeTreatments.some(recoveryOnly)
+            // Recovery needs nothing from the player, so it should not read as urgent.
+            const showRed = !administeredToday && !isRecovering
             return (
               <div key={record.id} className={cn("overflow-hidden rounded-md border", showRed ? "border-destructive/25" : "border-border")} data-tutorial={!record.diagnosedAt ? "health-unknown-illness" : "health-diagnosed-condition"} data-condition-name={record.conditionDef.name}>
                 <div className={cn("flex items-center justify-between gap-2 px-3 py-2", showRed ? "bg-destructive/10" : "bg-secondary/40")}>
@@ -106,7 +124,10 @@ export function HealthPanel({
                     {record.diagnosedAt ? (
                       <>
                         <Badge tone="danger">{record.conditionDef.conditionType}</Badge>
-                        <span className="text-sm font-semibold text-foreground">{record.conditionDef.name}</span>
+                        <span className="text-sm font-semibold text-foreground">
+                          {record.conditionDef.name}
+                          {isRecovering && <span className="font-normal text-muted-foreground"> · Recovering</span>}
+                        </span>
                       </>
                     ) : (
                       <>
@@ -184,8 +205,10 @@ export function HealthPanel({
                             {remaining} cycle{remaining !== 1 ? "s" : ""} remaining
                           </p>
                         )
-                      })() : (
-                        <p className="mt-0.5 text-[11px] text-muted-foreground">Lifelong medication</p>
+                      })() : treatmentType === "ACTIVITY_RESTRICTION" ? null : (
+                        <p className="mt-0.5 text-[11px] text-muted-foreground">
+                          {treatmentType === "VET_PROCEDURE" ? "Procedure complete · recovering" : "Lifelong medication"}
+                        </p>
                       )}
                       {t.treatmentDef.restrictionDefs.map((rd) => {
                         const live = t.activityRestriction.find(
@@ -207,7 +230,7 @@ export function HealthPanel({
                         )
                       })}
 
-                      {!readonly && playerAccountId && treatmentType !== "ACTIVITY_RESTRICTION" && treatmentType !== "VET_PROCEDURE" && (() => {
+                      {!readonly && playerAccountId && treatmentType !== "ACTIVITY_RESTRICTION" && treatmentType !== "VET_PROCEDURE" && !recoveryOnly(t) && (() => {
                         const isTimeBased = treatmentType === "OTC" || treatmentType === "PRESCRIPTION" || treatmentType === "PLAYER_ACTION"
                         const administeredToday = isTimeBased && (t as typeof t & { lastAdministeredCycle?: number | null }).lastAdministeredCycle === animal.ageInCycles
                         const cyclesRemaining = t.treatmentDef.durationCycles != null

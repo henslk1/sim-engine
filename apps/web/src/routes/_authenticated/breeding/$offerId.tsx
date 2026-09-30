@@ -25,9 +25,15 @@ function BreedingPage() {
   const [result, setResult] = useState<{ conceived: boolean } | null>(null)
 
   const { data: offer, isLoading } = trpc.breeding.cover.getForBreeding.useQuery({ offerId })
+  // Charged from the dam owner's balance — refresh it or the header only updates on reload.
+  const refreshBalance = () => {
+    const playerAccountId = offer?.dam.playerAccount.id
+    if (playerAccountId) utils.player.balances.invalidate({ playerAccountId })
+  }
 
   const { mutate: acceptCover, isPending: acceptPending } = trpc.breeding.cover.accept.useMutation({
     onSuccess: (data) => {
+      refreshBalance()
       utils.animalProfile.get.invalidate({ animalId: offer?.dam.id })
       if (data.conceived && data.requiredCycles === 0) {
         navigate({ to: "/animal/$animalId", params: { animalId: offer!.dam.id } })

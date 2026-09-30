@@ -51,8 +51,11 @@ export function BreedingPanel({
   const [coverPrice, setCoverPrice] = useState(0)
 
   const utils = trpc.useUtils()
+  // Charged from the player's balance — refresh it or the header only updates on reload.
+  const refreshBalance = () => { if (animal.playerAccountId) utils.player.balances.invalidate({ playerAccountId: animal.playerAccountId }) }
   const navigate = useNavigate()
   const invalidate = () => utils.animalProfile.get.invalidate({ animalId: animal.id })
+    refreshBalance()
 
   const { mutate: flushEmbryo, isPending: flushPending } =
     trpc.breeding.material.flushEmbryo.useMutation({ onSettled: invalidate })

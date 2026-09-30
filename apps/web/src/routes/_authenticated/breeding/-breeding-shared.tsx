@@ -159,8 +159,12 @@ export function PredictorSection({
   const [result, setResult] = useState<PredictorResult | null>(null)
   const [quotaUsed, setQuotaUsed] = useState(predictorQuota.used)
 
+  const utils = trpc.useUtils()
+  // The predictor charges a fee past the free daily quota, so the header
+  // balance has to be refreshed alongside the quota itself.
   const { mutate: runPredictorNormal, isPending: isPendingNormal, error: errorNormal } = trpc.breeding.cover.runPredictor.useMutation({
     onSuccess: (data) => {
+      if ("playerAccountId" in runInput) utils.player.balances.invalidate({ playerAccountId: runInput.playerAccountId })
       setResult(data)
       setQuotaUsed(data.quotaUsed)
     },

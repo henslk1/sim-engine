@@ -277,19 +277,30 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
         })
       }
 
-      let shouldClose = false
-      if (treatmentType === "ACTIVITY_RESTRICTION") {
-        const allDone = treatment.activityRestriction.length === 0 ||
-          treatment.activityRestriction.every(r => r.isLifelong ? false : r.remainingCycles <= 1)
-        if (allDone) shouldClose = true
-      } else if (durationCycles !== null) {
-        if (newAge >= treatment.startedCycle + durationCycles) shouldClose = true
-      }
+      // A course is over only when both halves are: the medication's own
+      // duration and every restriction it carries. `activityRestriction` still
+      // holds this cycle's pre-decrement values, so <= 1 means "expired just now".
+      const restrictionsDone = treatment.activityRestriction.every(r => !r.isLifelong && r.remainingCycles <= 1)
+      // Neither of these carries a medication course: a procedure is a one-off
+      // and a restriction is itself the treatment, so only recovery gates them.
+      // A null duration on anything else means lifelong medication — never closes.
+      const medicationDone = treatmentType === "ACTIVITY_RESTRICTION" || treatmentType === "VET_PROCEDURE"
+        ? true
+        : durationCycles !== null && newAge >= treatment.startedCycle + durationCycles
+      const shouldClose = medicationDone && restrictionsDone
 
       if (shouldClose) {
         await tx.animalTreatmentRecord.update({
           where: { id: treatment.id },
           data: { isActive: false, completedCycle: newAge, completedAt: new Date() },
+        })
+        // The treatment record is the only path the profile walks to find these,
+        // so a row left active here blocks training and competition invisibly —
+        // the server checks restrictions by animalId alone. Matches the cleanup
+        // vet.startTreatment already does when it supersedes a treatment.
+        await tx.activityRestriction.updateMany({
+          where: { treatmentRecordId: treatment.id, isActive: true },
+          data: { isActive: false, remainingCycles: 0 },
         })
         const remaining = await tx.animalTreatmentRecord.count({
           where: { healthRecordId: treatment.healthRecordId, isActive: true, id: { not: treatment.id } },

@@ -1120,6 +1120,9 @@ function VetPage() {
               <button
                 key={s.key}
                 type="button"
+                data-tutorial={s.key === "euthanasia" ? undefined : "vet-service-nav"}
+                data-service={s.key}
+                data-active={active === s.key}
                 onClick={() => setActive(s.key)}
                 className={cn(
                   "flex w-full items-center gap-2.5 rounded px-2.5 py-2 text-left text-sm transition-colors",
