@@ -2,9 +2,18 @@ import { initTRPC } from "@trpc/server"
 import { TRPCError } from "@trpc/server"
 import { db } from "@sim-engine/db"
 import { guardTutorialMutation } from "./tutorial-guard.js"
+import { noopRealtime, type RealtimeControl } from "./messaging/realtime.js"
 
 export type Context = {
   userId: string | null
+  // Supplied by the application server. Lets a mutation push a live event
+  // without this package importing Socket.IO — see messaging/realtime.ts.
+  realtime: RealtimeControl
+}
+
+// A context for callers with no realtime server attached: scripts, jobs, tests.
+export function baseContext(userId: string | null): Context {
+  return { userId, realtime: noopRealtime }
 }
 
 export const t = initTRPC.context<Context>().create()

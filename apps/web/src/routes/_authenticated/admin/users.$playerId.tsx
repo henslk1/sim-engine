@@ -36,12 +36,15 @@ function PlayerDetail() {
   const [resetAnimalId, setResetAnimalId] = useState("")
   const [resetAnimalName, setResetAnimalName] = useState("")
   const [roleToAssign, setRoleToAssign] = useState<"OWNER" | "ADMIN" | "MODERATOR">("MODERATOR")
+  const [moderatorGameId, setModeratorGameId] = useState("")
 
   if (!data) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>
 
   const { player, recentTransactions, reportsAgainst } = data
   const activeBan = player.user.banRecords.find(b => !b.expiresAt || new Date(b.expiresAt) > new Date())
   const staffRoles = player.user.staffRoles
+  // Moderators are scoped to one game, and only to a game this user plays.
+  const moderatableGames = player.user.playerAccounts
 
   const TABS = ["overview", "transactions", "logs", "notes", "actions"] as const
 
@@ -356,7 +359,12 @@ function PlayerDetail() {
               <div className="space-y-1">
                 {staffRoles.map(r => (
                   <div key={r.id} className="flex items-center justify-between rounded-md bg-primary/5 px-3 py-1.5">
-                    <span className="text-xs font-semibold text-primary">{r.role}</span>
+                    <span className="text-xs font-semibold text-primary">
+                      {r.role}
+                      <span className="ml-1.5 font-normal text-muted-foreground">
+                        · {r.gameId ? r.game?.name ?? "unknown game" : "all games"}
+                      </span>
+                    </span>
                     <button
                       onClick={() => removeRoleMutation.mutate({ staffRoleId: r.id })}
                       disabled={removeRoleMutation.isPending}
@@ -381,13 +389,40 @@ function PlayerDetail() {
                 <option value="OWNER">Owner</option>
               </select>
               <button
-                onClick={() => assignRoleMutation.mutate({ userId: player.user.id, role: roleToAssign })}
-                disabled={assignRoleMutation.isPending}
+                onClick={() => assignRoleMutation.mutate(
+                  roleToAssign === "MODERATOR"
+                    ? { role: "MODERATOR", userId: player.user.id, gameId: moderatorGameId }
+                    : { role: roleToAssign, userId: player.user.id }
+                )}
+                disabled={assignRoleMutation.isPending || (roleToAssign === "MODERATOR" && !moderatorGameId)}
                 className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground disabled:opacity-50"
               >
                 Assign
               </button>
             </div>
+            {roleToAssign === "MODERATOR" ? (
+              moderatableGames.length > 0 ? (
+                <select
+                  value={moderatorGameId}
+                  onChange={e => setModeratorGameId(e.target.value)}
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+                >
+                  <option value="">Select a game to moderate…</option>
+                  {moderatableGames.map(a => (
+                    <option key={a.gameId} value={a.gameId}>{a.game.name}</option>
+                  ))}
+                </select>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  This user has no player account, so they cannot be made a moderator.
+                </p>
+              )
+            ) : (
+              <p className="text-xs text-muted-foreground">Applies to every game.</p>
+            )}
+            {assignRoleMutation.error && (
+              <p className="text-xs text-destructive">{assignRoleMutation.error.message}</p>
+            )}
           </ActionCard>
         </div>
       )}

@@ -6,6 +6,7 @@ import { auth } from "./auth.js"
 import { cors } from "hono/cors"
 import type { Server as HttpServer } from "node:http"
 import { initSocket, getIo } from "./socket.js"
+import { realtimeControl } from "./realtime.js"
 import { db } from "@sim-engine/db"
 import { competitionDispatchQueue, venueRotationDispatchQueue, nightlyDispatchQueue } from "./jobs/queue.js"
 import { nightlyDispatcherWorker } from "./jobs/nightly.dispatcher.js"
@@ -27,7 +28,7 @@ app.use("/trpc/*", trpcServer({
   router: appRouter,
   createContext: async (_opts, c) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers })
-    return { userId: session?.user.id ?? null}
+    return { userId: session?.user.id ?? null, realtime: realtimeControl }
   }
 }))
 

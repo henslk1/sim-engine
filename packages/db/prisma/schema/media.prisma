@@ -1,0 +1,67 @@
+enum MediaPurpose {
+  CHAT_ATTACHMENT
+  ARTWORK_SOURCE
+  ANIMAL_RENDER
+  AVATAR
+  GROUP_IMAGE
+}
+
+enum MediaProvider {
+  R2
+}
+
+enum MediaStatus {
+  PENDING
+  PROCESSING
+  READY
+  REJECTED
+  DELETED
+}
+
+model MediaAsset {
+  id                   String             @id @default(cuid())
+  gameId               String
+  uploadedByPlayerId   String?
+  purpose              MediaPurpose
+  /// The channel this upload was authorized for, set when the upload intent is
+  /// issued and required for CHAT_ATTACHMENT. A send may only attach assets
+  /// whose channel matches its destination, so this is authorization data: the
+  /// client never supplies or changes it.
+  preparedForChannelId String?
+  provider             MediaProvider      @default(R2)
+  bucket               String
+  /// Object key within the bucket. Unique, so the same stored object cannot be
+  /// claimed by two assets.
+  storageKey           String             @unique
+  mimeType             String
+  byteSize             Int
+  width                Int?
+  height               Int?
+  sha256               String?
+  status               MediaStatus        @default(PENDING)
+  createdAt            DateTime           @default(now())
+  readyAt              DateTime?
+  /// Cleanup deadline for an upload that was never attached to a message.
+  expiresAt            DateTime?
+  deletedAt            DateTime?
+  attachment           MessageAttachment?
+  preparedForChannel   ChatChannel?       @relation(fields: [preparedForChannelId], references: [id])
+  uploadedByPlayer     PlayerAccount?     @relation(fields: [uploadedByPlayerId], references: [id])
+  game                 Game               @relation(fields: [gameId], references: [id])
+
+  @@index([status, expiresAt])
+}
+
+model MessageAttachment {
+  id           String      @id @default(cuid())
+  messageId    String
+  /// Unique: an asset belongs to at most one message, ever. This is what stops
+  /// a second send from re-attaching an image someone else already posted.
+  mediaAssetId String      @unique
+  displayOrder Int         @default(0)
+  altText      String?
+  mediaAsset   MediaAsset  @relation(fields: [mediaAssetId], references: [id])
+  message      ChatMessage @relation(fields: [messageId], references: [id])
+
+  @@index([messageId])
+}

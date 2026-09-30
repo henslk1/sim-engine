@@ -65,8 +65,11 @@ model Game {
   follows                Follow[]
   notificationTopicDefs  NotificationTopicDef[]
   notifications          Notification[]
+  chatServers            ChatServer[]
   chatChannels           ChatChannel[]
+  chatMessages           ChatMessage[]
   directMessages         DirectMessage[]
+  mediaAssets            MediaAsset[]
   forumSections          ForumSection[]
   userReports            UserReport[]
   tutorialStepDefs       TutorialStepDef[]
@@ -219,14 +222,17 @@ model PlayerAccount {
   notificationSettings       NotificationSetting[]
   notifications              Notification[]
   createdChatChannels        ChatChannel[]
-  dmConversationsAsPlayerOne DirectMessage[]            @relation("DMPlayerOne")
-  dmConversationsAsPlayerTwo DirectMessage[]            @relation("DMPlayerTwo")
-  chatMessages               ChatMessage[]
+  dmConversationsAsLow       DirectMessage[]            @relation("DMParticipantLow")
+  dmConversationsAsHigh      DirectMessage[]            @relation("DMParticipantHigh")
+  chatMessages               ChatMessage[]              @relation("ChatMessageAuthor")
+  deletedChatMessages        ChatMessage[]              @relation("ChatMessageDeletedBy")
+  uploadedMedia              MediaAsset[]
   messageReadStatuses        MessageReadStatus[]
   forumThreadsAuthored       ForumThread[]
   forumPostsAuthored         ForumPost[]
   forumThreadFollows         ForumThreadFollow[]
-  pinnedMessages             PinnedMessage[]
+  pinnedChatMessages         PinnedChatMessage[]
+  pinnedForumThreads         PinnedForumThread[]
   submittedReports           UserReport[]               @relation("ReporterPlayer")
   reportsAgainstMe           UserReport[]               @relation("ReportedPlayer")
   reviewedReports            UserReport[]               @relation("ReviewingPlayer")
@@ -311,6 +317,8 @@ model BanRecord {
   bannedByUserId String
   user           User      @relation("BannedUser", fields: [userId], references: [id])
   bannedBy       User      @relation("BanIssuedBy", fields: [bannedByUserId], references: [id])
+
+  @@index([userId, expiresAt])
 }
 
 model IpBan {

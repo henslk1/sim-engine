@@ -1,6 +1,8 @@
 import { router, protectedProcedure, staffProcedure, ownerProcedure } from "../trpc.js"
 import { db, Prisma } from "@sim-engine/db"
 import { z } from "zod"
+import { randomUUID } from "node:crypto"
+import { TRPCError } from "@trpc/server"
 
 // ── Overview ────────────────────────────────────────────────────────────────
 
@@ -130,7 +132,13 @@ const playersOpsRouter = router({
           user: {
             include: {
               banRecords: { orderBy: { bannedAt: "desc" } },
-              staffRoles: true,
+              staffRoles: { include: { game: { select: { name: true } } } },
+              // The games this user can be made a moderator of: a moderator
+              // role only means anything where they hold an account.
+              playerAccounts: {
+                select: { gameId: true, game: { select: { name: true } } },
+                orderBy: { createdAt: "asc" },
+              },
               userIpLogs: { orderBy: { seenAt: "desc" }, take: 20 },
               userDeviceLogs: { orderBy: { seenAt: "desc" }, take: 20 },
             },
@@ -256,6 +264,11 @@ const playersOpsRouter = router({
           },
         }),
       ])
+
+      // After the transaction, never inside it: a rolled back ban must not have
+      // kicked anyone. The periodic sweep would catch this within a minute
+      // anyway, so this is the fast path rather than the guarantee.
+      ctx.realtime.disconnectUser(input.userId, "banned")
     }),
 
   banIp: staffProcedure
@@ -284,20 +297,36 @@ const playersOpsRouter = router({
       ])
     }),
 
+  // Owners and admins are global; a moderator is appointed to one game and has
+  // to name it. Splitting the input by role means a moderator without a game,
+  // or an owner carrying one, cannot be expressed at all — the caller has to
+  // say which it is, rather than leaving a scope to be inferred later.
   assignRole: ownerProcedure
-    .input(z.object({
-      userId: z.string(),
-      gameId: z.string().optional(),
-      role: z.enum(["OWNER", "ADMIN", "MODERATOR"]),
-    }))
+    .input(z.discriminatedUnion("role", [
+      z.object({ role: z.literal("MODERATOR"), userId: z.string(), gameId: z.string() }),
+      z.object({ role: z.enum(["OWNER", "ADMIN"]), userId: z.string() }),
+    ]))
     .mutation(async ({ input, ctx }) => {
+      const gameId = input.role === "MODERATOR" ? input.gameId : null
+      if (gameId) {
+        // A moderator moderates a game they actually play. Messaging resolves
+        // the acting player from user plus game, so a moderator role in a game
+        // where the user has no account would authorize nothing at all.
+        const account = await db.playerAccount.findUnique({
+          where: { userId_gameId: { userId: input.userId, gameId } },
+          select: { id: true },
+        })
+        if (!account) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "That user has no account in this game." })
+        }
+      }
       await db.staffRole.create({
-        data: { userId: input.userId, gameId: input.gameId ?? null, role: input.role },
+        data: { userId: input.userId, gameId, role: input.role },
       })
       await db.adminActionLog.create({
         data: {
           staffUserId: ctx.userId,
-          gameId: input.gameId ?? null,
+          gameId,
           action: `assign_role:${input.role}`,
           targetType: "User",
           targetId: input.userId,
@@ -1046,13 +1075,14 @@ const broadcastOpsRouter = router({
 
       let sent = 0
       for (const toId of targets) {
-        const existing = await db.directMessage.findFirst({
+        // Canonical pair ordering, so a broadcast reuses the conversation the
+        // player already has. Moves to the shared messaging service once it exists.
+        const from = input.fromPlayerAccountId
+        const participantLowId = from < toId ? from : toId
+        const participantHighId = from < toId ? toId : from
+        const existing = await db.directMessage.findUnique({
           where: {
-            gameId: input.gameId,
-            OR: [
-              { playerOneId: input.fromPlayerAccountId, playerTwoId: toId },
-              { playerOneId: toId, playerTwoId: input.fromPlayerAccountId },
-            ],
+            gameId_participantLowId_participantHighId: { gameId: input.gameId, participantLowId, participantHighId },
           },
         })
         let channelId: string
@@ -1060,16 +1090,30 @@ const broadcastOpsRouter = router({
           channelId = existing.chatChannelId
         } else {
           const channel = await db.chatChannel.create({
-            data: { gameId: input.gameId, channelType: "DM", createdByPlayerId: input.fromPlayerAccountId },
+            data: { gameId: input.gameId, channelType: "DM", createdByPlayerId: from },
           })
           channelId = channel.id
           await db.directMessage.create({
-            data: { gameId: input.gameId, chatChannelId: channelId, playerOneId: input.fromPlayerAccountId, playerTwoId: toId },
+            data: { gameId: input.gameId, chatChannelId: channelId, participantLowId, participantHighId },
           })
         }
         await db.chatMessage.create({
-          data: { channelId, authorPlayerId: input.fromPlayerAccountId, content: input.body },
+          data: {
+            gameId: input.gameId,
+            channelId,
+            authorPlayerId: from,
+            clientMessageId: randomUUID(),
+            content: input.body,
+          },
         })
+        // A conversation created just above already sorts to the top; only an
+        // existing one needs bumping so the broadcast surfaces in the DM list.
+        if (existing) {
+          await db.directMessage.update({
+            where: { id: existing.id },
+            data: { lastActivityAt: new Date() },
+          })
+        }
         sent++
       }
 

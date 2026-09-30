@@ -109,6 +109,7 @@ model Group {
   inventory              GroupInventory[]
   prestige               GroupPrestige?
   prestigeLogs           GroupPrestigeLog[]
+  chatServer             ChatServer?
   channels               GroupChannel[]
   activityLogs           GroupActivityLog[]
   venues                 Venue[]
