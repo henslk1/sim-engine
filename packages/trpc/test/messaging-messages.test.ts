@@ -140,6 +140,8 @@ const realtime = {
     void state.emitted.push({ room: `player:${gameId}:${playerId}`, event }),
   emitToChannel: (channelId: string, event: string) =>
     void state.emitted.push({ room: `channel:${channelId}`, event }),
+  emitToGame: (gameId: string, event: string) =>
+    void state.emitted.push({ room: `game:${gameId}`, event }),
   disconnectUser: () => {},
 }
 

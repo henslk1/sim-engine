@@ -27,6 +27,12 @@ export type RealtimeControl = {
     payload: unknown
   ): void
   emitToChannel(channelId: string, event: ServerToClientEvent, payload: unknown): void
+  // Game-wide delivery, for things every player in the game can see regardless
+  // of which conversation they have open: a channel appearing, being renamed,
+  // being archived. A channel room is the wrong address for those — nobody has
+  // joined a channel that was created a moment ago, and the players who need to
+  // hear that one was archived are precisely the ones not looking at it.
+  emitToGame(gameId: string, event: ServerToClientEvent, payload: unknown): void
   // Account-level revocation. Called after a ban or session revocation commits,
   // never before — a rolled back transaction must not have kicked anyone.
   disconnectUser(userId: string, reason: string): void
@@ -38,5 +44,6 @@ export type RealtimeControl = {
 export const noopRealtime: RealtimeControl = {
   emitToPlayer: () => {},
   emitToChannel: () => {},
+  emitToGame: () => {},
   disconnectUser: () => {},
 }

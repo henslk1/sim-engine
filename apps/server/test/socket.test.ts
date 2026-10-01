@@ -176,6 +176,31 @@ test("a valid session connects and can enter its game", async () => {
   socket.close()
 })
 
+test("entering a game joins both the game room and the player room", async () => {
+  const { socket } = await authed()
+  await emit(socket, "game:enter", { gameId: GAME })
+
+  // The game room is what channel:created and channel:archived are addressed
+  // to. Without it an admin creating a channel reaches nobody, because no
+  // client has joined a channel that did not exist a moment ago.
+  const inGame = await server.in(`game:${GAME}`).fetchSockets()
+  const inPlayer = await server.in(`player:${GAME}:${ME}`).fetchSockets()
+  assert.equal(inGame.length, 1)
+  assert.equal(inPlayer.length, 1)
+  socket.close()
+})
+
+test("switching games leaves the previous game's rooms behind", async () => {
+  const { socket } = await authed()
+  await emit(socket, "game:enter", { gameId: GAME })
+  await emit(socket, "game:enter", { gameId: "game-2" })
+
+  // Otherwise this socket would keep hearing about channels in a game it left.
+  assert.equal((await server.in(`game:${GAME}`).fetchSockets()).length, 0)
+  assert.equal((await server.in("game:game-2").fetchSockets()).length, 1)
+  socket.close()
+})
+
 test("revoking the session mid-connection stops the next event and drops the socket", async () => {
   const { socket } = await authed()
   await emit(socket, "game:enter", { gameId: GAME })

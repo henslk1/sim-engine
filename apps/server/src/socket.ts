@@ -152,7 +152,10 @@ function privileged<T>(
 
 function leaveGameRooms(socket: MessagingSocket) {
   const previous = socket.data.actor
-  if (previous) socket.leave(`player:${previous.gameId}:${previous.playerAccountId}`)
+  if (previous) {
+    socket.leave(`game:${previous.gameId}`)
+    socket.leave(`player:${previous.gameId}:${previous.playerAccountId}`)
+  }
   for (const channelId of socket.data.channelRooms) socket.leave(`channel:${channelId}`)
   socket.data.channelRooms.clear()
 }
@@ -169,6 +172,12 @@ function registerHandlers(socket: MessagingSocket) {
     // keep receiving player events for a game it has left.
     leaveGameRooms(socket)
     socket.data.actor = decision.value
+    // Two rooms, two audiences. The player room carries this one person's
+    // badges and notifications; the game room carries structure every player in
+    // the game shares — a channel created, renamed or archived. Both are joined
+    // here because holding a player account in this game is the only thing
+    // either of them requires.
+    socket.join(`game:${gameId}`)
     socket.join(`player:${gameId}:${decision.value.playerAccountId}`)
     return { ok: true, value: null }
   }))

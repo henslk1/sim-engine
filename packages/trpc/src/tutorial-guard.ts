@@ -8,6 +8,18 @@ const denied = () => new TRPCError({ code: "FORBIDDEN", message: "This action is
 export async function guardTutorialMutation(userId: string | null, path: string, raw: unknown) {
   if (!userId) throw new TRPCError({ code: "UNAUTHORIZED" })
   const input = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>
+  // Messaging is exempt, the same way the tutorial's click guard exempts
+  // [data-tutorial-messaging]. The widget renders throughout the tutorial and
+  // the tutorial is precisely where a tester finds things worth reporting, so
+  // #testing-feedback has to work from inside it — which means marking a channel
+  // read, or editing a typo, has to work too. Without this they would all fall
+  // through to isTutorialMutationAllowed, which denies anything a step has not
+  // explicitly listed.
+  //
+  // Safe to exempt as a block because, unlike admin.*, every messaging procedure
+  // carries its own authorization: messagingProcedure resolves the acting player
+  // from the session, and channelAdminProcedure requires admin in this game.
+  if (path.startsWith("messaging.")) return
   if (path.startsWith("admin.")) {
     if (!await db.staffRole.findFirst({ where: { userId } })) throw denied()
     return

@@ -43,6 +43,17 @@ test("the active vet step permits only the player's mare and required certificat
   await assert.rejects(guardTutorialMutation("user", "vet.issueCert", { animalId: "mare", certDefId: "Unrelated" }), forbidden)
   await assert.rejects(guardTutorialMutation("user", "training.perform", { animalId: "mare" }), forbidden)
 })
+test("messaging stays usable at every step, including ones that permit nothing else", async () => {
+  // The mutation-layer twin of the [data-tutorial-messaging] click exemption.
+  // The widget renders throughout the tutorial, so marking a channel read or
+  // fixing a typo in #testing-feedback has to work from inside it — and an info
+  // step permits no mutations at all, which is what would otherwise block them.
+  for (const index of [null, 10, 58, 59, 61, 79]) {
+    step = index
+    await guardTutorialMutation("user", "messaging.markRead", { gameId: "game", channelId: "c1" })
+    await guardTutorialMutation("user", "messaging.edit", { gameId: "game", messageId: "m1" })
+  }
+})
 test("missing state and info steps reject game actions", async () => {
   for (const index of [null, 10, 58, 61, 79]) {
     step = index

@@ -346,3 +346,74 @@ export async function markRead(
   realtime.emitToPlayer(actor.gameId, actor.playerAccountId, "read:updated", pointer)
   return allow(pointer)
 }
+
+// How many messages a page holds by default, and the ceiling a caller may ask
+// for. The ceiling matters because the page size arrives from the client.
+export const HISTORY_PAGE_SIZE = 50
+const MAX_HISTORY_PAGE_SIZE = 100
+
+// Where the next page starts. Two fields rather than one because createdAt is
+// not unique — two messages can share a millisecond, and a cursor that only
+// knew the timestamp would either skip one of them or repeat it forever.
+export type HistoryCursor = { createdAt: Date; id: string }
+
+export type MessagePage = {
+  // Oldest first, the order they are drawn in.
+  messages: SavedMessage[]
+  // Pass back as `before` to fetch the page above this one. Null at the top of
+  // the conversation.
+  nextCursor: HistoryCursor | null
+}
+
+// One page of a conversation, walking backwards from the newest message.
+//
+// Chat is read from the bottom, so "the first page" is the end of the history
+// and paging means going further back. The query therefore sorts descending and
+// the result is reversed before returning: the database works in the direction
+// the index is useful, the caller gets the direction the screen needs.
+export async function loadHistory(
+  actor: MessagingActor,
+  input: { channelId: string; limit?: number; before?: HistoryCursor | null }
+): Promise<Decision<MessagePage>> {
+  const access = await loadViewableChannel(actor, input.channelId)
+  if (!access.ok) return access
+
+  const take = Math.min(Math.max(input.limit ?? HISTORY_PAGE_SIZE, 1), MAX_HISTORY_PAGE_SIZE)
+  const before = input.before ?? null
+
+  const rows = await db.chatMessage.findMany({
+    where: {
+      channelId: access.value.channel.id,
+      // "Strictly before this point in the ordering": either an older
+      // timestamp, or the same timestamp and a lower id. This is the two-field
+      // cursor doing its job — it is exactly the (createdAt, id) index order
+      // the orderBy below asks for.
+      ...(before === null
+        ? {}
+        : {
+            OR: [
+              { createdAt: { lt: before.createdAt } },
+              { createdAt: before.createdAt, id: { lt: before.id } },
+            ],
+          }),
+    },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    // One extra row, never returned. Its existence is the answer to "is there
+    // more above this?", which a count query would otherwise have to ask
+    // separately.
+    take: take + 1,
+    select: MESSAGE_SELECT,
+  })
+
+  const hasMore = rows.length > take
+  const page = hasMore ? rows.slice(0, take) : rows
+  // Deleted messages stay in the page. The tombstone keeps the conversation's
+  // shape, and toSavedMessage is what empties the body.
+  const messages = page.map(row => toSavedMessage(row)).reverse()
+  const oldest = page.at(-1)
+
+  return allow({
+    messages,
+    nextCursor: hasMore && oldest ? { createdAt: oldest.createdAt, id: oldest.id } : null,
+  })
+}

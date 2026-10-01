@@ -16,6 +16,10 @@ export const realtimeControl: RealtimeControl = {
     tryGetIo()?.to(`channel:${channelId}`).emit(event, payload)
   },
 
+  emitToGame(gameId, event, payload) {
+    tryGetIo()?.to(`game:${gameId}`).emit(event, payload)
+  },
+
   disconnectUser(userId, reason) {
     const io = tryGetIo()
     if (!io) return

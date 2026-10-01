@@ -18,6 +18,7 @@ import { supportTicketRouter } from "./routers/supportTicket.js";
 import { breedRouter } from "./routers/breed.js";
 import { socialRouter } from "./routers/social.js";
 import { directoryRouter } from "./routers/directory.js";
+import { messagingRouter } from "./routers/messaging.js";
 
 export const appRouter = router({
   health: publicProcedure.query(() => ({ status: "ok" })),
@@ -40,6 +41,7 @@ export const appRouter = router({
   breed: breedRouter,
   social: socialRouter,
   directory: directoryRouter,
+  messaging: messagingRouter,
 })
 
 export type AppRouter = typeof appRouter

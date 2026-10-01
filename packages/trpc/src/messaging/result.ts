@@ -21,6 +21,12 @@ export type MessagingDenialCode =
   | "CONTENT_EMPTY"
   | "CONTENT_TOO_LONG"
   | "BAD_CLIENT_ID"
+  // Channel management. These three are admin-facing, so unlike the codes
+  // above they say exactly what went wrong — the caller already administers
+  // this game, so there is nothing a precise message could disclose.
+  | "CHANNEL_NAME_INVALID"
+  | "CHANNEL_NAME_TAKEN"
+  | "CHANNEL_ORDER_INCOMPLETE"
 
 export type Denied = {
   ok: false

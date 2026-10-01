@@ -20,6 +20,9 @@ const TRPC_CODE: Record<MessagingDenialCode, TRPCError["code"]> = {
   CONTENT_EMPTY: "BAD_REQUEST",
   CONTENT_TOO_LONG: "BAD_REQUEST",
   BAD_CLIENT_ID: "BAD_REQUEST",
+  CHANNEL_NAME_INVALID: "BAD_REQUEST",
+  CHANNEL_NAME_TAKEN: "CONFLICT",
+  CHANNEL_ORDER_INCOMPLETE: "BAD_REQUEST",
 }
 
 // Only the player-facing message crosses the wire. `detail` stays here.
