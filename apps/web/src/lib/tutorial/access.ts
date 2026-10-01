@@ -79,7 +79,13 @@ export function prepareTutorialControl(selector: string) {
 
 export function isTutorialElementAllowed(target: Element) {
   if (!access.restricted || preparing) return true
-  if (target.closest('[data-tutorial-recovery], a[href="/dashboard"], [data-tutorial-signout]')) return true
+  // The messaging widget is exempt as a block rather than per step. It renders
+  // for the whole tutorial, and the tutorial is precisely where a tester finds
+  // things worth reporting — so #testing-feedback has to be reachable from
+  // inside it. This bypasses the click guard only: isTutorialRouteAllowed still
+  // applies below, so a link in a message cannot be used to escape into a page
+  // the current step disallows.
+  if (target.closest('[data-tutorial-recovery], a[href="/dashboard"], [data-tutorial-signout], [data-tutorial-messaging]')) return true
   if (import.meta.env.DEV && target.closest('[data-tutorial-dev]')) return true
   if (window.location.pathname === "/dashboard" && !access.running && target.closest('[data-tutorial-resume]')) return true
   if (!access.running || !access.ready) return false

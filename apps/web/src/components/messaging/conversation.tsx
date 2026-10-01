@@ -1,0 +1,406 @@
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
+import { ArrowLeft, Hash, Lock, Megaphone } from "lucide-react"
+import { trpc, type RouterOutputs } from "@/lib/trpc"
+import {
+  joinChannel,
+  leaveChannel,
+  sendMessage,
+  toChatMessage,
+  useSocketEvent,
+  type ChatMessage,
+  type MessagingConnection,
+} from "@/lib/messaging/socket-events"
+
+type ChannelSummary = RouterOutputs["messaging"]["overview"]["channels"][number]
+type HistoryCursor = { createdAt: Date; id: string }
+
+// Messages from the same person inside this window share one header, the way
+// every chat client does it. Long enough to group a burst of typing, short
+// enough that a reply hours later still gets its own name and time.
+const GROUP_WINDOW_MS = 5 * 60 * 1000
+
+// How close to the top counts as "show me more".
+const LOAD_OLDER_THRESHOLD_PX = 80
+
+// How close to the bottom counts as "following the conversation". Someone
+// reading back through history should not get yanked down by a new message, and
+// should not have it marked read on their behalf either.
+const AT_BOTTOM_THRESHOLD_PX = 60
+
+// Marking read on every arriving message would be a mutation per message. This
+// collapses a burst into one write.
+const MARK_READ_DEBOUNCE_MS = 400
+
+// Inserts or replaces a message, keeping the list in (createdAt, id) order.
+//
+// The same message can arrive twice: the sender gets it once as the
+// acknowledgement of their own send and once as the broadcast to the channel
+// room, in either order. Both are matched here — by id for anything already
+// saved, and by clientMessageId for the optimistic bubble that has no id yet.
+function upsertMessage(list: ChatMessage[], incoming: ChatMessage): ChatMessage[] {
+  const existing = list.findIndex(
+    message =>
+      message.id === incoming.id ||
+      (message.pending === true && message.clientMessageId === incoming.clientMessageId)
+  )
+  if (existing !== -1) {
+    const next = [...list]
+    next[existing] = incoming
+    return next
+  }
+
+  // Overwhelmingly the common case: the newest message belongs at the end.
+  const last = list.at(-1)
+  if (!last || last.createdAt <= incoming.createdAt) return [...list, incoming]
+
+  const at = list.findIndex(message => message.createdAt > incoming.createdAt)
+  return [...list.slice(0, at), incoming, ...list.slice(at)]
+}
+
+function sameDay(a: string, b: string): boolean {
+  return new Date(a).toDateString() === new Date(b).toDateString()
+}
+
+function dayLabel(iso: string): string {
+  const date = new Date(iso)
+  const today = new Date()
+  const yesterday = new Date(today)
+  yesterday.setDate(today.getDate() - 1)
+  if (date.toDateString() === today.toDateString()) return "Today"
+  if (date.toDateString() === yesterday.toDateString()) return "Yesterday"
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+}
+
+function timeLabel(iso: string): string {
+  return new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+}
+
+function channelIcon(channel: ChannelSummary) {
+  if (channel.isArchived) return Lock
+  return channel.channelType === "ANNOUNCEMENT" ? Megaphone : Hash
+}
+
+export function Conversation({
+  gameId,
+  channel,
+  connection,
+  playerAccountId,
+  onBack,
+}: {
+  gameId: string
+  channel: ChannelSummary
+  connection: MessagingConnection
+  playerAccountId: string | undefined
+  onBack: () => void
+}) {
+  const utils = trpc.useUtils()
+  const markRead = trpc.messaging.markRead.useMutation({
+    onSuccess: () => void utils.messaging.overview.invalidate(),
+  })
+
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [cursor, setCursor] = useState<HistoryCursor | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [loadingOlder, setLoadingOlder] = useState(false)
+  const [draft, setDraft] = useState("")
+
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const atBottom = useRef(true)
+  // Set when older messages are prepended, read once by the layout effect that
+  // puts the scroll position back where it was.
+  const prependFrom = useRef<number | null>(null)
+  const markReadTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastMarked = useRef<string | null>(null)
+
+  const channelId = channel.channelId
+
+  // Open the conversation: take the channel room so live messages arrive, then
+  // load the newest page.
+  //
+  // Runs again on every epoch change — that is, whenever the socket reconnects
+  // and re-enters the game. Room membership does not survive a disconnect, and
+  // anything said while the connection was down was never delivered, so both
+  // halves have to be redone. This is the reconnect reconciliation: the
+  // database is asked again rather than the gap being assumed empty.
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    lastMarked.current = null
+
+    void joinChannel(channelId)
+    void utils.messaging.history
+      .fetch({ gameId, channelId })
+      .then(page => {
+        if (cancelled) return
+        setMessages(page.messages.map(message => toChatMessage(message)))
+        setCursor(page.nextCursor)
+        atBottom.current = true
+      })
+      .catch(() => {
+        if (!cancelled) setMessages([])
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+      void leaveChannel(channelId)
+    }
+  }, [channelId, gameId, connection.epoch, utils])
+
+  useSocketEvent<Parameters<typeof toChatMessage>[0]>("message:created", payload => {
+    if (payload.channelId !== channelId) return
+    setMessages(list => upsertMessage(list, toChatMessage(payload)))
+  })
+  useSocketEvent<Parameters<typeof toChatMessage>[0]>("message:updated", payload => {
+    if (payload.channelId !== channelId) return
+    setMessages(list => upsertMessage(list, toChatMessage(payload)))
+  })
+  useSocketEvent<Parameters<typeof toChatMessage>[0]>("message:deleted", payload => {
+    if (payload.channelId !== channelId) return
+    setMessages(list => upsertMessage(list, toChatMessage(payload)))
+  })
+
+  const loadOlder = useCallback(async () => {
+    if (!cursor || loadingOlder) return
+    setLoadingOlder(true)
+    const container = scrollRef.current
+    prependFrom.current = container ? container.scrollHeight : null
+    try {
+      const page = await utils.messaging.history.fetch({ gameId, channelId, before: cursor })
+      setMessages(list => [...page.messages.map(message => toChatMessage(message)), ...list])
+      setCursor(page.nextCursor)
+    } catch {
+      prependFrom.current = null
+    } finally {
+      setLoadingOlder(false)
+    }
+  }, [cursor, loadingOlder, gameId, channelId, utils])
+
+  function onScroll() {
+    const container = scrollRef.current
+    if (!container) return
+    atBottom.current =
+      container.scrollHeight - container.scrollTop - container.clientHeight < AT_BOTTOM_THRESHOLD_PX
+    if (container.scrollTop < LOAD_OLDER_THRESHOLD_PX) void loadOlder()
+  }
+
+  // Keeps the view still while older messages are inserted above it. Without
+  // this, prepending 50 messages jumps the reader to the top of a page they
+  // have already read. A layout effect because it has to happen before the
+  // browser paints the new scroll position.
+  useLayoutEffect(() => {
+    const container = scrollRef.current
+    if (!container) return
+    if (prependFrom.current !== null) {
+      container.scrollTop += container.scrollHeight - prependFrom.current
+      prependFrom.current = null
+      return
+    }
+    if (atBottom.current) container.scrollTop = container.scrollHeight
+  }, [messages, loading])
+
+  // Move the read pointer to the newest message, but only for someone actually
+  // looking at it. Scrolled up through history is reading the past, not the
+  // present, and marking it read would clear a badge for messages they have not
+  // seen.
+  useEffect(() => {
+    if (!atBottom.current) return
+    const newest = [...messages].reverse().find(message => message.pending !== true)
+    if (!newest || newest.id === lastMarked.current) return
+
+    if (markReadTimer.current) clearTimeout(markReadTimer.current)
+    markReadTimer.current = setTimeout(() => {
+      lastMarked.current = newest.id
+      markRead.mutate({ gameId, channelId, lastReadMessageId: newest.id })
+    }, MARK_READ_DEBOUNCE_MS)
+
+    return () => {
+      if (markReadTimer.current) clearTimeout(markReadTimer.current)
+    }
+  }, [messages, gameId, channelId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function send() {
+    const content = draft.trim()
+    if (content.length === 0) return
+
+    const clientMessageId = crypto.randomUUID()
+    const optimistic: ChatMessage = {
+      id: `pending-${clientMessageId}`,
+      channelId,
+      authorPlayerId: playerAccountId ?? "",
+      authorUsername: "You",
+      clientMessageId,
+      content,
+      createdAt: new Date().toISOString(),
+      editedAt: null,
+      removedBy: null,
+      pending: true,
+    }
+
+    setDraft("")
+    atBottom.current = true
+    setMessages(list => [...list, optimistic])
+
+    const result = await sendMessage({ channelId, clientMessageId, content })
+    if (result.ok) {
+      setMessages(list => upsertMessage(list, toChatMessage(result.value)))
+      return
+    }
+    // The bubble stays, carrying the reason. Dropping it would lose what they
+    // typed; replacing it with an error toast would lose where it belonged.
+    setMessages(list =>
+      list.map(message =>
+        message.clientMessageId === clientMessageId
+          ? { ...message, failed: result.message }
+          : message
+      )
+    )
+  }
+
+  const Icon = channelIcon(channel)
+  const offline = connection.status !== "online"
+  const composerMessage = offline
+    ? connection.status === "connecting"
+      ? "Connecting…"
+      : "Reconnecting…"
+    : channel.cannotPostReason
+
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex shrink-0 items-center gap-2 border-b border-border px-2 py-1.5">
+        <button
+          onClick={onBack}
+          className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          aria-label="Back to channels"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+        </button>
+        <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        <span className="truncate text-xs font-semibold text-foreground">{channel.name}</span>
+        {channel.description && (
+          <span className="hidden truncate text-[10px] text-muted-foreground sm:inline">
+            {channel.description}
+          </span>
+        )}
+      </div>
+
+      <div ref={scrollRef} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto px-3 py-2">
+        {loading ? (
+          <p className="py-4 text-center text-xs text-muted-foreground">Loading…</p>
+        ) : messages.length === 0 ? (
+          <p className="py-4 text-center text-xs text-muted-foreground">
+            Nothing here yet. Say something.
+          </p>
+        ) : (
+          <>
+            {loadingOlder && (
+              <p className="py-2 text-center text-[10px] text-muted-foreground">Loading older…</p>
+            )}
+            {!loadingOlder && cursor === null && (
+              <p className="py-2 text-center text-[10px] text-muted-foreground">
+                The beginning of #{channel.name}
+              </p>
+            )}
+            {messages.map((message, index) => {
+              const previous = messages[index - 1]
+              const newDay = !previous || !sameDay(previous.createdAt, message.createdAt)
+              const grouped =
+                !newDay &&
+                previous !== undefined &&
+                previous.authorPlayerId === message.authorPlayerId &&
+                previous.removedBy === null &&
+                message.removedBy === null &&
+                new Date(message.createdAt).getTime() - new Date(previous.createdAt).getTime() <
+                  GROUP_WINDOW_MS
+
+              return (
+                <div key={message.pending === true ? message.clientMessageId : message.id}>
+                  {newDay && (
+                    <div className="my-2 flex items-center gap-2">
+                      <div className="h-px flex-1 bg-border" />
+                      <span className="text-[9px] uppercase tracking-wide text-muted-foreground">
+                        {dayLabel(message.createdAt)}
+                      </span>
+                      <div className="h-px flex-1 bg-border" />
+                    </div>
+                  )}
+                  <div className={grouped ? "" : "mt-2"}>
+                    {!grouped && (
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-[11px] font-semibold text-foreground">
+                          {message.authorUsername}
+                        </span>
+                        <span className="text-[9px] text-muted-foreground">
+                          {timeLabel(message.createdAt)}
+                        </span>
+                      </div>
+                    )}
+                    {message.removedBy === null ? (
+                      <p
+                        className={[
+                          "whitespace-pre-wrap break-words text-xs leading-snug",
+                          message.failed !== undefined
+                            ? "text-destructive"
+                            : message.pending === true
+                              ? "text-muted-foreground"
+                              : "text-foreground",
+                        ].join(" ")}
+                      >
+                        {message.content}
+                        {message.editedAt !== null && (
+                          <span className="ml-1 text-[9px] text-muted-foreground">(edited)</span>
+                        )}
+                      </p>
+                    ) : (
+                      // The author and the position stay; only the body is
+                      // replaced. The wording lives here rather than in the
+                      // database, so it can be changed without rewriting rows.
+                      <p className="text-xs italic leading-snug text-muted-foreground">
+                        {message.removedBy === "author"
+                          ? "— message deleted —"
+                          : "— message removed by staff —"}
+                      </p>
+                    )}
+                    {message.failed !== undefined && (
+                      <p className="text-[9px] text-destructive">{message.failed}</p>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </>
+        )}
+      </div>
+
+      <div className="shrink-0 border-t border-border p-2">
+        {channel.canPost && !offline ? (
+          <textarea
+            value={draft}
+            onChange={event => setDraft(event.target.value)}
+            onKeyDown={event => {
+              // Enter sends, Shift+Enter breaks the line. Not while an IME is
+              // composing — a Japanese or Korean keyboard uses Enter to accept
+              // a candidate, and sending there would cut the word in half.
+              if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                event.preventDefault()
+                void send()
+              }
+            }}
+            rows={1}
+            placeholder={`Message #${channel.name}`}
+            className="max-h-24 w-full resize-none rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground outline-none placeholder:text-muted-foreground focus:border-primary"
+          />
+        ) : (
+          // Disabling is presentation, never enforcement: the server check is
+          // unchanged and authoritative. A crafted send bypasses this entirely
+          // and still has to get past evaluatePosting.
+          <p className="rounded-md border border-border bg-muted/40 px-2 py-1.5 text-xs text-muted-foreground">
+            {composerMessage ?? "You can't post here"}
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}

@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react"
 import { Bell, BookOpen, MessageCircle, X } from "lucide-react"
 import { trpc, type RouterOutputs } from "@/lib/trpc"
-import { socket } from "@/lib/socket"
+import { useMessagingSocket, useSocketEvent } from "@/lib/messaging/socket-events"
+import { ChatSection } from "@/components/messaging/chat-section"
 
 type Notification = RouterOutputs["notification"]["list"][number]
 type TutorialProgress = RouterOutputs["tutorial"]["getProgress"]
@@ -35,6 +36,21 @@ export function MessagingWidget() {
     )
   const notifUnread = notifications.filter(n => !n.isRead).length
 
+  // Opens the socket and claims the game on it. Mounted here because the widget
+  // lives for the whole authenticated tree, so the connection's lifetime
+  // matches being signed in — which is what the server's revocation checks
+  // assume. endClientSession closes it again on sign-out.
+  const connection = useMessagingSocket(gameId)
+
+  // The same query the chat section runs, so React Query serves both from one
+  // request. This one only wants the total for the badges.
+  const { data: messagingOverview } = trpc.messaging.overview.useQuery(
+    { gameId: gameId! },
+    { enabled: !!gameId }
+  )
+  const chatUnread = messagingOverview?.totalUnread ?? 0
+  const totalUnread = notifUnread + chatUnread
+
   const { data: tutorialData } = trpc.tutorial.getProgress.useQuery(
     { gameId: gameId! },
     { enabled: !!gameId && !tutorialCompleted }
@@ -56,13 +72,7 @@ export function MessagingWidget() {
     if (tutorialCompleted && activeSection === "tutorial") setActiveSection("notifications")
   }, [tutorialCompleted]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    // socket.connect() — deferred until socket server is live
-    socket.on("notification", () => { void refetchNotifications() })
-    return () => {
-      socket.off("notification")
-    }
-  }, [refetchNotifications])
+  useSocketEvent("notification:created", () => void refetchNotifications())
 
   function onPointerDown(e: React.PointerEvent<HTMLButtonElement>) {
     isDragging.current = true
@@ -126,18 +136,23 @@ export function MessagingWidget() {
       label: "Notifications",
       badge: notifUnread > 0 ? notifUnread : null,
     },
-    ...(tutorialCompleted ? [{
+    {
+      // Present during the tutorial too. The tutorial is exactly where a tester
+      // finds things worth reporting, so #testing-feedback has to be reachable
+      // from inside it — see the [data-tutorial-messaging] exemption in
+      // lib/tutorial/access.ts and the matching one in the server's mutation
+      // guard.
       key: "chat" as const,
       icon: MessageCircle,
       label: "Messages",
-      badge: null as number | null,
-    }] : []),
+      badge: chatUnread > 0 ? chatUnread : null,
+    },
   ]
 
   const sectionLabel = navItems.find(n => n.key === activeSection)?.label ?? ""
 
   return (
-    <div className="fixed z-50" style={{ right: pos.x, bottom: pos.y }}>
+    <div data-tutorial-messaging className="fixed z-50" style={{ right: pos.x, bottom: pos.y }}>
       {open && (
         <div
           className="absolute bottom-16 right-0 flex overflow-hidden rounded-lg border border-border bg-card shadow-xl"
@@ -199,7 +214,9 @@ export function MessagingWidget() {
               </button>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto p-3">
+            {/* The chat section scrolls its own history and pins its composer,
+                so it gets the bare pane. The other two are plain lists. */}
+            <div className={activeSection === "chat" ? "min-h-0 flex-1" : "min-h-0 flex-1 overflow-y-auto p-3"}>
               {activeSection === "tutorial" && (
                 <TutorialContent data={tutorialData} />
               )}
@@ -210,11 +227,12 @@ export function MessagingWidget() {
                   onRefresh={() => void refetchNotifications()}
                 />
               )}
-              {activeSection === "chat" && (
-                <div className="flex h-full flex-col items-center justify-center gap-2 text-muted-foreground">
-                  <MessageCircle className="h-8 w-8 opacity-30" />
-                  <p className="text-xs">Direct messages coming soon.</p>
-                </div>
+              {activeSection === "chat" && gameId && (
+                <ChatSection
+                  gameId={gameId}
+                  connection={connection}
+                  playerAccountId={player?.id}
+                />
               )}
             </div>
           </div>
@@ -230,9 +248,9 @@ export function MessagingWidget() {
         aria-label="Messages"
       >
         <MessageCircle className="h-6 w-6" />
-        {notifUnread > 0 && (
+        {totalUnread > 0 && (
           <span className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground ring-2 ring-card">
-            {notifUnread > 99 ? "99+" : notifUnread}
+            {totalUnread > 99 ? "99+" : totalUnread}
           </span>
         )}
       </button>

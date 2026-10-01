@@ -150,6 +150,19 @@ function emit(socket: ClientSocket, event: string, payload: unknown): Promise<Ac
 
 const authed = () => open(`session=${SESSION}`)
 
+// Resolves with the first payload of `event`, or null if nothing arrives in
+// time. A null is a real answer here: two of the tests below exist to prove
+// that a broadcast does *not* reach somebody.
+function nextEvent(socket: ClientSocket, event: string, waitMs = 600): Promise<unknown> {
+  return new Promise(resolve => {
+    const timer = setTimeout(() => resolve(null), waitMs)
+    socket.once(event, (payload: unknown) => {
+      clearTimeout(timer)
+      resolve(payload)
+    })
+  })
+}
+
 test("an unauthenticated socket cannot connect", async () => {
   const { socket, error } = await open(null)
   assert.equal(error, "Unauthorized")
@@ -283,6 +296,72 @@ test("the author comes from the session, not from the payload", async () => {
   assert.equal(saved.authorPlayerId, ME)
   assert.equal(saved.gameId, GAME)
   socket.close()
+})
+
+test("a message reaches another client that joined the same channel", async () => {
+  // The delivery path end to end: one client sends, the service commits, and
+  // the broadcast lands on a second connection. Everything either side of this
+  // is tested elsewhere; this is the part where chat is actually chat.
+  const sender = await authed()
+  const listener = await authed()
+  await emit(sender.socket, "game:enter", { gameId: GAME })
+  await emit(listener.socket, "game:enter", { gameId: GAME })
+  await emit(sender.socket, "channel:join", { channelId: CHANNEL })
+  await emit(listener.socket, "channel:join", { channelId: CHANNEL })
+
+  const delivered = nextEvent(listener.socket, "message:created")
+  await emit(sender.socket, "message:send", {
+    channelId: CHANNEL,
+    clientMessageId: "c-live",
+    content: "hello room",
+  })
+
+  const payload = (await delivered) as { content: string; authorPlayerId: string } | null
+  assert.notEqual(payload, null)
+  assert.equal(payload?.content, "hello room")
+  assert.equal(payload?.authorPlayerId, ME)
+  sender.socket.close()
+  listener.socket.close()
+})
+
+test("a client that never joined the channel is not sent its messages", async () => {
+  const sender = await authed()
+  const bystander = await authed()
+  await emit(sender.socket, "game:enter", { gameId: GAME })
+  await emit(bystander.socket, "game:enter", { gameId: GAME })
+  await emit(sender.socket, "channel:join", { channelId: CHANNEL })
+
+  const delivered = nextEvent(bystander.socket, "message:created")
+  await emit(sender.socket, "message:send", {
+    channelId: CHANNEL,
+    clientMessageId: "c-scoped",
+    content: "only for the room",
+  })
+
+  assert.equal(await delivered, null)
+  sender.socket.close()
+  bystander.socket.close()
+})
+
+test("leaving a channel stops its messages arriving", async () => {
+  const sender = await authed()
+  const leaver = await authed()
+  await emit(sender.socket, "game:enter", { gameId: GAME })
+  await emit(leaver.socket, "game:enter", { gameId: GAME })
+  await emit(sender.socket, "channel:join", { channelId: CHANNEL })
+  await emit(leaver.socket, "channel:join", { channelId: CHANNEL })
+  await emit(leaver.socket, "channel:leave", { channelId: CHANNEL })
+
+  const delivered = nextEvent(leaver.socket, "message:created")
+  await emit(sender.socket, "message:send", {
+    channelId: CHANNEL,
+    clientMessageId: "c-left",
+    content: "after leaving",
+  })
+
+  assert.equal(await delivered, null)
+  sender.socket.close()
+  leaver.socket.close()
 })
 
 test("a retried client id does not create a second message", async () => {
