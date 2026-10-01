@@ -3,6 +3,7 @@ import { db, Prisma } from "@sim-engine/db"
 import { z } from "zod"
 import { randomUUID } from "node:crypto"
 import { TRPCError } from "@trpc/server"
+import { removeAllMessagesByUser } from "../messaging/messages.js"
 
 // ── Overview ────────────────────────────────────────────────────────────────
 
@@ -243,6 +244,10 @@ const playersOpsRouter = router({
       reason: z.string(),
       expiresAt: z.string().datetime().optional(),
       gameId: z.string(),
+      // Deliberately a per-incident choice rather than a consequence of the ban
+      // length: a day-long ban for one bad post should not have to erase months
+      // of good ones, and a permanent ban for spam usually should.
+      removeMessages: z.boolean().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       await db.$transaction([
@@ -269,6 +274,19 @@ const playersOpsRouter = router({
       // kicked anyone. The periodic sweep would catch this within a minute
       // anyway, so this is the fast path rather than the guarantee.
       ctx.realtime.disconnectUser(input.userId, "banned")
+
+      if (input.removeMessages) {
+        const removed = await removeAllMessagesByUser(input.userId, ctx.realtime)
+        await db.adminActionLog.create({
+          data: {
+            staffUserId: ctx.userId,
+            gameId: input.gameId,
+            action: `ban_removed_messages:${removed}`,
+            targetType: "User",
+            targetId: input.userId,
+          },
+        })
+      }
     }),
 
   banIp: staffProcedure

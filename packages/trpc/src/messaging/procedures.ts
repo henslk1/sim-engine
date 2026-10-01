@@ -15,6 +15,11 @@ const TRPC_CODE: Record<MessagingDenialCode, TRPCError["code"]> = {
   BLOCKED: "FORBIDDEN",
   DM_UNAVAILABLE: "FORBIDDEN",
   NOT_STAFF: "FORBIDDEN",
+  MESSAGE_NOT_FOUND: "NOT_FOUND",
+  NOT_AUTHOR: "FORBIDDEN",
+  CONTENT_EMPTY: "BAD_REQUEST",
+  CONTENT_TOO_LONG: "BAD_REQUEST",
+  BAD_CLIENT_ID: "BAD_REQUEST",
 }
 
 // Only the player-facing message crosses the wire. `detail` stays here.

@@ -32,6 +32,7 @@ function PlayerDetail() {
   const [warnType, setWarnType] = useState<"VERBAL" | "FORMAL" | "FINAL">("VERBAL")
   const [banReason, setBanReason] = useState("")
   const [banExpiry, setBanExpiry] = useState("")
+  const [banRemoveMessages, setBanRemoveMessages] = useState(false)
   const [noteBody, setNoteBody] = useState("")
   const [resetAnimalId, setResetAnimalId] = useState("")
   const [resetAnimalName, setResetAnimalName] = useState("")
@@ -314,8 +315,29 @@ function PlayerDetail() {
                 className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
               />
             </div>
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={banRemoveMessages}
+                onChange={e => setBanRemoveMessages(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span>
+                Also remove this player's messages
+                <span className="block text-xs text-muted-foreground">
+                  Replaces every message they have sent, in every game, with a removal notice.
+                  The author and the original text stay in the record.
+                </span>
+              </span>
+            </label>
             <button
-              onClick={() => banMutation.mutate({ userId: player.user.id, reason: banReason, expiresAt: banExpiry || undefined, gameId: player.gameId })}
+              onClick={() => banMutation.mutate({
+                userId: player.user.id,
+                reason: banReason,
+                expiresAt: banExpiry || undefined,
+                gameId: player.gameId,
+                removeMessages: banRemoveMessages,
+              })}
               disabled={!banReason || banMutation.isPending}
               className="rounded-md bg-destructive px-3 py-1.5 text-sm font-medium text-destructive-foreground disabled:opacity-50"
             >

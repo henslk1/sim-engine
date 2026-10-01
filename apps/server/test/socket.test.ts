@@ -1,0 +1,285 @@
+import { test, before, after, beforeEach } from "node:test"
+import assert from "node:assert/strict"
+import { createServer, type Server as HttpServer } from "node:http"
+import { io as connect, type Socket as ClientSocket } from "socket.io-client"
+
+// Drives the real socket server. The session resolver and the Redis adapter are
+// injected, so this needs neither Better Auth nor Redis — everything else, the
+// handshake, the per-event revalidation, the sweep and the message service, is
+// the production path.
+
+const GAME = "game-1"
+const ME = "player-me"
+const USER = "user-me"
+const SESSION = "session-me"
+const CHANNEL = "channel-general"
+
+const state = {
+  session: null as { id: string; expiresAt: Date } | null,
+  activeBans: 0,
+  player: null as { id: string; username: string } | null,
+  channel: null as Record<string, unknown> | null,
+  messages: new Map<string, Record<string, unknown>>(),
+}
+
+let nextMessage = 0
+
+const db = {
+  session: {
+    findUnique: async () => state.session,
+    // The sweep filters on `expiresAt: { gt: now }`, so the double has to apply
+    // it. A mock that returned every row regardless would make the expiry test
+    // pass for the wrong reason — which is exactly what it caught the first time.
+    findMany: async ({ where }: { where?: { expiresAt?: { gt?: Date } } }) => {
+      if (!state.session) return []
+      const after = where?.expiresAt?.gt
+      if (after && state.session.expiresAt <= after) return []
+      return [{ id: state.session.id }]
+    },
+  },
+  banRecord: {
+    count: async () => state.activeBans,
+    findMany: async () => (state.activeBans > 0 ? [{ userId: USER }] : []),
+  },
+  playerAccount: { findUnique: async () => state.player, findFirst: async () => state.player },
+  staffRole: { findMany: async () => [] },
+  chatChannel: { findUnique: async () => state.channel },
+  blockedPlayer: { count: async () => 0 },
+  chatMessage: {
+    findUnique: async ({ where }: { where: Record<string, unknown> }) => {
+      const key = where["authorPlayerId_clientMessageId"] as
+        | { authorPlayerId: string; clientMessageId: string }
+        | undefined
+      if (key) return state.messages.get(`${key.authorPlayerId}:${key.clientMessageId}`) ?? null
+      return state.messages.get(where["id"] as string) ?? null
+    },
+    create: async ({ data }: { data: Record<string, string> }) => {
+      nextMessage += 1
+      const row = {
+        id: `message-${nextMessage}`,
+        gameId: data["gameId"],
+        channelId: data["channelId"],
+        authorPlayerId: data["authorPlayerId"],
+        clientMessageId: data["clientMessageId"],
+        content: data["content"],
+        createdAt: new Date(),
+        editedAt: null,
+        deletedAt: null,
+        deletedByPlayerId: null,
+        authorPlayer: { username: "me" },
+      }
+      state.messages.set(row.id, row)
+      state.messages.set(`${row.authorPlayerId}:${row.clientMessageId}`, row)
+      return row
+    },
+  },
+  directMessage: { update: async () => ({}) },
+  $transaction: async (fn: (tx: unknown) => Promise<unknown>) => fn(db),
+}
+Object.assign(globalThis, { prisma: db })
+
+const { initSocket, sweepConnections } = await import("../src/socket.ts")
+
+let httpServer: HttpServer
+let server: Awaited<ReturnType<typeof initSocket>>
+let url: string
+
+before(async () => {
+  httpServer = createServer()
+  server = initSocket(httpServer, {
+    resolveSession: async (cookieHeader) => {
+      // The harness passes the session id as the cookie. Anything else is an
+      // unknown session, which is what an expired or revoked one looks like.
+      if (!state.session || cookieHeader !== `session=${state.session.id}`) return null
+      return { userId: USER, sessionId: state.session.id, expiresAt: state.session.expiresAt }
+    },
+    attachRedisAdapter: false,
+  })
+  await new Promise<void>(resolve => httpServer.listen(0, resolve))
+  const address = httpServer.address()
+  if (address === null || typeof address === "string") throw new Error("no port")
+  url = `http://localhost:${address.port}`
+})
+
+after(async () => {
+  await server.close()
+  await new Promise<void>(resolve => httpServer.close(() => resolve()))
+})
+
+beforeEach(() => {
+  state.session = { id: SESSION, expiresAt: new Date(Date.now() + 60 * 60 * 1000) }
+  state.activeBans = 0
+  state.player = { id: ME, username: "me" }
+  state.channel = {
+    id: CHANNEL,
+    gameId: GAME,
+    channelType: "TEXT",
+    name: "general",
+    defaultCanPost: true,
+    isArchived: false,
+    server: { id: "server-global", serverType: "GLOBAL", isArchived: false },
+    directMessage: null,
+  }
+  state.messages.clear()
+  nextMessage = 0
+})
+
+type Ack = { ok: true; value: unknown } | { ok: false; code: string; message: string }
+
+function open(cookie: string | null): Promise<{ socket: ClientSocket; error: string | null }> {
+  const socket = connect(url, {
+    transports: ["websocket"],
+    reconnection: false,
+    ...(cookie === null ? {} : { extraHeaders: { cookie } }),
+  })
+  return new Promise(resolve => {
+    socket.on("connect", () => resolve({ socket, error: null }))
+    socket.on("connect_error", e => resolve({ socket, error: e.message }))
+  })
+}
+
+function emit(socket: ClientSocket, event: string, payload: unknown): Promise<Ack> {
+  return new Promise(resolve => {
+    const timer = setTimeout(() => resolve({ ok: false, code: "TIMEOUT", message: "no ack" }), 4000)
+    socket.emit(event, payload, (result: Ack) => {
+      clearTimeout(timer)
+      resolve(result)
+    })
+  })
+}
+
+const authed = () => open(`session=${SESSION}`)
+
+test("an unauthenticated socket cannot connect", async () => {
+  const { socket, error } = await open(null)
+  assert.equal(error, "Unauthorized")
+  socket.close()
+})
+
+test("an unknown session cannot connect", async () => {
+  const { socket, error } = await open("session=someone-elses")
+  assert.equal(error, "Unauthorized")
+  socket.close()
+})
+
+test("an actively banned user cannot connect", async () => {
+  state.activeBans = 1
+  const { socket, error } = await authed()
+  assert.equal(error, "Unauthorized")
+  socket.close()
+})
+
+test("a valid session connects and can enter its game", async () => {
+  const { socket, error } = await authed()
+  assert.equal(error, null)
+  assert.deepEqual(await emit(socket, "game:enter", { gameId: GAME }), { ok: true, value: null })
+  socket.close()
+})
+
+test("revoking the session mid-connection stops the next event and drops the socket", async () => {
+  const { socket } = await authed()
+  await emit(socket, "game:enter", { gameId: GAME })
+
+  // What logging out looks like from here: the row is gone.
+  state.session = null
+
+  const result = await emit(socket, "channel:join", { channelId: CHANNEL })
+  assert.equal(result.ok === false && result.code, "SESSION_INVALID")
+
+  await new Promise(resolve => setTimeout(resolve, 200))
+  assert.equal(socket.connected, false)
+  socket.close()
+})
+
+test("a ban issued after connecting is caught by the sweep", async () => {
+  const { socket } = await authed()
+  await emit(socket, "game:enter", { gameId: GAME })
+  assert.equal(socket.connected, true)
+
+  state.activeBans = 1
+  await sweepConnections(server)
+
+  await new Promise(resolve => setTimeout(resolve, 200))
+  assert.equal(socket.connected, false)
+  socket.close()
+})
+
+test("a listening socket whose session expires is dropped without sending anything", async () => {
+  const { socket } = await authed()
+  await emit(socket, "game:enter", { gameId: GAME })
+
+  // Expiry rather than revocation: the row is still there, its date is not.
+  state.session = { id: SESSION, expiresAt: new Date(Date.now() - 1000) }
+  await sweepConnections(server)
+
+  await new Promise(resolve => setTimeout(resolve, 200))
+  assert.equal(socket.connected, false)
+  socket.close()
+})
+
+test("a channel in another game cannot be joined", async () => {
+  const { socket } = await authed()
+  await emit(socket, "game:enter", { gameId: GAME })
+  state.channel = { ...state.channel, gameId: "game-2" }
+
+  const result = await emit(socket, "channel:join", { channelId: CHANNEL })
+  assert.equal(result.ok === false && result.code, "CHANNEL_NOT_FOUND")
+  socket.close()
+})
+
+test("sending before entering a game is refused", async () => {
+  const { socket } = await authed()
+  const result = await emit(socket, "message:send", {
+    channelId: CHANNEL,
+    clientMessageId: "c1",
+    content: "hello",
+  })
+  assert.equal(result.ok === false && result.code, "NO_GAME")
+  socket.close()
+})
+
+test("the author comes from the session, not from the payload", async () => {
+  const { socket } = await authed()
+  await emit(socket, "game:enter", { gameId: GAME })
+
+  const result = await emit(socket, "message:send", {
+    channelId: CHANNEL,
+    clientMessageId: "c-forged",
+    content: "posted as someone else?",
+    // All three are ignored. The server never reads them.
+    authorPlayerId: "player-victim",
+    gameId: "game-2",
+    playerAccountId: "player-victim",
+  })
+
+  assert.equal(result.ok, true)
+  if (result.ok !== true) return
+  const saved = result.value as { authorPlayerId: string; gameId: string }
+  assert.equal(saved.authorPlayerId, ME)
+  assert.equal(saved.gameId, GAME)
+  socket.close()
+})
+
+test("a retried client id does not create a second message", async () => {
+  const { socket } = await authed()
+  await emit(socket, "game:enter", { gameId: GAME })
+
+  const first = await emit(socket, "message:send", {
+    channelId: CHANNEL,
+    clientMessageId: "c-retry",
+    content: "original",
+  })
+  const second = await emit(socket, "message:send", {
+    channelId: CHANNEL,
+    clientMessageId: "c-retry",
+    content: "a different message entirely",
+  })
+
+  assert.equal(first.ok && second.ok, true)
+  if (first.ok !== true || second.ok !== true) return
+  const a = first.value as { id: string; content: string }
+  const b = second.value as { id: string; content: string }
+  assert.equal(a.id, b.id)
+  assert.equal(b.content, "original")
+  socket.close()
+})

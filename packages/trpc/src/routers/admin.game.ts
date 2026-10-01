@@ -1,6 +1,7 @@
 import { router, publicProcedure } from "../trpc.js";
 import { db } from "@sim-engine/db";
 import { z } from "zod";
+import { ensureGlobalChatServer } from "../messaging/servers.js"
 
 export const gameAdminRouter = router({
   get: publicProcedure.query(() =>
@@ -18,16 +19,20 @@ export const gameAdminRouter = router({
       slug: z.string().min(1).regex(/^[a-z0-9-]+$/, "Lowercase letters, numbers, and hyphens only"),
       isActive: z.boolean(),
     }))
-    .mutation(({ input }) => {
+    .mutation(async ({ input }) => {
       if (input.id) {
         return db.game.update({
           where: { id: input.id },
           data: { name: input.name, slug: input.slug, isActive: input.isActive },
         })
       }
-      return db.game.create({
+      const game = await db.game.create({
         data: { name: input.name, slug: input.slug, isActive: input.isActive },
       })
+      // Every game has exactly one global chat server, so it is created with the
+      // game rather than left for someone to remember later.
+      await ensureGlobalChatServer(game.id)
+      return game
     }),
 
     saveConfig: publicProcedure

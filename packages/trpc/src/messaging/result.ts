@@ -16,6 +16,11 @@ export type MessagingDenialCode =
   | "BLOCKED"
   | "DM_UNAVAILABLE"
   | "NOT_STAFF"
+  | "MESSAGE_NOT_FOUND"
+  | "NOT_AUTHOR"
+  | "CONTENT_EMPTY"
+  | "CONTENT_TOO_LONG"
+  | "BAD_CLIENT_ID"
 
 export type Denied = {
   ok: false

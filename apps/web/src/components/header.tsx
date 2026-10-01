@@ -11,7 +11,7 @@ import {
 import { ActionButton } from "./game/ui";
 import { trpc } from "@/lib/trpc";
 import { Coins, Gem } from "lucide-react";
-import { endTutorialSession } from "@/lib/tutorial";
+import { endClientSession } from "@/lib/session-cleanup"
 
 type Session = typeof authClient.$Infer.Session 
 
@@ -28,7 +28,7 @@ export function Header({ session }: { session: Session}) {
   const router = useRouter()
 
   async function handleSignOut() {
-    endTutorialSession()
+    endClientSession()
     await authClient.signOut()
     await router.invalidate()
     router.navigate({ to: "/login" })

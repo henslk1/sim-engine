@@ -6,7 +6,7 @@ import { useEffect, useState } from "react"
 import { trpc } from "@/lib/trpc"
 import { queryClient } from "@/lib/query-client"
 import { authClient } from "@/lib/auth-client"
-import { endTutorialSession } from "@/lib/tutorial"
+import { endClientSession } from "@/lib/session-cleanup"
 
 type Session = typeof authClient.$Infer.Session
 
@@ -40,7 +40,7 @@ function RootComponent() {
   useEffect(() => {
     // Covers expired sessions and other unauthenticated redirects in addition
     // to the explicit sign-out buttons.
-    if (!session) endTutorialSession()
+    if (!session) endClientSession()
   }, [session])
 
   const [trpcClient] = useState(() =>
