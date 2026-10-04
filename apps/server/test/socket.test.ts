@@ -116,6 +116,7 @@ beforeEach(() => {
     channelType: "TEXT",
     name: "general",
     defaultCanPost: true,
+    minimumStaffRole: null,
     isArchived: false,
     server: { id: "server-global", serverType: "GLOBAL", isArchived: false },
     directMessage: null,
@@ -262,6 +263,37 @@ test("a channel in another game cannot be joined", async () => {
 
   const result = await emit(socket, "channel:join", { channelId: CHANNEL })
   assert.equal(result.ok === false && result.code, "CHANNEL_NOT_FOUND")
+  socket.close()
+})
+
+test("a staff-only channel cannot be joined over the socket by a player", async () => {
+  // The read gate lives in loadViewableChannel, which channel:join calls — so
+  // the socket inherits it rather than restating it. staffRole.findMany returns
+  // nothing in this harness, so this connection holds no role.
+  const { socket } = await authed()
+  await emit(socket, "game:enter", { gameId: GAME })
+  state.channel = { ...state.channel, minimumStaffRole: "MODERATOR" }
+
+  const result = await emit(socket, "channel:join", { channelId: CHANNEL })
+  assert.equal(result.ok === false && result.code, "CHANNEL_NOT_FOUND")
+  socket.close()
+})
+
+test("a staff-only channel refuses a message even if a join somehow happened", async () => {
+  // Room membership is never treated as proof of access: createMessage calls
+  // loadViewableChannel again from scratch.
+  const { socket } = await authed()
+  await emit(socket, "game:enter", { gameId: GAME })
+  await emit(socket, "channel:join", { channelId: CHANNEL })
+  state.channel = { ...state.channel, minimumStaffRole: "ADMIN" }
+
+  const result = await emit(socket, "message:send", {
+    channelId: CHANNEL,
+    clientMessageId: "c-staff",
+    content: "should not land",
+  })
+  assert.equal(result.ok === false && result.code, "CHANNEL_NOT_FOUND")
+  assert.equal(state.messages.size, 0)
   socket.close()
 })
 

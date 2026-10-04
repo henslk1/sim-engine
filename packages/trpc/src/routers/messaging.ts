@@ -33,6 +33,9 @@ const historyCursor = z.object({ createdAt: z.coerce.date(), id: z.string() })
 // and resolveName rejects anything that normalizes to nothing.
 const channelName = z.string().min(1).max(60)
 
+// Who may see the channel at all. Absent or null means every player.
+const minimumStaffRole = z.enum(["MODERATOR", "ADMIN", "OWNER"]).nullish()
+
 export const messagingRouter = router({
   // The widget's one read for its sidebar: the game's channels, each with an
   // unread count and this player's own canPost.
@@ -95,6 +98,7 @@ export const messagingRouter = router({
           description: z.string().max(500).nullish(),
           channelType: z.enum(["TEXT", "ANNOUNCEMENT"]),
           defaultCanPost: z.boolean(),
+          minimumStaffRole,
         })
       )
       .mutation(async ({ ctx, input }) => {
@@ -103,6 +107,7 @@ export const messagingRouter = router({
           description: input.description ?? null,
           channelType: input.channelType,
           defaultCanPost: input.defaultCanPost,
+          minimumStaffRole: input.minimumStaffRole ?? null,
         })
         if (!result.ok) throw denialToTRPCError(result)
         return result.value
@@ -118,6 +123,7 @@ export const messagingRouter = router({
           description: z.string().max(500).nullish(),
           channelType: z.enum(["TEXT", "ANNOUNCEMENT"]).optional(),
           defaultCanPost: z.boolean().optional(),
+          minimumStaffRole,
         })
       )
       .mutation(async ({ ctx, input }) => {

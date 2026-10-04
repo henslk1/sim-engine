@@ -1,6 +1,7 @@
-import { db, type ChannelType } from "@sim-engine/db"
+import { db, type ChannelType, type StaffRoleType } from "@sim-engine/db"
 import type { MessagingActor } from "./actor.js"
 import { canManageChannels, evaluatePosting, type ChannelAccess } from "./permissions.js"
+import { outranksOrEquals } from "./staff.js"
 import { GLOBAL_SCOPE_KEY } from "./servers.js"
 
 // The badge stops counting here. A client renders "99+" past it, so there is no
@@ -19,6 +20,10 @@ export type ChannelSummary = {
   // them — which is exactly why the admin screen needs this field and cannot
   // infer the setting from canPost.
   defaultCanPost: boolean
+  // Null when every player can read it. The admin screen edits this; the
+  // player sidebar never sees a channel where it is set above their rank,
+  // because such channels are filtered out below.
+  minimumStaffRole: StaffRoleType | null
   isArchived: boolean
   // Capped at UNREAD_BADGE_CAP + 1. A value above the cap means "at least this
   // many", which is all the badge can show anyway.
@@ -105,15 +110,28 @@ export async function loadMessagingOverview(actor: MessagingActor): Promise<Mess
       channelType: true,
       displayOrder: true,
       defaultCanPost: true,
+      minimumStaffRole: true,
       isArchived: true,
     },
   })
-  if (channels.length === 0) return { server, channels: [], totalUnread: 0 }
+  // Staff-restricted channels leave the list for anyone who does not outrank
+  // them. Done here rather than in the query because the ladder lives in
+  // outranksOrEquals, and a Prisma `in` clause would have to restate it —
+  // two copies of the same rule is how they drift apart.
+  //
+  // This is presentation, not the guard. loadViewableChannel refuses the same
+  // channels by id, which is what stops someone opening one directly.
+  const visible = channels.filter(
+    channel =>
+      channel.minimumStaffRole === null ||
+      outranksOrEquals(actor.staffRole, channel.minimumStaffRole)
+  )
+  if (visible.length === 0) return { server, channels: [], totalUnread: 0 }
 
   const readStatuses = await db.messageReadStatus.findMany({
     where: {
       playerAccountId: actor.playerAccountId,
-      chatChannelId: { in: channels.map(channel => channel.id) },
+      chatChannelId: { in: visible.map(channel => channel.id) },
     },
     // The watermark is the read message's own createdAt, not lastReadAt.
     // lastReadAt records when the player pressed something, which is always a
@@ -126,7 +144,7 @@ export async function loadMessagingOverview(actor: MessagingActor): Promise<Mess
   )
 
   const summaries = await Promise.all(
-    channels.map(async (channel): Promise<ChannelSummary> => {
+    visible.map(async (channel): Promise<ChannelSummary> => {
       // The same evaluator the send path uses, fed from data already in hand.
       // One function decides both, so the composer cannot disagree with the
       // server about whether a message would be accepted.
@@ -137,6 +155,7 @@ export async function loadMessagingOverview(actor: MessagingActor): Promise<Mess
           channelType: channel.channelType,
           name: channel.name,
           defaultCanPost: channel.defaultCanPost,
+          minimumStaffRole: channel.minimumStaffRole,
           isArchived: channel.isArchived,
         },
         server: { id: server.id, serverType: "GLOBAL", isArchived: server.isArchived },
@@ -154,6 +173,7 @@ export async function loadMessagingOverview(actor: MessagingActor): Promise<Mess
         channelType: channel.channelType,
         displayOrder: channel.displayOrder,
         defaultCanPost: channel.defaultCanPost,
+        minimumStaffRole: channel.minimumStaffRole,
         isArchived: channel.isArchived,
         unreadCount: await countUnread(
           channel.id,

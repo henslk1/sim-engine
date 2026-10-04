@@ -153,8 +153,14 @@ model ChatChannel {
   name              String?
   description       String?
   displayOrder      Int?
-  /// False means staff post and everyone else reads.
+  /// False means staff post and everyone else reads. Applies to whoever can
+  /// see the channel at all, which minimumStaffRole decides.
   defaultCanPost    Boolean             @default(true)
+  /// Null means every player in the game can read this channel. Otherwise it is
+  /// the lowest staff rank that may see it at all — MODERATOR for a staff room,
+  /// ADMIN for an admin one. This gates *reading*; posting among those who can
+  /// read is still defaultCanPost's question, so the two stay orthogonal.
+  minimumStaffRole  StaffRoleType?
   isArchived        Boolean             @default(false)
   createdByPlayerId String?
   createdAt         DateTime            @default(now())

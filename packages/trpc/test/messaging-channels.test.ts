@@ -18,6 +18,7 @@ type ChannelRow = {
   description: string | null
   displayOrder: number | null
   defaultCanPost: boolean
+  minimumStaffRole: "OWNER" | "ADMIN" | "MODERATOR" | null
   isArchived: boolean
   server: { id: string; serverType: "GLOBAL" | "GROUP"; isArchived: boolean } | null
   directMessage: { id: string; participantLowId: string; participantHighId: string } | null
@@ -150,6 +151,7 @@ const db = {
         description: (data["description"] as string) ?? null,
         displayOrder: (data["displayOrder"] as number) ?? null,
         defaultCanPost: data["defaultCanPost"] as boolean,
+        minimumStaffRole: (data["minimumStaffRole"] as ChannelRow["minimumStaffRole"]) ?? null,
         isArchived: false,
         server: { id: SERVER, serverType: "GLOBAL", isArchived: false },
         directMessage: null,
@@ -226,6 +228,7 @@ function channel(over: Partial<ChannelRow> = {}): ChannelRow {
     description: null,
     displayOrder: 0,
     defaultCanPost: true,
+    minimumStaffRole: null,
     isArchived: false,
     server: { id: SERVER, serverType: "GLOBAL", isArchived: false },
     directMessage: null,
@@ -329,6 +332,38 @@ test("an archived channel leaves the list for a player but stays for an admin", 
 
   const asAdmin = await loadMessagingOverview(actor("ADMIN"))
   assert.deepEqual(asAdmin.channels.map(c => c.name), ["general", "announcements"])
+})
+
+test("a staff-restricted channel leaves the list for everyone below the rank", async () => {
+  state.channels = [
+    channel(),
+    channel({ id: "channel-staff", name: "staff", displayOrder: 1, minimumStaffRole: "MODERATOR" }),
+    channel({ id: "channel-admin", name: "admin", displayOrder: 2, minimumStaffRole: "ADMIN" }),
+  ]
+
+  assert.deepEqual((await loadMessagingOverview(actor())).channels.map(c => c.name), ["general"])
+  assert.deepEqual(
+    (await loadMessagingOverview(actor("MODERATOR"))).channels.map(c => c.name),
+    ["general", "staff"]
+  )
+  assert.deepEqual(
+    (await loadMessagingOverview(actor("OWNER"))).channels.map(c => c.name),
+    ["general", "staff", "admin"]
+  )
+})
+
+test("messages in a hidden channel do not reach the badge", async () => {
+  // Otherwise a player would see an unread count they could never open, and
+  // the number itself would leak that a private channel is busy.
+  state.channels = [
+    channel(),
+    channel({ id: "channel-staff", name: "staff", displayOrder: 1, minimumStaffRole: "MODERATOR" }),
+  ]
+  seed(2)
+  state.messages.push(message({ channelId: "channel-staff" }), message({ channelId: "channel-staff" }))
+
+  assert.equal((await loadMessagingOverview(actor())).totalUnread, 2)
+  assert.equal((await loadMessagingOverview(actor("MODERATOR"))).totalUnread, 4)
 })
 
 test("a read-only channel carries the composer's reason, and staff are not refused", async () => {
@@ -469,6 +504,28 @@ test("a new channel's name is normalized before it is stored", async () => {
   assert.equal(result.ok, true)
   if (!result.ok) return
   assert.equal(result.value.name, "testing-feedback")
+})
+
+test("a channel can be created restricted, and the restriction can later be cleared", async () => {
+  const created = await createChannel(actor("ADMIN"), realtime, {
+    name: "admin",
+    channelType: "TEXT",
+    defaultCanPost: true,
+    minimumStaffRole: "ADMIN",
+  })
+  assert.equal(created.ok, true)
+  if (!created.ok) return
+  assert.equal(created.value.minimumStaffRole, "ADMIN")
+
+  // null clears it; absent would have left it alone.
+  const opened = await updateChannel(actor("ADMIN"), realtime, {
+    channelId: created.value.channelId,
+    minimumStaffRole: null,
+  })
+  assert.equal(opened.ok, true)
+  if (!opened.ok) return
+  assert.equal(opened.value.minimumStaffRole, null)
+  assert.deepEqual(state.updated.at(-1)?.data, { minimumStaffRole: null })
 })
 
 test("a name with nothing left after normalizing is refused", async () => {

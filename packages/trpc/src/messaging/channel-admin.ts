@@ -1,4 +1,4 @@
-import { db, type ChannelType } from "@sim-engine/db"
+import { db, type ChannelType, type StaffRoleType } from "@sim-engine/db"
 import type { MessagingActor } from "./actor.js"
 import type { RealtimeControl } from "./realtime.js"
 import { allow, deny, type Decision } from "./result.js"
@@ -21,6 +21,7 @@ export type ChannelBroadcast = {
   channelType: ChannelType
   displayOrder: number | null
   defaultCanPost: boolean
+  minimumStaffRole: StaffRoleType | null
   isArchived: boolean
 }
 
@@ -31,6 +32,7 @@ const CHANNEL_SELECT = {
   channelType: true,
   displayOrder: true,
   defaultCanPost: true,
+  minimumStaffRole: true,
   isArchived: true,
 } as const
 
@@ -41,6 +43,7 @@ type ChannelRow = {
   channelType: ChannelType
   displayOrder: number | null
   defaultCanPost: boolean
+  minimumStaffRole: StaffRoleType | null
   isArchived: boolean
 }
 
@@ -52,6 +55,7 @@ function toBroadcast(row: ChannelRow): ChannelBroadcast {
     channelType: row.channelType,
     displayOrder: row.displayOrder,
     defaultCanPost: row.defaultCanPost,
+    minimumStaffRole: row.minimumStaffRole,
     isArchived: row.isArchived,
   }
 }
@@ -109,6 +113,7 @@ async function loadManageableChannel(
     channelType: channel.channelType,
     displayOrder: channel.displayOrder,
     defaultCanPost: channel.defaultCanPost,
+    minimumStaffRole: channel.minimumStaffRole,
     isArchived: channel.isArchived,
     serverId: channel.serverId,
   })
@@ -143,7 +148,13 @@ async function resolveName(
 export async function createChannel(
   actor: MessagingActor,
   realtime: RealtimeControl,
-  input: { name: string; description?: string | null; channelType: ChannelType; defaultCanPost: boolean }
+  input: {
+    name: string
+    description?: string | null
+    channelType: ChannelType
+    defaultCanPost: boolean
+    minimumStaffRole?: StaffRoleType | null
+  }
 ): Promise<Decision<ChannelBroadcast>> {
   const serverId = await globalServerId(actor.gameId)
   if (!serverId) {
@@ -166,6 +177,7 @@ export async function createChannel(
       description: input.description ?? null,
       channelType: input.channelType,
       defaultCanPost: input.defaultCanPost,
+      minimumStaffRole: input.minimumStaffRole ?? null,
       displayOrder,
       createdByPlayerId: actor.playerAccountId,
     },
@@ -190,6 +202,8 @@ export async function updateChannel(
     description?: string | null | undefined
     channelType?: ChannelType | undefined
     defaultCanPost?: boolean | undefined
+    // null clears the restriction; absent leaves it alone.
+    minimumStaffRole?: StaffRoleType | null | undefined
   }
 ): Promise<Decision<ChannelBroadcast>> {
   const channel = await loadManageableChannel(actor, input.channelId)
@@ -216,6 +230,11 @@ export async function updateChannel(
       // one does not have to be deleted and rebuilt.
       ...(input.channelType === undefined ? {} : { channelType: input.channelType }),
       ...(input.defaultCanPost === undefined ? {} : { defaultCanPost: input.defaultCanPost }),
+      // Narrowing this hides the channel from anyone below the new rank the
+      // moment the broadcast lands, and loadViewableChannel refuses them by id
+      // from the same instant. Sockets already sitting in the room are a
+      // separate problem — see disconnectUser at the role-change path.
+      ...(input.minimumStaffRole === undefined ? {} : { minimumStaffRole: input.minimumStaffRole }),
     },
     select: CHANNEL_SELECT,
   })

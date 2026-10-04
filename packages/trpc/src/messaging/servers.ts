@@ -42,6 +42,23 @@ const DEFAULT_CHANNELS = [
     channelType: "ANNOUNCEMENT",
     defaultCanPost: false,
   },
+  // The two restricted rooms. minimumStaffRole hides them from everyone below
+  // the rank; defaultCanPost stays true because everyone who can see a staff
+  // room is staff and should be able to talk in it.
+  {
+    name: "staff",
+    description: "Moderators and above. Not visible to players.",
+    channelType: "TEXT",
+    defaultCanPost: true,
+    minimumStaffRole: "MODERATOR",
+  },
+  {
+    name: "admin",
+    description: "Admins and owners only.",
+    channelType: "TEXT",
+    defaultCanPost: true,
+    minimumStaffRole: "ADMIN",
+  },
 ] as const
 
 // Gives a game its global chat server and starting channels.
@@ -75,6 +92,8 @@ export async function ensureGlobalChatServer(gameId: string): Promise<{ id: stri
         description: channel.description,
         channelType: channel.channelType,
         defaultCanPost: channel.defaultCanPost,
+        // Absent on the open channels, which is what null means here.
+        minimumStaffRole: "minimumStaffRole" in channel ? channel.minimumStaffRole : null,
         displayOrder: index,
       },
       update: {},

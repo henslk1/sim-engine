@@ -1,18 +1,35 @@
 import { createFileRoute } from "@tanstack/react-router"
 import { useState } from "react"
-import { ArrowDown, ArrowUp, Hash, Megaphone } from "lucide-react"
+import { ArrowDown, ArrowUp, Hash, Lock, Megaphone } from "lucide-react"
 import { trpc, type RouterOutputs } from "@/lib/trpc"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 
 type Channel = RouterOutputs["messaging"]["overview"]["channels"][number]
 type ChannelType = "TEXT" | "ANNOUNCEMENT"
+type StaffRole = "MODERATOR" | "ADMIN" | "OWNER"
+
+// The value carried in the select. "" is the everyone case, because a DOM
+// select cannot hold null.
+type Visibility = "" | StaffRole
+
+const VISIBILITY_OPTIONS: { value: Visibility; label: string }[] = [
+  { value: "", label: "Everyone" },
+  { value: "MODERATOR", label: "Staff only (moderators and up)" },
+  { value: "ADMIN", label: "Admins and owners" },
+  { value: "OWNER", label: "Owners only" },
+]
+
+function visibilityLabel(role: StaffRole | null): string {
+  return VISIBILITY_OPTIONS.find(option => option.value === (role ?? ""))?.label ?? "Everyone"
+}
 
 type ChannelForm = {
   name: string
   description: string
   channelType: ChannelType
   defaultCanPost: boolean
+  minimumStaffRole: Visibility
 }
 
 const emptyForm = (): ChannelForm => ({
@@ -20,6 +37,7 @@ const emptyForm = (): ChannelForm => ({
   description: "",
   channelType: "TEXT",
   defaultCanPost: true,
+  minimumStaffRole: "",
 })
 
 function ChatChannelsPage() {
@@ -73,6 +91,7 @@ function ChatChannelsPage() {
         description: description.length > 0 ? description : null,
         channelType: editing.channelType,
         defaultCanPost: editing.defaultCanPost,
+        minimumStaffRole: editing.minimumStaffRole === "" ? null : editing.minimumStaffRole,
       })
     } else {
       create.mutate({
@@ -81,6 +100,7 @@ function ChatChannelsPage() {
         description: description.length > 0 ? description : null,
         channelType: editing.channelType,
         defaultCanPost: editing.defaultCanPost,
+        minimumStaffRole: editing.minimumStaffRole === "" ? null : editing.minimumStaffRole,
       })
     }
   }
@@ -182,6 +202,29 @@ function ChatChannelsPage() {
                 </p>
               </div>
 
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Who can see it
+                </label>
+                <select
+                  value={editing.minimumStaffRole}
+                  onChange={e =>
+                    setEditing({ ...editing, minimumStaffRole: e.target.value as Visibility })
+                  }
+                  className="h-8 rounded-md border border-border bg-background px-2 text-sm text-foreground"
+                >
+                  {VISIBILITY_OPTIONS.map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-muted-foreground">
+                  A restricted channel is hidden from everyone below the rank — it does not appear
+                  in their list and cannot be opened directly.
+                </p>
+              </div>
+
               <label className="flex cursor-pointer items-start gap-2 text-sm text-foreground">
                 <input
                   type="checkbox"
@@ -224,6 +267,9 @@ function ChatChannelsPage() {
                     Channel
                   </th>
                   <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Visible to
+                  </th>
+                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                     Posting
                   </th>
                   <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -252,6 +298,7 @@ function ChatChannelsPage() {
                         description: channel.description ?? "",
                         channelType: channel.channelType === "ANNOUNCEMENT" ? "ANNOUNCEMENT" : "TEXT",
                         defaultCanPost: channel.defaultCanPost,
+                        minimumStaffRole: channel.minimumStaffRole ?? "",
                       })
                     }}
                     onMove={direction => move(index, direction)}
@@ -266,7 +313,7 @@ function ChatChannelsPage() {
                 ))}
                 {channels.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-3 py-6 text-center text-sm text-muted-foreground">
+                    <td colSpan={6} className="px-3 py-6 text-center text-sm text-muted-foreground">
                       No channels yet.
                     </td>
                   </tr>
@@ -308,6 +355,16 @@ function ChannelRow({
         </div>
         {channel.description && (
           <p className="mt-0.5 text-xs text-muted-foreground">{channel.description}</p>
+        )}
+      </td>
+      <td className="px-3 py-2 text-xs">
+        {channel.minimumStaffRole ? (
+          <span className="flex items-center gap-1 text-foreground">
+            <Lock className="h-3 w-3 shrink-0" />
+            {visibilityLabel(channel.minimumStaffRole)}
+          </span>
+        ) : (
+          <span className="text-muted-foreground">Everyone</span>
         )}
       </td>
       <td className="px-3 py-2 text-xs">

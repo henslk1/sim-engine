@@ -10,6 +10,7 @@ type ChannelRow = {
   channelType: "TEXT" | "ANNOUNCEMENT" | "DM"
   name: string | null
   defaultCanPost: boolean
+  minimumStaffRole: "OWNER" | "ADMIN" | "MODERATOR" | null
   isArchived: boolean
   server: { id: string; serverType: "GLOBAL" | "GROUP"; isArchived: boolean } | null
   directMessage: { id: string; participantLowId: string; participantHighId: string } | null
@@ -81,6 +82,7 @@ const globalChannel = (over: Partial<ChannelRow> = {}): ChannelRow => ({
   channelType: "TEXT",
   name: "general",
   defaultCanPost: true,
+  minimumStaffRole: null,
   isArchived: false,
   server: { id: "server-global", serverType: "GLOBAL", isArchived: false },
   directMessage: null,
@@ -92,6 +94,7 @@ const dmChannel = (over: Partial<ChannelRow> = {}): ChannelRow => ({
   gameId: GAME,
   channelType: "DM",
   name: null,
+  minimumStaffRole: null,
   defaultCanPost: true,
   isArchived: false,
   server: null,
@@ -211,6 +214,39 @@ const loadAccess = async (who = actor()) => {
   if (result.ok !== true) throw new Error("unreachable")
   return result.value
 }
+
+test("a staff-only channel is invisible to a player, in the same words as a missing one", async () => {
+  // Identical wording to a channel that does not exist, on purpose. Telling a
+  // player "you are not staff" confirms #staff exists and that the game has a
+  // staff room — a list of guessed ids would map the private channels.
+  state.channel = globalChannel({ id: "channel-staff", name: "staff", minimumStaffRole: "MODERATOR" })
+  const decision = await loadViewableChannel(actor(null), "channel-staff")
+  assert.equal(decision.ok, false)
+  if (decision.ok) return
+  assert.equal(decision.code, "CHANNEL_NOT_FOUND")
+  assert.equal(decision.message, "That conversation is not available.")
+})
+
+test("staff visibility follows the rank ladder in both directions", async () => {
+  state.channel = globalChannel({ id: "channel-admin", name: "admin", minimumStaffRole: "ADMIN" })
+
+  // A moderator does not reach an admin channel; an admin does, and so does an
+  // owner, because owner outranks admin.
+  assert.equal((await loadViewableChannel(actor("MODERATOR"), "channel-admin")).ok, false)
+  assert.equal((await loadViewableChannel(actor("ADMIN"), "channel-admin")).ok, true)
+  assert.equal((await loadViewableChannel(actor("OWNER"), "channel-admin")).ok, true)
+})
+
+test("a moderator reaches a staff room and can post in it", async () => {
+  state.channel = globalChannel({ id: "channel-staff", name: "staff", minimumStaffRole: "MODERATOR" })
+
+  const decision = await loadViewableChannel(actor("MODERATOR"), "channel-staff")
+  assert.equal(decision.ok, true)
+  if (!decision.ok) return
+  // Everyone who can see a staff room is staff, so defaultCanPost decides among
+  // them and minimumStaffRole never has to be consulted again.
+  assert.equal(evaluatePosting(actor("MODERATOR"), decision.value).ok, true)
+})
 
 test("an ordinary player cannot post to a read-only channel, but a moderator can", async () => {
   state.channel = globalChannel({ channelType: "ANNOUNCEMENT", defaultCanPost: false })

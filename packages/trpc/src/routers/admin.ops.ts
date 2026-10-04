@@ -341,6 +341,12 @@ const playersOpsRouter = router({
       await db.staffRole.create({
         data: { userId: input.userId, gameId, role: input.role },
       })
+      // A socket caches its staff role at game:enter and the 60s sweep only
+      // re-checks sessions and bans, so a role change would otherwise sit
+      // unnoticed on an open connection. Dropping it costs the user a silent
+      // reconnect, after which they re-resolve and join only the channels the
+      // new role can see. Matters most in the other direction — see removeRole.
+      ctx.realtime.disconnectUser(input.userId, `staff role assigned: ${input.role}`)
       await db.adminActionLog.create({
         data: {
           staffUserId: ctx.userId,
@@ -360,6 +366,12 @@ const playersOpsRouter = router({
     .mutation(async ({ input, ctx }) => {
       const role = await db.staffRole.findUniqueOrThrow({ where: { id: input.staffRoleId } })
       await db.staffRole.delete({ where: { id: input.staffRoleId } })
+      // The load-bearing one. Staff-restricted channels are gated on the role
+      // resolved at game:enter, so without this a demoted moderator keeps
+      // receiving #staff traffic on their existing socket until they happen to
+      // reconnect. After the commit, never before: a rolled back delete must
+      // not have kicked anyone.
+      ctx.realtime.disconnectUser(role.userId, `staff role removed: ${role.role}`)
       await db.adminActionLog.create({
         data: {
           staffUserId: ctx.userId,

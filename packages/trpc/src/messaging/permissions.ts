@@ -1,4 +1,4 @@
-import { db, type ChannelType, type ChatServerType } from "@sim-engine/db"
+import { db, type ChannelType, type ChatServerType, type StaffRoleType } from "@sim-engine/db"
 import type { MessagingActor } from "./actor.js"
 import { outranksOrEquals } from "./staff.js"
 import { ALLOWED, allow, deny, type Check, type Decision } from "./result.js"
@@ -12,6 +12,9 @@ export type ChannelAccess = {
     channelType: ChannelType
     name: string | null
     defaultCanPost: boolean
+    // Null means every player may read. Otherwise the lowest staff rank that
+    // can see the channel at all.
+    minimumStaffRole: StaffRoleType | null
     isArchived: boolean
   }
   server: { id: string; serverType: ChatServerType; isArchived: boolean } | null
@@ -38,6 +41,7 @@ export async function loadViewableChannel(
       channelType: true,
       name: true,
       defaultCanPost: true,
+      minimumStaffRole: true,
       isArchived: true,
       server: { select: { id: true, serverType: true, isArchived: true } },
       directMessage: { select: { id: true, participantLowId: true, participantHighId: true } },
@@ -57,6 +61,7 @@ export async function loadViewableChannel(
     channelType: channel.channelType,
     name: channel.name,
     defaultCanPost: channel.defaultCanPost,
+    minimumStaffRole: channel.minimumStaffRole,
     isArchived: channel.isArchived,
   }
 
@@ -80,6 +85,17 @@ export async function loadViewableChannel(
 
   if (channel.server.serverType === "GROUP") {
     return deny("GROUP_CHAT_UNAVAILABLE", "Group chat is not available yet.")
+  }
+
+  // A staff-restricted channel. Checked here rather than at post time because
+  // it governs *reading* — a staff room nobody outside staff can see.
+  //
+  // It returns the same "not available" wording as a missing channel, on
+  // purpose: a player who learned that #admin exists but is refused has been
+  // told something about how the game is run. Denying identically means a list
+  // of guessed ids reveals nothing.
+  if (channel.minimumStaffRole && !outranksOrEquals(actor.staffRole, channel.minimumStaffRole)) {
+    return hidden(`requires ${channel.minimumStaffRole}, caller holds ${actor.staffRole ?? "no role"}`)
   }
 
   // The global server: anyone holding a player account in this game may read it.
@@ -112,6 +128,11 @@ export function evaluatePosting(actor: MessagingActor, access: ChannelAccess): C
   // Posting hangs on defaultCanPost alone, not on channelType. An announcement
   // channel is simply one with defaultCanPost off — one rule that can be read
   // off a single column, rather than two that can end up disagreeing.
+  //
+  // minimumStaffRole is deliberately not consulted here. Reaching this function
+  // means loadViewableChannel already admitted the caller, so in a staff room
+  // everyone present is staff and defaultCanPost decides among them. The two
+  // fields answer different questions and never need to know about each other.
   if (access.channel.defaultCanPost) return ALLOWED
 
   return outranksOrEquals(actor.staffRole, "MODERATOR")
