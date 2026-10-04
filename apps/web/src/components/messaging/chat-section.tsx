@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Hash, Lock, Megaphone, MessageCircle, Plus, User, X } from "lucide-react"
+import { Hash, Lock, Megaphone, MessageCircle, Plus, X } from "lucide-react"
 import { trpc, type RouterOutputs } from "@/lib/trpc"
 import { useSocketEvent, type MessagingConnection } from "@/lib/messaging/socket-events"
 import { Conversation, type ConversationTarget } from "./conversation"
@@ -8,16 +8,21 @@ type Overview = RouterOutputs["messaging"]["overview"]
 type ChannelSummary = Overview["channels"][number]
 type DirectSummary = Overview["directMessages"][number]
 
-// Below this the pane shows one thing at a time: the rail stays, and opening a
-// conversation replaces the list. Above it, list and conversation sit side by
-// side the way Discord does. The widget starts at 400px and resizes to 700, so
-// both layouts are reachable without leaving the widget.
-const THREE_COLUMN_MIN_WIDTH = 560
+// Below this the pane shows one thing at a time: opening a conversation
+// replaces the list. Above it, list and conversation sit side by side the way
+// Discord does. The widget starts at 400px and resizes to 700, so both layouts
+// are reachable without leaving the widget.
+//
+// 512 rather than 560 because the destination rail moved out to the widget,
+// where it is shared with notifications and the tutorial. Those 48px went to
+// the conversation, so this pane is as wide at 512 now as it was at 560 before.
+const TWO_COLUMN_MIN_WIDTH = 512
 
-// Which rail entry is selected. Direct messages are their own destination
-// rather than a section inside a server, because they do not belong to one —
-// the same conversation exists whatever server you were last looking at.
-type Rail = { kind: "dms" } | { kind: "server"; serverId: string }
+// Which rail entry the widget has selected. Direct messages are their own
+// destination rather than a section inside a server, because they do not belong
+// to one — the same conversation exists whatever server you were last looking
+// at.
+export type ChatDestination = { kind: "dms" } | { kind: "server"; serverId: string }
 
 function channelIcon(channel: ChannelSummary) {
   if (channel.isArchived) return Lock
@@ -57,17 +62,21 @@ export function ChatSection({
   gameId,
   connection,
   width,
+  destination,
 }: {
   gameId: string
   connection: MessagingConnection
   width: number
+  destination: ChatDestination
 }) {
   const utils = trpc.useUtils()
-  // Null until the player picks, so the first render can fall back to whatever
-  // the game actually has rather than guessing before the data arrives.
-  const [rail, setRail] = useState<Rail | null>(null)
+  // One per destination rather than one shared id. Switching to the server and
+  // back lands on the conversation that was open, which is how Discord behaves
+  // — and it rules out the bug a single id invites, where a channel is still
+  // open beside a list of direct messages.
   const [openChannelId, setOpenChannelId] = useState<string | null>(null)
-  const [composing, setComposing] = useState(false)
+  const [openDirectId, setOpenDirectId] = useState<string | null>(null)
+  const [composeRequested, setComposeRequested] = useState(false)
 
   const { data: overview, isLoading } = trpc.messaging.overview.useQuery({ gameId })
 
@@ -76,190 +85,126 @@ export function ChatSection({
   useSocketEvent("channel:updated", refresh)
   useSocketEvent("channel:archived", refresh)
 
+  const onDms = destination.kind === "dms"
+  const openId = onDms ? openDirectId : openChannelId
+  const setOpenId = onDms ? setOpenDirectId : setOpenChannelId
+  // Starting a conversation is a direct-message act, so it only shows there.
+  // Switching to the server hides it without discarding it, the same way the
+  // open conversation is kept — come back and the half-typed search is still
+  // there.
+  const composing = composeRequested && onDms
+
   // A message in a conversation that is not open changes an unread count. One
   // that is open does not: the conversation marks it read, and that invalidates
   // the overview on its own. Refetching here too would make the badge flash.
   useSocketEvent<{ channelId: string }>("message:created", payload => {
-    if (payload.channelId !== openChannelId) refresh()
+    if (payload.channelId !== openId) refresh()
   })
 
   const channels = overview?.channels ?? []
   const conversations = overview?.directMessages ?? []
-  const server = overview?.server ?? null
 
-  // Channels are the shared space and where a new player has something to read,
-  // so that is the opening view. Someone with no server at all lands on DMs.
-  const activeRail: Rail = rail ?? (server ? { kind: "server", serverId: server.id } : { kind: "dms" })
-
-  const openChannel = channels.find(channel => channel.channelId === openChannelId)
-  const openConversation = conversations.find(dm => dm.channelId === openChannelId)
+  // Looked up in the list this destination owns, so an id left over from the
+  // other one cannot resolve to a target here.
+  const openChannel = onDms ? undefined : channels.find(channel => channel.channelId === openId)
+  const openConversation = onDms ? conversations.find(dm => dm.channelId === openId) : undefined
   const openTarget = openChannel
     ? channelTarget(openChannel)
     : openConversation
       ? directTarget(openConversation)
       : null
 
-  const channelUnread = channels.reduce((sum, channel) => sum + channel.unreadCount, 0)
-  const directUnread = conversations.reduce((sum, dm) => sum + dm.unreadCount, 0)
-
-  const wide = width >= THREE_COLUMN_MIN_WIDTH
+  const wide = width >= TWO_COLUMN_MIN_WIDTH
   // Narrow: the conversation takes the list's place. Wide: both are on screen,
-  // so the list never has to be dismissed to read something.
-  const showList = wide || openTarget === null
+  // so the list never has to be dismissed to read something. Composing takes
+  // the whole pane either way — picking somebody is the only thing to do.
+  const showList = !composing && (wide || openTarget === null)
 
   if (isLoading) {
     return <p className="p-3 text-xs text-muted-foreground">Loading…</p>
   }
 
-  function selectRail(next: Rail) {
-    setRail(next)
-    setComposing(false)
-    // Leaving a destination closes what was open inside it. Keeping it would
-    // show a channel while the list beside it belongs to somewhere else.
-    setOpenChannelId(null)
-  }
-
   return (
-    <div className="flex h-full min-h-0">
-      <nav className="flex w-12 shrink-0 flex-col items-center gap-1 border-r border-border bg-muted/30 py-2">
-        <RailButton
-          label="Direct messages"
-          active={activeRail.kind === "dms"}
-          unread={directUnread}
-          onClick={() => selectRail({ kind: "dms" })}
-        >
-          <MessageCircle className="h-4 w-4" />
-        </RailButton>
+    <div className="flex h-full min-h-0 flex-col">
+      {connection.status !== "online" && (
+        <p className="shrink-0 border-b border-border bg-muted/40 px-3 py-1 text-[10px] text-muted-foreground">
+          {connection.status === "connecting" ? "Connecting…" : "Reconnecting…"}
+        </p>
+      )}
 
-        {server && (
-          <>
-            <div className="my-1 h-px w-6 bg-border" />
-            <RailButton
-              label={server.name}
-              active={activeRail.kind === "server"}
-              unread={channelUnread}
-              onClick={() => selectRail({ kind: "server", serverId: server.id })}
-            >
-              {/* No server artwork exists, so the initial stands in — the same
-                  thing Discord falls back to for a server without an icon. */}
-              <span className="text-[11px] font-bold">{server.name.slice(0, 1).toUpperCase()}</span>
-            </RailButton>
-          </>
-        )}
-      </nav>
-
-      <div className="flex min-w-0 flex-1 flex-col">
-        {connection.status !== "online" && (
-          <p className="shrink-0 border-b border-border bg-muted/40 px-3 py-1 text-[10px] text-muted-foreground">
-            {connection.status === "connecting" ? "Connecting…" : "Reconnecting…"}
-          </p>
-        )}
-
-        <div className="flex min-h-0 flex-1">
-          {showList && (
-            <div
-              className={[
-                "min-h-0 overflow-y-auto p-2",
-                wide && openTarget ? "w-40 shrink-0 border-r border-border" : "flex-1",
-              ].join(" ")}
-            >
-              {composing ? null : activeRail.kind === "dms" ? (
-                <DirectList
-                  conversations={conversations}
-                  openChannelId={openChannelId}
-                  onOpen={setOpenChannelId}
-                  onCompose={() => setComposing(true)}
-                />
-              ) : (
-                <ChannelList
-                  serverName={server?.name ?? "Channels"}
-                  channels={channels}
-                  openChannelId={openChannelId}
-                  onOpen={setOpenChannelId}
-                />
-              )}
-            </div>
-          )}
-
-          <div className="min-h-0 min-w-0 flex-1">
-            {composing ? (
-              <NewConversation
-                gameId={gameId}
-                onCancel={() => setComposing(false)}
-                onOpened={channelId => {
-                  setComposing(false)
-                  setRail({ kind: "dms" })
-                  setOpenChannelId(channelId)
-                  refresh()
-                }}
+      <div className="flex min-h-0 flex-1">
+        {showList && (
+          <div
+            className={[
+              "min-h-0 overflow-y-auto p-2",
+              wide && openTarget ? "w-40 shrink-0 border-r border-border" : "flex-1",
+            ].join(" ")}
+          >
+            {onDms ? (
+              <DirectList
+                conversations={conversations}
+                openChannelId={openId}
+                onOpen={setOpenDirectId}
+                onCompose={() => setComposeRequested(true)}
               />
-            ) : openTarget && overview ? (
-              <Conversation
-                gameId={gameId}
-                target={openTarget}
-                connection={connection}
-                viewer={overview.viewer}
-                // Only reachable in the narrow layout; with the list already on
-                // screen there is nothing to go back to.
-                onBack={wide ? null : () => setOpenChannelId(null)}
+            ) : (
+              <ChannelList
+                channels={channels}
+                openChannelId={openId}
+                onOpen={setOpenChannelId}
               />
-            ) : wide ? (
-              <div className="flex h-full flex-col items-center justify-center gap-2 text-muted-foreground">
-                <MessageCircle className="h-8 w-8 opacity-30" />
-                <p className="text-xs">
-                  {activeRail.kind === "dms" ? "Pick a conversation." : "Pick a channel."}
-                </p>
-              </div>
-            ) : null}
+            )}
           </div>
+        )}
+
+        <div className="min-h-0 min-w-0 flex-1">
+          {composing ? (
+            <NewConversation
+              gameId={gameId}
+              onCancel={() => setComposeRequested(false)}
+              onOpened={channelId => {
+                setComposeRequested(false)
+                setOpenDirectId(channelId)
+                refresh()
+              }}
+            />
+          ) : openTarget && overview ? (
+            <Conversation
+              // Keyed so a different channel gets a fresh component rather than
+              // the same one told to change. Conversation clears its messages in
+              // an effect, which runs after the paint — so without this it draws
+              // one frame of the previous channel's history under the new name.
+              // Harmless between two channels; alarming when the new name is a
+              // person.
+              key={openTarget.channelId}
+              gameId={gameId}
+              target={openTarget}
+              connection={connection}
+              viewer={overview.viewer}
+              // Only reachable in the narrow layout; with the list already on
+              // screen there is nothing to go back to.
+              onBack={wide ? null : () => setOpenId(null)}
+            />
+          ) : wide ? (
+            <div className="flex h-full flex-col items-center justify-center gap-2 text-muted-foreground">
+              <MessageCircle className="h-8 w-8 opacity-30" />
+              <p className="text-xs">{onDms ? "Pick a conversation." : "Pick a channel."}</p>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
   )
 }
 
-function RailButton({
-  label,
-  active,
-  unread,
-  onClick,
-  children,
-}: {
-  label: string
-  active: boolean
-  unread: number
-  onClick: () => void
-  children: React.ReactNode
-}) {
-  return (
-    <button
-      onClick={onClick}
-      title={label}
-      aria-label={label}
-      className={[
-        "relative flex h-9 w-9 items-center justify-center rounded-xl transition-colors",
-        active
-          ? "bg-primary text-primary-foreground"
-          : "text-muted-foreground hover:bg-muted hover:text-foreground",
-      ].join(" ")}
-    >
-      {children}
-      {unread > 0 && (
-        <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-0.5 text-[9px] font-bold text-destructive-foreground">
-          {unread > 99 ? "99+" : unread}
-        </span>
-      )}
-    </button>
-  )
-}
-
+// No heading above the list: the widget's own header already names the server,
+// and there are no categories to divide the channels into. Discord puts the
+// server name in that header too, and uses the headings for its categories.
 function ChannelList({
-  serverName,
   channels,
   openChannelId,
   onOpen,
 }: {
-  serverName: string
   channels: ChannelSummary[]
   openChannelId: string | null
   onOpen: (channelId: string) => void
@@ -269,7 +214,6 @@ function ChannelList({
   }
   return (
     <>
-      <SectionHeading label={serverName} />
       {channels.map(channel => {
         const Icon = channelIcon(channel)
         return (
@@ -307,16 +251,16 @@ function DirectList({
 }) {
   return (
     <>
-      <div className="flex items-center justify-between pr-1">
-        <SectionHeading label="Direct messages" />
-        <button
-          onClick={onCompose}
-          aria-label="New message"
-          className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        >
-          <Plus className="h-3.5 w-3.5" />
-        </button>
-      </div>
+      {/* A row rather than a heading with a "+" on the end: the widget header
+          already says "Direct messages", so the only thing this strip has to
+          carry is the action. */}
+      <button
+        onClick={onCompose}
+        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+      >
+        <Plus className="h-3.5 w-3.5 shrink-0" />
+        <span className="truncate">New message</span>
+      </button>
       {conversations.length === 0 ? (
         <p className="px-1 text-[10px] text-muted-foreground">No conversations yet.</p>
       ) : (
@@ -351,14 +295,6 @@ function Avatar({ username, avatar }: { username: string; avatar: string | null 
     <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-muted text-[8px] font-semibold text-muted-foreground">
       {username.slice(0, 1).toUpperCase()}
     </span>
-  )
-}
-
-function SectionHeading({ label }: { label: string }) {
-  return (
-    <p className="truncate px-1 pb-1 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
-      {label}
-    </p>
   )
 }
 

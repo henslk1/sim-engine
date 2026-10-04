@@ -2,11 +2,16 @@ import { useState, useEffect, useRef } from "react"
 import { Bell, BookOpen, MessageCircle, X } from "lucide-react"
 import { trpc, type RouterOutputs } from "@/lib/trpc"
 import { useMessagingSocket, useSocketEvent } from "@/lib/messaging/socket-events"
-import { ChatSection } from "@/components/messaging/chat-section"
+import { ChatSection, type ChatDestination } from "@/components/messaging/chat-section"
 
 type Notification = RouterOutputs["notification"]["list"][number]
 type TutorialProgress = RouterOutputs["tutorial"]["getProgress"]
-type Section = "tutorial" | "notifications" | "chat"
+
+// One rail, one list of destinations. Servers sit below direct messages in the
+// same column as the tutorial and notifications rather than opening a second
+// rail inside the chat pane — the widget already has a sidebar, so a server is
+// another button on it.
+type Section = { kind: "tutorial" } | { kind: "notifications" } | ChatDestination
 type ResizeDir = "top" | "left" | "corner"
 
 function relativeTime(date: Date | string): string {
@@ -43,13 +48,18 @@ export function MessagingWidget() {
   const connection = useMessagingSocket(gameId)
 
   // The same query the chat section runs, so React Query serves both from one
-  // request. This one only wants the total for the badges.
+  // request. The rail needs it split by destination: one badge for direct
+  // messages, one per server. totalUnread still drives the closed bubble.
   const { data: messagingOverview } = trpc.messaging.overview.useQuery(
     { gameId: gameId! },
     { enabled: !!gameId }
   )
-  const chatUnread = messagingOverview?.totalUnread ?? 0
-  const totalUnread = notifUnread + chatUnread
+  const chatServer = messagingOverview?.server ?? null
+  const directUnread =
+    messagingOverview?.directMessages.reduce((sum, dm) => sum + dm.unreadCount, 0) ?? 0
+  const serverUnread =
+    messagingOverview?.channels.reduce((sum, channel) => sum + channel.unreadCount, 0) ?? 0
+  const totalUnread = notifUnread + (messagingOverview?.totalUnread ?? 0)
 
   const { data: tutorialData } = trpc.tutorial.getProgress.useQuery(
     { gameId: gameId! },
@@ -57,7 +67,7 @@ export function MessagingWidget() {
   )
 
   const [open, setOpen] = useState(false)
-  const [activeSection, setActiveSection] = useState<Section>("notifications")
+  const [activeSection, setActiveSection] = useState<Section>({ kind: "notifications" })
   const [pos, setPos] = useState({ x: 24, y: 24 })
   const [size, setSize] = useState({ w: 400, h: 400 })
 
@@ -69,7 +79,9 @@ export function MessagingWidget() {
   const resizeInfo = useRef({ dir: "corner" as ResizeDir, mx: 0, my: 0, w: 0, h: 0 })
 
   useEffect(() => {
-    if (tutorialCompleted && activeSection === "tutorial") setActiveSection("notifications")
+    if (tutorialCompleted && activeSection.kind === "tutorial") {
+      setActiveSection({ kind: "notifications" })
+    }
   }, [tutorialCompleted]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useSocketEvent("notification:created", () => void refetchNotifications())
@@ -123,33 +135,14 @@ export function MessagingWidget() {
     isResizing.current = false
   }
 
-  const navItems = [
-    ...(!tutorialCompleted ? [{
-      key: "tutorial" as const,
-      icon: BookOpen,
-      label: "Tutorial",
-      badge: null as number | null,
-    }] : []),
-    {
-      key: "notifications" as const,
-      icon: Bell,
-      label: "Notifications",
-      badge: notifUnread > 0 ? notifUnread : null,
-    },
-    {
-      // Present during the tutorial too. The tutorial is exactly where a tester
-      // finds things worth reporting, so #testing-feedback has to be reachable
-      // from inside it — see the [data-tutorial-messaging] exemption in
-      // lib/tutorial/access.ts and the matching one in the server's mutation
-      // guard.
-      key: "chat" as const,
-      icon: MessageCircle,
-      label: "Messages",
-      badge: chatUnread > 0 ? chatUnread : null,
-    },
-  ]
-
-  const sectionLabel = navItems.find(n => n.key === activeSection)?.label ?? ""
+  const sectionLabel =
+    activeSection.kind === "tutorial"
+      ? "Tutorial"
+      : activeSection.kind === "notifications"
+        ? "Notifications"
+        : activeSection.kind === "dms"
+          ? "Direct messages"
+          : (chatServer?.name ?? "Channels")
 
   return (
     <div data-tutorial-messaging className="fixed z-50" style={{ right: pos.x, bottom: pos.y }}>
@@ -179,27 +172,60 @@ export function MessagingWidget() {
           />
 
           {/* Icon rail */}
-          <div className="flex w-14 shrink-0 flex-col items-center gap-1 border-r border-border bg-muted/40 py-3">
-            {navItems.map(({ key, icon: Icon, label, badge }) => (
-              <button
-                key={key}
-                title={label}
-                onClick={() => setActiveSection(key)}
-                className={[
-                  "relative flex h-10 w-10 items-center justify-center rounded-xl transition-colors",
-                  activeSection === key
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                ].join(" ")}
+          <div className="flex w-14 shrink-0 flex-col items-center gap-1 overflow-y-auto border-r border-border bg-muted/40 py-3">
+            {!tutorialCompleted && (
+              <RailButton
+                label="Tutorial"
+                active={activeSection.kind === "tutorial"}
+                unread={0}
+                onClick={() => setActiveSection({ kind: "tutorial" })}
               >
-                <Icon className="h-5 w-5" />
-                {badge !== null && (
-                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-0.5 text-[9px] font-bold text-destructive-foreground">
-                    {badge > 99 ? "99+" : badge}
+                <BookOpen className="h-5 w-5" />
+              </RailButton>
+            )}
+
+            <RailButton
+              label="Notifications"
+              active={activeSection.kind === "notifications"}
+              unread={notifUnread}
+              onClick={() => setActiveSection({ kind: "notifications" })}
+            >
+              <Bell className="h-5 w-5" />
+            </RailButton>
+
+            {/* Present during the tutorial too. The tutorial is exactly where a
+                tester finds things worth reporting, so #testing-feedback has to
+                be reachable from inside it — see the [data-tutorial-messaging]
+                exemption in lib/tutorial/access.ts and the matching one in the
+                server's mutation guard. */}
+            <RailButton
+              label="Direct messages"
+              active={activeSection.kind === "dms"}
+              unread={directUnread}
+              onClick={() => setActiveSection({ kind: "dms" })}
+            >
+              <MessageCircle className="h-5 w-5" />
+            </RailButton>
+
+            {/* Servers below, after a divider — the same shape Discord uses,
+                and what makes a second game's server cheap: one more button. */}
+            {chatServer && (
+              <>
+                <div className="my-1 h-px w-7 shrink-0 rounded-full bg-border" />
+                <RailButton
+                  label={chatServer.name}
+                  active={activeSection.kind === "server"}
+                  unread={serverUnread}
+                  onClick={() => setActiveSection({ kind: "server", serverId: chatServer.id })}
+                >
+                  {/* No server artwork exists, so the initial stands in — what
+                      Discord falls back to for a server without an icon. */}
+                  <span className="text-xs font-bold">
+                    {chatServer.name.slice(0, 1).toUpperCase()}
                   </span>
-                )}
-              </button>
-            ))}
+                </RailButton>
+              </>
+            )}
           </div>
 
           {/* Content pane */}
@@ -216,19 +242,28 @@ export function MessagingWidget() {
 
             {/* The chat section scrolls its own history and pins its composer,
                 so it gets the bare pane. The other two are plain lists. */}
-            <div className={activeSection === "chat" ? "min-h-0 flex-1" : "min-h-0 flex-1 overflow-y-auto p-3"}>
-              {activeSection === "tutorial" && (
-                <TutorialContent data={tutorialData} />
-              )}
-              {activeSection === "notifications" && gameId && (
+            <div
+              className={
+                isChat(activeSection)
+                  ? "min-h-0 flex-1"
+                  : "min-h-0 flex-1 overflow-y-auto p-3"
+              }
+            >
+              {activeSection.kind === "tutorial" && <TutorialContent data={tutorialData} />}
+              {activeSection.kind === "notifications" && gameId && (
                 <NotificationsContent
                   notifications={notifications}
                   gameId={gameId}
                   onRefresh={() => void refetchNotifications()}
                 />
               )}
-              {activeSection === "chat" && gameId && (
-                <ChatSection gameId={gameId} connection={connection} width={size.w} />
+              {isChat(activeSection) && gameId && (
+                <ChatSection
+                  gameId={gameId}
+                  connection={connection}
+                  width={size.w}
+                  destination={activeSection}
+                />
               )}
             </div>
           </div>
@@ -251,6 +286,48 @@ export function MessagingWidget() {
         )}
       </button>
     </div>
+  )
+}
+
+// Both chat destinations render the same pane, so the content area asks this
+// rather than listing them twice — and it narrows, so `destination` below is
+// known to be one of them.
+function isChat(section: Section): section is ChatDestination {
+  return section.kind === "dms" || section.kind === "server"
+}
+
+function RailButton({
+  label,
+  active,
+  unread,
+  onClick,
+  children,
+}: {
+  label: string
+  active: boolean
+  unread: number
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      title={label}
+      aria-label={label}
+      onClick={onClick}
+      className={[
+        "relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors",
+        active
+          ? "bg-primary text-primary-foreground"
+          : "text-muted-foreground hover:bg-muted hover:text-foreground",
+      ].join(" ")}
+    >
+      {children}
+      {unread > 0 && (
+        <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-0.5 text-[9px] font-bold text-destructive-foreground">
+          {unread > 99 ? "99+" : unread}
+        </span>
+      )}
+    </button>
   )
 }
 
