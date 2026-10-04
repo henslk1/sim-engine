@@ -13,6 +13,12 @@ export type ChannelSummary = {
   description: string | null
   channelType: ChannelType
   displayOrder: number | null
+  // The channel's configured posting rule, as distinct from canPost below:
+  // this one is the same for everybody, that one is this caller's answer. Staff
+  // can post in a channel whose defaultCanPost is false, so the two disagree for
+  // them — which is exactly why the admin screen needs this field and cannot
+  // infer the setting from canPost.
+  defaultCanPost: boolean
   isArchived: boolean
   // Capped at UNREAD_BADGE_CAP + 1. A value above the cap means "at least this
   // many", which is all the badge can show anyway.
@@ -147,6 +153,7 @@ export async function loadMessagingOverview(actor: MessagingActor): Promise<Mess
         description: channel.description,
         channelType: channel.channelType,
         displayOrder: channel.displayOrder,
+        defaultCanPost: channel.defaultCanPost,
         isArchived: channel.isArchived,
         unreadCount: await countUnread(
           channel.id,

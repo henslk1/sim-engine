@@ -116,6 +116,7 @@ export const messagingRouter = router({
           // it" — which is why it is nullish here and not merely optional.
           name: channelName.optional(),
           description: z.string().max(500).nullish(),
+          channelType: z.enum(["TEXT", "ANNOUNCEMENT"]).optional(),
           defaultCanPost: z.boolean().optional(),
         })
       )

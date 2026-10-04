@@ -188,6 +188,7 @@ export async function updateChannel(
     channelId: string
     name?: string | undefined
     description?: string | null | undefined
+    channelType?: ChannelType | undefined
     defaultCanPost?: boolean | undefined
   }
 ): Promise<Decision<ChannelBroadcast>> {
@@ -210,6 +211,10 @@ export async function updateChannel(
     data: {
       ...(name === undefined ? {} : { name }),
       ...(input.description === undefined ? {} : { description: input.description }),
+      // Changing the type is cosmetic — posting hangs on defaultCanPost alone,
+      // so this only moves the icon. Editable so a channel created as the wrong
+      // one does not have to be deleted and rebuilt.
+      ...(input.channelType === undefined ? {} : { channelType: input.channelType }),
       ...(input.defaultCanPost === undefined ? {} : { defaultCanPost: input.defaultCanPost }),
     },
     select: CHANNEL_SELECT,

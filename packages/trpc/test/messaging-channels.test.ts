@@ -343,6 +343,16 @@ test("a read-only channel carries the composer's reason, and staff are not refus
   assert.equal(asModerator.channels[0]?.cannotPostReason, null)
 })
 
+test("the summary carries the channel's own posting rule, not the caller's answer", async () => {
+  // Staff can post in a read-only channel, so canPost and defaultCanPost
+  // disagree for them. The admin screen configures the setting, so it needs the
+  // setting — inferring it from canPost would show an owner the wrong state.
+  state.channels = [channel({ channelType: "ANNOUNCEMENT", defaultCanPost: false })]
+  const asOwner = await loadMessagingOverview(actor("OWNER"))
+  assert.equal(asOwner.channels[0]?.defaultCanPost, false)
+  assert.equal(asOwner.channels[0]?.canPost, true)
+})
+
 test("an archived channel refuses posting even to an owner", async () => {
   state.channels = [channel({ isArchived: true })]
   const overview = await loadMessagingOverview(actor("OWNER"))
@@ -509,6 +519,19 @@ test("an update leaves out what it was not asked to change", async () => {
   assert.equal(result.value.description, "Everything else.")
   // Only the field that was sent reaches the database.
   assert.deepEqual(state.updated[0]?.data, { defaultCanPost: false })
+})
+
+test("a channel's type can be changed without touching anything else", async () => {
+  const result = await updateChannel(actor("ADMIN"), realtime, {
+    channelId: GENERAL,
+    channelType: "ANNOUNCEMENT",
+  })
+  assert.equal(result.ok, true)
+  if (!result.ok) return
+  assert.equal(result.value.channelType, "ANNOUNCEMENT")
+  // Type is cosmetic: posting still hangs on defaultCanPost alone.
+  assert.equal(result.value.defaultCanPost, true)
+  assert.deepEqual(state.updated[0]?.data, { channelType: "ANNOUNCEMENT" })
 })
 
 test("renaming a channel to its own name is not a clash", async () => {

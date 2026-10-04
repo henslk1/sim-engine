@@ -10,7 +10,7 @@ import {
   Pill, FileCheck, Dumbbell, Gauge, Star, Award, Layers, MapPin,
   CalendarDays, BookOpen, CircleDollarSign, Package, ShoppingCart,
   ShoppingBag, Crown, Bell, Filter, ChevronDown, ChevronRight, ArrowLeft, Gift,
-  Stethoscope, Swords, Plus, Settings, Gamepad2, Loader2, CircleDot,
+  Stethoscope, Swords, Plus, Settings, Gamepad2, Loader2, CircleDot, Hash,
 } from "lucide-react"
 
 type NavLink = { to: string; label: string; icon: React.ComponentType<{ className?: string }>; badge?: number }
@@ -108,6 +108,7 @@ function makeConfigGroups(gameId: string): NavGroupDef[] {
       label: "World",
       links: [
         { to: `/admin/games/${gameId}/notification-topics`, label: "Notification Topics", icon: Bell },
+        { to: `/admin/games/${gameId}/chat-channels`, label: "Chat Channels", icon: Hash },
         { to: `/admin/games/${gameId}/directory-filters`, label: "Directory Filters", icon: Filter },
         { to: `/admin/games/${gameId}/tutorial-steps`, label: "Tutorial Steps", icon: BookOpen },
       ],

@@ -103,6 +103,7 @@ import { Route as AuthenticatedAdminGamesGameIdCurrenciesRouteImport } from './r
 import { Route as AuthenticatedAdminGamesGameIdConformationSectionsRouteImport } from './routes/_authenticated/admin/games.$gameId.conformation-sections'
 import { Route as AuthenticatedAdminGamesGameIdConfigRouteImport } from './routes/_authenticated/admin/games.$gameId.config'
 import { Route as AuthenticatedAdminGamesGameIdCompetitionTiersRouteImport } from './routes/_authenticated/admin/games.$gameId.competition-tiers'
+import { Route as AuthenticatedAdminGamesGameIdChatChannelsRouteImport } from './routes/_authenticated/admin/games.$gameId.chat-channels'
 import { Route as AuthenticatedAdminGamesGameIdCareActionsRouteImport } from './routes/_authenticated/admin/games.$gameId.care-actions'
 import { Route as AuthenticatedAdminGamesGameIdBreedsRouteImport } from './routes/_authenticated/admin/games.$gameId.breeds'
 import { Route as AuthenticatedAdminGamesGameIdAnimalTemplatesRouteImport } from './routes/_authenticated/admin/games.$gameId.animal-templates'
@@ -647,6 +648,12 @@ const AuthenticatedAdminGamesGameIdCompetitionTiersRoute =
     path: '/competition-tiers',
     getParentRoute: () => AuthenticatedAdminGamesGameIdRoute,
   } as any)
+const AuthenticatedAdminGamesGameIdChatChannelsRoute =
+  AuthenticatedAdminGamesGameIdChatChannelsRouteImport.update({
+    id: '/chat-channels',
+    path: '/chat-channels',
+    getParentRoute: () => AuthenticatedAdminGamesGameIdRoute,
+  } as any)
 const AuthenticatedAdminGamesGameIdCareActionsRoute =
   AuthenticatedAdminGamesGameIdCareActionsRouteImport.update({
     id: '/care-actions',
@@ -727,6 +734,7 @@ export interface FileRoutesByFullPath {
   '/admin/games/$gameId/animal-templates': typeof AuthenticatedAdminGamesGameIdAnimalTemplatesRoute
   '/admin/games/$gameId/breeds': typeof AuthenticatedAdminGamesGameIdBreedsRoute
   '/admin/games/$gameId/care-actions': typeof AuthenticatedAdminGamesGameIdCareActionsRoute
+  '/admin/games/$gameId/chat-channels': typeof AuthenticatedAdminGamesGameIdChatChannelsRoute
   '/admin/games/$gameId/competition-tiers': typeof AuthenticatedAdminGamesGameIdCompetitionTiersRoute
   '/admin/games/$gameId/config': typeof AuthenticatedAdminGamesGameIdConfigRoute
   '/admin/games/$gameId/conformation-sections': typeof AuthenticatedAdminGamesGameIdConformationSectionsRoute
@@ -820,6 +828,7 @@ export interface FileRoutesByTo {
   '/admin/games/$gameId/animal-templates': typeof AuthenticatedAdminGamesGameIdAnimalTemplatesRoute
   '/admin/games/$gameId/breeds': typeof AuthenticatedAdminGamesGameIdBreedsRoute
   '/admin/games/$gameId/care-actions': typeof AuthenticatedAdminGamesGameIdCareActionsRoute
+  '/admin/games/$gameId/chat-channels': typeof AuthenticatedAdminGamesGameIdChatChannelsRoute
   '/admin/games/$gameId/competition-tiers': typeof AuthenticatedAdminGamesGameIdCompetitionTiersRoute
   '/admin/games/$gameId/config': typeof AuthenticatedAdminGamesGameIdConfigRoute
   '/admin/games/$gameId/conformation-sections': typeof AuthenticatedAdminGamesGameIdConformationSectionsRoute
@@ -920,6 +929,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/games/$gameId/animal-templates': typeof AuthenticatedAdminGamesGameIdAnimalTemplatesRoute
   '/_authenticated/admin/games/$gameId/breeds': typeof AuthenticatedAdminGamesGameIdBreedsRoute
   '/_authenticated/admin/games/$gameId/care-actions': typeof AuthenticatedAdminGamesGameIdCareActionsRoute
+  '/_authenticated/admin/games/$gameId/chat-channels': typeof AuthenticatedAdminGamesGameIdChatChannelsRoute
   '/_authenticated/admin/games/$gameId/competition-tiers': typeof AuthenticatedAdminGamesGameIdCompetitionTiersRoute
   '/_authenticated/admin/games/$gameId/config': typeof AuthenticatedAdminGamesGameIdConfigRoute
   '/_authenticated/admin/games/$gameId/conformation-sections': typeof AuthenticatedAdminGamesGameIdConformationSectionsRoute
@@ -1020,6 +1030,7 @@ export interface FileRouteTypes {
     | '/admin/games/$gameId/animal-templates'
     | '/admin/games/$gameId/breeds'
     | '/admin/games/$gameId/care-actions'
+    | '/admin/games/$gameId/chat-channels'
     | '/admin/games/$gameId/competition-tiers'
     | '/admin/games/$gameId/config'
     | '/admin/games/$gameId/conformation-sections'
@@ -1113,6 +1124,7 @@ export interface FileRouteTypes {
     | '/admin/games/$gameId/animal-templates'
     | '/admin/games/$gameId/breeds'
     | '/admin/games/$gameId/care-actions'
+    | '/admin/games/$gameId/chat-channels'
     | '/admin/games/$gameId/competition-tiers'
     | '/admin/games/$gameId/config'
     | '/admin/games/$gameId/conformation-sections'
@@ -1212,6 +1224,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/games/$gameId/animal-templates'
     | '/_authenticated/admin/games/$gameId/breeds'
     | '/_authenticated/admin/games/$gameId/care-actions'
+    | '/_authenticated/admin/games/$gameId/chat-channels'
     | '/_authenticated/admin/games/$gameId/competition-tiers'
     | '/_authenticated/admin/games/$gameId/config'
     | '/_authenticated/admin/games/$gameId/conformation-sections'
@@ -1920,6 +1933,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminGamesGameIdCompetitionTiersRouteImport
       parentRoute: typeof AuthenticatedAdminGamesGameIdRoute
     }
+    '/_authenticated/admin/games/$gameId/chat-channels': {
+      id: '/_authenticated/admin/games/$gameId/chat-channels'
+      path: '/chat-channels'
+      fullPath: '/admin/games/$gameId/chat-channels'
+      preLoaderRoute: typeof AuthenticatedAdminGamesGameIdChatChannelsRouteImport
+      parentRoute: typeof AuthenticatedAdminGamesGameIdRoute
+    }
     '/_authenticated/admin/games/$gameId/care-actions': {
       id: '/_authenticated/admin/games/$gameId/care-actions'
       path: '/care-actions'
@@ -1997,6 +2017,7 @@ interface AuthenticatedAdminGamesGameIdRouteChildren {
   AuthenticatedAdminGamesGameIdAnimalTemplatesRoute: typeof AuthenticatedAdminGamesGameIdAnimalTemplatesRoute
   AuthenticatedAdminGamesGameIdBreedsRoute: typeof AuthenticatedAdminGamesGameIdBreedsRoute
   AuthenticatedAdminGamesGameIdCareActionsRoute: typeof AuthenticatedAdminGamesGameIdCareActionsRoute
+  AuthenticatedAdminGamesGameIdChatChannelsRoute: typeof AuthenticatedAdminGamesGameIdChatChannelsRoute
   AuthenticatedAdminGamesGameIdCompetitionTiersRoute: typeof AuthenticatedAdminGamesGameIdCompetitionTiersRoute
   AuthenticatedAdminGamesGameIdConfigRoute: typeof AuthenticatedAdminGamesGameIdConfigRoute
   AuthenticatedAdminGamesGameIdConformationSectionsRoute: typeof AuthenticatedAdminGamesGameIdConformationSectionsRoute
@@ -2043,6 +2064,8 @@ const AuthenticatedAdminGamesGameIdRouteChildren: AuthenticatedAdminGamesGameIdR
       AuthenticatedAdminGamesGameIdBreedsRoute,
     AuthenticatedAdminGamesGameIdCareActionsRoute:
       AuthenticatedAdminGamesGameIdCareActionsRoute,
+    AuthenticatedAdminGamesGameIdChatChannelsRoute:
+      AuthenticatedAdminGamesGameIdChatChannelsRoute,
     AuthenticatedAdminGamesGameIdCompetitionTiersRoute:
       AuthenticatedAdminGamesGameIdCompetitionTiersRoute,
     AuthenticatedAdminGamesGameIdConfigRoute:
