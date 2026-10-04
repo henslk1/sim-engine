@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
-import { ArrowLeft, Hash, Lock, Megaphone, Pencil, Trash2 } from "lucide-react"
+import { ArrowLeft, Hash, Lock, Megaphone, Pencil, Trash2, User } from "lucide-react"
 import { trpc, type RouterOutputs } from "@/lib/trpc"
 import {
   joinChannel,
@@ -11,8 +11,23 @@ import {
   type MessagingConnection,
 } from "@/lib/messaging/socket-events"
 
-type ChannelSummary = RouterOutputs["messaging"]["overview"]["channels"][number]
 type Viewer = RouterOutputs["messaging"]["overview"]["viewer"]
+
+// What the pane needs to draw a conversation, whichever kind it is. A channel
+// and a DM differ in almost everything the sidebar cares about and in almost
+// nothing this pane does — so they are flattened here rather than branched on
+// throughout. `isDirect` survives only because the two are addressed
+// differently in copy: you message #general, but you message Annie.
+export type ConversationTarget = {
+  channelId: string
+  title: string
+  isDirect: boolean
+  isAnnouncement: boolean
+  description: string | null
+  isArchived: boolean
+  canPost: boolean
+  cannotPostReason: string | null
+}
 type HistoryCursor = { createdAt: Date; id: string }
 
 // Messages from the same person inside this window share one header, the way
@@ -170,20 +185,21 @@ function timeLabel(iso: string): string {
   return new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
 }
 
-function channelIcon(channel: ChannelSummary) {
-  if (channel.isArchived) return Lock
-  return channel.channelType === "ANNOUNCEMENT" ? Megaphone : Hash
+function targetIcon(target: ConversationTarget) {
+  if (target.isDirect) return User
+  if (target.isArchived) return Lock
+  return target.isAnnouncement ? Megaphone : Hash
 }
 
 export function Conversation({
   gameId,
-  channel,
+  target,
   connection,
   viewer,
   onBack,
 }: {
   gameId: string
-  channel: ChannelSummary
+  target: ConversationTarget
   connection: MessagingConnection
   viewer: Viewer
   onBack: () => void
@@ -225,7 +241,7 @@ export function Conversation({
   const markReadTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastMarked = useRef<string | null>(null)
 
-  const channelId = channel.channelId
+  const channelId = target.channelId
 
   // Open the conversation: take the channel room so live messages arrive, then
   // load the newest page.
@@ -372,13 +388,13 @@ export function Conversation({
     )
   }
 
-  const Icon = channelIcon(channel)
+  const Icon = targetIcon(target)
   const offline = connection.status !== "online"
   const composerMessage = offline
     ? connection.status === "connecting"
       ? "Connecting…"
       : "Reconnecting…"
-    : channel.cannotPostReason
+    : target.cannotPostReason
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -391,10 +407,10 @@ export function Conversation({
           <ArrowLeft className="h-3.5 w-3.5" />
         </button>
         <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-        <span className="truncate text-xs font-semibold text-foreground">{channel.name}</span>
-        {channel.description && (
+        <span className="truncate text-xs font-semibold text-foreground">{target.title}</span>
+        {target.description && (
           <span className="hidden truncate text-[10px] text-muted-foreground sm:inline">
-            {channel.description}
+            {target.description}
           </span>
         )}
       </div>
@@ -413,7 +429,9 @@ export function Conversation({
             )}
             {!loadingOlder && cursor === null && (
               <p className="py-2 text-center text-[10px] text-muted-foreground">
-                The beginning of #{channel.name}
+                {target.isDirect
+                  ? `The beginning of your conversation with ${target.title}`
+                  : `The beginning of #${target.title}`}
               </p>
             )}
             {messages.map((message, index) => {
@@ -455,7 +473,7 @@ export function Conversation({
                         the session and decide again. */}
                     {message.removedBy === null && message.pending !== true && (
                       <MessageActions
-                        canEdit={message.authorPlayerId === viewer.playerAccountId && channel.canPost}
+                        canEdit={message.authorPlayerId === viewer.playerAccountId && target.canPost}
                         canDelete={
                           message.authorPlayerId === viewer.playerAccountId ||
                           viewer.staffRole !== null
@@ -533,7 +551,7 @@ export function Conversation({
             {(edit.error ?? remove.error)?.message}
           </p>
         )}
-        {channel.canPost && !offline ? (
+        {target.canPost && !offline ? (
           <textarea
             value={draft}
             onChange={event => setDraft(event.target.value)}
@@ -547,7 +565,7 @@ export function Conversation({
               }
             }}
             rows={1}
-            placeholder={`Message #${channel.name}`}
+            placeholder={target.isDirect ? `Message ${target.title}` : `Message #${target.title}`}
             className="max-h-24 w-full resize-none rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground outline-none placeholder:text-muted-foreground focus:border-primary"
           />
         ) : (

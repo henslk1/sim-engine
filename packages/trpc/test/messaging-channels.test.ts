@@ -59,6 +59,9 @@ const state = {
   logged: [] as string[],
   created: [] as Record<string, unknown>[],
   updated: [] as { id: string; data: Record<string, unknown> }[],
+  conversations: [] as Record<string, unknown>[],
+  blocks: [] as Record<string, unknown>[],
+  candidates: [] as Record<string, unknown>[],
 }
 
 // --- a very small slice of Prisma's query language -------------------------
@@ -79,7 +82,16 @@ function matchesField(value: unknown, condition: unknown): boolean {
       else if (op === "gt" && !((left as number) > (right as number))) return false
       else if (op === "lt" && !((left as number) < (right as number))) return false
       else if (op === "in" && !(operand as unknown[]).includes(value)) return false
-      else if (!["not", "gt", "lt", "in"].includes(op)) throw new Error(`unsupported operator: ${op}`)
+      else if (op === "notIn" && (operand as unknown[]).includes(value)) return false
+      else if (op === "contains") {
+        // Only the insensitive form is used, which is why `mode` is accepted
+        // and ignored rather than silently changing the comparison.
+        if (!String(value).toLowerCase().includes(String(operand).toLowerCase())) return false
+      }
+      else if (op === "mode") continue
+      else if (!["not", "gt", "lt", "in", "notIn", "contains", "mode"].includes(op)) {
+        throw new Error(`unsupported operator: ${op}`)
+      }
     }
     return true
   }
@@ -178,7 +190,20 @@ const db = {
     findUnique: async ({ where }: { where: { id: string } }) =>
       state.messages.find(message => message.id === where.id) ?? null,
   },
-  blockedPlayer: { count: async () => 0 },
+  blockedPlayer: {
+    count: async () => 0,
+    findMany: async (args: { where?: Where } = {}) => query(state.blocks, args),
+  },
+  directMessage: {
+    findMany: async (args: { where?: Where; orderBy?: unknown; take?: number } = {}) =>
+      query(state.conversations, args),
+  },
+  // Applies `where`, so the self-exclusion and block-exclusion the search
+  // relies on are really being tested rather than assumed.
+  playerAccount: {
+    findMany: async (args: { where?: Where; orderBy?: unknown; take?: number } = {}) =>
+      query(state.candidates, args),
+  },
   adminActionLog: {
     create: async ({ data }: { data: { action: string } }) => {
       state.logged.push(data.action)
@@ -195,6 +220,9 @@ const db = {
 Object.assign(globalThis, { prisma: db })
 
 const { loadMessagingOverview, UNREAD_BADGE_CAP } = await import("../src/messaging/channels.ts")
+const { listDirectConversations, findDirectMessageCandidates } = await import(
+  "../src/messaging/conversations.ts"
+)
 const { loadHistory } = await import("../src/messaging/messages.ts")
 const { createChannel, updateChannel, setChannelArchived, reorderChannels } = await import(
   "../src/messaging/channel-admin.ts"
@@ -269,6 +297,9 @@ beforeEach(() => {
   state.logged = []
   state.created = []
   state.updated = []
+  state.conversations = []
+  state.blocks = []
+  state.candidates = []
   nextMessage = 0
 })
 
@@ -428,6 +459,7 @@ test("a game with no chat server returns an empty list rather than failing", asy
   assert.deepEqual(overview, {
     server: null,
     channels: [],
+    directMessages: [],
     totalUnread: 0,
     viewer: { playerAccountId: ME, staffRole: null },
   })
@@ -714,4 +746,136 @@ test("a reorder that changes nothing writes nothing", async () => {
   assert.deepEqual(state.updated, [])
   assert.deepEqual(state.emitted, [])
   assert.deepEqual(state.logged, [])
+})
+
+// --- direct messages -------------------------------------------------------
+
+const OTHER = "player-other"
+
+function conversation(over: Record<string, unknown> = {}) {
+  return {
+    id: "dm-1",
+    chatChannelId: "channel-dm-1",
+    gameId: GAME,
+    participantLowId: ME,
+    participantHighId: THEM,
+    lastActivityAt: new Date(Date.UTC(2026, 9, 4, 12, 0)),
+    participantLow: { id: ME, username: "me", avatar: null },
+    participantHigh: { id: THEM, username: "them", avatar: null },
+    ...over,
+  }
+}
+
+// countUnread is injected into listDirectConversations, so these tests supply
+// their own rather than reaching through the overview.
+const noUnread = async () => 0
+
+test("the other participant is whichever column is not you", async () => {
+  // Participants are stored sorted by id, not as sender and recipient, so the
+  // conversation has to work out which end the caller is on.
+  state.conversations = [
+    conversation({ id: "dm-low", chatChannelId: "c1", participantLowId: ME, participantHighId: THEM }),
+    conversation({
+      id: "dm-high",
+      chatChannelId: "c2",
+      participantLowId: OTHER,
+      participantHighId: ME,
+      participantLow: { id: OTHER, username: "other", avatar: null },
+      participantHigh: { id: ME, username: "me", avatar: null },
+      lastActivityAt: new Date(Date.UTC(2026, 9, 4, 11, 0)),
+    }),
+  ]
+
+  const list = await listDirectConversations(actor(), noUnread)
+  assert.deepEqual(list.map(c => c.participant.username), ["them", "other"])
+})
+
+test("conversations are ordered by most recent activity", async () => {
+  state.conversations = [
+    conversation({ id: "old", chatChannelId: "c1", lastActivityAt: new Date(Date.UTC(2026, 9, 1)) }),
+    conversation({ id: "new", chatChannelId: "c2", lastActivityAt: new Date(Date.UTC(2026, 9, 4)) }),
+  ]
+  const list = await listDirectConversations(actor(), noUnread)
+  assert.deepEqual(list.map(c => c.directMessageId), ["new", "old"])
+})
+
+test("a block in either direction closes the composer without naming the blocker", async () => {
+  state.conversations = [conversation()]
+
+  // They blocked me.
+  state.blocks = [{ gameId: GAME, blockerPlayerId: THEM, blockedPlayerId: ME }]
+  const theyBlocked = await listDirectConversations(actor(), noUnread)
+  assert.equal(theyBlocked[0]?.canPost, false)
+  assert.equal(theyBlocked[0]?.cannotPostReason, "You can't reply to this conversation")
+
+  // I blocked them — same answer, same words.
+  state.blocks = [{ gameId: GAME, blockerPlayerId: ME, blockedPlayerId: THEM }]
+  const iBlocked = await listDirectConversations(actor(), noUnread)
+  assert.equal(iBlocked[0]?.canPost, false)
+  assert.equal(iBlocked[0]?.cannotPostReason, "You can't reply to this conversation")
+
+  // The conversation stays in the list either way: a block stops new messages,
+  // it does not hide the history.
+  assert.equal(iBlocked.length, 1)
+})
+
+test("an unblocked conversation can be replied to", async () => {
+  state.conversations = [conversation()]
+  state.blocks = []
+  const list = await listDirectConversations(actor(), noUnread)
+  assert.equal(list[0]?.canPost, true)
+  assert.equal(list[0]?.cannotPostReason, null)
+})
+
+test("the player search excludes you and the people you blocked", async () => {
+  state.candidates = [
+    { id: ME, gameId: GAME, username: "mesmerising", avatar: null },
+    { id: THEM, gameId: GAME, username: "message-friend", avatar: null },
+    { id: OTHER, gameId: GAME, username: "messenger", avatar: null },
+  ]
+  // I blocked OTHER. Hiding them is tidiness — it was my own decision, so it
+  // discloses nothing.
+  state.blocks = [{ gameId: GAME, blockerPlayerId: ME, blockedPlayerId: OTHER }]
+
+  const found = await findDirectMessageCandidates(actor(), "mes")
+  assert.deepEqual(found.map(p => p.username), ["message-friend"])
+})
+
+test("the player search still lists someone who blocked you", async () => {
+  // Removing them would make the block visible by absence. They stay in the
+  // results and canOpenDirectMessage refuses with wording that cannot be told
+  // apart from "no such player".
+  state.candidates = [{ id: THEM, gameId: GAME, username: "them", avatar: null }]
+  state.blocks = [{ gameId: GAME, blockerPlayerId: THEM, blockedPlayerId: ME }]
+
+  const found = await findDirectMessageCandidates(actor(), "the")
+  assert.deepEqual(found.map(p => p.username), ["them"])
+})
+
+test("an empty search term matches nobody rather than everybody", async () => {
+  state.candidates = [{ id: THEM, gameId: GAME, username: "them", avatar: null }]
+  assert.deepEqual(await findDirectMessageCandidates(actor(), "   "), [])
+})
+
+test("direct message unread counts reach the badge total", async () => {
+  state.channels = [channel()]
+  seed(2)
+  state.conversations = [conversation()]
+
+  const overview = await loadMessagingOverview(actor())
+  assert.equal(overview.directMessages.length, 1)
+  // Two in #general, none in the conversation (it holds no messages here).
+  assert.equal(overview.totalUnread, 2)
+})
+
+test("conversations survive a game whose chat server was never provisioned", async () => {
+  // Loaded before the early returns, because losing someone's DMs to a missing
+  // server would be a bug nobody would think to look for.
+  state.server = null
+  state.conversations = [conversation()]
+
+  const overview = await loadMessagingOverview(actor())
+  assert.equal(overview.server, null)
+  assert.deepEqual(overview.channels, [])
+  assert.equal(overview.directMessages.length, 1)
 })

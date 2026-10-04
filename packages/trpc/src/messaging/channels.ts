@@ -2,6 +2,7 @@ import { db, type ChannelType, type StaffRoleType } from "@sim-engine/db"
 import type { MessagingActor } from "./actor.js"
 import { canManageChannels, evaluatePosting, type ChannelAccess } from "./permissions.js"
 import { outranksOrEquals } from "./staff.js"
+import { listDirectConversations, type DirectConversationSummary } from "./conversations.js"
 import { GLOBAL_SCOPE_KEY } from "./servers.js"
 
 // The badge stops counting here. A client renders "99+" past it, so there is no
@@ -38,6 +39,10 @@ export type ChannelSummary = {
 export type MessagingOverview = {
   server: { id: string; name: string; description: string | null; isArchived: boolean } | null
   channels: ChannelSummary[]
+  // A second list beside the channels rather than more entries in it: a
+  // conversation is addressed by who you are talking to, a channel by what it
+  // is about, and the sidebar draws them as separate sections.
+  directMessages: DirectConversationSummary[]
   totalUnread: number
   // Who the server resolved the caller to be. The client needs its own player
   // id to tell its messages from everyone else's, and its own staff role to
@@ -98,7 +103,31 @@ export async function loadMessagingOverview(actor: MessagingActor): Promise<Mess
   // what fixes it.
   const viewer = { playerAccountId: actor.playerAccountId, staffRole: actor.staffRole }
 
-  if (!server) return { server: null, channels: [], totalUnread: 0, viewer }
+  // Loaded before any of the early returns below: a player can have
+  // conversations in a game whose chat server was never provisioned, or whose
+  // channels are all archived, and losing their DMs to either would be a bug
+  // nobody would think to look for.
+  //
+  // countUnread is handed in rather than imported, so conversations.ts does not
+  // have to import this module back.
+  const directMessages = await listDirectConversations(actor, (channelId, after) =>
+    countUnread(channelId, actor.playerAccountId, after)
+  )
+
+  const compose = (
+    chatServer: MessagingOverview["server"],
+    channels: ChannelSummary[]
+  ): MessagingOverview => ({
+    server: chatServer,
+    channels,
+    directMessages,
+    totalUnread:
+      channels.reduce((sum, channel) => sum + channel.unreadCount, 0) +
+      directMessages.reduce((sum, conversation) => sum + conversation.unreadCount, 0),
+    viewer,
+  })
+
+  if (!server) return compose(null, [])
 
   // Admins keep seeing archived channels because they are the ones who archive
   // and restore them. For everyone else an archived channel leaves the list.
@@ -136,7 +165,7 @@ export async function loadMessagingOverview(actor: MessagingActor): Promise<Mess
       channel.minimumStaffRole === null ||
       outranksOrEquals(actor.staffRole, channel.minimumStaffRole)
   )
-  if (visible.length === 0) return { server, channels: [], totalUnread: 0, viewer }
+  if (visible.length === 0) return compose(server, [])
 
   const readStatuses = await db.messageReadStatus.findMany({
     where: {
@@ -196,10 +225,5 @@ export async function loadMessagingOverview(actor: MessagingActor): Promise<Mess
     })
   )
 
-  return {
-    server,
-    channels: summaries,
-    totalUnread: summaries.reduce((sum, channel) => sum + channel.unreadCount, 0),
-    viewer,
-  }
+  return compose(server, summaries)
 }

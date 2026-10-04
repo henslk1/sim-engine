@@ -3,6 +3,7 @@ import type { MessagingActor } from "./actor.js"
 import { prepareContent } from "./content.js"
 import { isUniqueViolation } from "./db-errors.js"
 import { canModerateMessages, evaluatePosting, loadViewableChannel } from "./permissions.js"
+import { messageRateLimit, retryWording } from "./rate-limit.js"
 import type { RealtimeControl } from "./realtime.js"
 import { allow, deny, type Decision } from "./result.js"
 
@@ -111,6 +112,15 @@ export async function createMessage(
   // the channel has since been archived or turned read-only.
   const alreadySaved = await findByClientId(actor.playerAccountId, clientMessageId)
   if (alreadySaved) return allow(alreadySaved)
+
+  // Charged here: after idempotency, so a retry of a message that is already
+  // saved is never counted as a new one, and before the permission load, so a
+  // flood aimed at a channel the sender cannot even see still costs them their
+  // allowance instead of a database round trip each time.
+  const budget = messageRateLimit.check(actor.playerAccountId)
+  if (!budget.ok) {
+    return deny("RATE_LIMITED", `You're sending messages too quickly. ${retryWording(budget.retryAfterMs)}`)
+  }
 
   // A fresh check, not the one the client did when it opened the conversation.
   // Permissions, blocks and archival can all have changed since then.

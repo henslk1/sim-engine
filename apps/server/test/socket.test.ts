@@ -79,6 +79,7 @@ const db = {
 Object.assign(globalThis, { prisma: db })
 
 const { initSocket, sweepConnections } = await import("../src/socket.ts")
+const { resetMessagingRateLimits } = await import("@sim-engine/trpc/messaging")
 
 let httpServer: HttpServer
 let server: Awaited<ReturnType<typeof initSocket>>
@@ -123,6 +124,10 @@ beforeEach(() => {
   }
   state.messages.clear()
   nextMessage = 0
+  // The send limit is a module-level counter shared by every test in this file,
+  // so without this the tests that send several messages starve the ones after
+  // them — which is exactly how this was noticed.
+  resetMessagingRateLimits()
 })
 
 type Ack = { ok: true; value: unknown } | { ok: false; code: string; message: string }

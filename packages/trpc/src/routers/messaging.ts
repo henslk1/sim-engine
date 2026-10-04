@@ -4,6 +4,10 @@ import { channelAdminProcedure, denialToTRPCError, messagingProcedure } from "..
 import { loadMessagingOverview } from "../messaging/channels.js"
 import { deleteMessage, editMessage, loadHistory, markRead } from "../messaging/messages.js"
 import {
+  findDirectMessageCandidates,
+  getOrCreateDirectMessage,
+} from "../messaging/conversations.js"
+import {
   createChannel,
   reorderChannels,
   setChannelArchived,
@@ -78,6 +82,24 @@ export const messagingRouter = router({
       if (!result.ok) throw denialToTRPCError(result)
       return result.value
     }),
+
+  // Opens a conversation with another player, or returns the one that already
+  // exists. Safe to call repeatedly: the pair is stored in canonical order and
+  // settled by a unique index, so two people pressing this at the same moment
+  // still end up in one conversation.
+  openDirectMessage: messagingProcedure
+    .input(z.object({ targetPlayerAccountId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const result = await getOrCreateDirectMessage(ctx.actor, input)
+      if (!result.ok) throw denialToTRPCError(result)
+      return result.value
+    }),
+
+  // Somewhere to begin a conversation from. Deliberately narrow — it answers
+  // "who can I message" and nothing else, and it is not a player directory.
+  findPlayers: messagingProcedure
+    .input(z.object({ query: z.string().max(40) }))
+    .query(({ ctx, input }) => findDirectMessageCandidates(ctx.actor, input.query)),
 
   markRead: messagingProcedure
     .input(z.object({ channelId: z.string(), lastReadMessageId: z.string() }))

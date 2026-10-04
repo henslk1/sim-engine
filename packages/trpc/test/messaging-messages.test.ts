@@ -134,6 +134,7 @@ Object.assign(globalThis, { prisma: db })
 const { createMessage, editMessage, deleteMessage, markRead, removeAllMessagesByUser } = await import("../src/messaging/messages.ts")
 const { getOrCreateDirectMessage } = await import("../src/messaging/conversations.ts")
 const { prepareContent, MAX_CONTENT_CODE_POINTS } = await import("../src/messaging/content.ts")
+const { resetMessagingRateLimits } = await import("../src/messaging/rate-limit.ts")
 
 const realtime = {
   emitToPlayer: (gameId: string, playerId: string, event: string) =>
@@ -175,6 +176,9 @@ beforeEach(() => {
   state.emitted = []
   state.dmActivityBumped = 0
   state.auditLogged = []
+  // Limits are module-level counters, so without this the first test to send
+  // five messages would silently starve every test after it.
+  resetMessagingRateLimits()
   state.userAccounts = [{ id: ME }]
   state.allMessages = []
   state.createdChannels = 0
@@ -424,4 +428,96 @@ test("opening a new conversation creates a channel and a conversation", async ()
   const result = await getOrCreateDirectMessage(actor(), { targetPlayerAccountId: THEM })
   assert.equal(result.ok === true && result.value.created, true)
   assert.equal(state.createdChannels, 1)
+})
+
+// ── Rate limiting ────────────────────────────────────────────────────────────
+
+test("the sixth message in five seconds is refused, the first five are not", async () => {
+  for (let i = 0; i < 5; i += 1) {
+    const result = await createMessage(actor(), realtime, {
+      channelId: CHANNEL,
+      clientMessageId: `burst-${i}`,
+      content: "hello",
+    })
+    assert.equal(result.ok, true)
+  }
+
+  const over = await createMessage(actor(), realtime, {
+    channelId: CHANNEL,
+    clientMessageId: "burst-5",
+    content: "one too many",
+  })
+  assert.equal(over.ok, false)
+  if (over.ok) return
+  assert.equal(over.code, "RATE_LIMITED")
+  // The composer shows this, so it has to say when to try again.
+  assert.match(over.message, /Try again in \d+ second/)
+})
+
+test("retrying a message that is already saved is not charged", async () => {
+  // The whole point of the idempotency check running first. A client whose
+  // acknowledgement was lost retries; if that retry spent allowance, a flaky
+  // connection would rate-limit someone who never sent a second message.
+  const first = await createMessage(actor(), realtime, {
+    channelId: CHANNEL,
+    clientMessageId: "c-retry",
+    content: "original",
+  })
+  assert.equal(first.ok, true)
+
+  for (let i = 0; i < 20; i += 1) {
+    const retry = await createMessage(actor(), realtime, {
+      channelId: CHANNEL,
+      clientMessageId: "c-retry",
+      content: "original",
+    })
+    assert.equal(retry.ok, true)
+  }
+
+  // Four of the five are still available, so a genuinely new message lands.
+  const fresh = await createMessage(actor(), realtime, {
+    channelId: CHANNEL,
+    clientMessageId: "c-new",
+    content: "a real second message",
+  })
+  assert.equal(fresh.ok, true)
+})
+
+test("a rate-limited send is refused before the channel is even loaded", async () => {
+  // Charged ahead of the permission work, so a flood aimed at a channel the
+  // sender cannot see still costs them their allowance rather than a database
+  // round trip each time.
+  for (let i = 0; i < 5; i += 1) {
+    await createMessage(actor(), realtime, {
+      channelId: CHANNEL,
+      clientMessageId: `burst-${i}`,
+      content: "hello",
+    })
+  }
+  state.channel = null
+
+  const result = await createMessage(actor(), realtime, {
+    channelId: CHANNEL,
+    clientMessageId: "burst-5",
+    content: "into the void",
+  })
+  assert.equal(result.ok === false && result.code, "RATE_LIMITED")
+})
+
+test("reopening an existing conversation is free, only new ones are charged", async () => {
+  // getOrCreateDirectMessage returns early for a conversation that already
+  // exists, so the limiter is never reached — which is why `created` is on the
+  // return value in the first place.
+  state.directMessage = { id: "dm-1", chatChannelId: "channel-dm" }
+  for (let i = 0; i < 50; i += 1) {
+    const result = await getOrCreateDirectMessage(actor(), { targetPlayerAccountId: THEM })
+    assert.equal(result.ok, true)
+    assert.equal(result.ok && result.value.created, false)
+  }
+
+  // The allowance was never touched, so a genuinely new conversation opens.
+  state.directMessage = null
+  const created = await getOrCreateDirectMessage(actor(), { targetPlayerAccountId: THEM })
+  assert.equal(created.ok, true)
+  assert.equal(created.ok && created.value.created, true)
 })

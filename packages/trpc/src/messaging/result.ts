@@ -21,6 +21,7 @@ export type MessagingDenialCode =
   | "CONTENT_EMPTY"
   | "CONTENT_TOO_LONG"
   | "BAD_CLIENT_ID"
+  | "RATE_LIMITED"
   // Channel management. These three are admin-facing, so unlike the codes
   // above they say exactly what went wrong — the caller already administers
   // this game, so there is nothing a precise message could disclose.
