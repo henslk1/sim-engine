@@ -177,11 +177,24 @@ export async function listDirectConversations(
 // Players this actor could start a conversation with, by username.
 //
 // Not a general directory: it exists so the widget has somewhere to begin a DM.
-// People this player has blocked are filtered out, because that was their own
-// decision and hiding them is tidiness rather than disclosure. People who have
-// blocked *them* are deliberately left in — removing them would make the block
-// visible by absence, and canOpenDirectMessage refuses with wording that cannot
-// be told apart from "no such player".
+//
+// A block in *either* direction removes someone from the results, which is the
+// same both-ways rule the rest of messaging uses. Hiding the people this player
+// blocked is obvious enough — it was their own decision. Hiding the people who
+// blocked *them* is the part worth explaining, because the opposite looks
+// defensible at first glance.
+//
+// Leaving a blocker in the list seems to protect them: canOpenDirectMessage
+// refuses with wording that cannot be told apart from "no such player", so
+// surely absence would be the thing that gives the block away? It is the other
+// way round. That identical wording only does its job while the searcher does
+// not know the account exists. Showing them the name and then refusing rules
+// out every innocent reading, and they learn they were blocked with more
+// certainty than silence would ever have given them.
+//
+// Absence stays ambiguous — a rename, a player who left, a misremembered
+// spelling. So absence is the kinder answer, and it is what every platform
+// people already use does.
 export async function findDirectMessageCandidates(
   actor: MessagingActor,
   query: string,
@@ -190,16 +203,26 @@ export async function findDirectMessageCandidates(
   const term = query.trim()
   if (term.length === 0) return []
 
-  const iBlocked = await db.blockedPlayer.findMany({
-    where: { gameId: actor.gameId, blockerPlayerId: actor.playerAccountId },
-    select: { blockedPlayerId: true },
+  const blocks = await db.blockedPlayer.findMany({
+    where: {
+      gameId: actor.gameId,
+      OR: [
+        { blockerPlayerId: actor.playerAccountId },
+        { blockedPlayerId: actor.playerAccountId },
+      ],
+    },
+    select: { blockerPlayerId: true, blockedPlayerId: true },
   })
+  // Whichever end of each block is not the searcher is the person to hide.
+  const hidden = blocks.map(block =>
+    block.blockerPlayerId === actor.playerAccountId ? block.blockedPlayerId : block.blockerPlayerId
+  )
 
   const players = await db.playerAccount.findMany({
     where: {
       gameId: actor.gameId,
       username: { contains: term, mode: "insensitive" },
-      id: { notIn: [actor.playerAccountId, ...iBlocked.map(block => block.blockedPlayerId)] },
+      id: { notIn: [actor.playerAccountId, ...hidden] },
     },
     orderBy: { username: "asc" },
     take: limit,

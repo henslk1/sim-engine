@@ -827,29 +827,33 @@ test("an unblocked conversation can be replied to", async () => {
   assert.equal(list[0]?.cannotPostReason, null)
 })
 
-test("the player search excludes you and the people you blocked", async () => {
+test("the player search excludes you and a block in either direction", async () => {
   state.candidates = [
     { id: ME, gameId: GAME, username: "mesmerising", avatar: null },
     { id: THEM, gameId: GAME, username: "message-friend", avatar: null },
     { id: OTHER, gameId: GAME, username: "messenger", avatar: null },
   ]
-  // I blocked OTHER. Hiding them is tidiness — it was my own decision, so it
-  // discloses nothing.
   state.blocks = [{ gameId: GAME, blockerPlayerId: ME, blockedPlayerId: OTHER }]
 
   const found = await findDirectMessageCandidates(actor(), "mes")
   assert.deepEqual(found.map(p => p.username), ["message-friend"])
 })
 
-test("the player search still lists someone who blocked you", async () => {
-  // Removing them would make the block visible by absence. They stay in the
-  // results and canOpenDirectMessage refuses with wording that cannot be told
-  // apart from "no such player".
-  state.candidates = [{ id: THEM, gameId: GAME, username: "them", avatar: null }]
+test("someone who blocked you does not appear in the search", async () => {
+  // Leaving them in looks like the privacy-preserving choice and is the
+  // opposite. canOpenDirectMessage's refusal is worded to be indistinguishable
+  // from "no such player", which only works while the searcher does not know
+  // the account exists — showing the name and then refusing rules out every
+  // innocent reading. Absence stays ambiguous: a rename, a player who left, a
+  // misremembered spelling.
+  state.candidates = [
+    { id: THEM, gameId: GAME, username: "them", avatar: null },
+    { id: OTHER, gameId: GAME, username: "theodore", avatar: null },
+  ]
   state.blocks = [{ gameId: GAME, blockerPlayerId: THEM, blockedPlayerId: ME }]
 
   const found = await findDirectMessageCandidates(actor(), "the")
-  assert.deepEqual(found.map(p => p.username), ["them"])
+  assert.deepEqual(found.map(p => p.username), ["theodore"])
 })
 
 test("an empty search term matches nobody rather than everybody", async () => {
