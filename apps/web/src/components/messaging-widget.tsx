@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react"
-import { Bell, BookOpen, Hash, MessageCircle, X } from "lucide-react"
+import { Bell, BookOpen, MessageCircle, X } from "lucide-react"
 import { trpc, type RouterOutputs } from "@/lib/trpc"
 import { useMessagingSocket, useSocketEvent } from "@/lib/messaging/socket-events"
 import { Avatar, ChatSection, type ChatDestination } from "@/components/messaging/chat-section"
@@ -23,17 +23,22 @@ type OpenPanel = { kind: "main" } | { kind: "conversation"; channelId: string } 
 type Edge = "left" | "right"
 type ResizeDir = "top" | "side" | "corner"
 
-// Geometry of the dock. The bubbles are a column standing on one edge of the
-// viewport; the panel opens inboard of that column, so the column is never
-// covered by what it opened.
+// Geometry of the dock. Every bubble stands on one of the two side edges at its
+// own height, and the panel opens inboard of whichever bubble it belongs to.
 const BUBBLE = 56 // h-14 w-14
 const BUBBLE_GAP = 8
-const MARGIN = 24 // breathing room between the column and the viewport edge
-const PANEL_GAP = 8 // between the column and the panel beside it
+const MARGIN = 24 // breathing room between a bubble and the viewport edge
+const PANEL_GAP = 8 // between a bubble and the panel beside it
 const MIN_PANEL_W = 280
 const MIN_PANEL_H = 200
 const MAX_PANEL_W = 700
 const MAX_PANEL_H = 850
+
+// Bubbles are placed free-hand but land on a slot, one bubble tall plus its
+// gap. Snapping on release is what stops two of them half-covering each other:
+// a dropped bubble takes the nearest slot that is empty, so they tidy
+// themselves into a column without ever being locked into one.
+const SLOT = BUBBLE + BUBBLE_GAP
 
 // How many conversations may have a bubble at once. A cap rather than a
 // viewport calculation: deriving it from the height would silently close
@@ -41,8 +46,26 @@ const MAX_PANEL_H = 850
 // behaves the same every time.
 const MAX_POPPED = 4
 
+// The widget's own bubble, in the same placement map as the conversations. It
+// is not special — it can be moved, and anything that holds a position holds it
+// the same way.
+const MAIN = "main"
+
+type Placement = { edge: Edge; slot: number }
+
 function clamp(value: number, low: number, high: number) {
   return Math.min(Math.max(value, low), Math.max(low, high))
+}
+
+// Two letters rather than a generic hash, so one channel bubble is not
+// indistinguishable from the next. A hyphenated name gives its initials —
+// testing-feedback becomes TF — and a single word gives its first two.
+function monogram(name: string): string {
+  const words = name.split(/[^\p{L}\p{N}]+/u).filter(Boolean)
+  const first = words[0] ?? name
+  const second = words[1]
+  if (second) return (first.slice(0, 1) + second.slice(0, 1)).toUpperCase()
+  return first.slice(0, 2).toUpperCase()
 }
 
 // The dock is positioned against the viewport rather than inside a layout, so
@@ -113,15 +136,19 @@ export function MessagingWidget() {
   // Newest first, so the most recently opened conversation sits nearest the
   // main bubble.
   const [popped, setPopped] = useState<string[]>([])
-  const [dock, setDock] = useState<{ edge: Edge; bottom: number }>({
-    edge: "right",
-    bottom: MARGIN,
+  // Where each bubble lives, keyed by MAIN or a channel id.
+  const [placements, setPlacements] = useState<Record<string, Placement>>({
+    [MAIN]: { edge: "right", slot: 0 },
   })
+  // The bubble currently under the pointer, at its free-hand position. Separate
+  // from `placements` so a drag in progress is never mistaken for a resting
+  // place, and abandoning one leaves nothing behind.
+  const [drag, setDrag] = useState<{ key: string; edge: Edge; bottom: number } | null>(null)
   const [size, setSize] = useState({ w: 400, h: 400 })
 
-  const isDragging = useRef(false)
-  const hasDragged = useRef(false)
-  const dragStart = useRef({ mx: 0, my: 0, bottom: 0 })
+  const dragInfo = useRef<{ key: string; mx: number; my: number; bottom: number; moved: boolean } | null>(
+    null
+  )
 
   const isResizing = useRef(false)
   const resizeInfo = useRef({ dir: "corner" as ResizeDir, mx: 0, my: 0, w: 0, h: 0 })
@@ -144,56 +171,86 @@ export function MessagingWidget() {
   // Everything below is clamped at render rather than when it is set. A window
   // resize can invalidate a position that was legal when it was chosen, and
   // correcting it here means there is no state to keep in step.
-  const columnHeight = BUBBLE + bubbles.length * (BUBBLE + BUBBLE_GAP)
-  const bottom = clamp(dock.bottom, MARGIN, viewport.h - MARGIN - columnHeight)
+  const topSlot = Math.max(0, Math.floor((viewport.h - 2 * MARGIN - BUBBLE) / SLOT))
+
+  function positionOf(key: string): { edge: Edge; bottom: number } {
+    if (drag?.key === key) return { edge: drag.edge, bottom: drag.bottom }
+    const placed = placements[key] ?? { edge: "right" as Edge, slot: 0 }
+    return { edge: placed.edge, bottom: MARGIN + clamp(placed.slot, 0, topSlot) * SLOT }
+  }
+
+  // The nearest slot to `desired` that nothing else is standing on. Searched
+  // outwards in both directions so a bubble dropped onto an occupied slot
+  // settles beside it rather than jumping to the end of the queue.
+  function nearestFreeSlot(edge: Edge, desired: number, forKey: string): number {
+    const taken = new Set(
+      [MAIN, ...popped]
+        .filter(key => key !== forKey)
+        .map(key => placements[key])
+        .filter((placed): placed is Placement => placed?.edge === edge)
+        .map(placed => clamp(placed.slot, 0, topSlot))
+    )
+    const start = clamp(desired, 0, topSlot)
+    for (let step = 0; step <= topSlot; step++) {
+      if (start + step <= topSlot && !taken.has(start + step)) return start + step
+      if (start - step >= 0 && !taken.has(start - step)) return start - step
+    }
+    return start
+  }
 
   const panelInset = MARGIN + BUBBLE + PANEL_GAP
   const panelW = clamp(size.w, MIN_PANEL_W, Math.min(MAX_PANEL_W, viewport.w - panelInset - MARGIN))
   const panelH = clamp(size.h, MIN_PANEL_H, Math.min(MAX_PANEL_H, viewport.h - 2 * MARGIN))
-  // Sits on the same line as the column and rises from there, pulled down only
-  // as far as it must be to keep its top on screen.
-  const panelBottom = clamp(bottom, MARGIN, viewport.h - MARGIN - panelH)
 
-  function onPointerDown(e: React.PointerEvent<HTMLButtonElement>) {
-    isDragging.current = true
-    hasDragged.current = false
-    dragStart.current = { mx: e.clientX, my: e.clientY, bottom }
+  // The panel hangs off the bubble that opened it: same edge, same line, rising
+  // from there, and pulled down only as far as it must be to keep its top on
+  // screen. Dragging that bubble carries the panel with it.
+  const mainAt = positionOf(MAIN)
+  const anchor = openPanel?.kind === "conversation" ? positionOf(openPanel.channelId) : mainAt
+  const panelBottom = clamp(anchor.bottom, MARGIN, viewport.h - MARGIN - panelH)
+
+  function onPointerDown(key: string, e: React.PointerEvent<HTMLElement>) {
+    dragInfo.current = {
+      key,
+      mx: e.clientX,
+      my: e.clientY,
+      bottom: positionOf(key).bottom,
+      moved: false,
+    }
     e.currentTarget.setPointerCapture(e.pointerId)
   }
 
-  function onPointerMove(e: React.PointerEvent<HTMLButtonElement>) {
-    if (!isDragging.current) return
+  function onPointerMove(e: React.PointerEvent<HTMLElement>) {
+    const info = dragInfo.current
+    if (!info) return
     // The press ended somewhere we never heard about: released outside the
     // window, or cancelled by the browser mid-gesture. Without this the bubble
     // keeps chasing the cursor on every hover and can never be clicked again,
     // because it is always moving out from under the pointer.
     if (e.buttons === 0) {
-      isDragging.current = false
+      dragInfo.current = null
+      setDrag(null)
       return
     }
-    const dx = e.clientX - dragStart.current.mx
-    const dy = e.clientY - dragStart.current.my
-    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) hasDragged.current = true
+    const dx = e.clientX - info.mx
+    const dy = e.clientY - info.my
     // Nothing moves until the press is unmistakably a drag. A bubble that
     // shifted on mousedown would slide out from under the cursor, and the
-    // mouseup would then land on the page behind it — so the click that was
-    // meant to open the panel would never reach the button.
-    if (!hasDragged.current) return
+    // mouseup would then land on the page behind it.
+    if (!info.moved && Math.abs(dx) <= 3 && Math.abs(dy) <= 3) return
+    info.moved = true
 
     // Carried by how far the pointer has travelled, not by where it is, so the
     // bubble keeps the offset it was grabbed at instead of jumping to centre
     // itself on the cursor.
     //
-    // Snapped to an edge throughout the drag rather than released to one, so it
-    // never sits anywhere it would not stay. Which edge is decided by the
-    // pointer, not the bubble, so crossing the middle flips it.
-    setDock({
+    // Held against an edge throughout rather than released to one, so it never
+    // sits anywhere it would not stay. Which edge is decided by the pointer,
+    // not the bubble, so crossing the middle flips it.
+    setDrag({
+      key: info.key,
       edge: e.clientX < viewport.w / 2 ? "left" : "right",
-      bottom: clamp(
-        dragStart.current.bottom - dy,
-        MARGIN,
-        viewport.h - MARGIN - columnHeight
-      ),
+      bottom: clamp(info.bottom - dy, MARGIN, viewport.h - MARGIN - BUBBLE),
     })
   }
 
@@ -202,14 +259,26 @@ export function MessagingWidget() {
   // retargets the click to the nearest ancestor of the two, so a handler on the
   // button itself can simply never run. Pointerup always arrives at the element
   // holding capture.
-  function onPointerUp() {
-    if (!isDragging.current) return
-    isDragging.current = false
-    if (!hasDragged.current) toggle({ kind: "main" })
+  function onPointerUp(onTap: () => void) {
+    const info = dragInfo.current
+    dragInfo.current = null
+    if (!info) return
+    if (!info.moved) {
+      onTap()
+      return
+    }
+    // Free while held, slotted once dropped.
+    const landed = drag
+    setDrag(null)
+    if (!landed || landed.key !== info.key) return
+    const desired = Math.round((landed.bottom - MARGIN) / SLOT)
+    const slot = nearestFreeSlot(landed.edge, desired, info.key)
+    setPlacements(current => ({ ...current, [info.key]: { edge: landed.edge, slot } }))
   }
 
   function onPointerCancel() {
-    isDragging.current = false
+    dragInfo.current = null
+    setDrag(null)
   }
 
   function startResize(e: React.PointerEvent<HTMLDivElement>, dir: ResizeDir) {
@@ -225,7 +294,7 @@ export function MessagingWidget() {
     // The panel grows away from the edge it is docked against, so the handle
     // that widens it is on its left when docked right and on its right when
     // docked left. One sign flip covers both.
-    const widen = (dock.edge === "right" ? -1 : 1) * (e.clientX - mx)
+    const widen = (anchor.edge === "right" ? -1 : 1) * (e.clientX - mx)
     const taller = my - e.clientY
     setSize({
       w: dir === "side" || dir === "corner" ? clamp(w + widen, MIN_PANEL_W, MAX_PANEL_W) : w,
@@ -238,14 +307,36 @@ export function MessagingWidget() {
   }
 
   // Opening a conversation gives it a bubble and shows it. Already-docked ones
-  // are moved to the front rather than added twice.
+  // are moved to the front and keep where they were put, rather than being
+  // added twice or jumping back to the default spot.
   function popOut(channelId: string) {
-    setPopped(list => [channelId, ...list.filter(id => id !== channelId)].slice(0, MAX_POPPED))
+    const next = [channelId, ...popped.filter(id => id !== channelId)].slice(0, MAX_POPPED)
+    const evicted = popped.filter(id => !next.includes(id))
+    const main = placements[MAIN] ?? { edge: "right" as Edge, slot: 0 }
+    const existing = placements[channelId]
+    // Straight above the widget's own bubble, or the nearest free slot to it.
+    const placed = existing ?? {
+      edge: main.edge,
+      slot: nearestFreeSlot(main.edge, main.slot + 1, channelId),
+    }
+
+    setPopped(next)
+    setPlacements(current => {
+      const updated = { ...current, [channelId]: placed }
+      for (const id of evicted) delete updated[id]
+      return updated
+    })
     setOpenPanel({ kind: "conversation", channelId })
   }
 
   function closeBubble(channelId: string) {
     setPopped(list => list.filter(id => id !== channelId))
+    // Dropped too, so the slot it was standing on is free again.
+    setPlacements(current => {
+      const updated = { ...current }
+      delete updated[channelId]
+      return updated
+    })
     setOpenPanel(current =>
       current?.kind === "conversation" && current.channelId === channelId ? null : current
     )
@@ -287,7 +378,7 @@ export function MessagingWidget() {
       {openPanel && (
         <div
           className="pointer-events-auto absolute flex overflow-hidden rounded-lg border border-border bg-card shadow-xl"
-          style={{ [dock.edge]: panelInset, bottom: panelBottom, width: panelW, height: panelH }}
+          style={{ [anchor.edge]: panelInset, bottom: panelBottom, width: panelW, height: panelH }}
         >
           {/* Resize handles, on the two edges the panel grows towards: the top,
               and whichever side faces away from the viewport edge. */}
@@ -300,7 +391,7 @@ export function MessagingWidget() {
           <div
             className={[
               "absolute inset-y-3 z-10 w-1 cursor-ew-resize rounded-full hover:bg-primary/15",
-              dock.edge === "right" ? "left-0" : "right-0",
+              anchor.edge === "right" ? "left-0" : "right-0",
             ].join(" ")}
             onPointerDown={e => startResize(e, "side")}
             onPointerMove={doResize}
@@ -309,7 +400,7 @@ export function MessagingWidget() {
           <div
             className={[
               "absolute top-0 z-10 h-3 w-3 cursor-nwse-resize hover:bg-primary/15",
-              dock.edge === "right" ? "left-0 rounded-br" : "right-0 rounded-bl",
+              anchor.edge === "right" ? "left-0 rounded-br" : "right-0 rounded-bl",
             ].join(" ")}
             onPointerDown={e => startResize(e, "corner")}
             onPointerMove={doResize}
@@ -447,30 +538,48 @@ export function MessagingWidget() {
         </div>
       )}
 
-      {/* The bubble column. Conversations above, the widget itself at the foot
-          — the one that is always there is the one that stays put. */}
-      <div
-        className="pointer-events-auto absolute flex flex-col items-center gap-2"
-        style={{ [dock.edge]: MARGIN, bottom }}
-      >
-        {[...bubbles].reverse().map(bubble => (
-          <ConversationBubble
-            key={bubble.target.channelId}
-            name={bubble.target.title}
-            avatar={bubble.avatar}
-            isDirect={bubble.target.isDirect}
-            unread={bubble.unreadCount}
-            active={openPanel?.kind === "conversation" && openPanel.channelId === bubble.target.channelId}
-            onClick={() => toggle({ kind: "conversation", channelId: bubble.target.channelId })}
-            onClose={() => closeBubble(bubble.target.channelId)}
-          />
-        ))}
+      {/* Each bubble stands on its own, at its own place on its own edge. The
+          one being dragged is lifted above the rest so it is never hidden
+          behind one it is passing. */}
+      {bubbles.map(bubble => {
+        const channelId = bubble.target.channelId
+        const at = positionOf(channelId)
+        return (
+          <div
+            key={channelId}
+            className="pointer-events-auto absolute"
+            style={{ [at.edge]: MARGIN, bottom: at.bottom, zIndex: drag?.key === channelId ? 2 : 1 }}
+          >
+            <ConversationBubble
+              name={bubble.target.title}
+              avatar={bubble.avatar}
+              isDirect={bubble.target.isDirect}
+              unread={bubble.unreadCount}
+              active={openPanel?.kind === "conversation" && openPanel.channelId === channelId}
+              onPointerDown={e => onPointerDown(channelId, e)}
+              onPointerMove={onPointerMove}
+              onPointerUp={() => onPointerUp(() => toggle({ kind: "conversation", channelId }))}
+              onPointerCancel={onPointerCancel}
+              onKeyActivate={() => toggle({ kind: "conversation", channelId })}
+              onClose={() => closeBubble(channelId)}
+            />
+          </div>
+        )
+      })}
 
+      <div
+        className="pointer-events-auto absolute"
+        style={{
+          [mainAt.edge]: MARGIN,
+          bottom: mainAt.bottom,
+          zIndex: drag?.key === MAIN ? 2 : 1,
+        }}
+      >
         <button
-          className="relative flex h-14 w-14 cursor-grab items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg ring-2 ring-primary/20 transition-transform hover:scale-105 active:cursor-grabbing active:scale-95"
-          onPointerDown={onPointerDown}
+          className="relative flex h-14 w-14 cursor-grab touch-none items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg ring-2 ring-primary/20 transition-transform hover:scale-105 active:cursor-grabbing active:scale-95"
+          onPointerDown={e => onPointerDown(MAIN, e)}
           onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
+          onPointerUp={() => onPointerUp(() => toggle({ kind: "main" }))}
           onPointerCancel={onPointerCancel}
           onClick={e => {
             // Keyboard only. A click synthesised by Enter or Space reports
@@ -499,16 +608,23 @@ function isChat(section: Section): section is ChatDestination {
   return section.kind === "dms" || section.kind === "server"
 }
 
-// A conversation parked on the edge of the screen. Not draggable itself: the
-// column moves as a unit from the bubble at its foot, so there is only ever one
-// thing to position.
+// A conversation parked on the edge of the screen, draggable in its own right.
+//
+// A person gets a circle with their face on it; a channel gets a rounded square
+// with two letters, the way Discord separates servers from direct messages. The
+// shape says which kind it is and the letters say which one — a bare hash said
+// neither, so a column of channels was a column of identical buttons.
 function ConversationBubble({
   name,
   avatar,
   isDirect,
   unread,
   active,
-  onClick,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+  onPointerCancel,
+  onKeyActivate,
   onClose,
 }: {
   name: string
@@ -516,24 +632,37 @@ function ConversationBubble({
   isDirect: boolean
   unread: number
   active: boolean
-  onClick: () => void
+  onPointerDown: (e: React.PointerEvent<HTMLElement>) => void
+  onPointerMove: (e: React.PointerEvent<HTMLElement>) => void
+  onPointerUp: () => void
+  onPointerCancel: () => void
+  onKeyActivate: () => void
   onClose: () => void
 }) {
   return (
     <div className="group relative">
       <button
-        onClick={onClick}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
+        onClick={e => {
+          if (e.detail === 0) onKeyActivate()
+        }}
         title={name}
         aria-label={name}
         className={[
-          "flex h-12 w-12 items-center justify-center rounded-full bg-card shadow-lg transition-transform hover:scale-105",
+          "flex h-14 w-14 cursor-grab touch-none items-center justify-center bg-card shadow-lg transition-transform hover:scale-105 active:cursor-grabbing",
+          isDirect ? "rounded-full" : "rounded-2xl",
           active ? "ring-2 ring-primary" : "ring-1 ring-border",
         ].join(" ")}
       >
         {isDirect ? (
-          <Avatar username={name} avatar={avatar} className="h-10 w-10 text-sm" />
+          <Avatar username={name} avatar={avatar} className="h-12 w-12 text-base" />
         ) : (
-          <Hash className="h-5 w-5 text-muted-foreground" />
+          <span className="text-sm font-bold tracking-tight text-muted-foreground">
+            {monogram(name)}
+          </span>
         )}
       </button>
 
