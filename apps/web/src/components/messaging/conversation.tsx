@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
+import { Link } from "@tanstack/react-router"
 import { ArrowLeft, Hash, Lock, Megaphone, Pencil, Trash2, User } from "lucide-react"
 import { trpc, type RouterOutputs } from "@/lib/trpc"
 import {
@@ -27,6 +28,11 @@ export type ConversationTarget = {
   isArchived: boolean
   canPost: boolean
   cannotPostReason: string | null
+  // The username to link the header to, for a conversation with a person.
+  // Carried separately rather than reusing `title`, which only happens to be
+  // the same string today — a nickname or a display name would quietly break
+  // a link built out of it.
+  profileUsername: string | null
 }
 type HistoryCursor = { createdAt: Date; id: string }
 
@@ -202,7 +208,9 @@ export function Conversation({
   target: ConversationTarget
   connection: MessagingConnection
   viewer: Viewer
-  onBack: () => void
+  // Null in the wide layout, where the list is already on screen and there is
+  // nothing to go back to.
+  onBack: (() => void) | null
 }) {
   const utils = trpc.useUtils()
   const markRead = trpc.messaging.markRead.useMutation({
@@ -399,15 +407,31 @@ export function Conversation({
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 items-center gap-2 border-b border-border px-2 py-1.5">
-        <button
-          onClick={onBack}
-          className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          aria-label="Back to channels"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" />
-        </button>
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            aria-label="Back to channels"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+          </button>
+        )}
         <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-        <span className="truncate text-xs font-semibold text-foreground">{target.title}</span>
+        {target.profileUsername === null ? (
+          <span className="truncate text-xs font-semibold text-foreground">{target.title}</span>
+        ) : (
+          // During the tutorial this still obeys isTutorialRouteAllowed, so a
+          // profile the current step disallows bounces back to the dashboard.
+          // That is the intended division: the widget's click guard exemption
+          // makes messaging usable, route protection decides where it can go.
+          <Link
+            to="/player/$username"
+            params={{ username: target.profileUsername }}
+            className="truncate text-xs font-semibold text-foreground underline-offset-2 hover:underline"
+          >
+            {target.title}
+          </Link>
+        )}
         {target.description && (
           <span className="hidden truncate text-[10px] text-muted-foreground sm:inline">
             {target.description}

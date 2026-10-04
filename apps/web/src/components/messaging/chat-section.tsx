@@ -8,14 +8,22 @@ type Overview = RouterOutputs["messaging"]["overview"]
 type ChannelSummary = Overview["channels"][number]
 type DirectSummary = Overview["directMessages"][number]
 
+// Below this the pane shows one thing at a time: the rail stays, and opening a
+// conversation replaces the list. Above it, list and conversation sit side by
+// side the way Discord does. The widget starts at 400px and resizes to 700, so
+// both layouts are reachable without leaving the widget.
+const THREE_COLUMN_MIN_WIDTH = 560
+
+// Which rail entry is selected. Direct messages are their own destination
+// rather than a section inside a server, because they do not belong to one —
+// the same conversation exists whatever server you were last looking at.
+type Rail = { kind: "dms" } | { kind: "server"; serverId: string }
+
 function channelIcon(channel: ChannelSummary) {
   if (channel.isArchived) return Lock
   return channel.channelType === "ANNOUNCEMENT" ? Megaphone : Hash
 }
 
-// Both kinds collapse into the shape the pane wants. Doing it here keeps the
-// difference between a channel and a conversation in the sidebar, which is the
-// only place it shows.
 function channelTarget(channel: ChannelSummary): ConversationTarget {
   return {
     channelId: channel.channelId,
@@ -26,6 +34,7 @@ function channelTarget(channel: ChannelSummary): ConversationTarget {
     isArchived: channel.isArchived,
     canPost: channel.canPost,
     cannotPostReason: channel.cannotPostReason,
+    profileUsername: null,
   }
 }
 
@@ -40,22 +49,23 @@ function directTarget(conversation: DirectSummary): ConversationTarget {
     isArchived: false,
     canPost: conversation.canPost,
     cannotPostReason: conversation.cannotPostReason,
+    profileUsername: conversation.participant.username,
   }
 }
 
-// The Messages section of the widget: a channel list, a conversation list, or
-// one open conversation.
-//
-// Master/detail rather than a side-by-side split because the widget is 400px
-// wide by default. Discord's two-column layout needs room this does not have.
 export function ChatSection({
   gameId,
   connection,
+  width,
 }: {
   gameId: string
   connection: MessagingConnection
+  width: number
 }) {
   const utils = trpc.useUtils()
+  // Null until the player picks, so the first render can fall back to whatever
+  // the game actually has rather than guessing before the data arrives.
+  const [rail, setRail] = useState<Rail | null>(null)
   const [openChannelId, setOpenChannelId] = useState<string | null>(null)
   const [composing, setComposing] = useState(false)
 
@@ -75,6 +85,11 @@ export function ChatSection({
 
   const channels = overview?.channels ?? []
   const conversations = overview?.directMessages ?? []
+  const server = overview?.server ?? null
+
+  // Channels are the shared space and where a new player has something to read,
+  // so that is the opening view. Someone with no server at all lands on DMs.
+  const activeRail: Rail = rail ?? (server ? { kind: "server", serverId: server.id } : { kind: "dms" })
 
   const openChannel = channels.find(channel => channel.channelId === openChannelId)
   const openConversation = conversations.find(dm => dm.channelId === openChannelId)
@@ -84,113 +99,264 @@ export function ChatSection({
       ? directTarget(openConversation)
       : null
 
-  // A conversation that vanished underneath an open pane — a channel archived,
-  // or the list reloaded without it. Falling back to the list beats rendering a
-  // pane with nothing behind it.
-  if (openTarget && overview) {
-    return (
-      <Conversation
-        gameId={gameId}
-        target={openTarget}
-        connection={connection}
-        viewer={overview.viewer}
-        onBack={() => setOpenChannelId(null)}
-      />
-    )
-  }
+  const channelUnread = channels.reduce((sum, channel) => sum + channel.unreadCount, 0)
+  const directUnread = conversations.reduce((sum, dm) => sum + dm.unreadCount, 0)
 
-  if (composing) {
-    return (
-      <NewConversation
-        gameId={gameId}
-        onCancel={() => setComposing(false)}
-        onOpened={channelId => {
-          setComposing(false)
-          setOpenChannelId(channelId)
-          refresh()
-        }}
-      />
-    )
-  }
+  const wide = width >= THREE_COLUMN_MIN_WIDTH
+  // Narrow: the conversation takes the list's place. Wide: both are on screen,
+  // so the list never has to be dismissed to read something.
+  const showList = wide || openTarget === null
 
   if (isLoading) {
     return <p className="p-3 text-xs text-muted-foreground">Loading…</p>
   }
 
-  if (channels.length === 0 && conversations.length === 0) {
-    return (
-      <div className="flex h-full flex-col items-center justify-center gap-2 text-muted-foreground">
-        <MessageCircle className="h-8 w-8 opacity-30" />
-        <p className="text-xs">No channels yet.</p>
-      </div>
-    )
+  function selectRail(next: Rail) {
+    setRail(next)
+    setComposing(false)
+    // Leaving a destination closes what was open inside it. Keeping it would
+    // show a channel while the list beside it belongs to somewhere else.
+    setOpenChannelId(null)
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      {connection.status !== "online" && (
-        <p className="shrink-0 border-b border-border bg-muted/40 px-3 py-1 text-[10px] text-muted-foreground">
-          {connection.status === "connecting" ? "Connecting…" : "Reconnecting…"}
-        </p>
-      )}
-      <div className="min-h-0 flex-1 overflow-y-auto p-2">
-        {channels.length > 0 && (
+    <div className="flex h-full min-h-0">
+      <nav className="flex w-12 shrink-0 flex-col items-center gap-1 border-r border-border bg-muted/30 py-2">
+        <RailButton
+          label="Direct messages"
+          active={activeRail.kind === "dms"}
+          unread={directUnread}
+          onClick={() => selectRail({ kind: "dms" })}
+        >
+          <MessageCircle className="h-4 w-4" />
+        </RailButton>
+
+        {server && (
           <>
-            <SectionHeading label={overview?.server?.name ?? "Channels"} />
-            {channels.map(channel => {
-              const Icon = channelIcon(channel)
-              return (
-                <SidebarRow
-                  key={channel.channelId}
-                  icon={<Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
-                  label={channel.name}
-                  unread={channel.unreadCount}
-                  trailing={
-                    channel.isArchived ? (
-                      <span className="shrink-0 text-[9px] uppercase tracking-wide text-muted-foreground">
-                        archived
-                      </span>
-                    ) : null
-                  }
-                  onClick={() => setOpenChannelId(channel.channelId)}
-                />
-              )
-            })}
+            <div className="my-1 h-px w-6 bg-border" />
+            <RailButton
+              label={server.name}
+              active={activeRail.kind === "server"}
+              unread={channelUnread}
+              onClick={() => selectRail({ kind: "server", serverId: server.id })}
+            >
+              {/* No server artwork exists, so the initial stands in — the same
+                  thing Discord falls back to for a server without an icon. */}
+              <span className="text-[11px] font-bold">{server.name.slice(0, 1).toUpperCase()}</span>
+            </RailButton>
           </>
         )}
+      </nav>
 
-        <div className="mt-2 flex items-center justify-between pr-1">
-          <SectionHeading label="Direct messages" />
-          <button
-            onClick={() => setComposing(true)}
-            aria-label="New message"
-            className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            <Plus className="h-3.5 w-3.5" />
-          </button>
-        </div>
-        {conversations.length === 0 ? (
-          <p className="px-2 py-1 text-[10px] text-muted-foreground">No conversations yet.</p>
-        ) : (
-          conversations.map(conversation => (
-            <SidebarRow
-              key={conversation.channelId}
-              icon={<User className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
-              label={conversation.participant.username}
-              unread={conversation.unreadCount}
-              trailing={null}
-              onClick={() => setOpenChannelId(conversation.channelId)}
-            />
-          ))
+      <div className="flex min-w-0 flex-1 flex-col">
+        {connection.status !== "online" && (
+          <p className="shrink-0 border-b border-border bg-muted/40 px-3 py-1 text-[10px] text-muted-foreground">
+            {connection.status === "connecting" ? "Connecting…" : "Reconnecting…"}
+          </p>
         )}
+
+        <div className="flex min-h-0 flex-1">
+          {showList && (
+            <div
+              className={[
+                "min-h-0 overflow-y-auto p-2",
+                wide && openTarget ? "w-40 shrink-0 border-r border-border" : "flex-1",
+              ].join(" ")}
+            >
+              {composing ? null : activeRail.kind === "dms" ? (
+                <DirectList
+                  conversations={conversations}
+                  openChannelId={openChannelId}
+                  onOpen={setOpenChannelId}
+                  onCompose={() => setComposing(true)}
+                />
+              ) : (
+                <ChannelList
+                  serverName={server?.name ?? "Channels"}
+                  channels={channels}
+                  openChannelId={openChannelId}
+                  onOpen={setOpenChannelId}
+                />
+              )}
+            </div>
+          )}
+
+          <div className="min-h-0 min-w-0 flex-1">
+            {composing ? (
+              <NewConversation
+                gameId={gameId}
+                onCancel={() => setComposing(false)}
+                onOpened={channelId => {
+                  setComposing(false)
+                  setRail({ kind: "dms" })
+                  setOpenChannelId(channelId)
+                  refresh()
+                }}
+              />
+            ) : openTarget && overview ? (
+              <Conversation
+                gameId={gameId}
+                target={openTarget}
+                connection={connection}
+                viewer={overview.viewer}
+                // Only reachable in the narrow layout; with the list already on
+                // screen there is nothing to go back to.
+                onBack={wide ? null : () => setOpenChannelId(null)}
+              />
+            ) : wide ? (
+              <div className="flex h-full flex-col items-center justify-center gap-2 text-muted-foreground">
+                <MessageCircle className="h-8 w-8 opacity-30" />
+                <p className="text-xs">
+                  {activeRail.kind === "dms" ? "Pick a conversation." : "Pick a channel."}
+                </p>
+              </div>
+            ) : null}
+          </div>
+        </div>
       </div>
     </div>
   )
 }
 
+function RailButton({
+  label,
+  active,
+  unread,
+  onClick,
+  children,
+}: {
+  label: string
+  active: boolean
+  unread: number
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+      className={[
+        "relative flex h-9 w-9 items-center justify-center rounded-xl transition-colors",
+        active
+          ? "bg-primary text-primary-foreground"
+          : "text-muted-foreground hover:bg-muted hover:text-foreground",
+      ].join(" ")}
+    >
+      {children}
+      {unread > 0 && (
+        <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-0.5 text-[9px] font-bold text-destructive-foreground">
+          {unread > 99 ? "99+" : unread}
+        </span>
+      )}
+    </button>
+  )
+}
+
+function ChannelList({
+  serverName,
+  channels,
+  openChannelId,
+  onOpen,
+}: {
+  serverName: string
+  channels: ChannelSummary[]
+  openChannelId: string | null
+  onOpen: (channelId: string) => void
+}) {
+  if (channels.length === 0) {
+    return <p className="px-1 text-[10px] text-muted-foreground">No channels yet.</p>
+  }
+  return (
+    <>
+      <SectionHeading label={serverName} />
+      {channels.map(channel => {
+        const Icon = channelIcon(channel)
+        return (
+          <SidebarRow
+            key={channel.channelId}
+            active={channel.channelId === openChannelId}
+            icon={<Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+            label={channel.name}
+            unread={channel.unreadCount}
+            trailing={
+              channel.isArchived ? (
+                <span className="shrink-0 text-[9px] uppercase tracking-wide text-muted-foreground">
+                  archived
+                </span>
+              ) : null
+            }
+            onClick={() => onOpen(channel.channelId)}
+          />
+        )
+      })}
+    </>
+  )
+}
+
+function DirectList({
+  conversations,
+  openChannelId,
+  onOpen,
+  onCompose,
+}: {
+  conversations: DirectSummary[]
+  openChannelId: string | null
+  onOpen: (channelId: string) => void
+  onCompose: () => void
+}) {
+  return (
+    <>
+      <div className="flex items-center justify-between pr-1">
+        <SectionHeading label="Direct messages" />
+        <button
+          onClick={onCompose}
+          aria-label="New message"
+          className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <Plus className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      {conversations.length === 0 ? (
+        <p className="px-1 text-[10px] text-muted-foreground">No conversations yet.</p>
+      ) : (
+        conversations.map(conversation => (
+          <SidebarRow
+            key={conversation.channelId}
+            active={conversation.channelId === openChannelId}
+            icon={
+              <Avatar
+                username={conversation.participant.username}
+                avatar={conversation.participant.avatar}
+              />
+            }
+            label={conversation.participant.username}
+            unread={conversation.unreadCount}
+            trailing={null}
+            onClick={() => onOpen(conversation.channelId)}
+          />
+        ))
+      )}
+    </>
+  )
+}
+
+// The player's own profile picture, which is the one image messaging uses.
+// Falls back to an initial rather than a placeholder graphic.
+function Avatar({ username, avatar }: { username: string; avatar: string | null }) {
+  if (avatar) {
+    return <img src={avatar} alt="" className="h-4 w-4 shrink-0 rounded-full object-cover" />
+  }
+  return (
+    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-muted text-[8px] font-semibold text-muted-foreground">
+      {username.slice(0, 1).toUpperCase()}
+    </span>
+  )
+}
+
 function SectionHeading({ label }: { label: string }) {
   return (
-    <p className="px-1 pb-1 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+    <p className="truncate px-1 pb-1 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
       {label}
     </p>
   )
@@ -201,24 +367,29 @@ function SidebarRow({
   label,
   unread,
   trailing,
+  active,
   onClick,
 }: {
   icon: React.ReactNode
   label: string
   unread: number
   trailing: React.ReactNode
+  active: boolean
   onClick: () => void
 }) {
   return (
     <button
       onClick={onClick}
-      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-muted"
+      className={[
+        "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors",
+        active ? "bg-muted" : "hover:bg-muted",
+      ].join(" ")}
     >
       {icon}
       <span
         className={[
           "min-w-0 flex-1 truncate text-xs",
-          unread > 0 ? "font-semibold text-foreground" : "text-muted-foreground",
+          unread > 0 || active ? "font-semibold text-foreground" : "text-muted-foreground",
         ].join(" ")}
       >
         {label}
@@ -297,12 +468,10 @@ function NewConversation({
             <button
               key={player.playerAccountId}
               disabled={open.isPending}
-              onClick={() =>
-                open.mutate({ gameId, targetPlayerAccountId: player.playerAccountId })
-              }
+              onClick={() => open.mutate({ gameId, targetPlayerAccountId: player.playerAccountId })}
               className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-muted disabled:opacity-50"
             >
-              <User className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <Avatar username={player.username} avatar={player.avatar} />
               <span className="min-w-0 flex-1 truncate text-xs text-foreground">
                 {player.username}
               </span>
