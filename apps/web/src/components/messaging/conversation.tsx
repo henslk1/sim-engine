@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
-import { ArrowLeft, Hash, Lock, Megaphone } from "lucide-react"
+import { ArrowLeft, Hash, Lock, Megaphone, Pencil, Trash2 } from "lucide-react"
 import { trpc, type RouterOutputs } from "@/lib/trpc"
 import {
   joinChannel,
@@ -12,6 +12,7 @@ import {
 } from "@/lib/messaging/socket-events"
 
 type ChannelSummary = RouterOutputs["messaging"]["overview"]["channels"][number]
+type Viewer = RouterOutputs["messaging"]["overview"]["viewer"]
 type HistoryCursor = { createdAt: Date; id: string }
 
 // Messages from the same person inside this window share one header, the way
@@ -30,6 +31,100 @@ const AT_BOTTOM_THRESHOLD_PX = 60
 // Marking read on every arriving message would be a mutation per message. This
 // collapses a burst into one write.
 const MARK_READ_DEBOUNCE_MS = 400
+
+// The hover row on a message. Absent entirely when the viewer can do neither
+// thing, so an empty strip never appears.
+//
+// Edit is gated on the same canPost the composer uses, because the server gates
+// it the same way: editMessage runs evaluatePosting, so a read-only or archived
+// channel refuses an edit. One condition for both means the button and the
+// composer can never disagree — and when that rule is revisited, they change
+// together.
+//
+// Delete is deliberately *not* gated on canPost. deleteMessage skips the
+// posting check on purpose: moderation has to keep working in a channel that
+// was archived precisely because it went wrong.
+function MessageActions({
+  canEdit,
+  canDelete,
+  busy,
+  onEdit,
+  onDelete,
+}: {
+  canEdit: boolean
+  canDelete: boolean
+  busy: boolean
+  onEdit: () => void
+  onDelete: () => void
+}) {
+  if (!canEdit && !canDelete) return null
+  return (
+    <div className="absolute right-0 top-0 hidden gap-0.5 rounded border border-border bg-card px-1 py-0.5 shadow-sm group-hover:flex">
+      {canEdit && (
+        <button
+          onClick={onEdit}
+          disabled={busy}
+          aria-label="Edit message"
+          className="rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40"
+        >
+          <Pencil className="h-3 w-3" />
+        </button>
+      )}
+      {canDelete && (
+        <button
+          onClick={onDelete}
+          disabled={busy}
+          aria-label="Delete message"
+          className="rounded p-0.5 text-muted-foreground transition-colors hover:text-destructive disabled:opacity-40"
+        >
+          <Trash2 className="h-3 w-3" />
+        </button>
+      )}
+    </div>
+  )
+}
+
+// Editing happens in place rather than in the composer, so the message keeps
+// its position and the surrounding conversation stays readable while you work.
+function MessageEditor({
+  value,
+  busy,
+  onChange,
+  onCancel,
+  onSave,
+}: {
+  value: string
+  busy: boolean
+  onChange: (next: string) => void
+  onCancel: () => void
+  onSave: () => void
+}) {
+  return (
+    <div className="mt-0.5">
+      <textarea
+        value={value}
+        autoFocus
+        rows={2}
+        disabled={busy}
+        onChange={event => onChange(event.target.value)}
+        onKeyDown={event => {
+          if (event.key === "Escape") {
+            event.preventDefault()
+            onCancel()
+          }
+          if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+            event.preventDefault()
+            onSave()
+          }
+        }}
+        className="w-full resize-none rounded-md border border-primary bg-background px-2 py-1 text-xs text-foreground outline-none"
+      />
+      <p className="text-[9px] text-muted-foreground">
+        Enter to save · Escape to cancel
+      </p>
+    </div>
+  )
+}
 
 // Inserts or replaces a message, keeping the list in (createdAt, id) order.
 //
@@ -84,13 +179,13 @@ export function Conversation({
   gameId,
   channel,
   connection,
-  playerAccountId,
+  viewer,
   onBack,
 }: {
   gameId: string
   channel: ChannelSummary
   connection: MessagingConnection
-  playerAccountId: string | undefined
+  viewer: Viewer
   onBack: () => void
 }) {
   const utils = trpc.useUtils()
@@ -98,11 +193,29 @@ export function Conversation({
     onSuccess: () => void utils.messaging.overview.invalidate(),
   })
 
+  // Both land twice: once as the mutation's own answer, once as the broadcast
+  // to the channel room. upsertMessage matches on id, so the second is a no-op
+  // — and the broadcast is what updates everyone else.
+  const edit = trpc.messaging.edit.useMutation({
+    onSuccess: saved => {
+      setMessages(list => upsertMessage(list, toChatMessage(saved)))
+      setEditingId(null)
+    },
+  })
+  const remove = trpc.messaging.remove.useMutation({
+    onSuccess: saved => setMessages(list => upsertMessage(list, toChatMessage(saved))),
+  })
+
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [cursor, setCursor] = useState<HistoryCursor | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadingOlder, setLoadingOlder] = useState(false)
   const [draft, setDraft] = useState("")
+  // The message being edited in place, and the text so far. Separate from
+  // `draft` so starting an edit does not eat what was half-typed in the
+  // composer.
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editDraft, setEditDraft] = useState("")
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const atBottom = useRef(true)
@@ -229,7 +342,7 @@ export function Conversation({
     const optimistic: ChatMessage = {
       id: `pending-${clientMessageId}`,
       channelId,
-      authorPlayerId: playerAccountId ?? "",
+      authorPlayerId: viewer.playerAccountId,
       authorUsername: "You",
       clientMessageId,
       content,
@@ -326,7 +439,7 @@ export function Conversation({
                       <div className="h-px flex-1 bg-border" />
                     </div>
                   )}
-                  <div className={grouped ? "" : "mt-2"}>
+                  <div className={["group relative", grouped ? "" : "mt-2"].join(" ")}>
                     {!grouped && (
                       <div className="flex items-baseline gap-1.5">
                         <span className="text-[11px] font-semibold text-foreground">
@@ -337,7 +450,47 @@ export function Conversation({
                         </span>
                       </div>
                     )}
-                    {message.removedBy === null ? (
+                    {/* Hover controls. Rendering them is presentation only —
+                        editMessage and deleteMessage re-derive the actor from
+                        the session and decide again. */}
+                    {message.removedBy === null && message.pending !== true && (
+                      <MessageActions
+                        canEdit={message.authorPlayerId === viewer.playerAccountId && channel.canPost}
+                        canDelete={
+                          message.authorPlayerId === viewer.playerAccountId ||
+                          viewer.staffRole !== null
+                        }
+                        busy={edit.isPending || remove.isPending}
+                        onEdit={() => {
+                          setEditingId(message.id)
+                          setEditDraft(message.content)
+                        }}
+                        onDelete={() => {
+                          const mine = message.authorPlayerId === viewer.playerAccountId
+                          if (!confirm(mine ? "Delete this message?" : "Remove this message?")) return
+                          remove.mutate({ gameId, messageId: message.id })
+                        }}
+                      />
+                    )}
+                    {editingId === message.id ? (
+                      <MessageEditor
+                        value={editDraft}
+                        busy={edit.isPending}
+                        onChange={setEditDraft}
+                        onCancel={() => setEditingId(null)}
+                        onSave={() => {
+                          const content = editDraft.trim()
+                          // An edit to nothing is a deletion asked for the
+                          // wrong way round. Refusing is kinder than silently
+                          // removing their message.
+                          if (content.length === 0 || content === message.content) {
+                            setEditingId(null)
+                            return
+                          }
+                          edit.mutate({ gameId, messageId: message.id, content })
+                        }}
+                      />
+                    ) : message.removedBy === null ? (
                       <p
                         className={[
                           "whitespace-pre-wrap break-words text-xs leading-snug",
@@ -375,6 +528,11 @@ export function Conversation({
       </div>
 
       <div className="shrink-0 border-t border-border p-2">
+        {(edit.error ?? remove.error) && (
+          <p className="pb-1 text-[10px] text-destructive">
+            {(edit.error ?? remove.error)?.message}
+          </p>
+        )}
         {channel.canPost && !offline ? (
           <textarea
             value={draft}

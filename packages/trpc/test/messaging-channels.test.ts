@@ -402,10 +402,35 @@ test("an archived server closes the composer in every one of its channels", asyn
   assert.equal(overview.channels[0]?.canPost, false)
 })
 
+test("the overview names who it was computed for, on every path", async () => {
+  // The client renders edit and delete controls from this, so it has to come
+  // back even when there is nothing to show — otherwise an empty channel list
+  // would leave the conversation pane unable to say which messages are yours.
+  const populated = await loadMessagingOverview(actor("MODERATOR"))
+  assert.deepEqual(populated.viewer, { playerAccountId: ME, staffRole: "MODERATOR" })
+
+  state.channels = []
+  assert.deepEqual((await loadMessagingOverview(actor())).viewer, {
+    playerAccountId: ME,
+    staffRole: null,
+  })
+
+  state.server = null
+  assert.deepEqual((await loadMessagingOverview(actor())).viewer, {
+    playerAccountId: ME,
+    staffRole: null,
+  })
+})
+
 test("a game with no chat server returns an empty list rather than failing", async () => {
   state.server = null
   const overview = await loadMessagingOverview(actor())
-  assert.deepEqual(overview, { server: null, channels: [], totalUnread: 0 })
+  assert.deepEqual(overview, {
+    server: null,
+    channels: [],
+    totalUnread: 0,
+    viewer: { playerAccountId: ME, staffRole: null },
+  })
 })
 
 // --- history ---------------------------------------------------------------

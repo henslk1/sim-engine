@@ -39,6 +39,14 @@ export type MessagingOverview = {
   server: { id: string; name: string; description: string | null; isArchived: boolean } | null
   channels: ChannelSummary[]
   totalUnread: number
+  // Who the server resolved the caller to be. The client needs its own player
+  // id to tell its messages from everyone else's, and its own staff role to
+  // know whether to offer a delete control on someone else's.
+  //
+  // Safe to send: it is the caller's own identity, which they already know.
+  // It is also only presentation — editMessage and deleteMessage re-derive the
+  // actor from the session and decide for themselves.
+  viewer: { playerAccountId: string; staffRole: StaffRoleType | null }
 }
 
 // How many messages this player has not seen in one channel.
@@ -88,7 +96,9 @@ export async function loadMessagingOverview(actor: MessagingActor): Promise<Mess
   // A game whose global server was never provisioned. Returning an empty list
   // is right: there is genuinely nothing to show, and ensureGlobalChatServer is
   // what fixes it.
-  if (!server) return { server: null, channels: [], totalUnread: 0 }
+  const viewer = { playerAccountId: actor.playerAccountId, staffRole: actor.staffRole }
+
+  if (!server) return { server: null, channels: [], totalUnread: 0, viewer }
 
   // Admins keep seeing archived channels because they are the ones who archive
   // and restore them. For everyone else an archived channel leaves the list.
@@ -126,7 +136,7 @@ export async function loadMessagingOverview(actor: MessagingActor): Promise<Mess
       channel.minimumStaffRole === null ||
       outranksOrEquals(actor.staffRole, channel.minimumStaffRole)
   )
-  if (visible.length === 0) return { server, channels: [], totalUnread: 0 }
+  if (visible.length === 0) return { server, channels: [], totalUnread: 0, viewer }
 
   const readStatuses = await db.messageReadStatus.findMany({
     where: {
@@ -190,5 +200,6 @@ export async function loadMessagingOverview(actor: MessagingActor): Promise<Mess
     server,
     channels: summaries,
     totalUnread: summaries.reduce((sum, channel) => sum + channel.unreadCount, 0),
+    viewer,
   }
 }

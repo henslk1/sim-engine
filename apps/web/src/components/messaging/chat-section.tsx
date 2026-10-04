@@ -18,11 +18,9 @@ function channelIcon(channel: ChannelSummary) {
 export function ChatSection({
   gameId,
   connection,
-  playerAccountId,
 }: {
   gameId: string
   connection: MessagingConnection
-  playerAccountId: string | undefined
 }) {
   const utils = trpc.useUtils()
   const [openChannelId, setOpenChannelId] = useState<string | null>(null)
@@ -50,13 +48,15 @@ export function ChatSection({
   // A channel that disappeared underneath an open conversation — archived, or
   // the list reloaded without it. Falling back to the list beats rendering a
   // pane with nothing behind it.
-  if (openChannelId !== null && openChannel) {
+  // viewer comes from the same query as the channels, so the conversation never
+  // has to be told separately who is looking at it.
+  if (openChannelId !== null && openChannel && overview) {
     return (
       <Conversation
         gameId={gameId}
         channel={openChannel}
         connection={connection}
-        playerAccountId={playerAccountId}
+        viewer={overview.viewer}
         onBack={() => setOpenChannelId(null)}
       />
     )

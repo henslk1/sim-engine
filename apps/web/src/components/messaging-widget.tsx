@@ -228,11 +228,7 @@ export function MessagingWidget() {
                 />
               )}
               {activeSection === "chat" && gameId && (
-                <ChatSection
-                  gameId={gameId}
-                  connection={connection}
-                  playerAccountId={player?.id}
-                />
+                <ChatSection gameId={gameId} connection={connection} />
               )}
             </div>
           </div>
