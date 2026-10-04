@@ -163,6 +163,14 @@ export function MessagingWidget() {
 
   function onPointerMove(e: React.PointerEvent<HTMLButtonElement>) {
     if (!isDragging.current) return
+    // The press ended somewhere we never heard about: released outside the
+    // window, or cancelled by the browser mid-gesture. Without this the bubble
+    // keeps chasing the cursor on every hover and can never be clicked again,
+    // because it is always moving out from under the pointer.
+    if (e.buttons === 0) {
+      isDragging.current = false
+      return
+    }
     const dx = e.clientX - dragStart.current.mx
     const dy = e.clientY - dragStart.current.my
     if (Math.abs(dx) > 3 || Math.abs(dy) > 3) hasDragged.current = true
@@ -189,7 +197,18 @@ export function MessagingWidget() {
     })
   }
 
+  // Opening is decided here rather than in onClick. If the pointer moves at all
+  // between press and release — and a real mouse usually does — the browser
+  // retargets the click to the nearest ancestor of the two, so a handler on the
+  // button itself can simply never run. Pointerup always arrives at the element
+  // holding capture.
   function onPointerUp() {
+    if (!isDragging.current) return
+    isDragging.current = false
+    if (!hasDragged.current) toggle({ kind: "main" })
+  }
+
+  function onPointerCancel() {
     isDragging.current = false
   }
 
@@ -452,9 +471,12 @@ export function MessagingWidget() {
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
-          onClick={() => {
-            if (hasDragged.current) return
-            toggle({ kind: "main" })
+          onPointerCancel={onPointerCancel}
+          onClick={e => {
+            // Keyboard only. A click synthesised by Enter or Space reports
+            // detail 0, where a real mouse click reports 1 or more — and that
+            // one is already handled on pointerup.
+            if (e.detail === 0) toggle({ kind: "main" })
           }}
           aria-label="Messages"
         >
