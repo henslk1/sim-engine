@@ -57,6 +57,37 @@ function clamp(value: number, low: number, high: number) {
   return Math.min(Math.max(value, low), Math.max(low, high))
 }
 
+// The highest slot that still leaves a bubble fully on screen.
+function topSlotFor(viewportHeight: number) {
+  return Math.max(0, Math.floor((viewportHeight - 2 * MARGIN - BUBBLE) / SLOT))
+}
+
+// The nearest slot to `desired` that nothing else is standing on. Searched
+// outwards in both directions so a bubble dropped onto an occupied slot settles
+// beside it rather than jumping to the end of the queue.
+//
+// Takes the map rather than reading state, so a drag that finishes several
+// renders after it began still decides against the placements as they are now.
+function nearestFreeSlot(
+  placements: Record<string, Placement>,
+  edge: Edge,
+  desired: number,
+  forKey: string,
+  topSlot: number
+): number {
+  const taken = new Set(
+    Object.entries(placements)
+      .filter(([key, placed]) => key !== forKey && placed.edge === edge)
+      .map(([, placed]) => clamp(placed.slot, 0, topSlot))
+  )
+  const start = clamp(desired, 0, topSlot)
+  for (let step = 0; step <= topSlot; step++) {
+    if (start + step <= topSlot && !taken.has(start + step)) return start + step
+    if (start - step >= 0 && !taken.has(start - step)) return start - step
+  }
+  return start
+}
+
 // Two letters rather than a generic hash, so one channel bubble is not
 // indistinguishable from the next. A hyphenated name gives its initials —
 // testing-feedback becomes TF — and a single word gives its first two.
@@ -146,12 +177,18 @@ export function MessagingWidget() {
   const [drag, setDrag] = useState<{ key: string; edge: Edge; bottom: number } | null>(null)
   const [size, setSize] = useState({ w: 400, h: 400 })
 
-  const dragInfo = useRef<{ key: string; mx: number; my: number; bottom: number; moved: boolean } | null>(
-    null
-  )
-
-  const isResizing = useRef(false)
-  const resizeInfo = useRef({ dir: "corner" as ResizeDir, mx: 0, my: 0, w: 0, h: 0 })
+  const dragInfo = useRef<{
+    key: string
+    mx: number
+    my: number
+    bottom: number
+    moved: boolean
+    at: { edge: Edge; bottom: number } | null
+  } | null>(null)
+  // Tears down the listeners of a drag in progress. Held in a ref so unmounting
+  // mid-drag cannot leave them attached to the window.
+  const stopDragging = useRef<(() => void) | null>(null)
+  useEffect(() => () => stopDragging.current?.(), [])
 
   useEffect(() => {
     if (tutorialCompleted && activeSection.kind === "tutorial") {
@@ -171,31 +208,12 @@ export function MessagingWidget() {
   // Everything below is clamped at render rather than when it is set. A window
   // resize can invalidate a position that was legal when it was chosen, and
   // correcting it here means there is no state to keep in step.
-  const topSlot = Math.max(0, Math.floor((viewport.h - 2 * MARGIN - BUBBLE) / SLOT))
+  const topSlot = topSlotFor(viewport.h)
 
   function positionOf(key: string): { edge: Edge; bottom: number } {
     if (drag?.key === key) return { edge: drag.edge, bottom: drag.bottom }
     const placed = placements[key] ?? { edge: "right" as Edge, slot: 0 }
     return { edge: placed.edge, bottom: MARGIN + clamp(placed.slot, 0, topSlot) * SLOT }
-  }
-
-  // The nearest slot to `desired` that nothing else is standing on. Searched
-  // outwards in both directions so a bubble dropped onto an occupied slot
-  // settles beside it rather than jumping to the end of the queue.
-  function nearestFreeSlot(edge: Edge, desired: number, forKey: string): number {
-    const taken = new Set(
-      [MAIN, ...popped]
-        .filter(key => key !== forKey)
-        .map(key => placements[key])
-        .filter((placed): placed is Placement => placed?.edge === edge)
-        .map(placed => clamp(placed.slot, 0, topSlot))
-    )
-    const start = clamp(desired, 0, topSlot)
-    for (let step = 0; step <= topSlot; step++) {
-      if (start + step <= topSlot && !taken.has(start + step)) return start + step
-      if (start - step >= 0 && !taken.has(start - step)) return start - step
-    }
-    return start
   }
 
   const panelInset = MARGIN + BUBBLE + PANEL_GAP
@@ -209,101 +227,123 @@ export function MessagingWidget() {
   const anchor = openPanel?.kind === "conversation" ? positionOf(openPanel.channelId) : mainAt
   const panelBottom = clamp(anchor.bottom, MARGIN, viewport.h - MARGIN - panelH)
 
-  function onPointerDown(key: string, e: React.PointerEvent<HTMLElement>) {
-    dragInfo.current = {
+  // Both gestures below listen on the window for the rest of the press, rather
+  // than calling setPointerCapture on the element.
+  //
+  // Capture redirects every pointer event on the page to one element until it
+  // is released. A release that never arrives — a press interrupted by a hot
+  // reload, a gesture the browser cancels, an element React swaps out from
+  // under the pointer — leaves the whole document unable to see the mouse, and
+  // the only way out is to reload. Window listeners cannot strand anything:
+  // they come off on pointerup, on pointercancel, and on unmount.
+  function listenUntilRelease(onMove: (e: PointerEvent) => void, onDone: (cancelled: boolean) => void) {
+    const move = (e: PointerEvent) => {
+      // Belt and braces for a release we somehow missed.
+      if (e.buttons === 0) {
+        finish(true)
+        return
+      }
+      onMove(e)
+    }
+    const up = () => finish(false)
+    const cancel = () => finish(true)
+    function finish(cancelled: boolean) {
+      window.removeEventListener("pointermove", move)
+      window.removeEventListener("pointerup", up)
+      window.removeEventListener("pointercancel", cancel)
+      stopDragging.current = null
+      onDone(cancelled)
+    }
+    stopDragging.current = () => finish(true)
+    window.addEventListener("pointermove", move)
+    window.addEventListener("pointerup", up)
+    window.addEventListener("pointercancel", cancel)
+  }
+
+  // `onTap` runs when the press was a click rather than a drag. Decided on
+  // release rather than in onClick: if the pointer moves at all between press
+  // and release — and a real mouse usually does — the browser retargets the
+  // click to the nearest common ancestor, so a handler on the button itself can
+  // simply never run.
+  function onPointerDown(key: string, onTap: () => void, e: React.PointerEvent<HTMLElement>) {
+    const info = {
       key,
       mx: e.clientX,
       my: e.clientY,
       bottom: positionOf(key).bottom,
       moved: false,
+      at: null as { edge: Edge; bottom: number } | null,
     }
-    e.currentTarget.setPointerCapture(e.pointerId)
-  }
+    dragInfo.current = info
 
-  function onPointerMove(e: React.PointerEvent<HTMLElement>) {
-    const info = dragInfo.current
-    if (!info) return
-    // The press ended somewhere we never heard about: released outside the
-    // window, or cancelled by the browser mid-gesture. Without this the bubble
-    // keeps chasing the cursor on every hover and can never be clicked again,
-    // because it is always moving out from under the pointer.
-    if (e.buttons === 0) {
-      dragInfo.current = null
-      setDrag(null)
-      return
-    }
-    const dx = e.clientX - info.mx
-    const dy = e.clientY - info.my
-    // Nothing moves until the press is unmistakably a drag. A bubble that
-    // shifted on mousedown would slide out from under the cursor, and the
-    // mouseup would then land on the page behind it.
-    if (!info.moved && Math.abs(dx) <= 3 && Math.abs(dy) <= 3) return
-    info.moved = true
+    listenUntilRelease(
+      move => {
+        const dx = move.clientX - info.mx
+        const dy = move.clientY - info.my
+        // Nothing moves until the press is unmistakably a drag. A bubble that
+        // shifted on mousedown would slide out from under the cursor.
+        if (!info.moved && Math.abs(dx) <= 3 && Math.abs(dy) <= 3) return
+        info.moved = true
 
-    // Carried by how far the pointer has travelled, not by where it is, so the
-    // bubble keeps the offset it was grabbed at instead of jumping to centre
-    // itself on the cursor.
-    //
-    // Held against an edge throughout rather than released to one, so it never
-    // sits anywhere it would not stay. Which edge is decided by the pointer,
-    // not the bubble, so crossing the middle flips it.
-    setDrag({
-      key: info.key,
-      edge: e.clientX < viewport.w / 2 ? "left" : "right",
-      bottom: clamp(info.bottom - dy, MARGIN, viewport.h - MARGIN - BUBBLE),
-    })
-  }
-
-  // Opening is decided here rather than in onClick. If the pointer moves at all
-  // between press and release — and a real mouse usually does — the browser
-  // retargets the click to the nearest ancestor of the two, so a handler on the
-  // button itself can simply never run. Pointerup always arrives at the element
-  // holding capture.
-  function onPointerUp(onTap: () => void) {
-    const info = dragInfo.current
-    dragInfo.current = null
-    if (!info) return
-    if (!info.moved) {
-      onTap()
-      return
-    }
-    // Free while held, slotted once dropped.
-    const landed = drag
-    setDrag(null)
-    if (!landed || landed.key !== info.key) return
-    const desired = Math.round((landed.bottom - MARGIN) / SLOT)
-    const slot = nearestFreeSlot(landed.edge, desired, info.key)
-    setPlacements(current => ({ ...current, [info.key]: { edge: landed.edge, slot } }))
-  }
-
-  function onPointerCancel() {
-    dragInfo.current = null
-    setDrag(null)
+        // Carried by how far the pointer has travelled, not by where it is, so
+        // the bubble keeps the offset it was grabbed at instead of jumping to
+        // centre itself on the cursor.
+        //
+        // Held against an edge throughout rather than released to one, so it
+        // never sits anywhere it would not stay. Which edge is decided by the
+        // pointer, so crossing the middle flips it.
+        const next = {
+          edge: (move.clientX < window.innerWidth / 2 ? "left" : "right") as Edge,
+          bottom: clamp(info.bottom - dy, MARGIN, window.innerHeight - MARGIN - BUBBLE),
+        }
+        info.at = next
+        setDrag({ key, ...next })
+      },
+      cancelled => {
+        dragInfo.current = null
+        setDrag(null)
+        if (!info.moved) {
+          if (!cancelled) onTap()
+          return
+        }
+        // Free while held, slotted once dropped.
+        const landed = info.at
+        if (!landed) return
+        const top = topSlotFor(window.innerHeight)
+        const desired = Math.round((landed.bottom - MARGIN) / SLOT)
+        setPlacements(current => ({
+          ...current,
+          [key]: { edge: landed.edge, slot: nearestFreeSlot(current, landed.edge, desired, key, top) },
+        }))
+      }
+    )
   }
 
   function startResize(e: React.PointerEvent<HTMLDivElement>, dir: ResizeDir) {
     e.stopPropagation()
-    isResizing.current = true
-    resizeInfo.current = { dir, mx: e.clientX, my: e.clientY, w: panelW, h: panelH }
-    e.currentTarget.setPointerCapture(e.pointerId)
-  }
-
-  function doResize(e: React.PointerEvent<HTMLDivElement>) {
-    if (!isResizing.current) return
-    const { dir, mx, my, w, h } = resizeInfo.current
+    const start = { mx: e.clientX, my: e.clientY, w: panelW, h: panelH }
     // The panel grows away from the edge it is docked against, so the handle
     // that widens it is on its left when docked right and on its right when
     // docked left. One sign flip covers both.
-    const widen = (anchor.edge === "right" ? -1 : 1) * (e.clientX - mx)
-    const taller = my - e.clientY
-    setSize({
-      w: dir === "side" || dir === "corner" ? clamp(w + widen, MIN_PANEL_W, MAX_PANEL_W) : w,
-      h: dir === "top" || dir === "corner" ? clamp(h + taller, MIN_PANEL_H, MAX_PANEL_H) : h,
-    })
-  }
+    const direction = anchor.edge === "right" ? -1 : 1
 
-  function endResize() {
-    isResizing.current = false
+    listenUntilRelease(
+      move => {
+        const widen = direction * (move.clientX - start.mx)
+        const taller = start.my - move.clientY
+        setSize({
+          w:
+            dir === "side" || dir === "corner"
+              ? clamp(start.w + widen, MIN_PANEL_W, MAX_PANEL_W)
+              : start.w,
+          h:
+            dir === "top" || dir === "corner"
+              ? clamp(start.h + taller, MIN_PANEL_H, MAX_PANEL_H)
+              : start.h,
+        })
+      },
+      () => {}
+    )
   }
 
   // Opening a conversation gives it a bubble and shows it. Already-docked ones
@@ -317,7 +357,7 @@ export function MessagingWidget() {
     // Straight above the widget's own bubble, or the nearest free slot to it.
     const placed = existing ?? {
       edge: main.edge,
-      slot: nearestFreeSlot(main.edge, main.slot + 1, channelId),
+      slot: nearestFreeSlot(placements, main.edge, main.slot + 1, channelId, topSlot),
     }
 
     setPopped(next)
@@ -371,13 +411,15 @@ export function MessagingWidget() {
       : null
 
   return (
-    // Covers the viewport so everything the dock draws is inside the element
-    // the tutorial's click guard allowlists, without intercepting clicks meant
-    // for the page underneath.
-    <div data-tutorial-messaging className="pointer-events-none fixed inset-0 z-50">
+    // display:contents, so this generates no box of its own. It exists only to
+    // be the ancestor the tutorial's click guard looks for with closest(). The
+    // previous full-viewport overlay relied on pointer-events-none to stay out
+    // of the way, which is one missing class away from swallowing every click
+    // on the page.
+    <div data-tutorial-messaging className="contents">
       {openPanel && (
         <div
-          className="pointer-events-auto absolute flex overflow-hidden rounded-lg border border-border bg-card shadow-xl"
+          className="fixed z-50 flex overflow-hidden rounded-lg border border-border bg-card shadow-xl"
           style={{ [anchor.edge]: panelInset, bottom: panelBottom, width: panelW, height: panelH }}
         >
           {/* Resize handles, on the two edges the panel grows towards: the top,
@@ -385,8 +427,6 @@ export function MessagingWidget() {
           <div
             className="absolute inset-x-3 top-0 z-10 h-1 cursor-ns-resize rounded-full hover:bg-primary/15"
             onPointerDown={e => startResize(e, "top")}
-            onPointerMove={doResize}
-            onPointerUp={endResize}
           />
           <div
             className={[
@@ -394,8 +434,6 @@ export function MessagingWidget() {
               anchor.edge === "right" ? "left-0" : "right-0",
             ].join(" ")}
             onPointerDown={e => startResize(e, "side")}
-            onPointerMove={doResize}
-            onPointerUp={endResize}
           />
           <div
             className={[
@@ -403,8 +441,6 @@ export function MessagingWidget() {
               anchor.edge === "right" ? "left-0 rounded-br" : "right-0 rounded-bl",
             ].join(" ")}
             onPointerDown={e => startResize(e, "corner")}
-            onPointerMove={doResize}
-            onPointerUp={endResize}
           />
 
           {openPanel.kind === "conversation" ? (
@@ -547,8 +583,8 @@ export function MessagingWidget() {
         return (
           <div
             key={channelId}
-            className="pointer-events-auto absolute"
-            style={{ [at.edge]: MARGIN, bottom: at.bottom, zIndex: drag?.key === channelId ? 2 : 1 }}
+            className="fixed"
+            style={{ [at.edge]: MARGIN, bottom: at.bottom, zIndex: drag?.key === channelId ? 51 : 50 }}
           >
             <ConversationBubble
               name={bubble.target.title}
@@ -556,11 +592,10 @@ export function MessagingWidget() {
               isDirect={bubble.target.isDirect}
               unread={bubble.unreadCount}
               active={openPanel?.kind === "conversation" && openPanel.channelId === channelId}
-              onPointerDown={e => onPointerDown(channelId, e)}
-              onPointerMove={onPointerMove}
-              onPointerUp={() => onPointerUp(() => toggle({ kind: "conversation", channelId }))}
-              onPointerCancel={onPointerCancel}
-              onKeyActivate={() => toggle({ kind: "conversation", channelId })}
+              onPointerDown={e =>
+                onPointerDown(channelId, () => toggle({ kind: "conversation", channelId }), e)
+              }
+              onActivate={() => toggle({ kind: "conversation", channelId })}
               onClose={() => closeBubble(channelId)}
             />
           </div>
@@ -568,19 +603,16 @@ export function MessagingWidget() {
       })}
 
       <div
-        className="pointer-events-auto absolute"
+        className="fixed"
         style={{
           [mainAt.edge]: MARGIN,
           bottom: mainAt.bottom,
-          zIndex: drag?.key === MAIN ? 2 : 1,
+          zIndex: drag?.key === MAIN ? 51 : 50,
         }}
       >
         <button
           className="relative flex h-14 w-14 cursor-grab touch-none items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg ring-2 ring-primary/20 transition-transform hover:scale-105 active:cursor-grabbing active:scale-95"
-          onPointerDown={e => onPointerDown(MAIN, e)}
-          onPointerMove={onPointerMove}
-          onPointerUp={() => onPointerUp(() => toggle({ kind: "main" }))}
-          onPointerCancel={onPointerCancel}
+          onPointerDown={e => onPointerDown(MAIN, () => toggle({ kind: "main" }), e)}
           onClick={e => {
             // Keyboard only. A click synthesised by Enter or Space reports
             // detail 0, where a real mouse click reports 1 or more — and that
@@ -621,10 +653,7 @@ function ConversationBubble({
   unread,
   active,
   onPointerDown,
-  onPointerMove,
-  onPointerUp,
-  onPointerCancel,
-  onKeyActivate,
+  onActivate,
   onClose,
 }: {
   name: string
@@ -633,21 +662,16 @@ function ConversationBubble({
   unread: number
   active: boolean
   onPointerDown: (e: React.PointerEvent<HTMLElement>) => void
-  onPointerMove: (e: React.PointerEvent<HTMLElement>) => void
-  onPointerUp: () => void
-  onPointerCancel: () => void
-  onKeyActivate: () => void
+  onActivate: () => void
   onClose: () => void
 }) {
   return (
     <div className="group relative">
       <button
         onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerCancel}
         onClick={e => {
-          if (e.detail === 0) onKeyActivate()
+          // Keyboard only; a mouse press is settled on release.
+          if (e.detail === 0) onActivate()
         }}
         title={name}
         aria-label={name}
