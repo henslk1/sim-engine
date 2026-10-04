@@ -53,10 +53,6 @@ function ChatChannelsPage() {
   const [editing, setEditing] = useState<ChannelForm>(emptyForm())
 
   const refresh = () => utils.messaging.overview.invalidate({ gameId })
-  const reset = () => {
-    setEditingId(null)
-    setEditing(emptyForm())
-  }
 
   const create = trpc.messaging.admin.createChannel.useMutation({
     onSuccess: () => {
@@ -73,6 +69,22 @@ function ChatChannelsPage() {
   const setArchived = trpc.messaging.admin.setArchived.useMutation({ onSuccess: () => void refresh() })
   const reorder = trpc.messaging.admin.reorder.useMutation({ onSuccess: () => void refresh() })
 
+  // A failed mutation keeps its error until it is reset, so without this a
+  // rejected name goes on being displayed under a table that has since been
+  // reordered and archived — an error outliving the thing it described.
+  function clearErrors() {
+    create.reset()
+    update.reset()
+    setArchived.reset()
+    reorder.reset()
+  }
+
+  function reset() {
+    clearErrors()
+    setEditingId(null)
+    setEditing(emptyForm())
+  }
+
   const channels = overview.data?.channels ?? []
   const busy = create.isPending || update.isPending || reorder.isPending || setArchived.isPending
   const error =
@@ -81,6 +93,7 @@ function ChatChannelsPage() {
   function submit() {
     const name = editing.name.trim()
     if (!name) return
+    clearErrors()
     const description = editing.description.trim()
 
     if (editingId) {
@@ -292,6 +305,7 @@ function ChatChannelsPage() {
                     isLast={index === channels.length - 1}
                     busy={busy}
                     onEdit={() => {
+                      clearErrors()
                       setEditingId(channel.channelId)
                       setEditing({
                         name: channel.name,
@@ -301,14 +315,18 @@ function ChatChannelsPage() {
                         minimumStaffRole: channel.minimumStaffRole ?? "",
                       })
                     }}
-                    onMove={direction => move(index, direction)}
-                    onArchive={() =>
+                    onMove={direction => {
+                      clearErrors()
+                      move(index, direction)
+                    }}
+                    onArchive={() => {
+                      clearErrors()
                       setArchived.mutate({
                         gameId,
                         channelId: channel.channelId,
                         isArchived: !channel.isArchived,
                       })
-                    }
+                    }}
                   />
                 ))}
                 {channels.length === 0 && (
