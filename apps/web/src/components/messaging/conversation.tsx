@@ -203,6 +203,7 @@ export function Conversation({
   connection,
   viewer,
   onBack,
+  headerAction = null,
 }: {
   gameId: string
   target: ConversationTarget
@@ -211,6 +212,10 @@ export function Conversation({
   // Null in the wide layout, where the list is already on screen and there is
   // nothing to go back to.
   onBack: (() => void) | null
+  // Parked at the right of the header. Inside the widget it pops the
+  // conversation out into its own bubble; inside a popped window it closes it.
+  // A slot rather than two booleans, because this pane does not care which.
+  headerAction?: React.ReactNode
 }) {
   const utils = trpc.useUtils()
   const markRead = trpc.messaging.markRead.useMutation({
@@ -437,6 +442,7 @@ export function Conversation({
             {target.description}
           </span>
         )}
+        {headerAction && <div className="ml-auto shrink-0">{headerAction}</div>}
       </div>
 
       <div ref={scrollRef} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto px-3 py-2">

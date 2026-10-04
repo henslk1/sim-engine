@@ -1,17 +1,14 @@
 import { useState } from "react"
-import { Hash, Lock, Megaphone, MessageCircle, Plus, X } from "lucide-react"
-import { trpc, type RouterOutputs } from "@/lib/trpc"
+import { ExternalLink, Hash, Lock, Megaphone, MessageCircle, Plus, X } from "lucide-react"
+import { trpc } from "@/lib/trpc"
 import { useSocketEvent, type MessagingConnection } from "@/lib/messaging/socket-events"
-import { Conversation, type ConversationTarget } from "./conversation"
+import { Conversation } from "./conversation"
+import { channelTarget, type ChannelSummary, type DirectSummary } from "./targets"
 
-type Overview = RouterOutputs["messaging"]["overview"]
-type ChannelSummary = Overview["channels"][number]
-type DirectSummary = Overview["directMessages"][number]
-
-// Below this the pane shows one thing at a time: opening a conversation
-// replaces the list. Above it, list and conversation sit side by side the way
-// Discord does. The widget starts at 400px and resizes to 700, so both layouts
-// are reachable without leaving the widget.
+// Below this the pane shows one thing at a time: opening a channel replaces the
+// list. Above it, list and conversation sit side by side the way Discord does.
+// The widget starts at 400px and resizes to 700, so both layouts are reachable
+// without leaving the widget.
 //
 // 512 rather than 560 because the destination rail moved out to the widget,
 // where it is shared with notifications and the tutorial. Those 48px went to
@@ -29,53 +26,26 @@ function channelIcon(channel: ChannelSummary) {
   return channel.channelType === "ANNOUNCEMENT" ? Megaphone : Hash
 }
 
-function channelTarget(channel: ChannelSummary): ConversationTarget {
-  return {
-    channelId: channel.channelId,
-    title: channel.name,
-    isDirect: false,
-    isAnnouncement: channel.channelType === "ANNOUNCEMENT",
-    description: channel.description,
-    isArchived: channel.isArchived,
-    canPost: channel.canPost,
-    cannotPostReason: channel.cannotPostReason,
-    profileUsername: null,
-  }
-}
-
-function directTarget(conversation: DirectSummary): ConversationTarget {
-  return {
-    channelId: conversation.channelId,
-    title: conversation.participant.username,
-    isDirect: true,
-    isAnnouncement: false,
-    // A conversation is named by who is in it, so there is nothing to subtitle.
-    description: null,
-    isArchived: false,
-    canPost: conversation.canPost,
-    cannotPostReason: conversation.cannotPostReason,
-    profileUsername: conversation.participant.username,
-  }
-}
-
 export function ChatSection({
   gameId,
   connection,
   width,
   destination,
+  onPopOut,
 }: {
   gameId: string
   connection: MessagingConnection
   width: number
   destination: ChatDestination
+  // Hands a conversation to the dock, which gives it a bubble of its own.
+  // Direct messages always go this way; a channel only when asked.
+  onPopOut: (channelId: string) => void
 }) {
   const utils = trpc.useUtils()
-  // One per destination rather than one shared id. Switching to the server and
-  // back lands on the conversation that was open, which is how Discord behaves
-  // — and it rules out the bug a single id invites, where a channel is still
-  // open beside a list of direct messages.
+  // Only ever a channel. Conversations are not opened in here any more — they
+  // leave through onPopOut — so there is no second kind of id to confuse this
+  // one with.
   const [openChannelId, setOpenChannelId] = useState<string | null>(null)
-  const [openDirectId, setOpenDirectId] = useState<string | null>(null)
   const [composeRequested, setComposeRequested] = useState(false)
 
   const { data: overview, isLoading } = trpc.messaging.overview.useQuery({ gameId })
@@ -85,34 +55,26 @@ export function ChatSection({
   useSocketEvent("channel:updated", refresh)
   useSocketEvent("channel:archived", refresh)
 
-  const onDms = destination.kind === "dms"
-  const openId = onDms ? openDirectId : openChannelId
-  const setOpenId = onDms ? setOpenDirectId : setOpenChannelId
-  // Starting a conversation is a direct-message act, so it only shows there.
-  // Switching to the server hides it without discarding it, the same way the
-  // open conversation is kept — come back and the half-typed search is still
-  // there.
-  const composing = composeRequested && onDms
-
   // A message in a conversation that is not open changes an unread count. One
   // that is open does not: the conversation marks it read, and that invalidates
   // the overview on its own. Refetching here too would make the badge flash.
   useSocketEvent<{ channelId: string }>("message:created", payload => {
-    if (payload.channelId !== openId) refresh()
+    if (payload.channelId !== openChannelId) refresh()
   })
+
+  const onDms = destination.kind === "dms"
+  // Starting a conversation is a direct-message act, so it only shows there.
+  // Switching to the server hides it without discarding it — come back and the
+  // half-typed search is still there.
+  const composing = composeRequested && onDms
 
   const channels = overview?.channels ?? []
   const conversations = overview?.directMessages ?? []
 
-  // Looked up in the list this destination owns, so an id left over from the
-  // other one cannot resolve to a target here.
-  const openChannel = onDms ? undefined : channels.find(channel => channel.channelId === openId)
-  const openConversation = onDms ? conversations.find(dm => dm.channelId === openId) : undefined
-  const openTarget = openChannel
-    ? channelTarget(openChannel)
-    : openConversation
-      ? directTarget(openConversation)
-      : null
+  const openChannel = onDms
+    ? undefined
+    : channels.find(channel => channel.channelId === openChannelId)
+  const openTarget = openChannel ? channelTarget(openChannel) : null
 
   const wide = width >= TWO_COLUMN_MIN_WIDTH
   // Narrow: the conversation takes the list's place. Wide: both are on screen,
@@ -143,14 +105,13 @@ export function ChatSection({
             {onDms ? (
               <DirectList
                 conversations={conversations}
-                openChannelId={openId}
-                onOpen={setOpenDirectId}
+                onOpen={onPopOut}
                 onCompose={() => setComposeRequested(true)}
               />
             ) : (
               <ChannelList
                 channels={channels}
-                openChannelId={openId}
+                openChannelId={openChannelId}
                 onOpen={setOpenChannelId}
               />
             )}
@@ -164,7 +125,7 @@ export function ChatSection({
               onCancel={() => setComposeRequested(false)}
               onOpened={channelId => {
                 setComposeRequested(false)
-                setOpenDirectId(channelId)
+                onPopOut(channelId)
                 refresh()
               }}
             />
@@ -174,8 +135,6 @@ export function ChatSection({
               // the same one told to change. Conversation clears its messages in
               // an effect, which runs after the paint — so without this it draws
               // one frame of the previous channel's history under the new name.
-              // Harmless between two channels; alarming when the new name is a
-              // person.
               key={openTarget.channelId}
               gameId={gameId}
               target={openTarget}
@@ -183,7 +142,20 @@ export function ChatSection({
               viewer={overview.viewer}
               // Only reachable in the narrow layout; with the list already on
               // screen there is nothing to go back to.
-              onBack={wide ? null : () => setOpenId(null)}
+              onBack={wide ? null : () => setOpenChannelId(null)}
+              headerAction={
+                <button
+                  onClick={() => {
+                    onPopOut(openTarget.channelId)
+                    setOpenChannelId(null)
+                  }}
+                  title="Open in its own bubble"
+                  aria-label="Open in its own bubble"
+                  className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </button>
+              }
             />
           ) : wide ? (
             <div className="flex h-full flex-col items-center justify-center gap-2 text-muted-foreground">
@@ -238,14 +210,15 @@ function ChannelList({
   )
 }
 
+// A launcher, not a reading surface: picking somebody gives the conversation its
+// own bubble rather than opening it in here. Channels are the opposite — they
+// are read in place and only leave when asked.
 function DirectList({
   conversations,
-  openChannelId,
   onOpen,
   onCompose,
 }: {
   conversations: DirectSummary[]
-  openChannelId: string | null
   onOpen: (channelId: string) => void
   onCompose: () => void
 }) {
@@ -267,7 +240,7 @@ function DirectList({
         conversations.map(conversation => (
           <SidebarRow
             key={conversation.channelId}
-            active={conversation.channelId === openChannelId}
+            active={false}
             icon={
               <Avatar
                 username={conversation.participant.username}
@@ -287,12 +260,22 @@ function DirectList({
 
 // The player's own profile picture, which is the one image messaging uses.
 // Falls back to an initial rather than a placeholder graphic.
-function Avatar({ username, avatar }: { username: string; avatar: string | null }) {
+export function Avatar({
+  username,
+  avatar,
+  className = "h-4 w-4 text-[8px]",
+}: {
+  username: string
+  avatar: string | null
+  className?: string
+}) {
   if (avatar) {
-    return <img src={avatar} alt="" className="h-4 w-4 shrink-0 rounded-full object-cover" />
+    return <img src={avatar} alt="" className={`${className} shrink-0 rounded-full object-cover`} />
   }
   return (
-    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-muted text-[8px] font-semibold text-muted-foreground">
+    <span
+      className={`${className} flex shrink-0 items-center justify-center rounded-full bg-muted font-semibold text-muted-foreground`}
+    >
       {username.slice(0, 1).toUpperCase()}
     </span>
   )
