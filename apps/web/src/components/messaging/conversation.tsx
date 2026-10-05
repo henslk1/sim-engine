@@ -65,58 +65,27 @@ const MARK_READ_DEBOUNCE_MS = 400
 // Delete is deliberately *not* gated on canPost. deleteMessage skips the
 // posting check on purpose: moderation has to keep working in a channel that
 // was archived precisely because it went wrong.
-// Confirmation is asked for in here rather than with window.confirm. A native
-// dialog is suppressed outright in some browser contexts — it returns false
-// without ever being shown — and a delete guarded by one then does nothing at
-// all, silently, with no way to tell a refusal from a bug. Asking in the widget
-// also keeps a destructive step from throwing an OS dialog over the game.
+// No confirmation step. There was one, and it was worse than nothing: a strip
+// small enough to scroll past, which left the delete half-done and the whole
+// gesture to repeat. The control it guards is a 12px icon that has to be aimed
+// for, so reaching it is close to always deliberate — and deleting is a
+// tombstone rather than an erasure, since deleteMessage leaves the original
+// text on the row. An accident is recoverable; a confirmation nobody can see is
+// not worth the step.
 function MessageActions({
   canEdit,
   canDelete,
-  confirming,
   busy,
-  mine,
   onEdit,
-  onAskDelete,
-  onConfirmDelete,
-  onCancelDelete,
+  onDelete,
 }: {
   canEdit: boolean
   canDelete: boolean
-  confirming: boolean
   busy: boolean
-  mine: boolean
   onEdit: () => void
-  onAskDelete: () => void
-  onConfirmDelete: () => void
-  onCancelDelete: () => void
+  onDelete: () => void
 }) {
   if (!canEdit && !canDelete) return null
-
-  if (confirming) {
-    return (
-      <div className="absolute right-0 top-0 flex items-center gap-1 rounded border border-border bg-card px-1 py-0.5 shadow-sm">
-        <span className="text-[10px] text-muted-foreground">
-          {mine ? "Delete?" : "Remove?"}
-        </span>
-        <button
-          onClick={onConfirmDelete}
-          disabled={busy}
-          className="rounded px-1 text-[10px] font-semibold text-destructive transition-colors hover:underline disabled:opacity-40"
-        >
-          Yes
-        </button>
-        <button
-          onClick={onCancelDelete}
-          disabled={busy}
-          className="rounded px-1 text-[10px] text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40"
-        >
-          No
-        </button>
-      </div>
-    )
-  }
-
   return (
     <div className="absolute right-0 top-0 hidden gap-0.5 rounded border border-border bg-card px-1 py-0.5 shadow-sm group-hover:flex">
       {canEdit && (
@@ -131,7 +100,7 @@ function MessageActions({
       )}
       {canDelete && (
         <button
-          onClick={onAskDelete}
+          onClick={onDelete}
           disabled={busy}
           aria-label="Delete message"
           className="rounded p-0.5 text-muted-foreground transition-colors hover:text-destructive disabled:opacity-40"
@@ -270,10 +239,7 @@ export function Conversation({
     },
   })
   const remove = trpc.messaging.remove.useMutation({
-    onSuccess: saved => {
-      setMessages(list => upsertMessage(list, toChatMessage(saved)))
-      setConfirmingId(null)
-    },
+    onSuccess: saved => setMessages(list => upsertMessage(list, toChatMessage(saved))),
   })
 
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -286,9 +252,6 @@ export function Conversation({
   // composer.
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState("")
-  // The message whose delete has been asked for but not yet answered. One at a
-  // time, so asking about a second message drops the question about the first.
-  const [confirmingId, setConfirmingId] = useState<string | null>(null)
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const atBottom = useRef(true)
@@ -531,12 +494,7 @@ export function Conversation({
                       <div className="h-px flex-1 bg-border" />
                     </div>
                   )}
-                  <div
-                    className={["group relative", grouped ? "" : "mt-2"].join(" ")}
-                    onMouseLeave={() => {
-                      if (confirmingId === message.id) setConfirmingId(null)
-                    }}
-                  >
+                  <div className={["group relative", grouped ? "" : "mt-2"].join(" ")}>
                     {!grouped && (
                       <div className="flex items-baseline gap-1.5">
                         <span className="text-[11px] font-semibold text-foreground">
@@ -557,19 +515,12 @@ export function Conversation({
                           message.authorPlayerId === viewer.playerAccountId ||
                           viewer.staffRole !== null
                         }
-                        confirming={confirmingId === message.id}
                         busy={edit.isPending || remove.isPending}
-                        mine={message.authorPlayerId === viewer.playerAccountId}
                         onEdit={() => {
-                          setConfirmingId(null)
                           setEditingId(message.id)
                           setEditDraft(message.content)
                         }}
-                        onAskDelete={() => setConfirmingId(message.id)}
-                        onCancelDelete={() => setConfirmingId(null)}
-                        onConfirmDelete={() =>
-                          remove.mutate({ gameId, messageId: message.id })
-                        }
+                        onDelete={() => remove.mutate({ gameId, messageId: message.id })}
                       />
                     )}
                     {editingId === message.id ? (
