@@ -728,10 +728,14 @@ function RailButton({
       aria-label={label}
       onClick={onClick}
       className={[
-        "relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors",
+        // Every state carries a border, so the tile is the same size whichever
+        // one it is in — without it the unselected buttons are a bare glyph
+        // beside a filled block, and read as smaller. The selected one borders
+        // in its own fill so the outline does not draw a second edge around it.
+        "relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition-colors",
         active
-          ? "bg-primary text-primary-foreground"
-          : "text-muted-foreground hover:bg-muted hover:text-foreground",
+          ? "border-primary bg-primary text-primary-foreground"
+          : "border-border text-muted-foreground hover:bg-muted hover:text-foreground",
       ].join(" ")}
     >
       {children}
