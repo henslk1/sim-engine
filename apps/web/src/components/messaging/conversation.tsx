@@ -34,7 +34,12 @@ export type ConversationTarget = {
   // a link built out of it.
   profileUsername: string | null
 }
-type HistoryCursor = { createdAt: Date; id: string }
+// `createdAt` is a string, not a Date, because there is no superjson
+// transformer on this client — the server's HistoryCursor says Date, and what
+// arrives over the wire is an ISO string. Holding it as what it actually is
+// keeps the lie out of the client; the conversion back happens at the one place
+// that sends it, where the router coerces it anyway.
+type HistoryCursor = { createdAt: string; id: string }
 
 // Messages from the same person inside this window share one header, the way
 // every chat client does it. Long enough to group a burst of typing, short
@@ -317,7 +322,11 @@ export function Conversation({
     const container = scrollRef.current
     prependFrom.current = container ? container.scrollHeight : null
     try {
-      const page = await utils.messaging.history.fetch({ gameId, channelId, before: cursor })
+      const page = await utils.messaging.history.fetch({
+        gameId,
+        channelId,
+        before: cursor === null ? null : { id: cursor.id, createdAt: new Date(cursor.createdAt) },
+      })
       setMessages(list => [...page.messages.map(message => toChatMessage(message)), ...list])
       setCursor(page.nextCursor)
     } catch {
