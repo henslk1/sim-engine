@@ -736,7 +736,11 @@ function RailButton({
     >
       {children}
       {unread > 0 && (
-        <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-0.5 text-[9px] font-bold text-destructive-foreground">
+        // Same treatment as the badge on the bubble itself. It was two sizes
+        // smaller and had no ring, which left it reading as a red dot: you
+        // could tell there was something unread but not how much, which is the
+        // only thing a count is for.
+        <span className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold leading-none text-destructive-foreground ring-2 ring-card">
           {unread > 99 ? "99+" : unread}
         </span>
       )}
