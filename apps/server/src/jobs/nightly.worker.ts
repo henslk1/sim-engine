@@ -1,13 +1,19 @@
 import { Worker } from "bullmq";
 import { connection } from "./queue.js";
 import { db } from "@sim-engine/db";
-import { advanceAnimalAging } from "@sim-engine/engine";
+import {
+  advanceAnimalAging,
+  loadGameAgingCache,
+  selectAnimalsForAging,
+  summariseInnateTotals,
+} from "@sim-engine/engine";
 
 export const nightlyWorker = new Worker (
   "nightly",
   async (job) => {
     const { gameId } = job.data
-    
+    const startedAt = Date.now()
+
     const log = await db.nightlyUpdateLog.create({
       data: { gameId, success: false },
     })
@@ -26,34 +32,35 @@ export const nightlyWorker = new Worker (
       select: { id: true, lifeStageId: true, ageInCycles: true },
     })
 
-    const candidateIds = candidates.map(a => a.id)
-    const cyclesInPlay = [...new Set(candidates.map(a => a.ageInCycles))]
-
     // COVER_ACCEPTED is written to the sire when a female owner accepts a stud market
     // cover — the stud owner played no part, so it must not count as an interaction.
-    const interactedLogs = await db.animalDailyLog.findMany({
+    //
+    // Deliberately not `distinct` — the match is per animal against its own
+    // current cycle, and keeping one arbitrary row per animal is what made
+    // `selectAnimalsForAging` necessary. See the note there.
+    const interactions = await db.animalDailyLog.findMany({
       where: {
-        animalId: { in: candidateIds },
-        cycleNumber: { in: cyclesInPlay },
+        animalId: { in: candidates.map(a => a.id) },
+        cycleNumber: { in: [...new Set(candidates.map(a => a.ageInCycles))] },
         NOT: { eventType: "COVER_ACCEPTED" },
       },
       select: { animalId: true, cycleNumber: true },
-      distinct: ["animalId"],
     })
 
-    const interactedIds = new Set(
-      interactedLogs
-        .filter(log => candidates.find(a => a.id === log.animalId)?.ageInCycles === log.cycleNumber)
-        .map(log => log.animalId)
-    )
+    const animals = selectAnimalsForAging(candidates, interactions)
 
-    const animals = candidates.filter(a => interactedIds.has(a.id))
+    if (animals.length > 0) {
+      // The game's definitions — config, life stages, expression rules, illness
+      // and injury pools — read once for the whole run rather than once per
+      // animal. Loaded only when there is work, so an idle game stays free.
+      const cache = await loadGameAgingCache(db, gameId)
 
-    for (const animal of animals) {
-      try {
-        await advanceAnimalAging(db, animal.id)
-      } catch (err) {
-        console.error(`[nightly] failed to age animal ${animal.id}:`, err)
+      for (const animal of animals) {
+        try {
+          await advanceAnimalAging(db, animal.id, cache)
+        } catch (err) {
+          console.error(`[nightly] failed to age animal ${animal.id}:`, err)
+        }
       }
     }
 
@@ -62,31 +69,31 @@ export const nightlyWorker = new Worker (
       select: { id: true, status: true, lifeStageId: true },
     })
 
+    const stageBefore = new Map(animals.map(a => [a.id, a.lifeStageId]))
     const deaths = updated.filter(a => a.status === "DECEASED").length
     const transitions = updated.filter(a => {
-      const before = animals.find(b => b.id === a.id)!
-      return before.lifeStageId !== a.lifeStageId
+      const before = stageBefore.get(a.id)
+      return before !== undefined && before !== a.lifeStageId
     }).length
 
-    // Recalculate GameInnateMax from all alive animals
-    const animalStats = await db.animalStat.findMany({
-      where: { animal: { gameId, status: "ALIVE" } },
-      select: { animalId: true, innateValue: true },
+    // Recalculate GameInnateMax from the living population.
+    //
+    // Postgres does the per-animal sum, so this returns one row per animal
+    // rather than every stat row of every animal. Tutorial animals are excluded
+    // — they are handed generous fixed stats and would drag the game's ceiling
+    // around for everyone.
+    const innateTotals = await db.animalStat.groupBy({
+      by: ["animalId"],
+      where: { animal: { gameId, status: "ALIVE", isTutorialAnimal: false } },
+      _sum: { innateValue: true },
     })
 
-    if (animalStats.length > 0) {
-      const totalsByAnimal = new Map<string, number>()
-      for (const s of animalStats) {
-        totalsByAnimal.set(s.animalId, (totalsByAnimal.get(s.animalId) ?? 0) + s.innateValue)
-      }
-      const totals = Array.from(totalsByAnimal.values())
-      const maxTotalInnate = Math.max(...totals)
-      const averageTotalInnate = totals.reduce((a, b) => a + b, 0) / totals.length
-
+    const innate = summariseInnateTotals(innateTotals.map(row => row._sum.innateValue ?? 0))
+    if (innate) {
       await db.gameInnateMax.upsert({
         where: { gameId },
-        create: { gameId, maxTotalInnate, averageTotalInnate },
-        update: { maxTotalInnate, averageTotalInnate },
+        create: { gameId, maxTotalInnate: innate.max, averageTotalInnate: innate.average },
+        update: { maxTotalInnate: innate.max, averageTotalInnate: innate.average },
       })
     }
 
@@ -101,8 +108,10 @@ export const nightlyWorker = new Worker (
       },
     })
 
-    console.log(`[nightly] gameId=${gameId} aged=${animals.length} deaths=${deaths} transitions=${transitions}`)
-    
+    const elapsedMs = Date.now() - startedAt
+    const rate = animals.length > 0 ? (animals.length / (elapsedMs / 1000)).toFixed(1) : "0"
+    console.log(`[nightly] gameId=${gameId} aged=${animals.length} deaths=${deaths} transitions=${transitions} in ${elapsedMs}ms (${rate}/s)`)
+
   },
   { connection, lockDuration: 120000 }
 )

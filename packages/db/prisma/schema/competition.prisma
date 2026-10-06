@@ -305,6 +305,8 @@ model CompetitionEntry {
   competition     Competition            @relation(fields: [competitionId], references: [id])
 
   @@unique([competitionId, animalId])
+
+  @@index([animalId, cycleNumber])
 }
 
 model CompetitionEntryStat {

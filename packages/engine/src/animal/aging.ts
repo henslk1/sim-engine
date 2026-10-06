@@ -1,8 +1,17 @@
 import { db } from "@sim-engine/db";
+import { genotypeKey, indexHealthRecords, loadGameAgingCache } from "./aging-cache.js";
+import type { GameAgingCache } from "./aging-cache.js";
 
 type Client = typeof db
 
-export async function advanceAnimalAging(client: Client, animalId: string): Promise<{ pregnancyCompleted?: string; lifeStageAdvanced?: boolean; ageInCycles?: number }> {
+/**
+ * Ages one animal by a cycle.
+ *
+ * `cache` holds the game-scoped definitions this reads. A nightly loads it once
+ * and hands the same object to every animal; a one-off caller may leave it out
+ * and the animal's own game is loaded for it, exactly as before.
+ */
+export async function advanceAnimalAging(client: Client, animalId: string, cache?: GameAgingCache): Promise<{ pregnancyCompleted?: string; lifeStageAdvanced?: boolean; ageInCycles?: number }> {
   return client.$transaction(async (tx) => {
     const animal = await tx.animal.findUniqueOrThrow({
       where: { id: animalId },
@@ -13,13 +22,31 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
       },
     })
 
-    const [gameConfig, lifeStageDefs] = await Promise.all([
-      tx.gameConfig.findUniqueOrThrow({ where: { gameId: animal.gameId } }),
-      tx.lifeStageDef.findMany({
-        where: { gameId: animal.gameId },
-        orderBy: { stageIndex: "asc" },
-      }),
-    ])
+    // A cache built for a different game would silently apply the wrong config
+    // to every animal in the run, so it is checked rather than trusted.
+    if (cache && cache.gameId !== animal.gameId) {
+      throw new Error(`Aging cache is for game ${cache.gameId}, animal ${animalId} belongs to ${animal.gameId}`)
+    }
+    const game = cache ?? await loadGameAgingCache(tx, animal.gameId)
+    const { gameConfig, lifeStageDefs } = game
+
+    // Read once and answered in memory from here on. Every "does this animal
+    // already have condition X" and "when did X last resolve" below used to be
+    // its own round trip, several of them inside loops.
+    const healthRecords = indexHealthRecords(
+      await tx.animalHealthRecord.findMany({
+        where: { animalId },
+        select: { conditionDefId: true, isActive: true, resolvedCycle: true },
+      })
+    )
+
+    // Both the illness roll and the genetic-onset pass walk the animal's
+    // genotypes; neither may be reached, so this stays lazy.
+    let genotypeRows: { locusId: string; alleleOneId: string; alleleTwoId: string }[] | null = null
+    const loadGenotypes = async () => genotypeRows ??= await tx.animalGenotype.findMany({
+      where: { animalId },
+      select: { locusId: true, alleleOneId: true, alleleTwoId: true },
+    })
 
     const newAge = animal.ageInCycles + 1
 
@@ -109,43 +136,19 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
       const careRatio = careScore ? careScore.score / 100 : 1
       const illnessChance = (1 - immunityRatio * careRatio) / 25
       if (Math.random() < illnessChance) {
-        const eligible = await tx.healthConditionDef.findMany({
-          where: {
-            gameId: animal.gameId,
-            conditionType: "ILLNESS",
-            isGenetic: false,
-            healthRecords: { none: { animalId, isActive: true } },
-          },
-          include: {
-            healthRecords: {
-              where: { animalId, isActive: false },
-              orderBy: { resolvedCycle: "desc" },
-              take: 1,
-              select: { resolvedCycle: true },
-            },
-            ruleConditions: {
-              select: {
-                penetrance: true,
-                expressionRule: { select: { locusId: true, alleleOneId: true, alleleTwoId: true } },
-              },
-            },
-          },
-        })
-        const eligibleFiltered = eligible.filter(cond => {
+        const eligibleFiltered = game.illnessPool.filter(cond => {
+          if (healthRecords.hasActive(cond.id)) return false
           if (!cond.flareupCooldownCycles) return true
-          const lastResolved = cond.healthRecords[0]
-          if (lastResolved?.resolvedCycle == null) return true
-          return newAge >= lastResolved.resolvedCycle + cond.flareupCooldownCycles
+          const lastResolved = healthRecords.lastResolvedCycle(cond.id)
+          if (lastResolved == null) return true
+          return newAge >= lastResolved + cond.flareupCooldownCycles
         })
         if (eligibleFiltered.length > 0) {
-          const genotypes = await tx.animalGenotype.findMany({
-            where: { animalId },
-            select: { locusId: true, alleleOneId: true, alleleTwoId: true },
-          })
-          const genotypeSet = new Set(genotypes.map(g => `${g.locusId}:${g.alleleOneId}:${g.alleleTwoId}`))
+          const genotypes = await loadGenotypes()
+          const genotypeSet = new Set(genotypes.map(genotypeKey))
           const weights = eligibleFiltered.map(cond => {
             const bonus = cond.ruleConditions
-              .filter(rc => genotypeSet.has(`${rc.expressionRule.locusId}:${rc.expressionRule.alleleOneId}:${rc.expressionRule.alleleTwoId}`))
+              .filter(rc => genotypeSet.has(genotypeKey(rc.expressionRule)))
               .reduce((sum, rc) => sum + (rc.penetrance ?? 0), 0)
             return cond.baseWeight + bonus
           })
@@ -159,24 +162,16 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
           await tx.animalHealthRecord.create({
             data: { animalId, conditionDefId: picked.id, isActive: true },
           })
+          healthRecords.markActive(picked.id)
         }
       }
     }
 
     if (!animal.isTutorialAnimal) {
       // Genetic condition onset rolls
-      const genotypes = await tx.animalGenotype.findMany({ where: { animalId } })
+      const genotypes = await loadGenotypes()
       for (const genotype of genotypes) {
-        const rule = await tx.expressionRule.findUnique({
-          where: {
-            locusId_alleleOneId_alleleTwoId: {
-              locusId: genotype.locusId,
-              alleleOneId: genotype.alleleOneId,
-              alleleTwoId: genotype.alleleTwoId,
-            },
-          },
-          include: { ruleConditions: { include: { healthConditionDef: true } } },
-        })
+        const rule = game.expressionRulesByGenotype.get(genotypeKey(genotype))
 
         if (!rule?.ruleConditions.length) continue
 
@@ -185,28 +180,21 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
           if (!condDef.isGenetic) continue
           if (condDef.onsetMinCycle !== null && newAge < condDef.onsetMinCycle) continue
 
-          const alreadyExists = await tx.animalHealthRecord.findFirst({
-            where: {
-              animalId,
-              conditionDefId: condDef.id,
-              ...(condDef.isEpisodic ? { isActive: true } : {}),
-            },
-          })
+          const alreadyExists = condDef.isEpisodic
+            ? healthRecords.hasActive(condDef.id)
+            : healthRecords.hasAny(condDef.id)
           if (alreadyExists) continue
 
           if (condDef.isEpisodic && condDef.flareupCooldownCycles) {
-            const lastResolved = await tx.animalHealthRecord.findFirst({
-              where: { animalId, conditionDefId: condDef.id, isActive: false },
-              orderBy: { resolvedCycle: "desc" },
-              select: { resolvedCycle: true },
-            })
-            if (lastResolved?.resolvedCycle != null && newAge < lastResolved.resolvedCycle + condDef.flareupCooldownCycles) continue
+            const lastResolved = healthRecords.lastResolvedCycle(condDef.id)
+            if (lastResolved != null && newAge < lastResolved + condDef.flareupCooldownCycles) continue
           }
 
           if (Math.random() < (rc.penetrance ?? 1.0)) {
             await tx.animalHealthRecord.create({
               data: { animalId, conditionDefId: condDef.id, isActive: true },
             })
+            healthRecords.markActive(condDef.id)
           }
         }
       }
@@ -322,10 +310,9 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
         tx.competitionEntry.count({ where: { animalId, cycleNumber: currentCycle } }),
         tx.stageActivityLog.count({ where: { animalId, cycleNumber: currentCycle } }),
       ]).then(([t, c, s]) => t + c + s > 0),
-      Promise.all([
-        tx.careActionDef.count({ where: { gameId: animal.gameId } }),
-        tx.careLog.count({ where: { animalId, cycleNumber: currentCycle } }),
-      ]).then(([total, done]) => total === 0 || done >= total),
+      tx.careLog
+        .count({ where: { animalId, cycleNumber: currentCycle } })
+        .then(done => game.careActionCount === 0 || done >= game.careActionCount),
       tx.animalEnergy.findUnique({ where: { animalId } }),
       tx.animalMood.findUnique({ where: { animalId } }),
       tx.animalCondition.findUnique({ where: { animalId } }),
@@ -393,18 +380,13 @@ export async function advanceAnimalAging(client: Client, animalId: string): Prom
     // Overwork injury: fires if animal ends the cycle with critically low energy
     if (!animal.isTutorialAnimal && isOverworked) {
       if (Math.random() < gameConfig.overworkInjuryChance + animal.structuralRisk) {
-        const injuryPool = await tx.healthConditionDef.findMany({
-          where: {
-            gameId: animal.gameId,
-            conditionType: "INJURY",
-            healthRecords: { none: { animalId, isActive: true } },
-          },
-        })
+        const injuryPool = game.injuryPool.filter(cond => !healthRecords.hasActive(cond.id))
         if (injuryPool.length > 0) {
           const picked = injuryPool[Math.floor(Math.random() * injuryPool.length)]!
           await tx.animalHealthRecord.create({
             data: { animalId, conditionDefId: picked.id, isActive: true },
           })
+          healthRecords.markActive(picked.id)
         }
       }
     }

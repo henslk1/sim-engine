@@ -43,6 +43,8 @@ model CareLog {
   careActionDef       CareActionDef  @relation(fields: [careActionDefId], references: [id])
   performedBy         PlayerAccount? @relation("CarePerformedBy", fields: [performedByPlayerId], references: [id])
   createdAt           DateTime       @default(now())
+
+  @@index([animalId, cycleNumber])
 }
 
 model AnimalCareScore {

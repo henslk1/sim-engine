@@ -46,6 +46,8 @@ model TrainingLog {
   intensityTierDef    IntensityTierDef  @relation(fields: [intensityTierDefId], references: [id])
   trainingActionDef   TrainingActionDef @relation(fields: [trainingActionDefId], references: [id])
   animal              Animal            @relation(fields: [animalId], references: [id])
+
+  @@index([animalId, cycleNumber])
 }
 
 model AnimalEnergy {
@@ -141,6 +143,8 @@ model StageActivityLog {
   performedBy         PlayerAccount?   @relation(fields: [performedByPlayerId], references: [id])
   stageActivityDef    StageActivityDef @relation(fields: [stageActivityDefId], references: [id])
   animal              Animal           @relation(fields: [animalId], references: [id])
+
+  @@index([animalId, cycleNumber])
 }
 
 model Clinic {

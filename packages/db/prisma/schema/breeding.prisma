@@ -143,6 +143,8 @@ model Pregnancy {
   surrogacyRecord    SurrogacyRecord?
   breedingRecord     BreedingRecord       @relation(fields: [breedingRecordId], references: [id])
   animal             Animal               @relation(fields: [animalId], references: [id])
+
+  @@index([animalId, isCompleted])
 }
 
 model PregnancyOffspring {
