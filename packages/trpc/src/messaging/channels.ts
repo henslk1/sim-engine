@@ -67,7 +67,7 @@ export type MessagingOverview = {
 async function countUnread(
   channelId: string,
   playerAccountId: string,
-  after: Date | null
+  after: { createdAt: Date; id: string } | null
 ): Promise<number> {
   const rows = await db.chatMessage.findMany({
     where: {
@@ -77,7 +77,14 @@ async function countUnread(
       // Neither should your own messages. Sending in a channel is as good as
       // having read it.
       authorPlayerId: { not: playerAccountId },
-      ...(after === null ? {} : { createdAt: { gt: after } }),
+      ...(after === null
+        ? {}
+        : {
+            OR: [
+              { createdAt: { gt: after.createdAt } },
+              { createdAt: after.createdAt, id: { gt: after.id } },
+            ],
+          }),
     },
     orderBy: { createdAt: "asc" },
     select: { id: true },
@@ -176,10 +183,10 @@ export async function loadMessagingOverview(actor: MessagingActor): Promise<Mess
     // lastReadAt records when the player pressed something, which is always a
     // little after the message they were looking at — so counting from it would
     // silently swallow anything that arrived in that gap.
-    select: { chatChannelId: true, lastReadMessage: { select: { createdAt: true } } },
+    select: { chatChannelId: true, lastReadMessage: { select: { id: true, createdAt: true } } },
   })
   const watermarks = new Map(
-    readStatuses.map(status => [status.chatChannelId, status.lastReadMessage?.createdAt ?? null])
+    readStatuses.map(status => [status.chatChannelId, status.lastReadMessage ?? null])
   )
 
   const summaries = await Promise.all(

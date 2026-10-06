@@ -9,22 +9,30 @@ type ChannelRow = {
   name: string | null
   defaultCanPost: boolean
   isArchived: boolean
-  server: { id: string; serverType: "GLOBAL" | "GROUP"; isArchived: boolean } | null
-  directMessage: { id: string; participantLowId: string; participantHighId: string } | null
+  server: { id: string; gameId: string; serverType: "GLOBAL" | "GROUP"; isArchived: boolean } | null
+  directMessage: {
+    id: string
+    gameId: string
+    participantLowId: string
+    participantHighId: string
+    participantLow: { gameId: string }
+    participantHigh: { gameId: string }
+  } | null
 }
 
 type MessageRow = {
   id: string
   gameId: string
   channelId: string
-  authorPlayerId: string
+  authorPlayerId: string | null
+  authorName: string | null
   clientMessageId: string
   content: string
   createdAt: Date
   editedAt: Date | null
   deletedAt: Date | null
   deletedByPlayerId: string | null
-  authorPlayer: { username: string }
+  authorPlayer: { username: string } | null
 }
 
 const GAME = "game-1"
@@ -47,6 +55,15 @@ const state = {
   userAccounts: [{ id: ME }] as { id: string }[],
   allMessages: [] as MessageRow[],
   createdChannels: 0,
+  announcementServer: null as {
+    announcementChannelId: string | null
+    game: { name: string }
+  } | null,
+  readStatus: null as {
+    lastReadMessageId: string
+    lastReadAt: Date
+    lastReadMessage: { id: string; createdAt: Date }
+  } | null,
 }
 
 let nextId = 0
@@ -57,6 +74,7 @@ function makeMessage(over: Partial<MessageRow> = {}): MessageRow {
     gameId: GAME,
     channelId: CHANNEL,
     authorPlayerId: ME,
+    authorName: null,
     clientMessageId: `client-${nextId}`,
     content: "hello",
     createdAt: new Date("2026-09-30T12:00:00Z"),
@@ -70,11 +88,14 @@ function makeMessage(over: Partial<MessageRow> = {}): MessageRow {
 
 function store(message: MessageRow) {
   state.messagesById.set(message.id, message)
-  state.messagesByClientId.set(`${message.authorPlayerId}:${message.clientMessageId}`, message)
+  if (message.authorPlayerId !== null) {
+    state.messagesByClientId.set(`${message.authorPlayerId}:${message.clientMessageId}`, message)
+  }
   return message
 }
 
 const db = {
+  chatServer: { findUnique: async () => state.announcementServer },
   chatChannel: {
     findUnique: async () => state.channel,
     create: async () => {
@@ -96,13 +117,15 @@ const db = {
       if (!key) return null
       return state.messagesByClientId.get(`${key.authorPlayerId}:${key.clientMessageId}`) ?? null
     },
-    create: async ({ data }: { data: Record<string, string> }) =>
+    create: async ({ data }: { data: Record<string, unknown> }) =>
       store(makeMessage({
         gameId: data["gameId"] as string,
         channelId: data["channelId"] as string,
-        authorPlayerId: data["authorPlayerId"] as string,
+        authorPlayerId: data["authorPlayerId"] as string | null,
+        authorName: (data["authorName"] as string | undefined) ?? null,
         clientMessageId: data["clientMessageId"] as string,
         content: data["content"] as string,
+        authorPlayer: data["authorPlayerId"] === null ? null : { username: "me" },
       })),
     findMany: async () => state.allMessages,
     updateMany: async ({ data }: { data: { deletedAt: Date } }) => {
@@ -120,7 +143,23 @@ const db = {
     create: async () => ({ id: "dm-new", chatChannelId: "channel-new-1" }),
     update: async () => { state.dmActivityBumped += 1 },
   },
-  messageReadStatus: { upsert: async () => ({}) },
+  messageReadStatus: {
+    findUnique: async () => state.readStatus,
+    upsert: async ({ create, update }: {
+      create: { lastReadMessageId: string; lastReadAt: Date }
+      update: { lastReadMessageId: string; lastReadAt: Date }
+    }) => {
+      const next = state.readStatus === null ? create : update
+      const message = state.messagesById.get(next.lastReadMessageId)
+      if (!message) throw new Error("read target missing")
+      state.readStatus = {
+        lastReadMessageId: next.lastReadMessageId,
+        lastReadAt: next.lastReadAt,
+        lastReadMessage: { id: message.id, createdAt: message.createdAt },
+      }
+      return { lastReadMessageId: next.lastReadMessageId, lastReadAt: next.lastReadAt }
+    },
+  },
   adminActionLog: {
     create: async ({ data }: { data: { action: string } }) => {
       state.auditLogged.push(data.action)
@@ -131,7 +170,14 @@ const db = {
 }
 Object.assign(globalThis, { prisma: db })
 
-const { createMessage, editMessage, deleteMessage, markRead, removeAllMessagesByUser } = await import("../src/messaging/messages.ts")
+const {
+  createGameAnnouncement,
+  createMessage,
+  editMessage,
+  deleteMessage,
+  markRead,
+  removeAllMessagesByUser,
+} = await import("../src/messaging/messages.ts")
 const { getOrCreateDirectMessage } = await import("../src/messaging/conversations.ts")
 const { prepareContent, MAX_CONTENT_CODE_POINTS } = await import("../src/messaging/content.ts")
 const { resetMessagingRateLimits } = await import("../src/messaging/rate-limit.ts")
@@ -143,7 +189,10 @@ const realtime = {
     void state.emitted.push({ room: `channel:${channelId}`, event }),
   emitToGame: (gameId: string, event: string) =>
     void state.emitted.push({ room: `game:${gameId}`, event }),
+  emitMessagingActivity: () =>
+    void state.emitted.push({ room: "activity", event: "messaging:activity" }),
   disconnectUser: () => {},
+  disconnectGame: () => {},
 }
 
 const actor = (staffRole: "OWNER" | "ADMIN" | "MODERATOR" | null = null) => ({
@@ -161,7 +210,7 @@ const globalChannel = (over: Partial<ChannelRow> = {}): ChannelRow => ({
   name: "general",
   defaultCanPost: true,
   isArchived: false,
-  server: { id: "server-global", serverType: "GLOBAL", isArchived: false },
+  server: { id: "server-global", gameId: GAME, serverType: "GLOBAL", isArchived: false },
   directMessage: null,
   ...over,
 })
@@ -182,6 +231,8 @@ beforeEach(() => {
   state.userAccounts = [{ id: ME }]
   state.allMessages = []
   state.createdChannels = 0
+  state.announcementServer = null
+  state.readStatus = null
   nextId = 0
 })
 
@@ -226,7 +277,37 @@ const send = (over: Partial<{ channelId: string; clientMessageId: string; conten
 test("a message is saved and announced to its channel", async () => {
   const result = await send()
   assert.equal(result.ok, true)
-  assert.deepEqual(state.emitted, [{ room: `channel:${CHANNEL}`, event: "message:created" }])
+  assert.deepEqual(state.emitted, [
+    { room: `channel:${CHANNEL}`, event: "message:created" },
+    { room: "activity", event: "messaging:activity" },
+  ])
+})
+
+test("a broadcast is authored by the game in its configured announcement channel", async () => {
+  state.channel = globalChannel({
+    channelType: "ANNOUNCEMENT",
+    defaultCanPost: false,
+  })
+  state.announcementServer = {
+    announcementChannelId: CHANNEL,
+    game: { name: "Horse World" },
+  }
+
+  const result = await createGameAnnouncement(actor("ADMIN"), realtime, {
+    content: "  Scheduled maintenance tonight.  ",
+  })
+
+  assert.equal(result.ok, true)
+  if (!result.ok) return
+  assert.equal(result.value.channelId, CHANNEL)
+  assert.equal(result.value.authorPlayerId, null)
+  assert.equal(result.value.authorUsername, "Horse World")
+  assert.equal(result.value.content, "Scheduled maintenance tonight.")
+  assert.deepEqual(state.auditLogged, ["chat_announcement_posted"])
+  assert.deepEqual(state.emitted.map(event => event.event), [
+    "message:created",
+    "messaging:activity",
+  ])
 })
 
 test("resending the same client id returns the original instead of a duplicate", async () => {
@@ -258,7 +339,14 @@ test("a blocked DM refuses the send but the channel still loads", async () => {
   state.channel = globalChannel({
     channelType: "DM",
     server: null,
-    directMessage: { id: "dm-1", participantLowId: ME, participantHighId: THEM },
+    directMessage: {
+      id: "dm-1",
+      gameId: GAME,
+      participantLowId: ME,
+      participantHighId: THEM,
+      participantLow: { gameId: GAME },
+      participantHigh: { gameId: GAME },
+    },
   })
   state.blocks = 1
   const result = await send()
@@ -270,7 +358,14 @@ test("sending into a DM bumps its position in the conversation list", async () =
   state.channel = globalChannel({
     channelType: "DM",
     server: null,
-    directMessage: { id: "dm-1", participantLowId: ME, participantHighId: THEM },
+    directMessage: {
+      id: "dm-1",
+      gameId: GAME,
+      participantLowId: ME,
+      participantHighId: THEM,
+      participantLow: { gameId: GAME },
+      participantHigh: { gameId: GAME },
+    },
   })
   await send()
   assert.equal(state.dmActivityBumped, 1)
@@ -404,6 +499,25 @@ test("marking read notifies only the player's own room", async () => {
   const result = await markRead(actor(), realtime, { channelId: CHANNEL, lastReadMessageId: message.id })
   assert.equal(result.ok, true)
   assert.deepEqual(state.emitted, [{ room: `player:${GAME}:${ME}`, event: "read:updated" }])
+})
+
+test("an older tab cannot move the read pointer backwards", async () => {
+  const createdAt = new Date("2026-09-30T12:00:00Z")
+  const older = store(makeMessage({ id: "message-a", createdAt }))
+  const newer = store(makeMessage({ id: "message-b", createdAt }))
+
+  const advanced = await markRead(actor(), realtime, {
+    channelId: CHANNEL,
+    lastReadMessageId: newer.id,
+  })
+  const stale = await markRead(actor(), realtime, {
+    channelId: CHANNEL,
+    lastReadMessageId: older.id,
+  })
+
+  assert.equal(advanced.ok, true)
+  assert.equal(stale.ok === true && stale.value.lastReadMessageId, newer.id)
+  assert.equal(state.readStatus?.lastReadMessageId, newer.id)
 })
 
 // ── Opening conversations ────────────────────────────────────────────────────

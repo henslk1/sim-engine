@@ -203,10 +203,13 @@ function timeLabel(iso: string): string {
   return new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
 }
 
-function targetIcon(target: ConversationTarget) {
-  if (target.isDirect) return User
-  if (target.isArchived) return Lock
-  return target.isAnnouncement ? Megaphone : Hash
+function TargetIcon({ target }: { target: ConversationTarget }) {
+  if (target.isDirect) return <User className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+  if (target.isArchived) return <Lock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+  if (target.isAnnouncement) {
+    return <Megaphone className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+  }
+  return <Hash className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
 }
 
 export function Conversation({
@@ -278,24 +281,27 @@ export function Conversation({
   // database is asked again rather than the gap being assumed empty.
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
     lastMarked.current = null
 
-    void joinChannel(channelId)
-    void utils.messaging.history
-      .fetch({ gameId, channelId })
-      .then(page => {
+    void (async () => {
+      // Let the effect finish before changing render state. This avoids a
+      // synchronous effect cascade while still showing loading on a reconnect.
+      await Promise.resolve()
+      if (cancelled) return
+      setLoading(true)
+      void joinChannel(channelId)
+      try {
+        const page = await utils.messaging.history.fetch({ gameId, channelId })
         if (cancelled) return
         setMessages(page.messages.map(message => toChatMessage(message)))
         setCursor(page.nextCursor)
         atBottom.current = true
-      })
-      .catch(() => {
+      } catch {
         if (!cancelled) setMessages([])
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) setLoading(false)
-      })
+      }
+    })()
 
     return () => {
       cancelled = true
@@ -417,7 +423,6 @@ export function Conversation({
     )
   }
 
-  const Icon = targetIcon(target)
   const offline = connection.status !== "online"
   const composerMessage = offline
     ? connection.status === "connecting"
@@ -437,7 +442,7 @@ export function Conversation({
             <ArrowLeft className="h-3.5 w-3.5" />
           </button>
         )}
-        <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        <TargetIcon target={target} />
         {target.profileUsername === null ? (
           <span className="truncate text-xs font-semibold text-foreground">{target.title}</span>
         ) : (

@@ -20,27 +20,35 @@ type ChannelRow = {
   defaultCanPost: boolean
   minimumStaffRole: "OWNER" | "ADMIN" | "MODERATOR" | null
   isArchived: boolean
-  server: { id: string; serverType: "GLOBAL" | "GROUP"; isArchived: boolean } | null
-  directMessage: { id: string; participantLowId: string; participantHighId: string } | null
+  server: { id: string; gameId: string; serverType: "GLOBAL" | "GROUP"; isArchived: boolean } | null
+  directMessage: {
+    id: string
+    gameId: string
+    participantLowId: string
+    participantHighId: string
+    participantLow: { gameId: string }
+    participantHigh: { gameId: string }
+  } | null
 }
 
 type MessageRow = {
   id: string
   gameId: string
   channelId: string
-  authorPlayerId: string
+  authorPlayerId: string | null
+  authorName: string | null
   clientMessageId: string
   content: string
   createdAt: Date
   editedAt: Date | null
   deletedAt: Date | null
   deletedByPlayerId: string | null
-  authorPlayer: { username: string }
+  authorPlayer: { username: string } | null
 }
 
 type ReadStatusRow = {
   chatChannelId: string
-  lastReadMessage: { createdAt: Date } | null
+  lastReadMessage: { id: string; createdAt: Date } | null
 }
 
 const GAME = "game-1"
@@ -165,7 +173,7 @@ const db = {
         defaultCanPost: data["defaultCanPost"] as boolean,
         minimumStaffRole: (data["minimumStaffRole"] as ChannelRow["minimumStaffRole"]) ?? null,
         isArchived: false,
-        server: { id: SERVER, serverType: "GLOBAL", isArchived: false },
+        server: { id: SERVER, gameId: data["gameId"] as string, serverType: "GLOBAL", isArchived: false },
         directMessage: null,
       }
       state.channels.push(row)
@@ -235,7 +243,11 @@ const realtime = {
     void state.emitted.push({ room: `channel:${channelId}`, event, payload }),
   emitToGame: (gameId: string, event: string, payload: unknown) =>
     void state.emitted.push({ room: `game:${gameId}`, event, payload }),
+  emitMessagingActivity: (_audience: unknown, payload: unknown) =>
+    void state.emitted.push({ room: "activity", event: "messaging:activity", payload }),
   disconnectUser: () => {},
+  disconnectGame: (gameId: string, reason: string) =>
+    void state.emitted.push({ room: `game:${gameId}`, event: "disconnect", payload: reason }),
 }
 
 const actor = (staffRole: "OWNER" | "ADMIN" | "MODERATOR" | null = null) => ({
@@ -258,7 +270,7 @@ function channel(over: Partial<ChannelRow> = {}): ChannelRow {
     defaultCanPost: true,
     minimumStaffRole: null,
     isArchived: false,
-    server: { id: SERVER, serverType: "GLOBAL", isArchived: false },
+    server: { id: SERVER, gameId: GAME, serverType: "GLOBAL", isArchived: false },
     directMessage: null,
     ...over,
   }
@@ -272,6 +284,7 @@ function message(over: Partial<MessageRow> = {}): MessageRow {
     gameId: GAME,
     channelId: GENERAL,
     authorPlayerId: THEM,
+    authorName: null,
     clientMessageId: `client-${nextMessage}`,
     content: `message ${nextMessage}`,
     // One minute apart, so ordering is unambiguous unless a test says otherwise.
@@ -333,7 +346,21 @@ test("the unread watermark is the read message's own timestamp, not when it was 
   const first = message({ createdAt: new Date(Date.UTC(2026, 9, 1, 12, 1)) })
   const second = message({ createdAt: new Date(Date.UTC(2026, 9, 1, 12, 2)) })
   state.messages.push(first, second)
-  state.readStatuses = [{ chatChannelId: GENERAL, lastReadMessage: { createdAt: first.createdAt } }]
+  state.readStatuses = [{ chatChannelId: GENERAL, lastReadMessage: { id: first.id, createdAt: first.createdAt } }]
+
+  const overview = await loadMessagingOverview(actor())
+  assert.equal(overview.channels[0]?.unreadCount, 1)
+})
+
+test("a message after the watermark in the same millisecond is still unread", async () => {
+  const createdAt = new Date(Date.UTC(2026, 9, 1, 12, 1))
+  const first = message({ id: "message-a", createdAt })
+  const second = message({ id: "message-b", createdAt })
+  state.messages.push(first, second)
+  state.readStatuses = [{
+    chatChannelId: GENERAL,
+    lastReadMessage: { id: first.id, createdAt: first.createdAt },
+  }]
 
   const overview = await loadMessagingOverview(actor())
   assert.equal(overview.channels[0]?.unreadCount, 1)
@@ -428,7 +455,7 @@ test("an archived channel refuses posting even to an owner", async () => {
 
 test("an archived server closes the composer in every one of its channels", async () => {
   state.server = { id: SERVER, name: "Global", description: null, isArchived: true }
-  state.channels = [channel({ server: { id: SERVER, serverType: "GLOBAL", isArchived: true } })]
+  state.channels = [channel({ server: { id: SERVER, gameId: GAME, serverType: "GLOBAL", isArchived: true } })]
   const overview = await loadMessagingOverview(actor())
   assert.equal(overview.channels[0]?.canPost, false)
 })
@@ -583,6 +610,10 @@ test("a channel can be created restricted, and the restriction can later be clea
   if (!opened.ok) return
   assert.equal(opened.value.minimumStaffRole, null)
   assert.deepEqual(state.updated.at(-1)?.data, { minimumStaffRole: null })
+  assert.equal(
+    state.emitted.some(event => event.room === `game:${GAME}` && event.event === "disconnect"),
+    true
+  )
 })
 
 test("a name with nothing left after normalizing is refused", async () => {

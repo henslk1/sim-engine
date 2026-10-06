@@ -1,5 +1,6 @@
-import { db, type ChannelType, type StaffRoleType } from "@sim-engine/db"
+import { db, Prisma, type ChannelType, type StaffRoleType } from "@sim-engine/db"
 import type { MessagingActor } from "./actor.js"
+import { isUniqueViolation } from "./db-errors.js"
 import type { RealtimeControl } from "./realtime.js"
 import { allow, deny, type Decision } from "./result.js"
 import { GLOBAL_SCOPE_KEY, normalizeChannelName } from "./servers.js"
@@ -70,8 +71,13 @@ async function globalServerId(gameId: string): Promise<string | null> {
 
 // Records the act, not its content. The row before and after is in the database;
 // what an audit needs to add is who changed it and when.
-async function logChannelAction(actor: MessagingActor, action: string, channelId: string) {
-  await db.adminActionLog.create({
+async function logChannelAction(
+  actor: MessagingActor,
+  action: string,
+  channelId: string,
+  client: Pick<Prisma.TransactionClient, "adminActionLog"> = db
+) {
+  await client.adminActionLog.create({
     data: {
       staffUserId: actor.userId,
       gameId: actor.gameId,
@@ -169,22 +175,32 @@ export async function createChannel(
   // reorder rewrites every position anyway.
   const displayOrder = await db.chatChannel.count({ where: { serverId } })
 
-  const row = await db.chatChannel.create({
-    data: {
-      gameId: actor.gameId,
-      serverId,
-      name: name.value,
-      description: input.description ?? null,
-      channelType: input.channelType,
-      defaultCanPost: input.defaultCanPost,
-      minimumStaffRole: input.minimumStaffRole ?? null,
-      displayOrder,
-      createdByPlayerId: actor.playerAccountId,
-    },
-    select: CHANNEL_SELECT,
-  })
-
-  await logChannelAction(actor, "chat_channel_created", row.id)
+  let row: ChannelRow
+  try {
+    row = await db.$transaction(async tx => {
+      const created = await tx.chatChannel.create({
+        data: {
+          gameId: actor.gameId,
+          serverId,
+          name: name.value,
+          description: input.description ?? null,
+          channelType: input.channelType,
+          defaultCanPost: input.defaultCanPost,
+          minimumStaffRole: input.minimumStaffRole ?? null,
+          displayOrder,
+          createdByPlayerId: actor.playerAccountId,
+        },
+        select: CHANNEL_SELECT,
+      })
+      await logChannelAction(actor, "chat_channel_created", created.id, tx)
+      return created
+    })
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      return deny("CHANNEL_NAME_TAKEN", `There is already a #${name.value} channel.`)
+    }
+    throw error
+  }
 
   const broadcast = toBroadcast(row)
   // To the game rather than the channel: nobody has joined a channel that did
@@ -216,13 +232,16 @@ export async function updateChannel(
     name = resolved.value
   }
 
-  const row = await db.chatChannel.update({
-    where: { id: channel.value.id },
+  let row: ChannelRow
+  try {
+    row = await db.$transaction(async tx => {
+      const updated = await tx.chatChannel.update({
+        where: { id: channel.value.id },
     // Each field is written only when the caller sent it. A patch that omits a
     // field has to leave it alone rather than null it, and with
     // exactOptionalPropertyTypes on, an explicit `undefined` is not the same as
     // an absent key.
-    data: {
+        data: {
       ...(name === undefined ? {} : { name }),
       ...(input.description === undefined ? {} : { description: input.description }),
       // Changing the type is cosmetic — posting hangs on defaultCanPost alone,
@@ -235,17 +254,30 @@ export async function updateChannel(
       // from the same instant. Sockets already sitting in the room are a
       // separate problem — see disconnectUser at the role-change path.
       ...(input.minimumStaffRole === undefined ? {} : { minimumStaffRole: input.minimumStaffRole }),
-    },
-    select: CHANNEL_SELECT,
-  })
-
-  await logChannelAction(actor, "chat_channel_updated", row.id)
+        },
+        select: CHANNEL_SELECT,
+      })
+      await logChannelAction(actor, "chat_channel_updated", updated.id, tx)
+      return updated
+    })
+  } catch (error) {
+    if (isUniqueViolation(error) && name !== undefined) {
+      return deny("CHANNEL_NAME_TAKEN", `There is already a #${name} channel.`)
+    }
+    throw error
+  }
 
   const broadcast = toBroadcast(row)
   // Reaches everyone in the game, which includes everyone with this channel
   // open. Flipping defaultCanPost off is how a channel becomes read-only, and
   // this event is what closes the composer for them without a page refresh.
   realtime.emitToGame(actor.gameId, "channel:updated", broadcast)
+  if (
+    input.minimumStaffRole !== undefined &&
+    input.minimumStaffRole !== channel.value.minimumStaffRole
+  ) {
+    realtime.disconnectGame(actor.gameId, `channel visibility changed: ${row.id}`)
+  }
   return allow(broadcast)
 }
 
@@ -257,17 +289,20 @@ export async function setChannelArchived(
   const channel = await loadManageableChannel(actor, input.channelId)
   if (!channel.ok) return channel
 
-  const row = await db.chatChannel.update({
-    where: { id: channel.value.id },
-    data: { isArchived: input.isArchived },
-    select: CHANNEL_SELECT,
+  const row = await db.$transaction(async tx => {
+    const updated = await tx.chatChannel.update({
+      where: { id: channel.value.id },
+      data: { isArchived: input.isArchived },
+      select: CHANNEL_SELECT,
+    })
+    await logChannelAction(
+      actor,
+      input.isArchived ? "chat_channel_archived" : "chat_channel_restored",
+      updated.id,
+      tx
+    )
+    return updated
   })
-
-  await logChannelAction(
-    actor,
-    input.isArchived ? "chat_channel_archived" : "chat_channel_restored",
-    row.id
-  )
 
   const broadcast = toBroadcast(row)
   realtime.emitToGame(
@@ -315,16 +350,17 @@ export async function reorderChannels(
   if (moved.length === 0) return allow([])
 
   // One transaction: a half-applied reorder is a list in an order nobody chose.
-  await db.$transaction(
-    moved.map(entry =>
-      db.chatChannel.update({
-        where: { id: entry.row.id },
-        data: { displayOrder: entry.displayOrder },
-      })
+  await db.$transaction(async tx => {
+    await Promise.all(
+      moved.map(entry =>
+        tx.chatChannel.update({
+          where: { id: entry.row.id },
+          data: { displayOrder: entry.displayOrder },
+        })
+      )
     )
-  )
-
-  await logChannelAction(actor, "chat_channels_reordered", serverId)
+    await logChannelAction(actor, "chat_channels_reordered", serverId, tx)
+  })
 
   const broadcasts = moved.map(entry => toBroadcast({ ...entry.row, displayOrder: entry.displayOrder }))
   for (const broadcast of broadcasts) {

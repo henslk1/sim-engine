@@ -1,7 +1,6 @@
 import { router, protectedProcedure, staffProcedure, ownerProcedure } from "../trpc.js"
 import { db, Prisma } from "@sim-engine/db"
 import { z } from "zod"
-import { randomUUID } from "node:crypto"
 import { TRPCError } from "@trpc/server"
 import { removeAllMessagesByUser } from "../messaging/messages.js"
 
@@ -1089,78 +1088,6 @@ const systemOpsRouter = router({
     ),
 })
 
-// ── Broadcast ─────────────────────────────────────────────────────────────────
-
-const broadcastOpsRouter = router({
-  send: staffProcedure
-    .input(z.object({
-      gameId: z.string(),
-      fromPlayerAccountId: z.string(),
-      body: z.string().min(1),
-      targetPlayerAccountIds: z.array(z.string()).optional(),
-    }))
-    .mutation(async ({ input, ctx }) => {
-      const targets = input.targetPlayerAccountIds
-        ?? (await db.playerAccount.findMany({ where: { gameId: input.gameId }, select: { id: true } })).map(p => p.id)
-
-      let sent = 0
-      for (const toId of targets) {
-        // Canonical pair ordering, so a broadcast reuses the conversation the
-        // player already has. Moves to the shared messaging service once it exists.
-        const from = input.fromPlayerAccountId
-        const participantLowId = from < toId ? from : toId
-        const participantHighId = from < toId ? toId : from
-        const existing = await db.directMessage.findUnique({
-          where: {
-            gameId_participantLowId_participantHighId: { gameId: input.gameId, participantLowId, participantHighId },
-          },
-        })
-        let channelId: string
-        if (existing) {
-          channelId = existing.chatChannelId
-        } else {
-          const channel = await db.chatChannel.create({
-            data: { gameId: input.gameId, channelType: "DM", createdByPlayerId: from },
-          })
-          channelId = channel.id
-          await db.directMessage.create({
-            data: { gameId: input.gameId, chatChannelId: channelId, participantLowId, participantHighId },
-          })
-        }
-        await db.chatMessage.create({
-          data: {
-            gameId: input.gameId,
-            channelId,
-            authorPlayerId: from,
-            clientMessageId: randomUUID(),
-            content: input.body,
-          },
-        })
-        // A conversation created just above already sorts to the top; only an
-        // existing one needs bumping so the broadcast surfaces in the DM list.
-        if (existing) {
-          await db.directMessage.update({
-            where: { id: existing.id },
-            data: { lastActivityAt: new Date() },
-          })
-        }
-        sent++
-      }
-
-      await db.adminActionLog.create({
-        data: {
-          staffUserId: ctx.userId,
-          gameId: input.gameId,
-          action: `broadcast:${sent}_recipients`,
-          targetType: "Broadcast",
-          targetId: input.gameId,
-        },
-      })
-
-      return { sent }
-    }),
-})
-
 // ── Root ──────────────────────────────────────────────────────────────────────
 
 export const opsAdminRouter = router({
@@ -1175,5 +1102,4 @@ export const opsAdminRouter = router({
   integrity: integrityOpsRouter,
   audit: auditOpsRouter,
   system: systemOpsRouter,
-  broadcast: broadcastOpsRouter,
 })

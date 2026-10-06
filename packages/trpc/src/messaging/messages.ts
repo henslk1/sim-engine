@@ -1,8 +1,10 @@
 import { db } from "@sim-engine/db"
+import { randomUUID } from "node:crypto"
 import type { MessagingActor } from "./actor.js"
 import { prepareContent } from "./content.js"
-import { isUniqueViolation } from "./db-errors.js"
+import { isTransactionConflict, isUniqueViolation } from "./db-errors.js"
 import { canModerateMessages, evaluatePosting, loadViewableChannel } from "./permissions.js"
+import type { ChannelAccess } from "./permissions.js"
 import { messageRateLimit, retryWording } from "./rate-limit.js"
 import type { RealtimeControl } from "./realtime.js"
 import { allow, deny, type Decision } from "./result.js"
@@ -16,6 +18,7 @@ const MESSAGE_SELECT = {
   gameId: true,
   channelId: true,
   authorPlayerId: true,
+  authorName: true,
   clientMessageId: true,
   content: true,
   createdAt: true,
@@ -29,14 +32,15 @@ type MessageRow = {
   id: string
   gameId: string
   channelId: string
-  authorPlayerId: string
+  authorPlayerId: string | null
+  authorName: string | null
   clientMessageId: string
   content: string
   createdAt: Date
   editedAt: Date | null
   deletedAt: Date | null
   deletedByPlayerId: string | null
-  authorPlayer: { username: string }
+  authorPlayer: { username: string } | null
 }
 
 // Who took the message down. The client renders the removal notice from this,
@@ -48,7 +52,7 @@ export type SavedMessage = {
   id: string
   gameId: string
   channelId: string
-  authorPlayerId: string
+  authorPlayerId: string | null
   authorUsername: string
   clientMessageId: string
   content: string
@@ -62,7 +66,11 @@ function toSavedMessage(row: MessageRow): SavedMessage {
   // A null remover means an account-level removal rather than one player acting
   // in a channel, which is still staff rather than the author.
   const removedBy: MessageRemoval | null =
-    row.deletedAt === null ? null : row.deletedByPlayerId === row.authorPlayerId ? "author" : "staff"
+    row.deletedAt === null
+      ? null
+      : row.authorPlayerId !== null && row.deletedByPlayerId === row.authorPlayerId
+        ? "author"
+        : "staff"
 
   return {
     id: row.id,
@@ -71,7 +79,7 @@ function toSavedMessage(row: MessageRow): SavedMessage {
     // The author stays. The message keeps its place and its name in the
     // conversation, and only the body is replaced.
     authorPlayerId: row.authorPlayerId,
-    authorUsername: row.authorPlayer.username,
+    authorUsername: row.authorPlayer?.username ?? row.authorName ?? "Game",
     clientMessageId: row.clientMessageId,
     // Redacted on the way out, not in the row. The original text stays in the
     // database for reports and moderation history — it simply never reaches a
@@ -82,6 +90,84 @@ function toSavedMessage(row: MessageRow): SavedMessage {
     deletedAt: row.deletedAt,
     removedBy,
   }
+}
+
+// Posts one staff-authored broadcast as the game itself. The game identity is
+// not a PlayerAccount and cannot sign in; authorName is a display snapshot, so
+// later renaming the game does not rewrite old announcements.
+export async function createGameAnnouncement(
+  actor: MessagingActor,
+  realtime: RealtimeControl,
+  input: { content: string }
+): Promise<Decision<SavedMessage>> {
+  const destination = await db.chatServer.findUnique({
+    where: { gameId_scopeKey: { gameId: actor.gameId, scopeKey: "GLOBAL" } },
+    select: {
+      announcementChannelId: true,
+      game: { select: { name: true } },
+    },
+  })
+  if (!destination?.announcementChannelId) {
+    return deny("ANNOUNCEMENT_CHANNEL_MISSING", "This game has no announcement channel configured.")
+  }
+
+  const access = await loadViewableChannel(actor, destination.announcementChannelId)
+  if (!access.ok) return access
+  const posting = evaluatePosting(actor, access.value)
+  if (!posting.ok) return posting
+  const content = prepareContent(input.content)
+  if (!content.ok) return content
+
+  const row = await db.$transaction(async tx => {
+    const message = await tx.chatMessage.create({
+      data: {
+        gameId: actor.gameId,
+        channelId: access.value.channel.id,
+        authorPlayerId: null,
+        authorName: destination.game.name,
+        clientMessageId: randomUUID(),
+        content: content.value,
+      },
+      select: MESSAGE_SELECT,
+    })
+    await tx.adminActionLog.create({
+      data: {
+        staffUserId: actor.userId,
+        gameId: actor.gameId,
+        action: "chat_announcement_posted",
+        targetType: "ChatMessage",
+        targetId: message.id,
+      },
+    })
+    return message
+  })
+
+  const saved = toSavedMessage(row)
+  realtime.emitToChannel(saved.channelId, "message:created", saved)
+  announceActivity(realtime, access.value, "created")
+  return allow(saved)
+}
+
+function announceActivity(
+  realtime: RealtimeControl,
+  access: ChannelAccess,
+  kind: "created" | "deleted"
+) {
+  const audience = access.directMessage
+    ? {
+        gameId: access.channel.gameId,
+        channelId: access.channel.id,
+        playerAccountIds: [
+          access.directMessage.participantLowId,
+          access.directMessage.participantHighId,
+        ],
+      }
+    : {
+        gameId: access.channel.gameId,
+        channelId: access.channel.id,
+        minimumStaffRole: access.channel.minimumStaffRole,
+      }
+  realtime.emitMessagingActivity(audience, { channelId: access.channel.id, kind })
 }
 
 async function findByClientId(authorPlayerId: string, clientMessageId: string): Promise<SavedMessage | null> {
@@ -117,8 +203,11 @@ export async function createMessage(
   // saved is never counted as a new one, and before the permission load, so a
   // flood aimed at a channel the sender cannot even see still costs them their
   // allowance instead of a database round trip each time.
-  const budget = messageRateLimit.check(actor.playerAccountId)
+  const budget = await messageRateLimit.check(actor.playerAccountId)
   if (!budget.ok) {
+    if (budget.unavailable) {
+      return deny("RATE_LIMIT_UNAVAILABLE", "Messaging is temporarily unavailable. Try again shortly.")
+    }
     return deny("RATE_LIMITED", `You're sending messages too quickly. ${retryWording(budget.retryAfterMs)}`)
   }
 
@@ -165,6 +254,7 @@ export async function createMessage(
     // After commit, never inside the transaction: a rolled back insert must not
     // have been announced to a room.
     realtime.emitToChannel(saved.channelId, "message:created", saved)
+    announceActivity(realtime, access.value, "created")
     return allow(saved)
   } catch (error) {
     // Two tabs retrying the same send simultaneously both get past the lookup
@@ -268,6 +358,7 @@ export async function deleteMessage(
 
   const saved = toSavedMessage(row)
   realtime.emitToChannel(saved.channelId, "message:deleted", saved)
+  announceActivity(realtime, access.value, "deleted")
   return allow(saved)
 }
 
@@ -331,26 +422,80 @@ export async function markRead(
   // count.
   const target = await db.chatMessage.findUnique({
     where: { id: input.lastReadMessageId },
-    select: { id: true, channelId: true },
+    select: { id: true, channelId: true, createdAt: true },
   })
   if (!target || target.channelId !== access.value.channel.id) {
     return deny("MESSAGE_NOT_FOUND", "That message is not in this conversation.")
   }
 
-  const lastReadAt = new Date()
   const chatChannelId = access.value.channel.id
-  await db.messageReadStatus.upsert({
-    where: { playerAccountId_chatChannelId: { playerAccountId: actor.playerAccountId, chatChannelId } },
-    create: {
-      playerAccountId: actor.playerAccountId,
-      chatChannelId,
-      lastReadMessageId: target.id,
-      lastReadAt,
-    },
-    update: { lastReadMessageId: target.id, lastReadAt },
-  })
+  const lastReadAt = new Date()
 
-  const pointer: ReadPointer = { channelId: chatChannelId, lastReadMessageId: target.id, lastReadAt }
+  // Serializable makes this comparison and write one monotonic operation even
+  // when two tabs mark different messages at the same time. One transaction
+  // will retry rather than allowing the older pointer to win last.
+  const savePointer = () => db.$transaction(async tx => {
+    const current = await tx.messageReadStatus.findUnique({
+      where: {
+        playerAccountId_chatChannelId: {
+          playerAccountId: actor.playerAccountId,
+          chatChannelId,
+        },
+      },
+      select: {
+        lastReadAt: true,
+        lastReadMessage: { select: { id: true, createdAt: true } },
+      },
+    })
+    const currentMessage = current?.lastReadMessage
+    const currentIsNewer =
+      currentMessage !== null &&
+      currentMessage !== undefined &&
+      (currentMessage.createdAt > target.createdAt ||
+        (currentMessage.createdAt.getTime() === target.createdAt.getTime() &&
+          currentMessage.id >= target.id))
+
+    if (currentIsNewer) {
+      return {
+        lastReadMessageId: currentMessage.id,
+        lastReadAt: current?.lastReadAt ?? lastReadAt,
+      }
+    }
+
+    return tx.messageReadStatus.upsert({
+      where: {
+        playerAccountId_chatChannelId: {
+          playerAccountId: actor.playerAccountId,
+          chatChannelId,
+        },
+      },
+      create: {
+        playerAccountId: actor.playerAccountId,
+        chatChannelId,
+        lastReadMessageId: target.id,
+        lastReadAt,
+      },
+      update: { lastReadMessageId: target.id, lastReadAt },
+      select: { lastReadMessageId: true, lastReadAt: true },
+    })
+  }, { isolationLevel: "Serializable" })
+
+  let saved: Awaited<ReturnType<typeof savePointer>> | null = null
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      saved = await savePointer()
+      break
+    } catch (error) {
+      if (!isTransactionConflict(error) || attempt === 2) throw error
+    }
+  }
+  if (!saved) throw new Error("Unable to advance message read pointer")
+
+  const pointer: ReadPointer = {
+    channelId: chatChannelId,
+    lastReadMessageId: saved.lastReadMessageId ?? target.id,
+    lastReadAt: saved.lastReadAt ?? lastReadAt,
+  }
   // To the player's own room rather than the channel: this is one person's
   // badge state, and their other tabs are the only thing that needs it.
   realtime.emitToPlayer(actor.gameId, actor.playerAccountId, "read:updated", pointer)

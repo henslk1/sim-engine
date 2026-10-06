@@ -1,14 +1,19 @@
 // Rate limits for the two messaging actions that can be used to flood someone:
 // sending a message, and opening a new conversation.
 //
-// Deliberately in-process rather than in Redis. One instance's counter is the
-// whole truth here, so across several app instances a sender gets the limit
-// times the instance count — fine for a tester group on one box, wrong the day
-// this runs on two. The fix is to move the window into Redis behind the same
-// interface; nothing else has to change, which is why `check` takes an explicit
-// key and nothing else knows how the counting works.
+// The transport-neutral package defines the policy and a local test backend.
+// Production installs the Redis backend during server startup, so every app
+// instance spends from the same allowance.
 
-export type RateLimitVerdict = { ok: true } | { ok: false; retryAfterMs: number }
+export type RateLimitVerdict =
+  | { ok: true }
+  | { ok: false; retryAfterMs: number; unavailable?: false }
+  | { ok: false; retryAfterMs: 0; unavailable: true }
+
+export type MessagingRateLimitBackend = {
+  check(bucket: string, key: string, limit: number, windowMs: number): Promise<RateLimitVerdict>
+  reset?(): void | Promise<void>
+}
 
 // Above this many tracked keys, a check also sweeps out the expired ones.
 // Without it, every player who ever sent a message would stay in the map for
@@ -61,7 +66,7 @@ export function createSlidingWindow(limit: number, windowMs: number): SlidingWin
 // Five in five seconds, from the design doc. Chosen so that the limit clears
 // before most people finish reading why they hit it — which is also why the
 // composer stays enabled rather than disabling on a rate limit.
-export const messageRateLimit = createSlidingWindow(5, 5_000)
+const localMessageWindow = createSlidingWindow(5, 5_000)
 
 // Opening conversations is the spam vector DMs actually have: one message to
 // fifty strangers. Five new conversations in five minutes still allows a new
@@ -70,11 +75,52 @@ export const messageRateLimit = createSlidingWindow(5, 5_000)
 // Only charged when a conversation is really created — getOrCreateDirectMessage
 // returns `created: false` for one that already exists, and reopening an old
 // conversation is not an act worth limiting.
-export const conversationRateLimit = createSlidingWindow(5, 5 * 60_000)
+const localConversationWindow = createSlidingWindow(5, 5 * 60_000)
+
+// Tests and standalone scripts have no Redis process, so the transport-neutral
+// package starts with the local implementation. apps/server replaces it during
+// startup with one atomic Redis backend shared by every instance.
+const localBackend: MessagingRateLimitBackend = {
+  async check(bucket, key) {
+    return bucket === "message"
+      ? localMessageWindow.check(key)
+      : localConversationWindow.check(key)
+  },
+  reset() {
+    localMessageWindow.reset()
+    localConversationWindow.reset()
+  },
+}
+
+let backend: MessagingRateLimitBackend = localBackend
+
+export function configureMessagingRateLimitBackend(next: MessagingRateLimitBackend) {
+  backend = next
+}
+
+function distributedWindow(bucket: string, limit: number, windowMs: number) {
+  return {
+    async check(key: string): Promise<RateLimitVerdict> {
+      try {
+        return await backend.check(bucket, key, limit, windowMs)
+      } catch (error) {
+        // Explicitly fail closed. A Redis outage must not silently turn off the
+        // abuse boundary on every server; callers show a temporary-unavailable
+        // message and no durable messaging action runs.
+        console.error(`[messaging] ${bucket} rate limiter unavailable:`, error)
+        return { ok: false, retryAfterMs: 0, unavailable: true }
+      }
+    },
+  }
+}
+
+export const messageRateLimit = distributedWindow("message", 5, 5_000)
+export const conversationRateLimit = distributedWindow("conversation", 5, 5 * 60_000)
 
 export function resetMessagingRateLimits() {
-  messageRateLimit.reset()
-  conversationRateLimit.reset()
+  backend = localBackend
+  localMessageWindow.reset()
+  localConversationWindow.reset()
 }
 
 // Shared wording so the two limits read the same way. Rounds up, because

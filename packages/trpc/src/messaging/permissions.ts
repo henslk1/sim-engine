@@ -43,8 +43,17 @@ export async function loadViewableChannel(
       defaultCanPost: true,
       minimumStaffRole: true,
       isArchived: true,
-      server: { select: { id: true, serverType: true, isArchived: true } },
-      directMessage: { select: { id: true, participantLowId: true, participantHighId: true } },
+      server: { select: { id: true, gameId: true, serverType: true, isArchived: true } },
+      directMessage: {
+        select: {
+          id: true,
+          gameId: true,
+          participantLowId: true,
+          participantHighId: true,
+          participantLow: { select: { gameId: true } },
+          participantHigh: { select: { gameId: true } },
+        },
+      },
     },
   })
 
@@ -67,6 +76,13 @@ export async function loadViewableChannel(
 
   if (channel.directMessage) {
     const { participantLowId, participantHighId } = channel.directMessage
+    if (
+      channel.directMessage.gameId !== channel.gameId ||
+      channel.directMessage.participantLow.gameId !== channel.gameId ||
+      channel.directMessage.participantHigh.gameId !== channel.gameId
+    ) {
+      return hidden("direct-message game identity is inconsistent")
+    }
     const isParticipant =
       actor.playerAccountId === participantLowId || actor.playerAccountId === participantHighId
     if (!isParticipant) return hidden("not a participant")
@@ -82,6 +98,7 @@ export async function loadViewableChannel(
   // A channel that is neither a DM nor attached to a server is malformed. Treat
   // it as invisible rather than guessing what was meant by it.
   if (!channel.server) return hidden("no server and no direct message")
+  if (channel.server.gameId !== channel.gameId) return hidden("server belongs to another game")
 
   if (channel.server.serverType === "GROUP") {
     return deny("GROUP_CHAT_UNAVAILABLE", "Group chat is not available yet.")
@@ -99,7 +116,16 @@ export async function loadViewableChannel(
   }
 
   // The global server: anyone holding a player account in this game may read it.
-  return allow({ channel: base, server: channel.server, directMessage: null, blockedEitherWay: false })
+  return allow({
+    channel: base,
+    server: {
+      id: channel.server.id,
+      serverType: channel.server.serverType,
+      isArchived: channel.server.isArchived,
+    },
+    directMessage: null,
+    blockedEitherWay: false,
+  })
 }
 
 // May this actor post here, right now?

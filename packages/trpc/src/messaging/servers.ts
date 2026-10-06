@@ -81,9 +81,10 @@ export async function ensureGlobalChatServer(gameId: string): Promise<{ id: stri
     select: { id: true },
   })
 
+  let announcementChannelId: string | null = null
   for (const [index, channel] of DEFAULT_CHANNELS.entries()) {
     const name = normalizeChannelName(channel.name)
-    await db.chatChannel.upsert({
+    const saved = await db.chatChannel.upsert({
       where: { serverId_name: { serverId: server.id, name } },
       create: {
         gameId,
@@ -98,6 +99,14 @@ export async function ensureGlobalChatServer(gameId: string): Promise<{ id: stri
       },
       update: {},
       select: { id: true },
+    })
+    if (name === "announcements") announcementChannelId = saved.id
+  }
+
+  if (announcementChannelId !== null) {
+    await db.chatServer.update({
+      where: { id: server.id },
+      data: { announcementChannelId },
     })
   }
 

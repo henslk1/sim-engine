@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url"
 // way when someone adds a router in a hurry.
 
 const SRC = fileURLToPath(new URL("../src/", import.meta.url))
+const SERVER_SRC = fileURLToPath(new URL("../../../apps/server/src/", import.meta.url))
 
 const FORBIDDEN: { pattern: RegExp; why: string }[] = [
   { pattern: /\bpublicProcedure\b/, why: "publicProcedure permits a null userId" },
@@ -74,5 +75,27 @@ test("messaging defines no unauthenticated procedures", () => {
       failures.push(`${relative(SRC, file)}: ${offence}`)
     }
   }
+  assert.deepEqual(failures, [])
+})
+
+test("durable chat writes stay behind the messaging service", () => {
+  // Socket handlers and unrelated routers must call the service instead of
+  // recreating its game, permission, rate-limit and realtime rules. This is
+  // what prevents a future convenience endpoint from becoming a second,
+  // weaker way to write chat state.
+  const write = /\b(?:chatMessage|chatChannel|directMessage)\.(?:create|update|updateMany|delete|deleteMany)\s*\(/
+  const roots = [SRC, SERVER_SRC]
+  const failures = roots.flatMap(root =>
+    walk(root)
+      .filter(file => file.endsWith(".ts"))
+      .filter(file => !file.includes(`${join("src", "messaging")}`))
+      .flatMap(file => {
+        const hits = readFileSync(file, "utf8")
+          .split(/\r?\n/)
+          .map((line, index) => ({ line, index: index + 1 }))
+          .filter(({ line }) => write.test(line))
+        return hits.map(hit => `${relative(root, file)}:${hit.index}: ${hit.line.trim()}`)
+      })
+  )
   assert.deepEqual(failures, [])
 })

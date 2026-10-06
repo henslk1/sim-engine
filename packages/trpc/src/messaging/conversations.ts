@@ -40,8 +40,11 @@ export async function getOrCreateDirectMessage(
   // Only a genuinely new conversation is charged. The lookup above returns
   // early for one that already exists, so reopening an old thread is free —
   // which is the whole reason `created` is on the return value.
-  const budget = conversationRateLimit.check(actor.playerAccountId)
+  const budget = await conversationRateLimit.check(actor.playerAccountId)
   if (!budget.ok) {
+    if (budget.unavailable) {
+      return deny("RATE_LIMIT_UNAVAILABLE", "Messaging is temporarily unavailable. Try again shortly.")
+    }
     return deny(
       "RATE_LIMITED",
       `You've started a lot of new conversations. ${retryWording(budget.retryAfterMs)}`
@@ -99,7 +102,10 @@ export type DirectConversationSummary = {
 // an OR across two columns and why the schema carries an index for each.
 export async function listDirectConversations(
   actor: MessagingActor,
-  countUnread: (channelId: string, after: Date | null) => Promise<number>
+  countUnread: (
+    channelId: string,
+    after: { createdAt: Date; id: string } | null
+  ) => Promise<number>
 ): Promise<DirectConversationSummary[]> {
   const rows = await db.directMessage.findMany({
     where: {
@@ -149,10 +155,10 @@ export async function listDirectConversations(
       chatChannelId: { in: rows.map(row => row.chatChannelId) },
     },
     // The read message's own timestamp, not lastReadAt — see loadMessagingOverview.
-    select: { chatChannelId: true, lastReadMessage: { select: { createdAt: true } } },
+    select: { chatChannelId: true, lastReadMessage: { select: { id: true, createdAt: true } } },
   })
   const watermarks = new Map(
-    pointers.map(pointer => [pointer.chatChannelId, pointer.lastReadMessage?.createdAt ?? null])
+    pointers.map(pointer => [pointer.chatChannelId, pointer.lastReadMessage ?? null])
   )
 
   return Promise.all(

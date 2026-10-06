@@ -2,7 +2,13 @@ import { z } from "zod"
 import { router } from "../trpc.js"
 import { channelAdminProcedure, denialToTRPCError, messagingProcedure } from "../messaging/procedures.js"
 import { loadMessagingOverview } from "../messaging/channels.js"
-import { deleteMessage, editMessage, loadHistory, markRead } from "../messaging/messages.js"
+import {
+  createGameAnnouncement,
+  deleteMessage,
+  editMessage,
+  loadHistory,
+  markRead,
+} from "../messaging/messages.js"
 import {
   findDirectMessageCandidates,
   getOrCreateDirectMessage,
@@ -113,6 +119,14 @@ export const messagingRouter = router({
   // game*, so a moderator cannot restructure the server and neither can an admin
   // who is only staff somewhere else.
   admin: router({
+    broadcastAnnouncement: channelAdminProcedure
+      .input(z.object({ content: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const result = await createGameAnnouncement(ctx.actor, ctx.realtime, input)
+        if (!result.ok) throw denialToTRPCError(result)
+        return result.value
+      }),
+
     createChannel: channelAdminProcedure
       .input(
         z.object({

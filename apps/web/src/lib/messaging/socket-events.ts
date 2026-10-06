@@ -12,7 +12,7 @@ import { socket } from "@/lib/socket"
 export type ChatMessage = {
   id: string
   channelId: string
-  authorPlayerId: string
+  authorPlayerId: string | null
   authorUsername: string
   clientMessageId: string
   content: string
@@ -29,7 +29,7 @@ export type ChatMessage = {
 type RawMessage = {
   id: string
   channelId: string
-  authorPlayerId: string
+  authorPlayerId: string | null
   authorUsername: string
   clientMessageId: string
   content: string
@@ -130,6 +130,7 @@ export function useMessagingSocket(gameId: string | undefined): MessagingConnect
     let cancelled = false
 
     async function enterGame() {
+      setStatus("connecting")
       const result = await request<null>("game:enter", { gameId })
       if (cancelled) return
       // A refusal here is a real answer — banned, or no character in this game.
@@ -151,7 +152,6 @@ export function useMessagingSocket(gameId: string | undefined): MessagingConnect
 
     if (socket.connected) void enterGame()
     else {
-      setStatus("connecting")
       socket.connect()
     }
 
@@ -178,7 +178,10 @@ export function useMessagingSocket(gameId: string | undefined): MessagingConnect
 // and could miss an event in the gap.
 export function useSocketEvent<T>(event: string, handler: (payload: T) => void) {
   const latest = useRef(handler)
-  latest.current = handler
+
+  useEffect(() => {
+    latest.current = handler
+  }, [handler])
 
   useEffect(() => {
     const listener = (payload: T) => latest.current(payload)

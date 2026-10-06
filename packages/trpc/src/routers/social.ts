@@ -145,20 +145,73 @@ export const socialRouter = router({
   blockPlayer: protectedProcedure
     .input(z.object({ blockerPlayerId: z.string(), blockedPlayerId: z.string(), gameId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      const account = await db.playerAccount.findUnique({ where: { id: input.blockerPlayerId }, select: { userId: true } })
-      if (!account || account.userId !== ctx.userId) throw new TRPCError({ code: "FORBIDDEN" })
-      return db.blockedPlayer.create({
-        data: { gameId: input.gameId, blockerPlayerId: input.blockerPlayerId, blockedPlayerId: input.blockedPlayerId },
+      if (input.blockerPlayerId === input.blockedPlayerId) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "You cannot block yourself." })
+      }
+      const accounts = await db.playerAccount.findMany({
+        where: { id: { in: [input.blockerPlayerId, input.blockedPlayerId] } },
+        select: { id: true, userId: true, gameId: true },
       })
+      const blocker = accounts.find(account => account.id === input.blockerPlayerId)
+      const target = accounts.find(account => account.id === input.blockedPlayerId)
+      if (!blocker || blocker.userId !== ctx.userId) throw new TRPCError({ code: "FORBIDDEN" })
+      if (!target || blocker.gameId !== input.gameId || target.gameId !== input.gameId) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "That player is not in this game." })
+      }
+
+      const block = await db.blockedPlayer.upsert({
+        where: {
+          gameId_blockerPlayerId_blockedPlayerId: {
+            gameId: input.gameId,
+            blockerPlayerId: input.blockerPlayerId,
+            blockedPlayerId: input.blockedPlayerId,
+          },
+        },
+        create: {
+          gameId: input.gameId,
+          blockerPlayerId: input.blockerPlayerId,
+          blockedPlayerId: input.blockedPlayerId,
+        },
+        update: {},
+      })
+      const pair = input.blockerPlayerId < input.blockedPlayerId
+        ? { participantLowId: input.blockerPlayerId, participantHighId: input.blockedPlayerId }
+        : { participantLowId: input.blockedPlayerId, participantHighId: input.blockerPlayerId }
+      const conversation = await db.directMessage.findUnique({
+        where: { gameId_participantLowId_participantHighId: { gameId: input.gameId, ...pair } },
+        select: { chatChannelId: true },
+      })
+      if (conversation) {
+        const payload = { channelId: conversation.chatChannelId }
+        ctx.realtime.emitToPlayer(input.gameId, input.blockerPlayerId, "messaging:permissions", payload)
+        ctx.realtime.emitToPlayer(input.gameId, input.blockedPlayerId, "messaging:permissions", payload)
+      }
+      return block
     }),
 
   unblockPlayer: protectedProcedure
     .input(z.object({ blockerPlayerId: z.string(), blockedPlayerId: z.string(), gameId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      const account = await db.playerAccount.findUnique({ where: { id: input.blockerPlayerId }, select: { userId: true } })
+      const account = await db.playerAccount.findUnique({
+        where: { id: input.blockerPlayerId },
+        select: { userId: true, gameId: true },
+      })
       if (!account || account.userId !== ctx.userId) throw new TRPCError({ code: "FORBIDDEN" })
+      if (account.gameId !== input.gameId) throw new TRPCError({ code: "BAD_REQUEST" })
       await db.blockedPlayer.deleteMany({
         where: { gameId: input.gameId, blockerPlayerId: input.blockerPlayerId, blockedPlayerId: input.blockedPlayerId },
       })
+      const pair = input.blockerPlayerId < input.blockedPlayerId
+        ? { participantLowId: input.blockerPlayerId, participantHighId: input.blockedPlayerId }
+        : { participantLowId: input.blockedPlayerId, participantHighId: input.blockerPlayerId }
+      const conversation = await db.directMessage.findUnique({
+        where: { gameId_participantLowId_participantHighId: { gameId: input.gameId, ...pair } },
+        select: { chatChannelId: true },
+      })
+      if (conversation) {
+        const payload = { channelId: conversation.chatChannelId }
+        ctx.realtime.emitToPlayer(input.gameId, input.blockerPlayerId, "messaging:permissions", payload)
+        ctx.realtime.emitToPlayer(input.gameId, input.blockedPlayerId, "messaging:permissions", payload)
+      }
     }),
 })

@@ -125,6 +125,7 @@ function relativeTime(date: Date | string): string {
 }
 
 export function MessagingWidget() {
+  const utils = trpc.useUtils()
   const { data: game } = trpc.admin.game.get.useQuery()
   const gameId = game?.id
 
@@ -164,6 +165,10 @@ export function MessagingWidget() {
 
   const [openPanel, setOpenPanel] = useState<OpenPanel>(null)
   const [activeSection, setActiveSection] = useState<Section>({ kind: "notifications" })
+  const currentSection: Section =
+    tutorialCompleted && activeSection.kind === "tutorial"
+      ? { kind: "notifications" }
+      : activeSection
   // Newest first, so the most recently opened conversation sits nearest the
   // main bubble.
   const [popped, setPopped] = useState<string[]>([])
@@ -190,13 +195,16 @@ export function MessagingWidget() {
   const stopDragging = useRef<(() => void) | null>(null)
   useEffect(() => () => stopDragging.current?.(), [])
 
-  useEffect(() => {
-    if (tutorialCompleted && activeSection.kind === "tutorial") {
-      setActiveSection({ kind: "notifications" })
-    }
-  }, [tutorialCompleted]) // eslint-disable-line react-hooks/exhaustive-deps
-
   useSocketEvent("notification:created", () => void refetchNotifications())
+  useSocketEvent("messaging:activity", () => void utils.messaging.overview.invalidate())
+  useSocketEvent("messaging:permissions", () => void utils.messaging.overview.invalidate())
+
+  // A reconnect may have a gap that no live event can describe. PostgreSQL is
+  // the source of truth, so reconcile the badge as soon as the socket has
+  // successfully re-entered the game.
+  useEffect(() => {
+    if (connection.epoch > 0) void utils.messaging.overview.invalidate()
+  }, [connection.epoch, utils])
 
   // Resolved every render rather than stored, so a bubble's name, face and
   // unread count stay current — and one whose conversation has gone away stops
@@ -397,11 +405,11 @@ export function MessagingWidget() {
   }
 
   const sectionLabel =
-    activeSection.kind === "tutorial"
+    currentSection.kind === "tutorial"
       ? "Tutorial"
-      : activeSection.kind === "notifications"
+      : currentSection.kind === "notifications"
         ? "Notifications"
-        : activeSection.kind === "dms"
+        : currentSection.kind === "dms"
           ? "Direct messages"
           : (chatServer?.name ?? "Channels")
 
@@ -474,7 +482,7 @@ export function MessagingWidget() {
                 {!tutorialCompleted && (
                   <RailButton
                     label="Tutorial"
-                    active={activeSection.kind === "tutorial"}
+                    active={currentSection.kind === "tutorial"}
                     unread={0}
                     onClick={() => setActiveSection({ kind: "tutorial" })}
                   >
@@ -484,7 +492,7 @@ export function MessagingWidget() {
 
                 <RailButton
                   label="Notifications"
-                  active={activeSection.kind === "notifications"}
+                  active={currentSection.kind === "notifications"}
                   unread={notifUnread}
                   onClick={() => setActiveSection({ kind: "notifications" })}
                 >
@@ -499,7 +507,7 @@ export function MessagingWidget() {
                     mutation guard. */}
                 <RailButton
                   label="Direct messages"
-                  active={activeSection.kind === "dms"}
+                  active={currentSection.kind === "dms"}
                   unread={directUnread}
                   onClick={() => setActiveSection({ kind: "dms" })}
                 >
@@ -514,7 +522,7 @@ export function MessagingWidget() {
                     <div className="my-1 h-px w-7 shrink-0 rounded-full bg-border" />
                     <RailButton
                       label={chatServer.name}
-                      active={activeSection.kind === "server"}
+                      active={currentSection.kind === "server"}
                       unread={serverUnread}
                       onClick={() => setActiveSection({ kind: "server", serverId: chatServer.id })}
                     >
@@ -547,23 +555,23 @@ export function MessagingWidget() {
                     lists. */}
                 <div
                   className={
-                    isChat(activeSection) ? "min-h-0 flex-1" : "min-h-0 flex-1 overflow-y-auto p-3"
+                    isChat(currentSection) ? "min-h-0 flex-1" : "min-h-0 flex-1 overflow-y-auto p-3"
                   }
                 >
-                  {activeSection.kind === "tutorial" && <TutorialContent data={tutorialData} />}
-                  {activeSection.kind === "notifications" && gameId && (
+                  {currentSection.kind === "tutorial" && <TutorialContent data={tutorialData} />}
+                  {currentSection.kind === "notifications" && gameId && (
                     <NotificationsContent
                       notifications={notifications}
                       gameId={gameId}
                       onRefresh={() => void refetchNotifications()}
                     />
                   )}
-                  {isChat(activeSection) && gameId && (
+                  {isChat(currentSection) && gameId && (
                     <ChatSection
                       gameId={gameId}
                       connection={connection}
                       width={panelW}
-                      destination={activeSection}
+                      destination={currentSection}
                       onPopOut={popOut}
                     />
                   )}

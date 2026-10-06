@@ -12,8 +12,15 @@ type ChannelRow = {
   defaultCanPost: boolean
   minimumStaffRole: "OWNER" | "ADMIN" | "MODERATOR" | null
   isArchived: boolean
-  server: { id: string; serverType: "GLOBAL" | "GROUP"; isArchived: boolean } | null
-  directMessage: { id: string; participantLowId: string; participantHighId: string } | null
+  server: { id: string; gameId: string; serverType: "GLOBAL" | "GROUP"; isArchived: boolean } | null
+  directMessage: {
+    id: string
+    gameId: string
+    participantLowId: string
+    participantHighId: string
+    participantLow: { gameId: string }
+    participantHigh: { gameId: string }
+  } | null
 }
 
 const state = {
@@ -84,7 +91,7 @@ const globalChannel = (over: Partial<ChannelRow> = {}): ChannelRow => ({
   defaultCanPost: true,
   minimumStaffRole: null,
   isArchived: false,
-  server: { id: "server-global", serverType: "GLOBAL", isArchived: false },
+  server: { id: "server-global", gameId: GAME, serverType: "GLOBAL", isArchived: false },
   directMessage: null,
   ...over,
 })
@@ -98,7 +105,14 @@ const dmChannel = (over: Partial<ChannelRow> = {}): ChannelRow => ({
   defaultCanPost: true,
   isArchived: false,
   server: null,
-  directMessage: { id: "dm-1", participantLowId: ME, participantHighId: THEM },
+  directMessage: {
+    id: "dm-1",
+    gameId: GAME,
+    participantLowId: ME,
+    participantHighId: THEM,
+    participantLow: { gameId: GAME },
+    participantHigh: { gameId: GAME },
+  },
   ...over,
 })
 
@@ -188,14 +202,21 @@ test("a channel belonging to another game is reported as not found", async () =>
 })
 
 test("a non-participant is told a DM does not exist, not that it is forbidden", async () => {
-  state.channel = dmChannel({ directMessage: { id: "dm-2", participantLowId: "a", participantHighId: "b" } })
+  state.channel = dmChannel({ directMessage: {
+    id: "dm-2",
+    gameId: GAME,
+    participantLowId: "a",
+    participantHighId: "b",
+    participantLow: { gameId: GAME },
+    participantHigh: { gameId: GAME },
+  } })
   const result = await loadViewableChannel(actor(), "channel-dm")
   // Anything other than NOT_FOUND would confirm the conversation is real.
   assert.equal(result.ok === false && result.code, "CHANNEL_NOT_FOUND")
 })
 
 test("group server channels are refused until group chat ships", async () => {
-  state.channel = globalChannel({ server: { id: "server-group", serverType: "GROUP", isArchived: false } })
+  state.channel = globalChannel({ server: { id: "server-group", gameId: GAME, serverType: "GROUP", isArchived: false } })
   const result = await loadViewableChannel(actor(), "channel-general")
   assert.equal(result.ok === false && result.code, "GROUP_CHAT_UNAVAILABLE")
 })
@@ -266,7 +287,7 @@ test("nobody posts to an archived channel, including an owner", async () => {
 })
 
 test("an archived server closes its channels even when the channel itself is open", async () => {
-  state.channel = globalChannel({ server: { id: "server-global", serverType: "GLOBAL", isArchived: true } })
+  state.channel = globalChannel({ server: { id: "server-global", gameId: GAME, serverType: "GLOBAL", isArchived: true } })
   const access = await loadAccess()
   const result = evaluatePosting(actor(), access)
   assert.equal(result.ok === false && result.code, "CHANNEL_ARCHIVED")

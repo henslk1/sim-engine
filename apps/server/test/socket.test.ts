@@ -60,6 +60,7 @@ const db = {
         gameId: data["gameId"],
         channelId: data["channelId"],
         authorPlayerId: data["authorPlayerId"],
+        authorName: null,
         clientMessageId: data["clientMessageId"],
         content: data["content"],
         createdAt: new Date(),
@@ -119,7 +120,7 @@ beforeEach(() => {
     defaultCanPost: true,
     minimumStaffRole: null,
     isArchived: false,
-    server: { id: "server-global", serverType: "GLOBAL", isArchived: false },
+    server: { id: "server-global", gameId: GAME, serverType: "GLOBAL", isArchived: false },
     directMessage: null,
   }
   state.messages.clear()
@@ -347,6 +348,7 @@ test("a message reaches another client that joined the same channel", async () =
   await emit(listener.socket, "channel:join", { channelId: CHANNEL })
 
   const delivered = nextEvent(listener.socket, "message:created")
+  const redundantActivity = nextEvent(listener.socket, "messaging:activity")
   await emit(sender.socket, "message:send", {
     channelId: CHANNEL,
     clientMessageId: "c-live",
@@ -357,6 +359,9 @@ test("a message reaches another client that joined the same channel", async () =
   assert.notEqual(payload, null)
   assert.equal(payload?.content, "hello room")
   assert.equal(payload?.authorPlayerId, ME)
+  // The full message already reached this open conversation. Sending the
+  // lightweight badge invalidation too would cause an unread flash.
+  assert.equal(await redundantActivity, null)
   sender.socket.close()
   listener.socket.close()
 })
@@ -369,6 +374,7 @@ test("a client that never joined the channel is not sent its messages", async ()
   await emit(sender.socket, "channel:join", { channelId: CHANNEL })
 
   const delivered = nextEvent(bystander.socket, "message:created")
+  const activity = nextEvent(bystander.socket, "messaging:activity")
   await emit(sender.socket, "message:send", {
     channelId: CHANNEL,
     clientMessageId: "c-scoped",
@@ -376,6 +382,7 @@ test("a client that never joined the channel is not sent its messages", async ()
   })
 
   assert.equal(await delivered, null)
+  assert.deepEqual(await activity, { channelId: CHANNEL, kind: "created" })
   sender.socket.close()
   bystander.socket.close()
 })

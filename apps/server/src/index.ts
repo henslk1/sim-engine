@@ -8,6 +8,11 @@ import type { Server as HttpServer } from "node:http"
 import { initSocket, getIo } from "./socket.js"
 import { realtimeControl } from "./realtime.js"
 import { db } from "@sim-engine/db"
+import { configureMessagingRateLimitBackend } from "@sim-engine/trpc/messaging"
+import {
+  closeMessagingRateLimitBackend,
+  redisMessagingRateLimitBackend,
+} from "./messaging-rate-limit.js"
 import { competitionDispatchQueue, venueRotationDispatchQueue, nightlyDispatchQueue } from "./jobs/queue.js"
 import { nightlyDispatcherWorker } from "./jobs/nightly.dispatcher.js"
 import { nightlyWorker } from "./jobs/nightly.worker.js"
@@ -16,6 +21,8 @@ import { competitionWorker } from "./jobs/competition.worker.js"
 import { venueRotationWorker } from "./jobs/venue-rotation.worker.js"
 
 const app = new Hono()
+
+configureMessagingRateLimitBackend(redisMessagingRateLimitBackend)
 
 app.use("*", cors({
   origin: process.env["CLIENT_URL"] ?? "http://localhost:5173",
@@ -108,7 +115,11 @@ async function shutdown(signal: string) {
     })
     // close() resolves once the worker's active job finishes, which is what
     // releases the lock cleanly rather than leaving it to expire.
-    await Promise.all([closeServer, ...WORKERS.map((worker) => worker.close())])
+    await Promise.all([
+      closeServer,
+      closeMessagingRateLimitBackend(),
+      ...WORKERS.map((worker) => worker.close()),
+    ])
     await db.$disconnect()
     console.log("Drained cleanly")
     process.exit(0)

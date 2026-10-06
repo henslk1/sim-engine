@@ -3,7 +3,13 @@ import assert from "node:assert/strict"
 
 // The sliding window on its own. No database, no actor — `now` is passed in, so
 // these are about the counting rule rather than about the clock.
-const { createSlidingWindow, retryWording } = await import("../src/messaging/rate-limit.ts")
+const {
+  configureMessagingRateLimitBackend,
+  createSlidingWindow,
+  messageRateLimit,
+  resetMessagingRateLimits,
+  retryWording,
+} = await import("../src/messaging/rate-limit.ts")
 
 test("the limit is reached, not exceeded", () => {
   const window = createSlidingWindow(3, 1000)
@@ -65,4 +71,40 @@ test("the countdown rounds up, because zero seconds is not a wait", () => {
   assert.equal(retryWording(1200), "Try again in 2 seconds.")
   assert.equal(retryWording(59_000), "Try again in 59 seconds.")
   assert.equal(retryWording(61_000), "Try again in 2 minutes.")
+})
+
+test("the production boundary receives the complete shared policy", async () => {
+  let received: unknown[] | null = null
+  configureMessagingRateLimitBackend({
+    async check(...args) {
+      received = args
+      return { ok: true }
+    },
+  })
+  try {
+    assert.deepEqual(await messageRateLimit.check("player-1"), { ok: true })
+    assert.deepEqual(received, ["message", "player-1", 5, 5_000])
+  } finally {
+    resetMessagingRateLimits()
+  }
+})
+
+test("a shared limiter outage fails closed", async () => {
+  const log = console.error
+  configureMessagingRateLimitBackend({
+    async check() {
+      throw new Error("redis unavailable")
+    },
+  })
+  console.error = () => {}
+  try {
+    assert.deepEqual(await messageRateLimit.check("player-1"), {
+      ok: false,
+      retryAfterMs: 0,
+      unavailable: true,
+    })
+  } finally {
+    console.error = log
+    resetMessagingRateLimits()
+  }
 })

@@ -14,7 +14,18 @@ export type ServerToClientEvent =
   | "channel:updated"
   | "channel:archived"
   | "read:updated"
+  | "messaging:activity"
+  | "messaging:permissions"
   | "notification:created"
+
+export type MessagingActivityAudience = {
+  gameId: string
+  channelId: string
+  // DMs address their two participants directly. Server channels leave this
+  // absent and use either the whole game or the minimum staff audience below.
+  playerAccountIds?: string[]
+  minimumStaffRole?: "MODERATOR" | "ADMIN" | "OWNER" | null
+}
 
 export type RealtimeControl = {
   // Player-scoped delivery: notifications and DM badges. Addressed by game and
@@ -33,9 +44,21 @@ export type RealtimeControl = {
   // joined a channel that was created a moment ago, and the players who need to
   // hear that one was archived are precisely the ones not looking at it.
   emitToGame(gameId: string, event: ServerToClientEvent, payload: unknown): void
+  // Tells every eligible socket *except those already watching the channel*
+  // that its persisted messaging overview changed. This is the unread-badge
+  // path: open conversations receive the full message event in their channel
+  // room, while closed widgets receive this lightweight invalidation.
+  emitMessagingActivity(
+    audience: MessagingActivityAudience,
+    payload: { channelId: string; kind: "created" | "deleted" }
+  ): void
   // Account-level revocation. Called after a ban or session revocation commits,
   // never before — a rolled back transaction must not have kicked anyone.
   disconnectUser(userId: string, reason: string): void
+  // Used when a channel's read visibility changes. Existing room membership
+  // was authorized under the old rule, so every socket in the game reconnects
+  // and resolves its role before it can join the room again.
+  disconnectGame(gameId: string, reason: string): void
 }
 
 // For anywhere a realtime server is not attached: tests, scripts, background
@@ -45,5 +68,7 @@ export const noopRealtime: RealtimeControl = {
   emitToPlayer: () => {},
   emitToChannel: () => {},
   emitToGame: () => {},
+  emitMessagingActivity: () => {},
   disconnectUser: () => {},
+  disconnectGame: () => {},
 }

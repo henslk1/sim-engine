@@ -155,9 +155,19 @@ function leaveGameRooms(socket: MessagingSocket) {
   if (previous) {
     socket.leave(`game:${previous.gameId}`)
     socket.leave(`player:${previous.gameId}:${previous.playerAccountId}`)
+    for (const room of staffAudienceRooms(previous.gameId, previous.staffRole)) socket.leave(room)
   }
   for (const channelId of socket.data.channelRooms) socket.leave(`channel:${channelId}`)
   socket.data.channelRooms.clear()
+}
+
+function staffAudienceRooms(gameId: string, role: MessagingActor["staffRole"]): string[] {
+  if (role === "OWNER") {
+    return ["MODERATOR", "ADMIN", "OWNER"].map(rank => `staff:${gameId}:${rank}`)
+  }
+  if (role === "ADMIN") return [`staff:${gameId}:MODERATOR`, `staff:${gameId}:ADMIN`]
+  if (role === "MODERATOR") return [`staff:${gameId}:MODERATOR`]
+  return []
 }
 
 function registerHandlers(socket: MessagingSocket) {
@@ -179,6 +189,7 @@ function registerHandlers(socket: MessagingSocket) {
     // either of them requires.
     socket.join(`game:${gameId}`)
     socket.join(`player:${gameId}:${decision.value.playerAccountId}`)
+    for (const room of staffAudienceRooms(gameId, decision.value.staffRole)) socket.join(room)
     return { ok: true, value: null }
   }))
 

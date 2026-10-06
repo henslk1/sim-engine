@@ -20,6 +20,23 @@ export const realtimeControl: RealtimeControl = {
     tryGetIo()?.to(`game:${gameId}`).emit(event, payload)
   },
 
+  emitMessagingActivity(audience, payload) {
+    const io = tryGetIo()
+    if (!io) return
+
+    const rooms = audience.playerAccountIds
+      ? audience.playerAccountIds.map(id => `player:${audience.gameId}:${id}`)
+      : audience.minimumStaffRole
+        ? [`staff:${audience.gameId}:${audience.minimumStaffRole}`]
+        : [`game:${audience.gameId}`]
+
+    // A socket with the conversation open already receives message:created or
+    // message:deleted and marks it read itself. Excluding the channel room
+    // avoids a transient unread flash there while still reaching another tab
+    // belonging to the same player.
+    io.to(rooms).except(`channel:${audience.channelId}`).emit("messaging:activity", payload)
+  },
+
   disconnectUser(userId, reason) {
     const io = tryGetIo()
     if (!io) return
@@ -32,5 +49,13 @@ export const realtimeControl: RealtimeControl = {
     // server. Together they are idempotent, and the local one cannot be lost.
     io.local.in(`user:${userId}`).disconnectSockets(true)
     io.in(`user:${userId}`).disconnectSockets(true)
+  },
+
+  disconnectGame(gameId, reason) {
+    const io = tryGetIo()
+    if (!io) return
+    console.log(`[socket] disconnecting game ${gameId}: ${reason}`)
+    io.local.in(`game:${gameId}`).disconnectSockets(true)
+    io.in(`game:${gameId}`).disconnectSockets(true)
   },
 }
