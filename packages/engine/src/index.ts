@@ -11,6 +11,8 @@ export { loadGameAgingCache, genotypeKey, indexHealthRecords } from "./animal/ag
 export { selectAnimalsForAging, summariseInnateTotals } from "./animal/nightly.js"
 export type { AgingCandidate, InteractionRow } from "./animal/nightly.js"
 export type { GameAgingCache, HealthRecordRow } from "./animal/aging-cache.js"
+export { zoneOffsetMinutes, nextDailyBoundary, nextIntervalBoundary } from "./schedule/time.js"
+export type { WallClock, CalendarDate } from "./schedule/time.js"
 export { runConformationInspection } from "./animal/conformation.js"
 export { generateOffspring } from "./breeding/generateOffspring.js"
 export { computeCOI } from "./breeding/computeCOI.js"

@@ -1,0 +1,87 @@
+// Scheduled work: when a game's recurring jobs are due, and what happened the
+// last time each one ran.
+//
+// The two tables do different jobs on purpose. ScheduledTask is the trigger —
+// one row per game per kind of work, holding only the next boundary. It is
+// allowed to be wrong: a tick can fire late, twice, or not at all.
+// ScheduledTaskRun is the claim, and it is what makes a run happen exactly
+// once. unique(gameId, taskType, scheduledFor) is the whole guarantee: two
+// server instances that both decide midnight is due will both try to insert
+// the same row, and only one of them can.
+//
+// Keeping them apart is what gives catch-up. A trigger that was missed leaves
+// no trace, so the old BullMQ cron could lose a midnight forever and nothing
+// noticed. An unfinished claim is a row sitting in the table.
+
+enum ScheduledTaskType {
+  NIGHTLY
+  COMPETITION_SWEEP
+  VENUE_ROTATION
+}
+
+enum ScheduledTaskRunStatus {
+  PENDING
+  RUNNING
+  RETRYING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+// One row per game per kind of work. `nextRunAt` is recomputed from an
+// absolute grid — the game's wall-clock nightly time, or the epoch-aligned
+// interval for sweeps — never from when the last run finished, so a slow or
+// missed run cannot walk the schedule forward.
+model ScheduledTask {
+  id        String             @id @default(cuid())
+  gameId    String
+  taskType  ScheduledTaskType
+  enabled   Boolean            @default(true)
+  nextRunAt DateTime
+  game      Game               @relation(fields: [gameId], references: [id])
+  runs      ScheduledTaskRun[]
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  @@unique([gameId, taskType])
+  @@index([enabled, nextRunAt])
+}
+
+// One row per boundary that came due. `gameId` and `taskType` are copied from
+// the task rather than read through it because the unique constraint that
+// makes the claim work has to live on this table, and because the admin
+// throughput queries read it without a join. Both are written once at insert
+// and never updated, so there is nothing to drift.
+//
+// The lease is how a crash recovers. A process that dies mid-run leaves the
+// row RUNNING with a `leaseUntil` that stops advancing; once it is in the past
+// another tick may take the run over. `attempt` stops that becoming a loop.
+model ScheduledTaskRun {
+  id             String                 @id @default(cuid())
+  taskId         String
+  gameId         String
+  taskType       ScheduledTaskType
+  scheduledFor   DateTime
+  status         ScheduledTaskRunStatus @default(PENDING)
+  claimedBy      String?
+  claimedAt      DateTime?
+  leaseUntil     DateTime?
+  heartbeatAt    DateTime?
+  attempt        Int                    @default(0)
+  startedAt      DateTime?
+  completedAt    DateTime?
+  errorMessage   String?
+  eligibleCount  Int                    @default(0)
+  claimedCount   Int                    @default(0)
+  processedCount Int                    @default(0)
+  succeededCount Int                    @default(0)
+  failedCount    Int                    @default(0)
+  retriedCount   Int                    @default(0)
+  skippedCount   Int                    @default(0)
+  task           ScheduledTask          @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  game           Game                   @relation(fields: [gameId], references: [id])
+
+  @@unique([gameId, taskType, scheduledFor])
+  @@index([status, leaseUntil])
+  @@index([gameId, taskType, startedAt])
+}

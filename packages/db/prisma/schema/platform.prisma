@@ -75,6 +75,8 @@ model Game {
   tutorialStepDefs       TutorialStepDef[]
   achievementDefs        AchievementDef[]
   nightlyUpdateLogs      NightlyUpdateLog[]
+  scheduledTasks         ScheduledTask[]
+  scheduledTaskRuns      ScheduledTaskRun[]
   personalityTraitDefs   PersonalityTraitDef[]
   conformationSections   ConformationSection[]
   predictorUsages        PlayerPredictorUsage[]
@@ -540,6 +542,10 @@ model GameConfig {
   tutorialFemalePrice             Int             @default(0)
   completeProfileTestCost          Int             @default(0)
   completeProfileTestCurrencyDefId String?
+  nightlyRunHour                  Int             @default(0)
+  nightlyRunMinute                Int             @default(0)
+  gameTimeZone                    String          @default("UTC")
+  competitionSweepMinutes         Int             @default(60)
   tutorialMaleBaseTemplate        AnimalTemplate? @relation("GameConfigTutorialMale", fields: [tutorialMaleBaseTemplateId], references: [id])
   tutorialFemaleBaseTemplate      AnimalTemplate? @relation("GameConfigTutorialFemale", fields: [tutorialFemaleBaseTemplateId], references: [id])
   completeProfileTestCurrency     CurrencyDef?    @relation("CompletePrfCurrency", fields: [completeProfileTestCurrencyDefId], references: [id])
