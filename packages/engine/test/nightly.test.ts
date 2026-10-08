@@ -1,75 +1,17 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 
-// Which animals a nightly picks up, and the population summary it writes
-// afterwards. No database: both take their rows as arguments.
-const { selectAnimalsForAging, summariseInnateTotals } = await import("../src/animal/nightly.ts")
-
-const animal = (id: string, ageInCycles: number) => ({ id, ageInCycles })
-
-test("an animal interacted with during its current cycle is aged", () => {
-  const picked = selectAnimalsForAging(
-    [animal("a", 6)],
-    [{ animalId: "a", cycleNumber: 6 }]
-  )
-  assert.deepEqual(picked.map(a => a.id), ["a"])
-})
-
-test("an animal whose only interaction was a previous cycle is left alone", () => {
-  const picked = selectAnimalsForAging(
-    [animal("a", 6)],
-    [{ animalId: "a", cycleNumber: 5 }]
-  )
-  assert.deepEqual(picked, [])
-})
-
-test("an animal nobody touched is left alone", () => {
-  assert.deepEqual(selectAnimalsForAging([animal("a", 6)], []), [])
-})
-
-test("a stale log alongside a current one does not hide the current one", () => {
-  // The regression this function exists for. The query it replaced asked for
-  // `distinct: ["animalId"]` with no `orderBy`, so it kept one arbitrary row
-  // per animal and compared that single row against the animal's age. An
-  // animal with yesterday's log and today's log could have yesterday's kept —
-  // and was then skipped for the night despite having been cared for.
-  const picked = selectAnimalsForAging(
-    [animal("a", 6)],
-    [
-      { animalId: "a", cycleNumber: 5 },
-      { animalId: "a", cycleNumber: 6 },
-    ]
-  )
-  assert.deepEqual(picked.map(a => a.id), ["a"])
-})
-
-test("cycles are matched per animal, not against a shared world cycle", () => {
-  // There is no global cycle: `cycleNumber` is the age that animal was at the
-  // time. Two animals at different ages are each judged against their own.
-  const picked = selectAnimalsForAging(
-    [animal("young", 2), animal("old", 40)],
-    [
-      { animalId: "young", cycleNumber: 40 },
-      { animalId: "old", cycleNumber: 40 },
-    ]
-  )
-  assert.deepEqual(picked.map(a => a.id), ["old"])
-})
-
-test("a log for an animal not in the candidate set is ignored", () => {
-  assert.deepEqual(
-    selectAnimalsForAging([animal("a", 6)], [{ animalId: "ghost", cycleNumber: 6 }]),
-    []
-  )
-})
-
-test("the candidate objects come back whole", () => {
-  // The worker reads lifeStageId off the result afterwards to count stage
-  // transitions, so this returns the rows it was given rather than ids.
-  const candidates = [{ id: "a", ageInCycles: 6, lifeStageId: "foal" }]
-  const picked = selectAnimalsForAging(candidates, [{ animalId: "a", cycleNumber: 6 }])
-  assert.deepEqual(picked, candidates)
-})
+// The population summary a nightly writes afterwards. Takes its rows as
+// arguments; no database.
+//
+// This file used to also cover `selectAnimalsForAging`, which matched living
+// animals against `AnimalDailyLog` rows in Node. That function is gone: which
+// animals are due is now a single indexed join in `selectEligibleAnimals`,
+// against markers written by `markAnimalActive`. The bug those tests pinned —
+// a `distinct` with no `orderBy` keeping an arbitrary log row per animal and
+// silently skipping animals that had been cared for — cannot recur, because
+// there is no longer a per-animal set of rows to pick the wrong one from.
+const { summariseInnateTotals } = await import("../src/animal/nightly.ts")
 
 test("no living animals means no summary to write", () => {
   assert.equal(summariseInnateTotals([]), null)

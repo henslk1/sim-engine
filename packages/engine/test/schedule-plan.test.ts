@@ -189,9 +189,9 @@ test("a blocked game still clears its backlog", () => {
 
 test("a run left behind by a crash is picked up again", () => {
   // The server died mid-nightly. Its lease was never renewed, so it lapsed, and
-  // the work is unfinished. Re-running it is safe: `selectAnimalsForAging` only
-  // picks animals interacted with during their current cycle, and an animal
-  // already aged has moved past that cycle.
+  // the work is unfinished. Re-running it is safe: `selectEligibleAnimals` only
+  // matches an animal whose current age equals one of its activity markers, and
+  // an animal already aged has moved past its marker.
   const plan = planGameRuns(
     [run({ id: "crashed", taskType: "NIGHTLY", status: "RUNNING", leaseUntil: "2026-10-07T05:02:00Z" })],
     at("2026-10-07T05:40:00Z")

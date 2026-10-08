@@ -11,7 +11,26 @@ type Client = typeof db
  * and hands the same object to every animal; a one-off caller may leave it out
  * and the animal's own game is loaded for it, exactly as before.
  */
-export async function advanceAnimalAging(client: Client, animalId: string, cache?: GameAgingCache): Promise<{ pregnancyCompleted?: string; lifeStageAdvanced?: boolean; ageInCycles?: number }> {
+export async function advanceAnimalAging(
+  client: Client,
+  animalId: string,
+  cache?: GameAgingCache,
+  options?: {
+    /**
+     * Age the animal only if it is still on this cycle.
+     *
+     * The nightly's work queue passes the cycle its work item was created for.
+     * Aging commits in this transaction; marking the work item done cannot be
+     * inside it, so a crash between the two is possible and the item is retried.
+     * Checked here, inside the transaction and against the row this transaction
+     * read, the retry sees the animal has already moved on and does nothing —
+     * which is what "a crash must never age the same animal twice" means in
+     * practice. Checking it in the caller would leave a gap between the check
+     * and the aging.
+     */
+    expectedCycle?: number
+  }
+): Promise<{ pregnancyCompleted?: string; lifeStageAdvanced?: boolean; ageInCycles?: number; alreadyAged?: boolean }> {
   return client.$transaction(async (tx) => {
     const animal = await tx.animal.findUniqueOrThrow({
       where: { id: animalId },
@@ -21,6 +40,11 @@ export async function advanceAnimalAging(client: Client, animalId: string, cache
         secondaryDisciplineDef: { select: { minLifeStageIndex: true, maxLifeStageIndex: true } },
       },
     })
+
+    // The work this transaction was asked to do has already happened.
+    if (options?.expectedCycle !== undefined && animal.ageInCycles !== options.expectedCycle) {
+      return { alreadyAged: true, ageInCycles: animal.ageInCycles }
+    }
 
     // A cache built for a different game would silently apply the wrong config
     // to every animal in the run, so it is checked rather than trusted.

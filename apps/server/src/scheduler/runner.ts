@@ -18,9 +18,9 @@
  * one run row per boundary, and the claim guarantees one holder at a time, but
  * a process that dies mid-run leaves a lease that lapses and the work is
  * redone. Handlers have to tolerate that. The nightly does, because
- * `selectAnimalsForAging` only picks animals interacted with during their
- * current cycle and an animal already aged has moved past it. Anything added
- * later has to earn the same property. The fencing token on each claim is what
+ * `selectEligibleAnimals` only matches an animal whose current age equals a
+ * marker's cycle — an animal already aged has moved past its marker and stops
+ * matching. Anything added later has to earn the same property. The fencing token on each claim is what
  * stops the two attempts writing over each other.
  *
  * Nothing here constructs a date. Every reading comes from the injected
@@ -404,7 +404,7 @@ export function createScheduler(options: SchedulerOptions = {}) {
 
     try {
       const totals = zeroFilled(
-        await handler({ gameId, runId: run.id, scheduledFor: run.scheduledFor, clock })
+        await handler({ gameId, runId: run.id, scheduledFor: run.scheduledFor, clock, token })
       )
 
       // A handler that returns normally having failed some of its work has not

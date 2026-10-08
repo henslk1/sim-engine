@@ -10,10 +10,19 @@
 
 import { db } from "@sim-engine/db"
 import {
+  claimChunk,
+  countWork,
+  createWorkItems,
+  finishWork,
+  hasOutstandingWork,
+  heartbeatWork,
+  recordSample,
+} from "./animal-work.js"
+import {
   advanceAnimalAging,
   checkCompetitions,
   loadGameAgingCache,
-  selectAnimalsForAging,
+  selectEligibleAnimals,
   summariseInnateTotals,
   type Clock,
   type ScheduledType,
@@ -43,9 +52,33 @@ export type HandlerContext = {
   /** The boundary this run covers, which may be older than `clock.now()`. */
   scheduledFor: Date
   clock: Clock
+  /**
+   * The run's fencing token. Per-animal work items are claimed with it, so a
+   * worker whose run was reclaimed cannot write results over its successor.
+   */
+  token: string
 }
 
 export type TaskHandler = (ctx: HandlerContext) => Promise<Partial<HandlerCounts>>
+
+/**
+ * How many animals one claim covers.
+ *
+ * Big enough that claiming is not the dominant cost, small enough that a crash
+ * loses at most this much lease time. The plan suggests 250-1,000; benchmark
+ * before moving it.
+ */
+const CHUNK_SIZE = 250
+
+/** How long a claimed chunk is owned for without a renewal. */
+const WORK_LEASE_MS = 120_000
+
+/**
+ * A stop on the drain loop. Each pass claims a chunk or discovers new work; a
+ * run that somehow keeps finding more should give up rather than spin all
+ * night.
+ */
+const MAX_PASSES = 10_000
 
 /**
  * Age every animal in a game that was cared for during its current cycle, then
@@ -57,7 +90,7 @@ export type TaskHandler = (ctx: HandlerContext) => Promise<Partial<HandlerCounts
  * failed looked identical in `NightlyUpdateLog` to one that worked.
  */
 export const runNightly: TaskHandler = async (ctx) => {
-  const { gameId } = ctx
+  const { gameId, runId, token } = ctx
   const startedAt = ctx.clock.now()
 
   const log = await db.nightlyUpdateLog.create({
@@ -72,64 +105,91 @@ export const runNightly: TaskHandler = async (ctx) => {
       data: { status: "BURIED" },
     })
 
-    // Only age animals that were interacted with during their current cycle.
-    // Shop animals (isAvailable: true) are always excluded.
-    const candidates = await db.animal.findMany({
+    // One work item per animal a player interacted with during its current
+    // cycle. Creating them first is what makes the night resumable: after this
+    // commits, the list of what has to happen is in the database rather than in
+    // this process's memory.
+    const eligible = await selectEligibleAnimals(db, gameId)
+    await createWorkItems(runId, eligible)
+
+    // Only so `skipped` still means "living animals nobody touched".
+    const livingCount = await db.animal.count({
       where: { gameId, status: "ALIVE", NOT: { gameShopAnimal: { isAvailable: true } } },
-      select: { id: true, lifeStageId: true, ageInCycles: true },
     })
 
-    // COVER_ACCEPTED is written to the sire when a female owner accepts a stud
-    // market cover — the stud owner played no part, so it must not count as an
-    // interaction.
-    //
-    // Deliberately not `distinct` — the match is per animal against its own
-    // current cycle, and keeping one arbitrary row per animal is what made
-    // `selectAnimalsForAging` necessary. See the note there.
-    const interactions = await db.animalDailyLog.findMany({
-      where: {
-        animalId: { in: candidates.map((a) => a.id) },
-        cycleNumber: { in: [...new Set(candidates.map((a) => a.ageInCycles))] },
-        NOT: { eventType: "COVER_ACCEPTED" },
-      },
-      select: { animalId: true, cycleNumber: true },
-    })
+    // The game's definitions — config, life stages, expression rules, illness
+    // and injury pools — read once for the whole run rather than once per
+    // animal. Loaded only when there is work, so an idle game stays free.
+    const cache = (await hasOutstandingWork(runId)) ? await loadGameAgingCache(db, gameId) : null
 
-    const animals = selectAnimalsForAging(candidates, interactions)
+    let processed = 0
     let failed = 0
+    let transitions = 0
+    let skippedAlreadyAged = 0
 
-    if (animals.length > 0) {
-      // The game's definitions — config, life stages, expression rules, illness
-      // and injury pools — read once for the whole run rather than once per
-      // animal. Loaded only when there is work, so an idle game stays free.
-      const cache = await loadGameAgingCache(db, gameId)
+    for (let pass = 0; pass < MAX_PASSES; pass++) {
+      const now = ctx.clock.now()
+      const chunk = await claimChunk(runId, token, now, WORK_LEASE_MS, CHUNK_SIZE)
 
-      // Nothing in here renews the lease. The runner holds it open on a timer
-      // for as long as this function is running, which is the only version
-      // that works: a game with fewer animals than any batch size would never
-      // have reached a renewal point, and the aggregate below can outlast a
-      // lease on its own however many animals there were.
-      for (const animal of animals) {
+      if (chunk.length === 0) {
+        // Nothing claimable. Before finishing, look for animals that became
+        // eligible while this run was going — somebody playing in the seconds
+        // either side of the boundary. Plan section 8 requires that check, and
+        // because the set stabilises it terminates.
+        const late = await selectEligibleAnimals(db, gameId)
+        const added = await createWorkItems(runId, late)
+        if (added > 0) {
+          console.log(`[nightly] ${added} animal(s) became eligible mid-run`)
+          continue
+        }
+        break
+      }
+
+      for (const work of chunk) {
         try {
-          await advanceAnimalAging(db, animal.id, cache)
+          // `expectedCycle` is the idempotency guarantee. If a previous attempt
+          // aged this animal and died before closing the item out, the aging
+          // transaction sees the animal has moved on and does nothing.
+          const result = await advanceAnimalAging(db, work.animalId, cache ?? undefined, {
+            expectedCycle: work.cycleNumber,
+          })
+
+          if (result.alreadyAged) skippedAlreadyAged++
+          else if (result.lifeStageAdvanced) transitions++
+
+          processed++
+          await finishWork(work.id, token, ctx.clock.now(), { status: "COMPLETED" })
         } catch (err) {
           failed++
-          console.error(`[nightly] failed to age animal ${animal.id}:`, err)
+          console.error(`[nightly] failed to age animal ${work.animalId}:`, err)
+          // Left RETRYING so the next pass picks it up; `attempt` on the row is
+          // the record of how many times it has been tried.
+          await finishWork(work.id, token, ctx.clock.now(), {
+            status: work.attempt >= 3 ? "FAILED" : "RETRYING",
+            errorMessage: err instanceof Error ? err.message : String(err),
+          })
         }
       }
+
+      // One lease renewal and one progress sample per chunk. Chunks are large,
+      // so this is naturally spaced without a timer of its own.
+      const after = ctx.clock.now()
+      await heartbeatWork(runId, token, after, WORK_LEASE_MS)
+      await recordSample(runId, ctx.clock)
     }
 
-    const updated = await db.animal.findMany({
-      where: { id: { in: animals.map((a) => a.id) } },
-      select: { id: true, status: true, lifeStageId: true },
-    })
+    const counts = await countWork(runId)
 
-    const stageBefore = new Map(animals.map((a) => [a.id, a.lifeStageId]))
-    const deaths = updated.filter((a) => a.status === "DECEASED").length
-    const transitions = updated.filter((a) => {
-      const before = stageBefore.get(a.id)
-      return before !== undefined && before !== a.lifeStageId
-    }).length
+    // Deaths are counted from the database rather than accumulated here, so the
+    // number is right even when an earlier attempt did some of the work.
+    const deaths = await db.animal.count({
+      where: {
+        gameId,
+        status: "DECEASED",
+        diedAt: { gte: startedAt },
+        nightlyWork: { some: { runId } },
+      },
+    })
 
     // Recalculate GameInnateMax from the living population.
     //
@@ -153,16 +213,23 @@ export const runNightly: TaskHandler = async (ctx) => {
     }
 
     const completedAt = ctx.clock.now()
-    const aged = animals.length - failed
+    const aged = counts.completed - skippedAlreadyAged
+    const outstanding = counts.pending + counts.running + counts.retrying
+
+    // Plan section 8: a run is not complete while work remains or any of it
+    // failed. Both are reported as failures so the runner refuses to mark the
+    // run COMPLETED.
+    const unfinished = counts.failed + outstanding
 
     await db.nightlyUpdateLog.update({
       where: { id: log.id },
       data: {
         completedAt,
-        // The change. A night in which animals threw is not a success, and
-        // recording that is what lets anyone notice it happened.
-        success: failed === 0,
-        errorMessage: failed === 0 ? null : `${failed} of ${animals.length} animals failed to age`,
+        success: unfinished === 0,
+        errorMessage:
+          unfinished === 0
+            ? null
+            : `${counts.failed} animal(s) failed, ${outstanding} still outstanding`,
         animalsAged: aged,
         animalDeaths: deaths,
         lifeStageTransitions: transitions,
@@ -170,18 +237,19 @@ export const runNightly: TaskHandler = async (ctx) => {
     })
 
     const elapsedMs = completedAt.getTime() - startedAt.getTime()
-    const rate = animals.length > 0 ? (animals.length / (elapsedMs / 1000)).toFixed(1) : "0"
+    const rate = processed > 0 ? (processed / (elapsedMs / 1000)).toFixed(1) : "0"
     console.log(
-      `[nightly] gameId=${gameId} aged=${aged} failed=${failed} deaths=${deaths} transitions=${transitions} in ${elapsedMs}ms (${rate}/s)`
+      `[nightly] gameId=${gameId} aged=${aged} failed=${counts.failed} outstanding=${outstanding} deaths=${deaths} transitions=${transitions} in ${elapsedMs}ms (${rate}/s)`
     )
 
     return {
-      eligibleCount: candidates.length,
-      claimedCount: animals.length,
-      processedCount: animals.length,
+      eligibleCount: eligible.length,
+      claimedCount: counts.completed + counts.failed + outstanding,
+      processedCount: processed,
       succeededCount: aged,
-      failedCount: failed,
-      skippedCount: candidates.length - animals.length,
+      failedCount: unfinished,
+      retriedCount: counts.retrying,
+      skippedCount: Math.max(0, livingCount - eligible.length),
     }
   } catch (err) {
     // The log row is created up front precisely so that a crash leaves a
