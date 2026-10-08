@@ -204,6 +204,8 @@ model Animal {
   healthCertificates                  HealthCertificate[]
   vetVisitLogs                        VetVisitLog[]
   immunity                            AnimalImmunity?
+  cycleActivity                       AnimalCycleActivity[]
+  nightlyWork                         NightlyAnimalWork[]
   careLogs                            CareLog[]
   trainingLogs                        TrainingLog[]
   energy                              AnimalEnergy?

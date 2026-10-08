@@ -1,4 +1,5 @@
 import { db } from "@sim-engine/db";
+import { markAnimalActive } from "../animal/activity.js";
 
 type Client = typeof db
 
@@ -240,6 +241,10 @@ export async function enterCompetition(
         cycleNumber: animal.ageInCycles,
       },
     })
+
+    // Entering is the player's action, so it is what counts. The result, when
+    // the competition eventually runs, is marked separately.
+    await markAnimalActive(tx, { gameId: competition.gameId, animalId, cycleNumber: animal.ageInCycles })
 
     if (!competition.disciplineDef.isConformation) {
       const statWeights = await tx.disciplineStatWeight.findMany({

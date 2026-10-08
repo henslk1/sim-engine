@@ -1,4 +1,5 @@
 import { db } from "@sim-engine/db"
+import { markAnimalActive } from "@sim-engine/engine"
 import { router, publicProcedure } from "../trpc.js"
 import { z } from "zod"
 
@@ -219,6 +220,9 @@ export const breedingListingRouter = router({
         }
 
         if (energyCost > 0) {
+          // Qualifying interaction: a player action that changes this animal's state.
+          await markAnimalActive(tx, { animalId: listing.animalId })
+
           await tx.animalEnergy.update({
             where: { animalId: listing.animalId },
             data: { currentEnergy: { decrement: energyCost } },

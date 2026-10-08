@@ -13,14 +13,20 @@ import {
   closeMessagingRateLimitBackend,
   redisMessagingRateLimitBackend,
 } from "./messaging-rate-limit.js"
-import { competitionDispatchQueue, venueRotationDispatchQueue, nightlyDispatchQueue } from "./jobs/queue.js"
-import { nightlyDispatcherWorker } from "./jobs/nightly.dispatcher.js"
-import { nightlyWorker } from "./jobs/nightly.worker.js"
-import { competitionDispatcherWorker } from "./jobs/competition.dispatcher.js"
-import { competitionWorker } from "./jobs/competition.worker.js"
-import { venueRotationWorker } from "./jobs/venue-rotation.worker.js"
+import { resolveSchedulerBackend } from "./scheduler/backend.js"
+import { createScheduler, type SchedulerHealth } from "./scheduler/runner.js"
 
 const app = new Hono()
+
+// Read before the server starts listening: an unrecognised value should stop
+// the process here, with a clear message, rather than three seconds later from
+// inside a timer callback.
+const SCHEDULER_BACKEND = resolveSchedulerBackend(process.env["SCHEDULER_BACKEND"])
+
+// Whichever backend wins sets these, and the rest of the file calls them
+// without caring which one is running.
+let stopScheduler: () => Promise<void> = async () => {}
+let schedulerHealth: () => SchedulerHealth | null = () => null
 
 configureMessagingRateLimitBackend(redisMessagingRateLimitBackend)
 
@@ -29,7 +35,23 @@ app.use("*", cors({
   credentials: true,
 }))
 
-app.get("/health", (c) => c.json({ status: "ok" }))
+// Readiness, not liveness. A process that is serving pages while scheduling
+// nothing looks completely healthy from the outside — no errors, no failed
+// requests — and the first sign of trouble is a player asking why their
+// animals did not age. This is what makes that detectable.
+app.get("/health", (c) => {
+  const scheduler = schedulerHealth()
+  const expected = SCHEDULER_BACKEND !== "none"
+  const healthy = !expected || scheduler?.started === true
+
+  return c.json(
+    {
+      status: healthy ? "ok" : "degraded",
+      scheduler: { backend: SCHEDULER_BACKEND, ...(scheduler ?? {}) },
+    },
+    healthy ? 200 : 503
+  )
+})
 
 app.use("/trpc/*", trpcServer({
   router: appRouter,
@@ -47,17 +69,21 @@ const httpServer = serve({ fetch: app.fetch, port: PORT }, () => {
   console.log(`Server running on port ${PORT}`)
   initSocket(httpServer as HttpServer)
 
-  // Register job schedulers in the background — not blocking request handling
-  Promise.all([
-    nightlyDispatchQueue.upsertJobScheduler("nightly-dispatch-cron",
-      { pattern: "0 0 * * *" }, { name: "nightly-dispatch", data: {} }),
-    competitionDispatchQueue.upsertJobScheduler("competition-dispatch-cron",
-      { pattern: "0 * * * *" }, { name: "competition-dispatch", data: {} }),
-    venueRotationDispatchQueue.upsertJobScheduler("venue-rotation-dispatch-cron",
-      { pattern: "0 0 * * 5" }, { name: "venue-rotation-dispatch", data: {} }),
-  ]).then(() => console.log("Job schedulers registered"))
-    .catch((err) => console.error("Job scheduler registration failed:", err))
+  // Start the scheduler in the background — not blocking request handling.
+  void startScheduler().catch((err) => console.error("Scheduler start failed:", err))
 }) as HttpServer
+
+async function startScheduler(): Promise<void> {
+  if (SCHEDULER_BACKEND === "none") {
+    console.log("Scheduler disabled (SCHEDULER_BACKEND=none)")
+    return
+  }
+
+  const scheduler = createScheduler()
+  stopScheduler = scheduler.stop
+  schedulerHealth = scheduler.getHealth
+  scheduler.start()
+}
 
 // Without this, a failed bind surfaces as an unhandled 'error' event: Node
 // rethrows it and the process dies with a raw stack trace, or silently if
@@ -75,20 +101,10 @@ httpServer.on("error", (error: NodeJS.ErrnoException) => {
 
 
 // Deploys and platform restarts stop this process with a signal, then force
-// kill it after a short grace period (Fly's kill_timeout defaults to 5s).
-// The HTTP server, Socket.io and all five BullMQ workers live in this one
-// process, so without draining them an in-flight job is cut mid-run and never
-// releases its Redis lock: BullMQ waits out lockDuration, marks the job
-// stalled, and past maxStalledCount fails it outright. That matters most for
-// the nightly tick, which advances every animal in a game.
-const WORKERS = [
-  nightlyDispatcherWorker,
-  nightlyWorker,
-  competitionDispatcherWorker,
-  competitionWorker,
-  venueRotationWorker,
-]
-
+// kill it after a short grace period (Fly's kill_timeout defaults to 5s). The
+// HTTP server, Socket.io and the scheduler all live in this one process, so
+// the scheduler gets a chance to wind down with everything else — see
+// `stopScheduler`, which each backend sets to its own drain.
 let shuttingDown = false
 async function shutdown(signal: string) {
   // A second signal during the drain must not restart it.
@@ -118,7 +134,7 @@ async function shutdown(signal: string) {
     await Promise.all([
       closeServer,
       closeMessagingRateLimitBackend(),
-      ...WORKERS.map((worker) => worker.close()),
+      stopScheduler(),
     ])
     await db.$disconnect()
     console.log("Drained cleanly")

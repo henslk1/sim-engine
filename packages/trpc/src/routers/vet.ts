@@ -1,5 +1,6 @@
 import { router, publicProcedure } from "../trpc.js"
 import { db } from "@sim-engine/db"
+import { markAnimalActive } from "@sim-engine/engine"
 import { z } from "zod"
 
 export const vetRouter = router({
@@ -160,11 +161,14 @@ export const vetRouter = router({
       db.$transaction(async (tx) => {
         const treatmentAnimal = await tx.animalTreatmentRecord.findUnique({
           where: { id: input.treatmentRecordId },
-          select: { animal: { select: { status: true } } },
+          select: { animalId: true, animal: { select: { status: true } } },
         })
         if (!treatmentAnimal?.animal || treatmentAnimal.animal.status !== "ALIVE") {
           throw new Error("Animal is not alive")
         }
+
+        // Qualifying interaction: a player action that changes this animal's state.
+        await markAnimalActive(tx, { animalId: treatmentAnimal.animalId })
 
         const record = await tx.animalTreatmentRecord.findUniqueOrThrow({
           where: { id: input.treatmentRecordId },
@@ -270,6 +274,9 @@ export const vetRouter = router({
     }))
     .mutation(({ input }) =>
       db.$transaction(async (tx) => {
+        // Qualifying interaction: a player action that changes this animal's state.
+        await markAnimalActive(tx, { animalId: input.animalId })
+
         const [animal, healthRecord, treatmentDef] = await Promise.all([
           tx.animal.findUniqueOrThrow({
             where: { id: input.animalId },

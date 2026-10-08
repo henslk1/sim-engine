@@ -8,6 +8,14 @@ export const Route = createFileRoute("/_authenticated/admin/games/$gameId/config
   component: GameConfigPage,
 })
 
+// The canonical IANA names the runtime knows, built once rather than per render.
+//
+// "UTC" is deliberately prepended: it is not in `supportedValuesOf`, but it is
+// the column's default and therefore the value every game starts on. A picker
+// built from that list alone cannot show you what your game is currently set
+// to, which is a confusing way to find out.
+const TIME_ZONES = ["UTC", ...Intl.supportedValuesOf("timeZone")]
+
 function Panel({ title, children, className }: { title: string; children: React.ReactNode; className?: string }) {
   return (
     <div className={`rounded-lg border border-border bg-card shadow-sm ${className ?? ""}`}>
@@ -80,6 +88,10 @@ function GameConfigPage() {
     tutorialFemalePrice: 0,
     completeProfileTestCost: 0,
     completeProfileTestCurrencyDefId: "",
+    nightlyRunHour: 0,
+    nightlyRunMinute: 0,
+    gameTimeZone: "UTC",
+    competitionSweepMinutes: 60,
   })
 
   function n(key: keyof typeof cf, float = false) {
@@ -149,15 +161,27 @@ function GameConfigPage() {
           tutorialFemalePrice: g.tutorialFemalePrice ?? 0,
           completeProfileTestCost: g.completeProfileTestCost ?? 0,
           completeProfileTestCurrencyDefId: g.completeProfileTestCurrencyDefId ?? "",
+          nightlyRunHour: g.nightlyRunHour,
+          nightlyRunMinute: g.nightlyRunMinute,
+          gameTimeZone: g.gameTimeZone,
+          competitionSweepMinutes: g.competitionSweepMinutes,
         })
       }
     }
   }, [data])
 
+  const { data: schedule = [] } = trpc.admin.game.scheduleStatus.useQuery({ gameId: gameId! })
   const { data: templates = [] } = trpc.admin.animalTemplate.list.useQuery({ gameId: gameId! })
   const { data: currencies = [] } = trpc.admin.currency.list.useQuery({ gameId: gameId! })
   const saveGame = trpc.admin.game.saveGame.useMutation({ onSuccess: () => utils.admin.game.get.invalidate() })
-  const saveConfig = trpc.admin.game.saveConfig.useMutation({ onSuccess: () => utils.admin.game.get.invalidate() })
+  const saveConfig = trpc.admin.game.saveConfig.useMutation({
+    onSuccess: () => {
+      utils.admin.game.get.invalidate()
+      // Saving moves each task onto its new boundary, so the "next run" below
+      // has to be re-read or it would still show the old schedule.
+      utils.admin.game.scheduleStatus.invalidate()
+    },
+  })
 
   function handleSaveConfig() {
     saveConfig.mutate({
@@ -312,6 +336,62 @@ function GameConfigPage() {
                   </select>
                 </F>
               </div>
+            </Panel>
+
+            <Panel title="Scheduling" className="col-span-2">
+              <div className="grid grid-cols-4 gap-2">
+                <F label="Nightly Hour (0–23)"><Input type="number" step="1" min="0" max="23" {...n("nightlyRunHour")} /></F>
+                <F label="Nightly Minute (0–59)"><Input type="number" step="1" min="0" max="59" {...n("nightlyRunMinute")} /></F>
+                <F label="Competition Sweep (minutes)"><Input type="number" step="1" min="1" max="1440" {...n("competitionSweepMinutes")} /></F>
+                <F label="Game Time Zone">
+                  <select
+                    className="h-8 rounded-md border border-input bg-background px-2 text-sm text-foreground"
+                    value={cf.gameTimeZone}
+                    onChange={e => setCf(prev => ({ ...prev, gameTimeZone: e.target.value }))}
+                  >
+                    {TIME_ZONES.map(zone => (
+                      <option key={zone} value={zone}>{zone}</option>
+                    ))}
+                  </select>
+                </F>
+              </div>
+
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                The nightly runs on this game{"\u2019"}s clock, not the server{"\u2019"}s — the same wall-clock
+                time all year, through daylight saving changes. The sweep runs on a fixed
+                grid anchored to the hour.
+              </p>
+
+              {schedule.length > 0 && schedule[0]!.timeZone !== cf.gameTimeZone && (
+                <p className="mt-2 text-[11px] font-medium text-destructive">
+                  Unsaved time zone change — the times below are still the saved schedule.
+                </p>
+              )}
+
+              {schedule.length > 0 && (
+                <div className="mt-2 space-y-1 border-t border-border pt-2">
+                  {schedule.map(task => (
+                    <div key={task.taskType} className="flex items-baseline justify-between gap-3 text-[11px]">
+                      <span className="font-medium text-foreground">
+                        {task.taskType === "NIGHTLY" ? "Nightly update" : "Competition sweep"}
+                      </span>
+                      <span className="text-muted-foreground">{task.description}</span>
+                      {/* `task.timeZone` is the saved one, not the dropdown's.
+                          Formatting with the form state would move this clock
+                          the moment the select changed, while the description
+                          beside it still read the saved zone — the same line
+                          contradicting itself, and implying a change had taken
+                          effect that had not been saved yet. */}
+                      <span className="tabular-nums text-muted-foreground">
+                        {task.nextRunAt
+                          ? `next ${new Date(task.nextRunAt).toLocaleString(undefined, { timeZone: task.timeZone, dateStyle: "medium", timeStyle: "short" })}`
+                          : "not scheduled yet"}
+                        {task.enabled === false && " (disabled)"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </Panel>
 
             <Panel title="Tutorial Base Templates" className="col-span-3">

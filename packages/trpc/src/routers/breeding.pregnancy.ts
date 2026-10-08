@@ -1,4 +1,5 @@
 import { db } from "@sim-engine/db"
+import { markAnimalActive } from "@sim-engine/engine"
 import { TRPCError } from "@trpc/server"
 import { router, protectedProcedure, publicProcedure } from "../trpc.js"
 import { z } from "zod"
@@ -299,6 +300,9 @@ export const breedingPregnancyRouter = router({
               await tx.animalHealthRecord.create({
                 data: { animalId: o.animal.id, conditionDefId: lethalCondition.id, isActive: false },
               })
+              // No activity marker: this foal is already DECEASED above, and
+              // the nightly's eligibility query only ever selects ALIVE
+              // animals. A marker here would be a row nothing could read.
               await tx.animalDailyLog.create({
                 data: { animalId: o.animal.id, cycleNumber: 0, eventType: "BORN_DECEASED", outcome: lethalCondition.name },
               })
@@ -332,6 +336,11 @@ export const breedingPregnancyRouter = router({
         }
 
         if (unborn.length > 0) {
+          // Qualifying interaction for the dam. The foals are not marked: a
+          // newborn has had nothing done to it yet, and it will be marked the
+          // first time somebody cares for it.
+          await markAnimalActive(tx, { animalId: pregnancy.animal.id, cycleNumber: pregnancy.animal.ageInCycles })
+
           await tx.animalDailyLog.create({
             data: {
               animalId: pregnancy.animal.id,

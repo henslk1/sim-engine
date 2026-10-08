@@ -1,0 +1,118 @@
+// Durable nightly work.
+//
+// Stage 3 of the scheduler rebuild. `scheduling.prisma` answers "is a run due
+// and who owns it"; this answers "which animals does that run have to touch,
+// and which of them are done". The split matters because a nightly is the one
+// task long enough to be interrupted halfway through.
+
+// Which animals were interacted with, during which of their own cycles.
+//
+// This replaces inferring eligibility from `AnimalDailyLog`, which was never
+// built for the job: most interactions do not write to it at all. Feeding,
+// grooming, training, stage activities and competition entry all left no row
+// there, so an animal could be looked after every day and still never age.
+//
+// A row here is written by `markAnimalActive`, in the same transaction as the
+// action that caused it. If the action rolls back so does the marker, and the
+// set of actions that qualify is a list in one file rather than a property of
+// which log tables happen to exist.
+//
+// `cycleNumber` is the age *that animal* was at the time. There is no global
+// game cycle, so every comparison is per animal: an animal is due to age when
+// it has a row for the cycle it is currently on.
+model AnimalCycleActivity {
+  id                 String   @id @default(cuid())
+  gameId             String
+  animalId           String
+  cycleNumber        Int
+  // When the first qualifying action of this cycle happened, and the most
+  // recent. Nothing reads them yet; they are what makes "this animal was
+  // active at 23:58, three minutes before the boundary" answerable later.
+  firstInteractionAt DateTime @default(now())
+  lastInteractionAt  DateTime @default(now())
+
+  game   Game   @relation(fields: [gameId], references: [id])
+  animal Animal @relation(fields: [animalId], references: [id], onDelete: Cascade)
+
+  // The marker is one row per animal per cycle no matter how many qualifying
+  // actions happen. It is also what makes `markAnimalActive` an upsert rather
+  // than something that has to check first.
+  @@unique([animalId, cycleNumber])
+  // The nightly's eligibility query: this game, joined to animals whose
+  // current age matches a row.
+  @@index([gameId, cycleNumber])
+}
+
+// One animal's share of one nightly run.
+//
+// Without this a nightly is all-or-nothing: a crash at animal 40,000 of 50,000
+// leaves no record of which 40,000 were done, and the only safe thing to do is
+// run the whole night again. With it, a reclaimed run picks up the items still
+// PENDING and the finished ones stay finished.
+//
+// It reuses `ScheduledTaskRunStatus` rather than defining a near-identical
+// second enum, because the states are genuinely the same ones: claimed with a
+// lease, retried, completed, given up on.
+model NightlyAnimalWork {
+  id       String @id @default(cuid())
+  runId    String
+  animalId String
+
+  // The age the animal was when this item was created, and the heart of the
+  // idempotency guarantee. Aging commits in its own transaction; marking the
+  // item complete cannot be inside it. So a crash between the two is possible,
+  // and on retry the executor compares this against the animal's current age:
+  // if the animal has moved on, the work already happened and the item is
+  // closed without touching it again. A crash must never age an animal twice,
+  // and this is how that is enforced rather than hoped for.
+  cycleNumber Int
+
+  status       ScheduledTaskRunStatus @default(PENDING)
+  attempt      Int                    @default(0)
+  claimedBy    String?
+  leaseUntil   DateTime?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  errorMessage String?
+
+  run    ScheduledTaskRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  animal Animal           @relation(fields: [animalId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  // One item per animal per run. This is what makes creating work items safe to
+  // repeat — including the late-activity sweep that runs just before a nightly
+  // is allowed to finish.
+  @@unique([runId, animalId])
+  // Claiming the next chunk, and counting what is left.
+  @@index([runId, status])
+  // Finding items whose owner died.
+  @@index([status, leaseUntil])
+}
+
+// A periodic snapshot of a run's progress.
+//
+// Sampled every few seconds rather than updated per animal: fifty thousand
+// animals would otherwise mean fifty thousand writes to one row, which is both
+// a hotspot and a worse answer, because a single running total cannot show
+// whether throughput is climbing or collapsing.
+//
+// Named for `ScheduledTaskRun` rather than the plan's `JobRunProgressSample`,
+// for the same reason the run itself was renamed: `jobs.prisma` already holds
+// the in-game job domain.
+model ScheduledTaskRunSample {
+  id             String   @id @default(cuid())
+  runId          String
+  recordedAt     DateTime @default(now())
+  processedTotal Int
+  succeededTotal Int
+  failedTotal    Int
+  // How many items held a live lease at this instant. With one process this is
+  // the chunk concurrency; it is what separates "completed per worker-second"
+  // from "completed per wall-clock second" once there is more than one.
+  activeWorkers  Int
+
+  run ScheduledTaskRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId, recordedAt])
+}

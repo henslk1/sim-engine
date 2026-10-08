@@ -8,7 +8,7 @@
     "test:tutorial": "node --import tsx --test packages/trpc/test/tutorial-policy.test.ts packages/trpc/test/tutorial-guard.test.ts packages/trpc/test/tutorial-markers.test.ts",
     "test:messaging": "node --import tsx --test packages/trpc/test/messaging-permissions.test.ts packages/trpc/test/messaging-messages.test.ts packages/trpc/test/messaging-channels.test.ts packages/trpc/test/messaging-rate-limit.test.ts packages/trpc/test/messaging-architecture.test.ts",
     "test:socket": "node --import tsx --test apps/server/test/socket.test.ts",
-    "test:engine": "node --import tsx --test packages/engine/test/nightly.test.ts packages/engine/test/aging-cache.test.ts packages/engine/test/schedule-time.test.ts",
+    "test:engine": "node --import tsx --test packages/engine/test/nightly.test.ts packages/engine/test/aging-cache.test.ts packages/engine/test/schedule-time.test.ts packages/engine/test/schedule-clock.test.ts packages/engine/test/schedule-plan.test.ts packages/engine/test/schedule-architecture.test.ts",
     "test": "pnpm test:tutorial && pnpm test:messaging && pnpm test:socket && pnpm test:engine"
   },
   "devDependencies": {

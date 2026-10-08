@@ -1,4 +1,5 @@
 import { db } from "@sim-engine/db"
+import { markAnimalActive } from "./activity.js";
 import { computeCoatFromCodes } from "../breeding/computePhenotype.js"
 
 type Client = typeof db
@@ -210,6 +211,9 @@ export async function runConformationInspection(client: Client, animalId: string
       if (sumWeights === 0) continue
       sectionScores.push({ sectionId: section.id, score: (sumMatched / sumWeights) * 100 })
     }
+
+    // Qualifying interaction: a player action that changes this animal's state.
+    await markAnimalActive(tx, { animalId })
 
     await Promise.all([
       tx.animalConformationScore.create({ data: { animalId, breedId, score: overallScore, isCoatDq, isTraitDq } }),

@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch --env-file=../../.env src/index.ts",
-    "build": "tsc"
+    "build": "tsc",
+    "redis:clear-bullmq": "node --env-file=../../.env --import tsx scripts/clear-bullmq-redis.ts"
   },
   "dependencies": {
     "@hono/node-server": "latest",
@@ -15,7 +16,6 @@
     "@socket.io/redis-adapter": "^8.3.0",
     "@trpc/server": "^11.18.0",
     "better-auth": "^1.6.23",
-    "bullmq": "^5.79.2",
     "hono": "latest",
     "ioredis": "^5.11.1",
     "socket.io": "^4.8.3"

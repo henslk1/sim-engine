@@ -80,6 +80,8 @@ model ScheduledTaskRun {
   skippedCount   Int                    @default(0)
   task           ScheduledTask          @relation(fields: [taskId], references: [id], onDelete: Cascade)
   game           Game                   @relation(fields: [gameId], references: [id])
+  animalWork     NightlyAnimalWork[]
+  samples        ScheduledTaskRunSample[]
 
   @@unique([gameId, taskType, scheduledFor])
   @@index([status, leaseUntil])

@@ -15,8 +15,21 @@ export async function checkCompetitions(client: Client, gameId: string) {
     select: { id: true },
   })
 
+  let ran = 0
+  let failed = 0
+
   for (const c of expired) {
-    await runCompetition(client, { competitionId: c.id })
+    try {
+      await runCompetition(client, { competitionId: c.id })
+      ran++
+    } catch (err) {
+      // One competition that cannot be resolved must not stop the sweep
+      // resolving the others, or topping the open set back up. It can also
+      // simply mean another process got there first, which is expected now
+      // that an interrupted sweep is re-run rather than lost.
+      failed++
+      console.error(`[competition] failed to run competition ${c.id}:`, err)
+    }
   }
 
   const venueDisciplines = await client.venueDiscipline.findMany({
@@ -100,5 +113,5 @@ export async function checkCompetitions(client: Client, gameId: string) {
     }
   }
 
-  return { ran: expired.length }
+  return { ran, failed, expired: expired.length }
 }

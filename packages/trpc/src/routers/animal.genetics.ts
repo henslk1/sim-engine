@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server"
 import { router, publicProcedure, protectedProcedure } from "../trpc.js"
 import { db } from "@sim-engine/db"
+import { markAnimalActive } from "@sim-engine/engine"
 import { z } from "zod"
 
 export const animalGeneticsRouter = router({
@@ -35,6 +36,9 @@ export const animalGeneticsRouter = router({
         if (testedThisCycle >= config.maxLocusTestsPerCycle) {
           throw new Error(`Test quota reached for this cycle (max ${config.maxLocusTestsPerCycle})`)
         }
+
+        // Qualifying interaction: a player action that changes this animal's state.
+        await markAnimalActive(tx, { animalId: input.animalId, cycleNumber: animal.ageInCycles })
 
         return tx.animalGenotype.update({
           where: { animalId_locusId: { animalId: input.animalId, locusId: input.locusId } },
@@ -128,6 +132,9 @@ export const animalGeneticsRouter = router({
           data: { isTestedByOwner: true, testedAt: new Date() },
         })
 
+        // Qualifying interaction: a player action that changes this animal's state.
+        await markAnimalActive(tx, { animalId: input.animalId })
+
         return { tested: eligibleGenotypes.length, cost: totalCost }
       })
     }),
@@ -209,6 +216,9 @@ export const animalGeneticsRouter = router({
           },
           data: { isTestedByOwner: true, testedAt: new Date() },
         })
+
+        // Qualifying interaction: a player action that changes this animal's state.
+        await markAnimalActive(tx, { animalId: input.animalId })
 
         return { tested: eligible.length, cost }
       })

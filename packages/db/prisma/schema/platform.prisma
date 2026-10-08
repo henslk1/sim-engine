@@ -77,6 +77,7 @@ model Game {
   nightlyUpdateLogs      NightlyUpdateLog[]
   scheduledTasks         ScheduledTask[]
   scheduledTaskRuns      ScheduledTaskRun[]
+  animalCycleActivity    AnimalCycleActivity[]
   personalityTraitDefs   PersonalityTraitDef[]
   conformationSections   ConformationSection[]
   predictorUsages        PlayerPredictorUsage[]

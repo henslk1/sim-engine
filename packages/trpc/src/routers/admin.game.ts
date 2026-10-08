@@ -1,7 +1,16 @@
 import { router, publicProcedure } from "../trpc.js";
 import { db } from "@sim-engine/db";
+import type { Prisma } from "@sim-engine/db";
 import { z } from "zod";
 import { ensureGlobalChatServer } from "../messaging/servers.js"
+import {
+  IMMINENT_BOUNDARY_MS,
+  SCHEDULED_TASK_TYPES,
+  describeSchedule,
+  isValidTimeZone,
+  nextBoundaryFor,
+  type GameSchedule,
+} from "@sim-engine/engine"
 
 export const gameAdminRouter = router({
   get: publicProcedure.query(() =>
@@ -83,8 +92,18 @@ export const gameAdminRouter = router({
         tutorialFemalePrice: z.number().int().min(0).default(0),
         completeProfileTestCost: z.number().int().min(0).default(0),
         completeProfileTestCurrencyDefId: z.string().nullish(),
+        // Scheduling. These four decide when the nightly and the competition
+        // sweep actually run, so the bounds here are the same ones
+        // `validateGameSchedule` enforces in the scheduler — a value this form
+        // accepts must be one the scheduler can compute a boundary from.
+        nightlyRunHour: z.number().int().min(0).max(23).default(0),
+        nightlyRunMinute: z.number().int().min(0).max(59).default(0),
+        gameTimeZone: z.string()
+          .refine(isValidTimeZone, "Not a time zone this server recognises")
+          .default("UTC"),
+        competitionSweepMinutes: z.number().int().min(1).max(1440).default(60),
       }))
-      .mutation(({ input }) => {
+      .mutation(async ({ input }) => {
         const { gameId, containerLabel, subContainerLabel, lifeExpectancyBaseline, maxBreedingSlots, tutorialMaleBaseTemplateId, tutorialFemaleBaseTemplateId, completeProfileTestCurrencyDefId, ...rest } = input
         const labels = {
           containerLabel: containerLabel ?? null,
@@ -97,12 +116,65 @@ export const gameAdminRouter = router({
           tutorialFemaleBaseTemplateId: tutorialFemaleBaseTemplateId ?? null,
           completeProfileTestCurrencyDefId: completeProfileTestCurrencyDefId ?? null,
         }
-        return db.gameConfig.upsert({
-          where: { gameId },
-          create: { gameId, ...rest, ...labels, ...nullable },
-          update: { ...rest, ...labels, ...nullable },
+        // One transaction, because the settings and the boundaries they imply
+        // are one change. Committing the config and then failing to move the
+        // tasks would report an error to the caller while leaving the config
+        // saved and the schedule stale — the one state nobody could diagnose
+        // from either screen.
+        return db.$transaction(async (tx) => {
+          const saved = await tx.gameConfig.upsert({
+            where: { gameId },
+            create: { gameId, ...rest, ...labels, ...nullable },
+            update: { ...rest, ...labels, ...nullable },
+          })
+
+          await rescheduleTasks(tx, gameId, saved)
+          return saved
         })
       }),
+
+  /**
+   * What each scheduled task is set to and when it next runs.
+   *
+   * Reads back from `ScheduledTask` rather than recomputing, because the row is
+   * what the scheduler will actually obey. A config that says midnight and a
+   * task that says otherwise is exactly the discrepancy worth being able to see.
+   */
+  scheduleStatus: publicProcedure
+    .input(z.object({ gameId: z.string() }))
+    .query(async ({ input }) => {
+      const config = await db.gameConfig.findUnique({
+        where: { gameId: input.gameId },
+        select: {
+          nightlyRunHour: true,
+          nightlyRunMinute: true,
+          gameTimeZone: true,
+          competitionSweepMinutes: true,
+        },
+      })
+      if (!config) return []
+
+      const tasks = await db.scheduledTask.findMany({
+        where: { gameId: input.gameId },
+        select: { taskType: true, enabled: true, nextRunAt: true },
+      })
+
+      return SCHEDULED_TASK_TYPES.map((taskType) => {
+        const task = tasks.find((t) => t.taskType === taskType)
+        return {
+          taskType,
+          description: describeSchedule(taskType, config),
+          // The zone these times should be read in. Sent with the rows rather
+          // than taken from the form, because the form may be holding an
+          // unsaved change — and a line that renders the clock from the
+          // dropdown beside a description from the database would be two
+          // halves of one sentence disagreeing with each other.
+          timeZone: config.gameTimeZone,
+          enabled: task?.enabled ?? null,
+          nextRunAt: task?.nextRunAt ?? null,
+        }
+      })
+    }),
 
   listDailyAllowanceCurrencies: publicProcedure
     .input(z.object({ gameId: z.string() }))
@@ -218,3 +290,52 @@ export const gameAdminRouter = router({
       }
     }),
 })
+
+
+/**
+ * Move each of a game's tasks onto the boundary its new settings imply.
+ *
+ * Without this, changing the time zone or the run time would not take effect
+ * until after the next run fired on the old setting — you would save "midnight
+ * Chicago", watch it run at 19:00, and reasonably conclude the setting did not
+ * work.
+ *
+ * A task whose boundary has passed, or is about to, is left exactly where it
+ * is — see `IMMINENT_BOUNDARY_MS`. Moving it would quietly cancel a run that
+ * was seconds away, which is a surprising amount of damage for saving a form:
+ * change the time zone at 23:59:50 and the whole night's aging would simply not
+ * happen, with nothing anywhere saying why. The tick materializes that run on
+ * the old settings, then computes the following boundary from the new ones.
+ *
+ * That window also closes the race in the other direction. The cutoff is
+ * decided once, so without it a task that was in the future when this read it
+ * could fall due before the update landed, and be moved anyway.
+ */
+async function rescheduleTasks(
+  tx: Prisma.TransactionClient,
+  gameId: string,
+  schedule: GameSchedule
+): Promise<void> {
+  const now = new Date()
+  const cutoff = new Date(now.getTime() + IMMINENT_BOUNDARY_MS)
+
+  const tasks = await tx.scheduledTask.findMany({
+    where: { gameId, nextRunAt: { gt: cutoff } },
+    select: { id: true, taskType: true, nextRunAt: true },
+  })
+
+  for (const task of tasks) {
+    const taskType = SCHEDULED_TASK_TYPES.find((type) => type === task.taskType)
+    if (!taskType) continue
+
+    const nextRunAt = nextBoundaryFor(taskType, schedule, now)
+    if (nextRunAt.getTime() === task.nextRunAt.getTime()) continue
+
+    // Conditional on the value this read saw, so a tick that materialized the
+    // task in the meantime is not overwritten.
+    await tx.scheduledTask.updateMany({
+      where: { id: task.id, nextRunAt: task.nextRunAt },
+      data: { nextRunAt },
+    })
+  }
+}

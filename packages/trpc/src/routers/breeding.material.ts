@@ -1,7 +1,7 @@
 import { db } from "@sim-engine/db"
 import { router, publicProcedure } from "../trpc.js"
 import { z } from "zod"
-import { generateOffspring, computePhenotypeDescription, computePhenotypeCodes, computeBreedingQuality, computeFixedFields, type BlendedAlleleFrequency } from "@sim-engine/engine"
+import { generateOffspring, computePhenotypeDescription, computePhenotypeCodes, computeBreedingQuality, computeFixedFields, type BlendedAlleleFrequency, markAnimalActive } from "@sim-engine/engine"
 
 async function buildBreedFreqMap(
   sireComp: Array<{ breedId: string; percentage: number }>,
@@ -74,6 +74,9 @@ export const breedingMaterialRouter = router({
     }))
     .mutation(async ({ input }) => {
       return db.$transaction(async (tx) => {
+        // Qualifying interaction: a player action that changes this animal's state.
+        await markAnimalActive(tx, { animalId: input.animalId })
+
         const animal = await tx.animal.findUniqueOrThrow({
           where: { id: input.animalId },
           select: {
@@ -875,6 +878,9 @@ export const breedingMaterialRouter = router({
         await tx.geneticMaterial.update({ where: { id: input.spermId }, data: { isUsed: true } })
 
         if (!result.conceived) {
+          // Qualifying interaction — this is what makes the nightly age the animal.
+          await markAnimalActive(tx, { animalId: input.damId, cycleNumber: dam.ageInCycles })
+
           await tx.animalDailyLog.create({
             data: {
               animalId: input.damId,
@@ -1007,6 +1013,9 @@ export const breedingMaterialRouter = router({
           ])
         }
 
+        // Qualifying interaction — this is what makes the nightly age the animal.
+        await markAnimalActive(tx, { animalId: input.damId, cycleNumber: dam.ageInCycles })
+
         await tx.animalDailyLog.create({
           data: {
             animalId: input.damId,
@@ -1049,6 +1058,10 @@ export const breedingMaterialRouter = router({
         }
 
         const { gameId, playerAccountId, ageInCycles } = pregnancy.animal
+
+        // Qualifying interaction: a player action that changes this animal's state.
+        // The mare is the one acted on - the embryo is taken from her.
+        await markAnimalActive(tx, { gameId, animalId: pregnancy.animalId, cycleNumber: ageInCycles })
 
         const vetService = await tx.vetServiceDef.findFirst({
           where: { gameId, serviceType: "GENETIC_COLLECTION" },
@@ -1269,6 +1282,9 @@ export const breedingMaterialRouter = router({
           where: { id: embryo.id },
           data: { isUsed: true },
         })
+
+        // Qualifying interaction — this is what makes the nightly age the animal.
+        await markAnimalActive(tx, { animalId: input.surrogateAnimalId, cycleNumber: surrogate.ageInCycles })
 
         await tx.animalDailyLog.create({
           data: {

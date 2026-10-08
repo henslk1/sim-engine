@@ -1,4 +1,5 @@
 import { db } from "@sim-engine/db";
+import { markAnimalActive } from "../animal/activity.js";
 
 type Client = typeof db
 
@@ -178,6 +179,11 @@ export async function applyCareAction(
       create: { animalId: animalId, score: Math.min(action.careScoreGain, ceiling) },
       update: { score: newCareScore },
     })
+
+    // Marks the animal as looked after this cycle, which is what makes the
+    // nightly age it. Inside the same transaction on purpose: an action that
+    // rolls back must not leave a marker claiming it happened.
+    await markAnimalActive(tx, { gameId: action.gameId, animalId, cycleNumber })
 
     return careLog
 

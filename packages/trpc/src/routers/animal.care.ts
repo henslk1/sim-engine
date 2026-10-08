@@ -1,4 +1,4 @@
-import { applyCareAction } from "@sim-engine/engine"
+import { applyCareAction, markAnimalActive } from "@sim-engine/engine"
 import { db } from "@sim-engine/db"
 import { router, publicProcedure } from "../trpc.js"
 import { z } from "zod"
@@ -60,6 +60,9 @@ export const animalCareRouter = router({
           where: { id: input.ltcRecordId },
           data: { lastPerformedCycle: animal.ageInCycles, nextDueCycle },
         })
+
+        // Qualifying interaction — this is what makes the nightly age the animal.
+        await markAnimalActive(tx, { animalId: input.animalId, cycleNumber: animal.ageInCycles })
 
         await tx.animalDailyLog.create({
           data: {

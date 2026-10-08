@@ -59,10 +59,24 @@ export async function runCompetition(
       throw new Error("Competition is not open")
     }
 
-    await tx.competition.update({
-      where: { id: competitionId },
+    // Claim the competition conditionally rather than reading OPEN above and
+    // trusting it. Under READ COMMITTED the read happens against a snapshot,
+    // so two callers can both see OPEN, both reach here, and both award prizes
+    // — the second UPDATE simply queues behind the first and then applies.
+    // Matching on the status makes the transition itself the claim: zero rows
+    // means somebody else is already running it.
+    //
+    // This matters more than it used to. The scheduler's lease recovery means a
+    // sweep that was interrupted is re-run, so duplicate execution is now a
+    // path the system takes deliberately rather than a freak event.
+    const { count } = await tx.competition.updateMany({
+      where: { id: competitionId, status: "OPEN" },
       data: { status: "IN_PROGRESS" },
     })
+
+    if (count !== 1) {
+      throw new Error("Competition is not open")
+    }
 
     // pre-fetch world max trained value per stat for normalization
     const statWorldMaxes = new Map<string, number>()

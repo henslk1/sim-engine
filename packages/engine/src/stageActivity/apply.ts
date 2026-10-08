@@ -1,4 +1,5 @@
 import { db } from "@sim-engine/db"
+import { markAnimalActive } from "../animal/activity.js"
 
 type Client = typeof db
 
@@ -25,7 +26,7 @@ export async function applyStageActivity(
 
     const animal = await tx.animal.findUniqueOrThrow({
       where: { id: animalId },
-      select: { lifeStageId: true },
+      select: { lifeStageId: true, gameId: true },
     })
 
     if (animal.lifeStageId !== activity.lifeStageId) {
@@ -73,6 +74,11 @@ export async function applyStageActivity(
       where: { animalId_traitDefId: { animalId, traitDefId: activity.traitDefId } },
       data: { personalityModifier: clampedModifier, traitLabel: newLabel },
     })
+
+    // Marks the animal as looked after this cycle, which is what makes the
+    // nightly age it. Inside the same transaction on purpose: an action that
+    // rolls back must not leave a marker claiming it happened.
+    await markAnimalActive(tx, { gameId: animal.gameId, animalId, cycleNumber })
 
     return tx.stageActivityLog.create({
       data: { animalId, stageActivityDefId, cycleNumber, performedByPlayerId },

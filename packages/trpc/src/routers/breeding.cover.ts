@@ -1,7 +1,7 @@
 import { db } from "@sim-engine/db"
 import { router, publicProcedure } from "../trpc.js"
 import { z } from "zod"
-import { generateOffspring, computePhenotypeDescription, computePhenotypeCodes, computeBreedingQuality, computeCOI, computeFixedFields } from "@sim-engine/engine"
+import { generateOffspring, computePhenotypeDescription, computePhenotypeCodes, computeBreedingQuality, computeCOI, computeFixedFields, markAnimalActive } from "@sim-engine/engine"
 
 async function buildBreedFreqMap(
   sireComp: Array<{ breedId: string; percentage: number }>,
@@ -349,6 +349,9 @@ export const breedingCoverRouter = router({
         select: { id: true, status: true },
       })
 
+      // Qualifying interaction — this is what makes the nightly age the animal.
+      await markAnimalActive(db, { animalId: input.sireId, cycleNumber: sire.ageInCycles })
+
       await db.animalDailyLog.create({
         data: {
           animalId: input.sireId,
@@ -488,6 +491,11 @@ export const breedingCoverRouter = router({
             where: { animalId: offer.sireId },
             data: { isActive: false },
           })
+
+          // Qualifying interaction for the DAM only. Her owner confirmed the
+          // breeding, which is a player action that changes her state. The sire's
+          // owner took no action here, so he is not marked.
+          await markAnimalActive(tx, { animalId: offer.damId })
 
           await Promise.all([
             tx.pregnancyOffspring.create({
@@ -679,6 +687,11 @@ export const breedingCoverRouter = router({
         })
 
         if (!result.conceived) {
+          // Qualifying interaction for the DAM only. Her owner confirmed the
+          // breeding, which is a player action that changes her state. The sire's
+          // owner took no action here, so he is not marked.
+          await markAnimalActive(tx, { animalId: offer.damId })
+
           await tx.animalDailyLog.create({
             data: {
               animalId: offer.damId,
@@ -812,6 +825,11 @@ export const breedingCoverRouter = router({
               : []),
           ])
         }
+
+        // Qualifying interaction for the DAM only. Her owner confirmed the
+        // breeding, which is a player action that changes her state. The sire's
+        // owner took no action here, so he is not marked.
+        await markAnimalActive(tx, { animalId: offer.damId })
 
         await tx.animalDailyLog.create({
           data: {
