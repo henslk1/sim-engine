@@ -286,7 +286,26 @@ model Competition {
   game                    Game                @relation(fields: [gameId], references: [id])
   tutorialPlayerAccount   PlayerAccount?      @relation("TutorialCompetitions", fields: [tutorialPlayerAccountId], references: [id])
   createdAt               DateTime            @default(now())
-  expiresAt               DateTime
+  // When this competition is due to be resolved, and null while it has none.
+  //
+  // Null is the whole point. The old `expiresAt` was set at creation to
+  // `now + maxWaitHours`, so every competition came due whether or not anybody
+  // had entered it - which is how 4,312 competitions were resolved with zero
+  // entries between them, and 1,078 empty ones were regenerated every hour.
+  // Nothing happened, so there is nothing to compute.
+  //
+  // It is set when the FIRST entry arrives, to the next competition-sweep
+  // boundary - not to `now + maxWaitHours`. A deadline measured from whenever
+  // someone happened to enter is exactly the drift that anchoring the sweep to
+  // an absolute grid removes. Entering at 13:59 means it runs at 14:00, and
+  // that short window is a guarantee of the system rather than a defect.
+  //
+  // `maxWaitHours` survives on this model for invitationals, whose boundary is
+  // the next nightly rather than the next sweep.
+  closesAt                DateTime?
+
+  // The sweep's query: this game's open competitions that have come due.
+  @@index([gameId, status, closesAt])
 }
 
 model CompetitionEntry {

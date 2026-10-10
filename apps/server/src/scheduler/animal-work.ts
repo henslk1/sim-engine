@@ -187,8 +187,24 @@ export async function hasOutstandingWork(runId: string): Promise<boolean> {
  * worse answer — a single running total cannot show whether throughput is
  * climbing or collapsing.
  */
-export async function recordSample(runId: string, clock: Clock): Promise<void> {
-  const counts = await countWork(runId)
+export async function recordSample(runId: string, token: string, clock: Clock): Promise<void> {
+  const [counts, claimants] = await Promise.all([
+    countWork(runId),
+    // Workers, not in-flight items. A sample is taken at the seam between
+    // chunks, where the caller has just finished everything it claimed and
+    // holds no live lease — counting leases here would have reported zero
+    // workers for the whole of a single-process run, and made "completed per
+    // worker-second" a division by nothing.
+    db.nightlyAnimalWork.findMany({
+      where: { runId, status: "RUNNING", claimedBy: { not: null } },
+      distinct: ["claimedBy"],
+      select: { claimedBy: true },
+    }),
+  ])
+
+  // Everyone else holding work, plus this worker, which is active by virtue of
+  // being the one recording.
+  const others = claimants.filter((c) => c.claimedBy !== token).length
 
   await db.scheduledTaskRunSample.create({
     data: {
@@ -197,7 +213,7 @@ export async function recordSample(runId: string, clock: Clock): Promise<void> {
       processedTotal: counts.completed + counts.failed,
       succeededTotal: counts.completed,
       failedTotal: counts.failed,
-      activeWorkers: counts.running,
+      activeWorkers: others + 1,
     },
   })
 }

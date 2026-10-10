@@ -1,4 +1,4 @@
-import { enterCompetition, runCompetition, runConformationInspection } from "@sim-engine/engine";
+import { enterCompetition, nextBoundaryFor, runCompetition, runConformationInspection } from "@sim-engine/engine";
 import { db } from "@sim-engine/db";
 import { router, publicProcedure } from "../trpc.js";
 import { z } from "zod";
@@ -13,6 +13,33 @@ export const animalCompetitionRouter = router({
         include: { disciplines: { select: { disciplineDefId: true } } },
       })
     ),
+
+  /**
+   * When competitions next resolve for this game.
+   *
+   * A competition nobody has entered has no deadline of its own, so the venue
+   * page has nothing of its own to count down to. This is what it counts down
+   * to instead, and the countdown is literally true: enter now and the
+   * competition runs at this boundary.
+   */
+  nextSweepAt: publicProcedure
+    .input(z.object({ gameId: z.string() }))
+    .query(async ({ input }) => {
+      const config = await db.gameConfig.findUnique({
+        where: { gameId: input.gameId },
+        select: {
+          nightlyRunHour: true,
+          nightlyRunMinute: true,
+          gameTimeZone: true,
+          competitionSweepMinutes: true,
+        },
+      })
+      if (!config) return null
+      return {
+        nextSweepAt: nextBoundaryFor("COMPETITION_SWEEP", config, new Date()),
+        sweepMinutes: config.competitionSweepMinutes,
+      }
+    }),
 
   listOpen: publicProcedure
     .input(z.object({
@@ -81,7 +108,10 @@ export const animalCompetitionRouter = router({
           },
           _count: { select: { entries: true } },
         },
-        orderBy: { expiresAt: "asc" },
+        // Postgres sorts NULLS LAST on an ascending order, so competitions
+        // that have been entered and have a deadline come first, and the ones
+        // still waiting for their first entry follow.
+        orderBy: { closesAt: "asc" },
       })
     ),
 

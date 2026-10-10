@@ -93,8 +93,13 @@ export const runNightly: TaskHandler = async (ctx) => {
   const { gameId, runId, token } = ctx
   const startedAt = ctx.clock.now()
 
-  const log = await db.nightlyUpdateLog.create({
-    data: { gameId, startedAt, success: false },
+  // One log row per run, not per attempt. A reclaimed run reopens the row it
+  // already has, which is what lets the outcome counters below describe the
+  // whole night rather than only whichever attempt happened to finish it.
+  const log = await db.nightlyUpdateLog.upsert({
+    where: { runId },
+    create: { runId, gameId, startedAt, success: false },
+    update: { completedAt: null, success: false, errorMessage: null },
   })
 
   try {
@@ -175,7 +180,7 @@ export const runNightly: TaskHandler = async (ctx) => {
       // so this is naturally spaced without a timer of its own.
       const after = ctx.clock.now()
       await heartbeatWork(runId, token, after, WORK_LEASE_MS)
-      await recordSample(runId, ctx.clock)
+      await recordSample(runId, token, ctx.clock)
     }
 
     const counts = await countWork(runId)
@@ -213,7 +218,16 @@ export const runNightly: TaskHandler = async (ctx) => {
     }
 
     const completedAt = ctx.clock.now()
-    const aged = counts.completed - skippedAlreadyAged
+
+    // Every completed item is an animal this run aged: either this attempt
+    // aged it, or an earlier attempt of the same run did and this one
+    // confirmed it. Subtracting `skippedAlreadyAged` looked right and was not
+    // — on a reclaimed run it is the count of work the *first* attempt
+    // finished, so taking it away reported zero for a night that had in fact
+    // aged everything. An animal that aged outside this run never gets an item
+    // in the first place, because eligibility matches the activity marker
+    // against the animal's current cycle.
+    const aged = counts.completed
     const outstanding = counts.pending + counts.running + counts.retrying
 
     // Plan section 8: a run is not complete while work remains or any of it
@@ -230,16 +244,22 @@ export const runNightly: TaskHandler = async (ctx) => {
           unfinished === 0
             ? null
             : `${counts.failed} animal(s) failed, ${outstanding} still outstanding`,
+        // Aged and deaths are recounted from the database each attempt, so
+        // they are already cumulative and are written outright. Transitions
+        // are counted in this process as they happen, so a second attempt
+        // only ever sees its own share and has to add to what is there.
         animalsAged: aged,
         animalDeaths: deaths,
-        lifeStageTransitions: transitions,
+        lifeStageTransitions: { increment: transitions },
       },
     })
 
     const elapsedMs = completedAt.getTime() - startedAt.getTime()
     const rate = processed > 0 ? (processed / (elapsedMs / 1000)).toFixed(1) : "0"
     console.log(
-      `[nightly] gameId=${gameId} aged=${aged} failed=${counts.failed} outstanding=${outstanding} deaths=${deaths} transitions=${transitions} in ${elapsedMs}ms (${rate}/s)`
+      `[nightly] gameId=${gameId} aged=${aged} failed=${counts.failed} outstanding=${outstanding} deaths=${deaths} transitions=${transitions}` +
+        (skippedAlreadyAged > 0 ? ` (${skippedAlreadyAged} already done by an earlier attempt)` : "") +
+        ` in ${elapsedMs}ms (${rate}/s)`
     )
 
     return {
@@ -271,12 +291,16 @@ export const runNightly: TaskHandler = async (ctx) => {
 
 /** Resolve competitions whose deadline has passed, then top the open set back up. */
 export const runCompetitionSweep: TaskHandler = async (ctx) => {
-  const { ran, failed, expired } = await checkCompetitions(db, ctx.gameId)
+  // The scheduler's instant, not a fresh reading: deadlines are judged against
+  // the same moment that decided this sweep was due.
+  const { ran, failed, due, created } = await checkCompetitions(db, ctx.gameId, ctx.clock.now())
+
+  if (created > 0) console.log(`[competition] gameId=${ctx.gameId} resolved=${ran} failed=${failed} created=${created}`)
 
   // `failedCount` is what makes the runner mark the run as not completed, so a
   // sweep that could not resolve a competition is visible rather than being
   // reported as a clean run that happened to do less.
-  return { eligibleCount: expired, processedCount: expired, succeededCount: ran, failedCount: failed }
+  return { eligibleCount: due, processedCount: due, succeededCount: ran, failedCount: failed }
 }
 
 export const HANDLERS: Record<ScheduledType, TaskHandler> = {

@@ -107,6 +107,7 @@ import { Route as AuthenticatedAdminGamesGameIdChatChannelsRouteImport } from '.
 import { Route as AuthenticatedAdminGamesGameIdCareActionsRouteImport } from './routes/_authenticated/admin/games.$gameId.care-actions'
 import { Route as AuthenticatedAdminGamesGameIdBreedsRouteImport } from './routes/_authenticated/admin/games.$gameId.breeds'
 import { Route as AuthenticatedAdminGamesGameIdAnimalTemplatesRouteImport } from './routes/_authenticated/admin/games.$gameId.animal-templates'
+import { Route as AuthenticatedAdminGamesGameIdAnalyticsRouteImport } from './routes/_authenticated/admin/games.$gameId.analytics'
 
 const VerifyEmailRoute = VerifyEmailRouteImport.update({
   id: '/verify-email',
@@ -672,6 +673,12 @@ const AuthenticatedAdminGamesGameIdAnimalTemplatesRoute =
     path: '/animal-templates',
     getParentRoute: () => AuthenticatedAdminGamesGameIdRoute,
   } as any)
+const AuthenticatedAdminGamesGameIdAnalyticsRoute =
+  AuthenticatedAdminGamesGameIdAnalyticsRouteImport.update({
+    id: '/analytics',
+    path: '/analytics',
+    getParentRoute: () => AuthenticatedAdminGamesGameIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -731,6 +738,7 @@ export interface FileRoutesByFullPath {
   '/admin/bugs/': typeof AuthenticatedAdminBugsIndexRoute
   '/admin/support/': typeof AuthenticatedAdminSupportIndexRoute
   '/admin/users/': typeof AuthenticatedAdminUsersIndexRoute
+  '/admin/games/$gameId/analytics': typeof AuthenticatedAdminGamesGameIdAnalyticsRoute
   '/admin/games/$gameId/animal-templates': typeof AuthenticatedAdminGamesGameIdAnimalTemplatesRoute
   '/admin/games/$gameId/breeds': typeof AuthenticatedAdminGamesGameIdBreedsRoute
   '/admin/games/$gameId/care-actions': typeof AuthenticatedAdminGamesGameIdCareActionsRoute
@@ -825,6 +833,7 @@ export interface FileRoutesByTo {
   '/admin/bugs': typeof AuthenticatedAdminBugsIndexRoute
   '/admin/support': typeof AuthenticatedAdminSupportIndexRoute
   '/admin/users': typeof AuthenticatedAdminUsersIndexRoute
+  '/admin/games/$gameId/analytics': typeof AuthenticatedAdminGamesGameIdAnalyticsRoute
   '/admin/games/$gameId/animal-templates': typeof AuthenticatedAdminGamesGameIdAnimalTemplatesRoute
   '/admin/games/$gameId/breeds': typeof AuthenticatedAdminGamesGameIdBreedsRoute
   '/admin/games/$gameId/care-actions': typeof AuthenticatedAdminGamesGameIdCareActionsRoute
@@ -926,6 +935,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/bugs/': typeof AuthenticatedAdminBugsIndexRoute
   '/_authenticated/admin/support/': typeof AuthenticatedAdminSupportIndexRoute
   '/_authenticated/admin/users/': typeof AuthenticatedAdminUsersIndexRoute
+  '/_authenticated/admin/games/$gameId/analytics': typeof AuthenticatedAdminGamesGameIdAnalyticsRoute
   '/_authenticated/admin/games/$gameId/animal-templates': typeof AuthenticatedAdminGamesGameIdAnimalTemplatesRoute
   '/_authenticated/admin/games/$gameId/breeds': typeof AuthenticatedAdminGamesGameIdBreedsRoute
   '/_authenticated/admin/games/$gameId/care-actions': typeof AuthenticatedAdminGamesGameIdCareActionsRoute
@@ -1027,6 +1037,7 @@ export interface FileRouteTypes {
     | '/admin/bugs/'
     | '/admin/support/'
     | '/admin/users/'
+    | '/admin/games/$gameId/analytics'
     | '/admin/games/$gameId/animal-templates'
     | '/admin/games/$gameId/breeds'
     | '/admin/games/$gameId/care-actions'
@@ -1121,6 +1132,7 @@ export interface FileRouteTypes {
     | '/admin/bugs'
     | '/admin/support'
     | '/admin/users'
+    | '/admin/games/$gameId/analytics'
     | '/admin/games/$gameId/animal-templates'
     | '/admin/games/$gameId/breeds'
     | '/admin/games/$gameId/care-actions'
@@ -1221,6 +1233,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/bugs/'
     | '/_authenticated/admin/support/'
     | '/_authenticated/admin/users/'
+    | '/_authenticated/admin/games/$gameId/analytics'
     | '/_authenticated/admin/games/$gameId/animal-templates'
     | '/_authenticated/admin/games/$gameId/breeds'
     | '/_authenticated/admin/games/$gameId/care-actions'
@@ -1961,6 +1974,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminGamesGameIdAnimalTemplatesRouteImport
       parentRoute: typeof AuthenticatedAdminGamesGameIdRoute
     }
+    '/_authenticated/admin/games/$gameId/analytics': {
+      id: '/_authenticated/admin/games/$gameId/analytics'
+      path: '/analytics'
+      fullPath: '/admin/games/$gameId/analytics'
+      preLoaderRoute: typeof AuthenticatedAdminGamesGameIdAnalyticsRouteImport
+      parentRoute: typeof AuthenticatedAdminGamesGameIdRoute
+    }
   }
 }
 
@@ -2014,6 +2034,7 @@ const AuthenticatedAdminUsersRouteWithChildren =
   )
 
 interface AuthenticatedAdminGamesGameIdRouteChildren {
+  AuthenticatedAdminGamesGameIdAnalyticsRoute: typeof AuthenticatedAdminGamesGameIdAnalyticsRoute
   AuthenticatedAdminGamesGameIdAnimalTemplatesRoute: typeof AuthenticatedAdminGamesGameIdAnimalTemplatesRoute
   AuthenticatedAdminGamesGameIdBreedsRoute: typeof AuthenticatedAdminGamesGameIdBreedsRoute
   AuthenticatedAdminGamesGameIdCareActionsRoute: typeof AuthenticatedAdminGamesGameIdCareActionsRoute
@@ -2058,6 +2079,8 @@ interface AuthenticatedAdminGamesGameIdRouteChildren {
 
 const AuthenticatedAdminGamesGameIdRouteChildren: AuthenticatedAdminGamesGameIdRouteChildren =
   {
+    AuthenticatedAdminGamesGameIdAnalyticsRoute:
+      AuthenticatedAdminGamesGameIdAnalyticsRoute,
     AuthenticatedAdminGamesGameIdAnimalTemplatesRoute:
       AuthenticatedAdminGamesGameIdAnimalTemplatesRoute,
     AuthenticatedAdminGamesGameIdBreedsRoute:

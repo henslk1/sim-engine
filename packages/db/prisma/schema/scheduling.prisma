@@ -82,6 +82,7 @@ model ScheduledTaskRun {
   game           Game                   @relation(fields: [gameId], references: [id])
   animalWork     NightlyAnimalWork[]
   samples        ScheduledTaskRunSample[]
+  nightlyLog     NightlyUpdateLog?
 
   @@unique([gameId, taskType, scheduledFor])
   @@index([status, leaseUntil])

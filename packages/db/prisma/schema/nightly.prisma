@@ -107,9 +107,13 @@ model ScheduledTaskRunSample {
   processedTotal Int
   succeededTotal Int
   failedTotal    Int
-  // How many items held a live lease at this instant. With one process this is
-  // the chunk concurrency; it is what separates "completed per worker-second"
-  // from "completed per wall-clock second" once there is more than one.
+  // How many workers were on this run at this instant — distinct claimants
+  // holding outstanding items, plus whoever recorded the sample. Workers
+  // rather than in-flight items, because a sample is taken at the seam
+  // between chunks where nothing holds a lease: counting leases reported zero
+  // for the whole of a single-process run. This is what separates "completed
+  // per worker-second" from "completed per wall-clock second" once there is
+  // more than one.
   activeWorkers  Int
 
   run ScheduledTaskRun @relation(fields: [runId], references: [id], onDelete: Cascade)

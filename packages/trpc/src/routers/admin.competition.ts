@@ -6,5 +6,5 @@ import { z } from "zod"
 export const competitionAdminRouter = router({
   check: publicProcedure
     .input(z.object({ gameId: z.string() }))
-    .mutation(({ input }) => checkCompetitions(db, input.gameId)),
+    .mutation(({ input }) => checkCompetitions(db, input.gameId, new Date())),
 })

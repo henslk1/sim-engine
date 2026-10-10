@@ -1384,7 +1384,8 @@ export const tutorialRouter = router({
             status: "COMPLETED",
             tutorialPlayerAccountId: player.id,
             tutorialNpcData: npcEntries,
-            expiresAt: now,
+            // Already COMPLETED; the deadline is only a record of when.
+            closesAt: now,
           },
         })
 
@@ -1729,7 +1730,9 @@ export const tutorialRouter = router({
           status: "OPEN",
           tutorialPlayerAccountId: player.id,
           tutorialNpcData: [],
-          expiresAt: new Date(),
+          // Resolved by the lines below rather than by the sweep, which skips
+          // tutorial competitions entirely.
+          closesAt: new Date(),
         },
       })
       try {

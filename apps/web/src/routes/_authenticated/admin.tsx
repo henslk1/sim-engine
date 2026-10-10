@@ -10,7 +10,7 @@ import {
   Pill, FileCheck, Dumbbell, Gauge, Star, Award, Layers, MapPin,
   CalendarDays, BookOpen, CircleDollarSign, Package, ShoppingCart,
   ShoppingBag, Crown, Bell, Filter, ChevronDown, ChevronRight, ArrowLeft, Gift,
-  Stethoscope, Swords, Plus, Settings, Gamepad2, Loader2, CircleDot, Hash,
+  Stethoscope, Swords, Plus, Settings, Gamepad2, Loader2, CircleDot, Hash, LineChart,
 } from "lucide-react"
 
 type NavLink = { to: string; label: string; icon: React.ComponentType<{ className?: string }>; badge?: number }
@@ -31,6 +31,7 @@ const platformLinks: NavLink[] = [
 function makeGameOpsLinks(gameId: string): NavLink[] {
   return [
     { to: `/admin/games/${gameId}`, label: "Setup Checklist", icon: Settings2 },
+    { to: `/admin/games/${gameId}/analytics`, label: "Analytics", icon: LineChart },
     { to: `/admin/games/${gameId}/economy`, label: "Economy", icon: TrendingUp },
     { to: `/admin/games/${gameId}/events`, label: "Events", icon: Calendar },
     { to: `/admin/games/${gameId}/seasons`, label: "Seasons & Comp", icon: Trophy },

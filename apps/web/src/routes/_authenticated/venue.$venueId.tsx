@@ -29,7 +29,7 @@ type Competition = {
   isInvitational: boolean
   breedId: string | null
   breed: { id: string; name: string } | null
-  expiresAt: Date | string
+  closesAt: Date | string | null
   _count: { entries: number }
   tierDef: { id: string; name: string; tierIndex: number; entryFee: number } | null
   disciplineDef: {
@@ -134,15 +134,34 @@ function SlotBar({ filled, max }: { filled: number; max: number }) {
   )
 }
 
-function deadlineInfo(expiresAt: Date | string): { text: string; cls: string } {
-  const ms = new Date(expiresAt).getTime() - Date.now()
+/**
+ * What to show in the deadline column.
+ *
+ * A competition with entries counts down to its own `closesAt`. One nobody has
+ * entered has no deadline at all — it waits indefinitely rather than being
+ * resolved empty — so it counts down to the next sweep instead, which is when
+ * it would run if you entered right now. The suffix is what keeps those two
+ * apart.
+ */
+function deadlineInfo(
+  closesAt: Date | string | null,
+  nextSweepAt: Date | string | null | undefined
+): { text: string; cls: string } {
+  const entered = closesAt != null
+  const target = closesAt ?? nextSweepAt
+  if (!target) return { text: "—", cls: "text-muted-foreground/50" }
+
+  const ms = new Date(target).getTime() - Date.now()
   const hours = ms / 3600000
   const minutes = ms / 60000
-  if (hours < 0)   return { text: "Expired",                          cls: "text-destructive" }
-  if (hours < 1)   return { text: `${Math.ceil(minutes)}m left`,      cls: "text-destructive font-semibold" }
-  if (hours < 6)   return { text: `${Math.ceil(hours)}h left`,        cls: "text-destructive font-semibold" }
-  if (hours < 24)  return { text: `${Math.ceil(hours)}h left`,        cls: "text-chart-1" }
-  return { text: `${Math.ceil(hours / 24)}d left`,                     cls: "text-muted-foreground" }
+  const suffix = entered ? "left" : "if entered"
+
+  // Past its deadline and still open means the sweep has not reached it yet,
+  // not that anything has gone wrong.
+  if (hours < 0)  return { text: entered ? "Due" : "any moment",         cls: "text-chart-1" }
+  if (hours < 1)  return { text: `${Math.ceil(minutes)}m ${suffix}`,     cls: entered ? "text-destructive font-semibold" : "text-muted-foreground" }
+  if (hours < 24) return { text: `${Math.ceil(hours)}h ${suffix}`,       cls: entered ? "text-chart-1" : "text-muted-foreground" }
+  return { text: `${Math.ceil(hours / 24)}d ${suffix}`,                   cls: "text-muted-foreground" }
 }
 
 // ─── Entry sub-table ───────────────────────────────────────────────────────────
@@ -263,6 +282,8 @@ type CompRowProps = {
   justEntered: boolean
   errorMsg: string | null
   onEnter: () => void
+  /** What an un-entered competition counts down to. */
+  nextSweepAt: Date | string | null | undefined
 }
 
 function CompRow({
@@ -276,9 +297,10 @@ function CompRow({
   justEntered,
   errorMsg,
   onEnter,
+  nextSweepAt,
 }: CompRowProps) {
   const isFull = comp._count.entries >= comp.maxEntries
-  const dl = deadlineInfo(comp.expiresAt)
+  const dl = deadlineInfo(comp.closesAt, nextSweepAt)
   const feeLabel = !comp.tierDef || comp.tierDef.entryFee === 0 ? "Free" : `${comp.tierDef.entryFee}`
   const canEnter = !!playerAccountId && !isFull && !isEntering && !justEntered
     && (animalMode || !!selectedAnimalId)
@@ -445,6 +467,14 @@ function VenueDetailPage() {
   const requiredCertDefIds = (certDefs ?? []).filter((c) => c.requiredForCompetition).map((c) => c.id)
 
   const { data: allVenues } = trpc.competition.listVenues.useQuery({ gameId: gameId! }, { enabled: !!gameId })
+
+  // Competitions nobody has entered have no deadline of their own, so the
+  // countdown they show is the one to the next sweep. Refetched on the minute
+  // because it goes stale the instant the boundary passes.
+  const { data: sweep } = trpc.competition.nextSweepAt.useQuery(
+    { gameId: gameId! },
+    { enabled: !!gameId, refetchInterval: 60_000 },
+  )
   const venue = allVenues?.find((v) => v.id === venueId)
 
   const { data: competitions, isLoading: compsLoading } = trpc.competition.listOpen.useQuery(
@@ -1120,6 +1150,7 @@ function VenueDetailPage() {
                                     ? enteredPairs.has(`${comp.id}:${initialAnimalId ?? ""}`) || comp.entries.some((e) => e.animal.id === initialAnimalId)
                                     : enteredPairs.has(`${comp.id}:${rowSelections[comp.id] ?? ""}`)}
                                   errorMsg={rowErrors[comp.id] ?? null}
+                                  nextSweepAt={sweep?.nextSweepAt}
                                   onEnter={() => {
                                     const animalId = isAnimalMode ? initialAnimalId : rowSelections[comp.id]
                                     if (!animalId || !playerAccountId) return
@@ -1204,6 +1235,7 @@ function VenueDetailPage() {
                                     ? enteredPairs.has(`${comp.id}:${initialAnimalId ?? ""}`) || comp.entries.some((e) => e.animal.id === initialAnimalId)
                                     : enteredPairs.has(`${comp.id}:${rowSelections[comp.id] ?? ""}`)}
                                   errorMsg={rowErrors[comp.id] ?? null}
+                                  nextSweepAt={sweep?.nextSweepAt}
                                   onEnter={() => {
                                     const animalId = isAnimalMode ? initialAnimalId : rowSelections[comp.id]
                                     if (!animalId || !playerAccountId) return

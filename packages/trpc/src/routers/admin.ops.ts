@@ -1088,6 +1088,386 @@ const systemOpsRouter = router({
     ),
 })
 
+// ── Scheduled-run analytics ──────────────────────────────────────────────────
+//
+// Everything here is read back out of `ScheduledTaskRun`, its progress samples
+// and its per-animal work items. None of it is accumulated live in the server
+// process, which is the point: a nightly that crashed halfway can still be
+// asked what it managed to do, and a run that is still going can be watched
+// from a second browser without the running process being involved at all.
+
+/** How many samples the "current" rate looks back over. */
+const RATE_TRAIL = 5
+
+/** How many previous runs a run is compared against. */
+const COMPARISON_RUNS = 5
+
+const OUTSTANDING_WORK = ["PENDING", "RETRYING", "RUNNING"] as const
+
+type RateSample = {
+  recordedAt: Date
+  succeededTotal: number
+  activeWorkers: number
+}
+
+/** Animals a second between two samples, or null if no time passed. */
+function rateBetween(from: RateSample, to: RateSample): number | null {
+  const seconds = (to.recordedAt.getTime() - from.recordedAt.getTime()) / 1000
+  if (seconds <= 0) return null
+  return (to.succeededTotal - from.succeededTotal) / seconds
+}
+
+const analyticsOpsRouter = router({
+  /**
+   * The run history, newest first. This is the comparison table: one row per
+   * boundary that came due, with what it cost and what it changed.
+   */
+  runs: staffProcedure
+    .input(z.object({
+      gameId: z.string(),
+      taskType: z.enum(["NIGHTLY", "COMPETITION_SWEEP", "VENUE_ROTATION"]).optional(),
+      limit: z.number().int().min(1).max(100).default(25),
+    }))
+    .query(async ({ input }) => {
+      const runs = await db.scheduledTaskRun.findMany({
+        where: { gameId: input.gameId, ...(input.taskType && { taskType: input.taskType }) },
+        orderBy: { scheduledFor: "desc" },
+        take: input.limit,
+        select: {
+          id: true, taskType: true, scheduledFor: true, status: true, attempt: true,
+          startedAt: true, completedAt: true, errorMessage: true,
+          eligibleCount: true, processedCount: true, succeededCount: true,
+          failedCount: true, retriedCount: true, skippedCount: true,
+          nightlyLog: {
+            select: { animalsAged: true, animalDeaths: true, lifeStageTransitions: true },
+          },
+        },
+      })
+
+      const now = new Date()
+
+      return runs.map((run) => {
+        // An unfinished run is measured against now, so a stuck one visibly
+        // grows rather than sitting at whatever it last reached.
+        const until = run.completedAt ?? (run.startedAt ? now : null)
+        const durationMs =
+          run.startedAt && until ? until.getTime() - run.startedAt.getTime() : null
+
+        return {
+          ...run,
+          durationMs,
+          // Successful items only. A retried animal is counted once, when it
+          // finally completes, so retries never inflate throughput.
+          wallClockRate:
+            durationMs && durationMs > 0 ? run.succeededCount / (durationMs / 1000) : null,
+        }
+      })
+    }),
+
+  /**
+   * One run in detail: its progress curve, what is left, what failed, and how
+   * it compares with the runs before it.
+   *
+   * With no `runId` it picks the run worth looking at - whatever is live, and
+   * otherwise the most recent one.
+   */
+  run: staffProcedure
+    .input(z.object({
+      gameId: z.string(),
+      runId: z.string().optional(),
+      taskType: z.enum(["NIGHTLY", "COMPETITION_SWEEP", "VENUE_ROTATION"]).default("NIGHTLY"),
+    }))
+    .query(async ({ input }) => {
+      const run = input.runId
+        ? await db.scheduledTaskRun.findFirst({
+            where: { id: input.runId, gameId: input.gameId },
+          })
+        : ((await db.scheduledTaskRun.findFirst({
+            where: {
+              gameId: input.gameId,
+              taskType: input.taskType,
+              status: { in: [...OUTSTANDING_WORK] },
+            },
+            orderBy: { scheduledFor: "desc" },
+          })) ??
+          (await db.scheduledTaskRun.findFirst({
+            where: { gameId: input.gameId, taskType: input.taskType },
+            orderBy: { scheduledFor: "desc" },
+          })))
+
+      if (!run) return null
+
+      const [sampleRows, workGroups, retriedItems, oldest, failures, log, previous] =
+        await Promise.all([
+          db.scheduledTaskRunSample.findMany({
+            where: { runId: run.id },
+            orderBy: { recordedAt: "asc" },
+            select: {
+              recordedAt: true, processedTotal: true, succeededTotal: true,
+              failedTotal: true, activeWorkers: true,
+            },
+          }),
+          db.nightlyAnimalWork.groupBy({
+            by: ["status"],
+            where: { runId: run.id },
+            _count: { _all: true },
+          }),
+          // Items that needed more than one try. Distinct from `failedCount`:
+          // most of these eventually succeeded.
+          db.nightlyAnimalWork.count({ where: { runId: run.id, attempt: { gt: 1 } } }),
+          db.nightlyAnimalWork.findFirst({
+            where: { runId: run.id, status: { in: [...OUTSTANDING_WORK] } },
+            orderBy: { createdAt: "asc" },
+            select: {
+              id: true, animalId: true, status: true, attempt: true, claimedBy: true,
+              createdAt: true, startedAt: true, leaseUntil: true,
+              animal: { select: { name: true } },
+            },
+          }),
+          db.nightlyAnimalWork.findMany({
+            where: { runId: run.id, status: "FAILED" },
+            orderBy: { completedAt: "desc" },
+            take: 50,
+            select: {
+              id: true, animalId: true, attempt: true, errorMessage: true,
+              completedAt: true, animal: { select: { name: true } },
+            },
+          }),
+          db.nightlyUpdateLog.findUnique({
+            where: { runId: run.id },
+            select: {
+              animalsAged: true, animalDeaths: true, lifeStageTransitions: true,
+              success: true, errorMessage: true,
+            },
+          }),
+          db.scheduledTaskRun.findMany({
+            where: {
+              gameId: input.gameId,
+              taskType: run.taskType,
+              status: "COMPLETED",
+              scheduledFor: { lt: run.scheduledFor },
+              startedAt: { not: null },
+              completedAt: { not: null },
+            },
+            orderBy: { scheduledFor: "desc" },
+            take: COMPARISON_RUNS,
+            select: { startedAt: true, completedAt: true, succeededCount: true },
+          }),
+        ])
+
+      const work = { pending: 0, running: 0, retrying: 0, completed: 0, failed: 0, cancelled: 0 }
+      for (const row of workGroups) {
+        const key = row.status.toLowerCase() as keyof typeof work
+        if (key in work) work[key] = row._count._all
+      }
+      const totalWork = Object.values(work).reduce((a, b) => a + b, 0)
+      const remaining = work.pending + work.running + work.retrying
+
+      // Pregnancies that came to term during this run. Counted from the
+      // database rather than tallied by the handler, so the number survives a
+      // run that was reclaimed halfway and finished by a second attempt.
+      const pregnanciesCompleted = run.startedAt
+        ? await db.pregnancy.count({
+            where: {
+              isCompleted: true,
+              completedAt: { gte: run.startedAt },
+              animal: { nightlyWork: { some: { runId: run.id } } },
+            },
+          })
+        : 0
+
+      const now = new Date()
+      const isLive = (OUTSTANDING_WORK as readonly string[]).includes(run.status)
+      const until = run.completedAt ?? (run.startedAt ? now : null)
+      const elapsedMs = run.startedAt && until ? until.getTime() - run.startedAt.getTime() : null
+
+      // Completed items, not attempts. This is the numerator of every rate
+      // below, which is how retries are kept out of successful throughput.
+      const succeeded = work.completed > 0 ? work.completed : run.succeededCount
+
+      const samples: RateSample[] = sampleRows.map((row) => ({
+        recordedAt: row.recordedAt,
+        succeededTotal: row.succeededTotal,
+        activeWorkers: row.activeWorkers,
+      }))
+
+      // Worker-seconds: each sample's worker count held for the interval that
+      // ended at it, including the first interval back to the run's start.
+      // This is what makes the processing rate differ from the wall-clock rate
+      // once more than one worker is on a run.
+      let workerSeconds = 0
+      let previousAt = run.startedAt
+      for (const sample of samples) {
+        if (previousAt) {
+          const dt = (sample.recordedAt.getTime() - previousAt.getTime()) / 1000
+          if (dt > 0) workerSeconds += dt * sample.activeWorkers
+        }
+        previousAt = sample.recordedAt
+      }
+
+      let peakRate: number | null = null
+      for (let i = 1; i < samples.length; i++) {
+        const rate = rateBetween(samples[i - 1]!, samples[i]!)
+        if (rate !== null && (peakRate === null || rate > peakRate)) peakRate = rate
+      }
+
+      const trail = samples.slice(-RATE_TRAIL)
+      const currentRate =
+        isLive && trail.length >= 2 ? rateBetween(trail[0]!, trail[trail.length - 1]!) : null
+
+      const wallClockRate = elapsedMs && elapsedMs > 0 ? succeeded / (elapsedMs / 1000) : null
+      const processingRate = workerSeconds > 0 ? succeeded / workerSeconds : null
+      const projectionRate = currentRate && currentRate > 0 ? currentRate : wallClockRate
+
+      const estimatedCompletionAt =
+        isLive && remaining > 0 && projectionRate && projectionRate > 0
+          ? new Date(now.getTime() + (remaining / projectionRate) * 1000)
+          : null
+
+      const comparable = previous.filter((p) => p.succeededCount > 0)
+      const comparison =
+        comparable.length > 0
+          ? {
+              runs: comparable.length,
+              averageDurationMs:
+                comparable.reduce(
+                  (sum, p) => sum + (p.completedAt!.getTime() - p.startedAt!.getTime()),
+                  0
+                ) / comparable.length,
+              averageSucceeded:
+                comparable.reduce((sum, p) => sum + p.succeededCount, 0) / comparable.length,
+              averageRate:
+                comparable.reduce((sum, p) => {
+                  const seconds = (p.completedAt!.getTime() - p.startedAt!.getTime()) / 1000
+                  return sum + (seconds > 0 ? p.succeededCount / seconds : 0)
+                }, 0) / comparable.length,
+            }
+          : null
+
+      return {
+        run: {
+          id: run.id,
+          taskType: run.taskType,
+          scheduledFor: run.scheduledFor,
+          status: run.status,
+          attempt: run.attempt,
+          claimedBy: run.claimedBy,
+          leaseUntil: run.leaseUntil,
+          heartbeatAt: run.heartbeatAt,
+          startedAt: run.startedAt,
+          completedAt: run.completedAt,
+          errorMessage: run.errorMessage,
+          eligibleCount: run.eligibleCount,
+          claimedCount: run.claimedCount,
+          processedCount: run.processedCount,
+          succeededCount: run.succeededCount,
+          failedCount: run.failedCount,
+          retriedCount: run.retriedCount,
+          skippedCount: run.skippedCount,
+        },
+        isLive,
+        elapsedMs,
+        work: { ...work, total: totalWork, remaining },
+        retriedItems,
+        rates: {
+          current: currentRate,
+          average: wallClockRate,
+          peak: peakRate,
+          processing: processingRate,
+          workerSeconds,
+        },
+        activeWorkers: samples.length > 0 ? samples[samples.length - 1]!.activeWorkers : 0,
+        estimatedCompletionAt,
+        oldestUnfinished: oldest
+          ? {
+              id: oldest.id,
+              animalId: oldest.animalId,
+              animalName: oldest.animal.name,
+              status: oldest.status,
+              attempt: oldest.attempt,
+              claimedBy: oldest.claimedBy,
+              leaseUntil: oldest.leaseUntil,
+              waitingMs: now.getTime() - (oldest.startedAt ?? oldest.createdAt).getTime(),
+            }
+          : null,
+        failures: failures.map((f) => ({
+          id: f.id,
+          animalId: f.animalId,
+          animalName: f.animal.name,
+          attempt: f.attempt,
+          errorMessage: f.errorMessage,
+          completedAt: f.completedAt,
+        })),
+        outcomes: {
+          animalsAged: log?.animalsAged ?? null,
+          animalDeaths: log?.animalDeaths ?? null,
+          lifeStageTransitions: log?.lifeStageTransitions ?? null,
+          pregnanciesCompleted,
+        },
+        samples: sampleRows,
+        comparison,
+      }
+    }),
+
+  /**
+   * Plan section 8's admin action: put a run's failed animals back in the
+   * queue and hand the run itself back to the scheduler.
+   *
+   * Attempts are reset on both, because an administrator asking for a retry is
+   * saying the cause has been dealt with - leaving the counters where they are
+   * would mean the next tick gave up immediately.
+   */
+  retryFailed: staffProcedure
+    .input(z.object({ gameId: z.string(), runId: z.string() }))
+    .mutation(async ({ input }) => {
+      const run = await db.scheduledTaskRun.findFirst({
+        where: { id: input.runId, gameId: input.gameId },
+        select: { id: true, status: true },
+      })
+      if (!run) throw new TRPCError({ code: "NOT_FOUND", message: "Run not found" })
+
+      if (run.status === "RUNNING") {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "This run is still going. Wait for it to stop before retrying it.",
+        })
+      }
+
+      return db.$transaction(async (tx) => {
+        const { count } = await tx.nightlyAnimalWork.updateMany({
+          where: { runId: run.id, status: "FAILED" },
+          data: {
+            status: "PENDING",
+            attempt: 0,
+            claimedBy: null,
+            leaseUntil: null,
+            startedAt: null,
+            completedAt: null,
+            errorMessage: null,
+          },
+        })
+
+        // RETRYING rather than PENDING: the run has been attempted, and
+        // RETRYING is the scheduler's own word for "pick this up again". The
+        // next tick claims it like any other outstanding run.
+        await tx.scheduledTaskRun.update({
+          where: { id: run.id },
+          data: {
+            status: "RETRYING",
+            attempt: 0,
+            claimedBy: null,
+            claimedAt: null,
+            leaseUntil: null,
+            completedAt: null,
+            errorMessage: null,
+          },
+        })
+
+        return { requeued: count }
+      })
+    }),
+})
+
 // ── Root ──────────────────────────────────────────────────────────────────────
 
 export const opsAdminRouter = router({
@@ -1102,4 +1482,5 @@ export const opsAdminRouter = router({
   integrity: integrityOpsRouter,
   audit: auditOpsRouter,
   system: systemOpsRouter,
+  analytics: analyticsOpsRouter,
 })

@@ -72,10 +72,13 @@ const DEVLOG = [
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
-function formatExpiry(expiresAt: Date | string): string {
-  const ms = new Date(expiresAt).getTime() - Date.now()
+function formatExpiry(closesAt: Date | string | null): string {
+  // An entered competition always has a deadline; the null case is only here
+  // because the column is nullable for the ones nobody has entered.
+  if (!closesAt) return "—"
+  const ms = new Date(closesAt).getTime() - Date.now()
   const days = Math.ceil(ms / 86400000)
-  if (days <= 0) return "Closed"
+  if (days <= 0) return "Due"
   return days === 1 ? "1d" : `${days}d`
 }
 
@@ -221,12 +224,12 @@ function AlertsSection({
 
 type CompEntry = {
   id: string; animalName: string; discipline: string
-  venue: string; tier: string; expiresAt: Date | string
+  venue: string; tier: string; closesAt: Date | string | null
 }
 
 type DashboardCompetition = {
   id: string
-  expiresAt: Date | string
+  closesAt: Date | string | null
   venue: { id: string; name: string }
   disciplineDef: { name: string } | null
   tierDef: { name: string } | null
@@ -251,7 +254,7 @@ function EntriesSection({ entries }: { entries: CompEntry[] }) {
         <p className="px-4 py-3 text-xs text-muted-foreground/40">No active entries</p>
       ) : (
         entries.map((e, i) => {
-          const expiry = formatExpiry(e.expiresAt)
+          const expiry = formatExpiry(e.closesAt)
           return (
             <div key={e.id} className={cn("flex items-center justify-between px-4 py-2.5 text-xs hover:bg-secondary/20 transition-colors", i > 0 && "border-t border-border/40")}>
               <div className="min-w-0">
@@ -575,7 +578,7 @@ function DashboardPage() {
             discipline: comp.disciplineDef?.name ?? "",
             venue: comp.venue.name,
             tier: comp.tierDef?.name ?? "",
-            expiresAt: comp.expiresAt,
+            closesAt: comp.closesAt,
           }))
       )
     : []

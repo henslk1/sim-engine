@@ -475,6 +475,14 @@ model AdminActionLog {
 model NightlyUpdateLog {
   id                       String    @id @default(cuid())
   gameId                   String
+  // Which scheduled run produced this.
+  //
+  // Nullable because the logs written before the database scheduler existed
+  // have no run to point at. Unique because a run has one log however many
+  // attempts it takes: a reclaimed run updates the row it already has rather
+  // than leaving two partial accounts of the same night, which is also what
+  // lets the outcome counters below be cumulative.
+  runId                    String?   @unique
   startedAt                DateTime  @default(now())
   completedAt              DateTime?
   success                  Boolean   @default(true)
@@ -489,6 +497,9 @@ model NightlyUpdateLog {
   campaignPhaseTransitions Int       @default(0)
   subscriptionsExpired     Int       @default(0)
   game                     Game      @relation(fields: [gameId], references: [id])
+  // SetNull, not Cascade: if a run row is ever cleared out the record of what
+  // that night did to the population should survive it.
+  run                      ScheduledTaskRun? @relation(fields: [runId], references: [id], onDelete: SetNull)
 }
 
 model GameConfig {

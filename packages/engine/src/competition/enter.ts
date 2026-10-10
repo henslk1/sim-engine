@@ -1,5 +1,6 @@
 import { db } from "@sim-engine/db";
 import { markAnimalActive } from "../animal/activity.js";
+import { nextBoundaryFor } from "../schedule/clock.js";
 
 type Client = typeof db
 
@@ -9,7 +10,8 @@ export async function enterCompetition(
     animalId: string
     competitionId: string
     playerAccountId: string
-  }
+  },
+  now: Date = new Date()
 ) {
   return client.$transaction(async (tx) => {
 
@@ -270,6 +272,36 @@ export async function enterCompetition(
 
     const entryCount = await tx.competitionEntry.count({ where: { competitionId } })
     const shouldRun = entryCount >= competition.maxEntries
+
+    // The first entry is what starts the clock. Until this moment the
+    // competition had no deadline at all, which is what kept the sweep from
+    // resolving it with nothing in it.
+    //
+    // The deadline is the next sweep boundary, not `now + maxWaitHours`: a
+    // deadline measured from whenever someone happened to enter is the drift
+    // that anchoring the sweep to an absolute grid exists to remove. Entering
+    // at 13:59 means it runs at 14:00, and that is the promise the venue page
+    // makes.
+    if (entryCount === 1) {
+      const config = await tx.gameConfig.findUniqueOrThrow({
+        where: { gameId: competition.gameId },
+        select: {
+          nightlyRunHour: true,
+          nightlyRunMinute: true,
+          gameTimeZone: true,
+          competitionSweepMinutes: true,
+        },
+      })
+
+      // Conditional on `closesAt` still being null, so two players entering an
+      // empty competition at once cannot land on two different boundaries —
+      // the second update matches nothing and the first writer's deadline
+      // stands.
+      await tx.competition.updateMany({
+        where: { id: competitionId, closesAt: null },
+        data: { closesAt: nextBoundaryFor("COMPETITION_SWEEP", config, now) },
+      })
+    }
 
     return { entry, shouldRun }
 
