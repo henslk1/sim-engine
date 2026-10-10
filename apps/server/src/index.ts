@@ -15,6 +15,8 @@ import {
 } from "./messaging-rate-limit.js"
 import { resolveSchedulerBackend } from "./scheduler/backend.js"
 import { createScheduler, type SchedulerHealth } from "./scheduler/runner.js"
+import { createResolver } from "./scheduler/resolver.js"
+import { configureCompetitionResolver, systemClock } from "@sim-engine/engine"
 
 const app = new Hono()
 
@@ -80,8 +82,22 @@ async function startScheduler(): Promise<void> {
   }
 
   const scheduler = createScheduler()
-  stopScheduler = scheduler.stop
   schedulerHealth = scheduler.getHealth
+
+  // The resolver drains competition work. It is woken by a competition filling
+  // up and by the sweep enqueueing, with its own one-minute sweep underneath as
+  // the recovery path. Registering it here is what lets the engine signal it
+  // without importing the server — the same arrangement the messaging rate
+  // limit backend uses.
+  const resolver = createResolver({ instanceId: scheduler.instanceId, clock: systemClock })
+  configureCompetitionResolver(resolver.wake)
+  resolver.start()
+
+  stopScheduler = async () => {
+    await scheduler.stop()
+    await resolver.stop()
+  }
+
   scheduler.start()
 }
 

@@ -1,6 +1,6 @@
 import { db } from "@sim-engine/db";
 import type { Prisma } from "@sim-engine/db";
-import { runCompetition } from "./run.js";
+import { enqueueCompetitionResolution } from "./queue.js";
 
 type Client = typeof db
 
@@ -18,7 +18,13 @@ function slotKey(
 }
 
 /**
- * Resolve the competitions that have come due, then top the open set back up.
+ * Enqueue the competitions that have come due, then top the open set back up.
+ *
+ * The sweep does not resolve anything itself. It used to, in one serial loop
+ * holding its lease the whole time — 571 competitions took 12.5 seconds — and a
+ * sweep interrupted halfway left no record of which ones it had got to. Now it
+ * writes down what is due and returns; the resolver takes them a chunk at a
+ * time and keeps the retry accounting.
  *
  * `now` is passed in rather than read here so the sweep judges deadlines
  * against the same instant the scheduler used to decide the sweep was due.
@@ -58,26 +64,16 @@ export async function checkCompetitions(client: Client, gameId: string, now: Dat
     select: { id: true },
   })
 
-  let ran = 0
-  let failed = 0
-
+  // Enqueueing is idempotent, so a sweep that runs twice over the same
+  // deadline — or lands on competitions a fill has already enqueued — adds
+  // nothing the second time.
   for (const c of due) {
-    try {
-      await runCompetition(client, { competitionId: c.id })
-      ran++
-    } catch (err) {
-      // One competition that cannot be resolved must not stop the sweep
-      // resolving the others, or topping the open set back up. It can also
-      // simply mean another process got there first, which is expected now
-      // that an interrupted sweep is re-run rather than lost.
-      failed++
-      console.error(`[competition] failed to run competition ${c.id}:`, err)
-    }
+    await enqueueCompetitionResolution(client, gameId, c.id)
   }
 
   const created = await replenishOpenSet(client, gameId)
 
-  return { ran, failed, due: due.length, created }
+  return { due: due.length, created }
 }
 
 /**

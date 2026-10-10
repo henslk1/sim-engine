@@ -6,6 +6,11 @@ export { applyTrainingAction } from "./training/apply.js"
 export { enterCompetition } from "./competition/enter.js"
 export { runCompetition } from "./competition/run.js"
 export { checkCompetitions } from "./competition/auto.js"
+export {
+  enqueueCompetitionResolution,
+  configureCompetitionResolver,
+  signalCompetitionResolution,
+} from "./competition/queue.js"
 export { advanceAnimalAging } from "./animal/aging.js"
 export { loadGameAgingCache, genotypeKey, indexHealthRecords } from "./animal/aging-cache.js"
 export { summariseInnateTotals } from "./animal/nightly.js"

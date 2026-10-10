@@ -182,6 +182,10 @@ function RunDetail({ detail, vocab, gameId }: {
     },
   })
 
+  const retryResolutions = trpc.admin.ops.analytics.retryResolutions.useMutation({
+    onSuccess: () => utils.admin.ops.analytics.run.invalidate(),
+  })
+
   const work = detail.work
   const progressTotal = vocab.hasWorkQueue ? work.total : 0
   const pct = (n: number) => (progressTotal > 0 ? (n / progressTotal) * 100 : 0)
@@ -231,9 +235,7 @@ function RunDetail({ detail, vocab, gameId }: {
               <ThroughputChart samples={detail.samples} unit={vocab.unit} />
             </div>
             <p className="mt-1.5 text-[11px] text-muted-foreground">
-              Rates count {vocab.unit} that finished, once each — one that failed and was retried does not count
-              twice. Per-worker and wall-clock rates are the same number until more than one worker is on a run.
-            </p>
+             </p>
           </Block>
 
           <Block title="Work">
@@ -339,26 +341,88 @@ function RunDetail({ detail, vocab, gameId }: {
         /* A sweep has no work queue, no samples and no population outcomes. It
            resolves competitions whose deadline has passed, and that is the only
            honest thing to report about it. */
-        <Block title="Competitions">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Stat label={vocab.eligibleLabel} value={detail.run.eligibleCount.toLocaleString()} hint={vocab.eligibleHint} />
-            <Stat label="Resolved" value={detail.run.succeededCount.toLocaleString()} />
-            <Stat
-              label="Failed"
-              value={detail.run.failedCount.toLocaleString()}
-              tone={detail.run.failedCount > 0 ? "bad" : "default"}
-            />
-            <Stat
-              label="Rate"
-              value={formatRate(detail.rates.average)}
-              hint={`${vocab.unit} per second`}
-            />
-          </div>
-          <p className="mt-1.5 text-[11px] text-muted-foreground">
-            The sweep also tops the open set back up, which it does not currently count. Progress samples and a
-            per-worker rate belong to the nightly's chunked work queue; a sweep has neither.
-          </p>
-        </Block>
+        <>
+          <Block title="This sweep">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <Stat label={vocab.eligibleLabel} value={detail.run.eligibleCount.toLocaleString()} hint={vocab.eligibleHint} />
+              <Stat label="Enqueued" value={detail.run.succeededCount.toLocaleString()} hint="handed to the resolver" />
+              <Stat label="Took" value={formatDuration(detail.elapsedMs)} />
+            </div>
+            <p className="mt-1.5 text-[11px] text-muted-foreground">
+             
+            </p>
+          </Block>
+
+          {detail.resolution && (
+            <Block
+              title="Resolution queue"
+              aside={
+                detail.resolution.counts.failed > 0 ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={retryResolutions.isPending}
+                    onClick={() => retryResolutions.mutate({ gameId })}
+                  >
+                    <RotateCcw className="size-3.5" />
+                    Retry failed
+                  </Button>
+                ) : undefined
+              }
+            >
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <Stat label="Waiting" value={detail.resolution.queued.toLocaleString()} hint="not yet resolved" />
+                <Stat label="Resolved" value={detail.resolution.counts.completed.toLocaleString()} hint="all time" />
+                <Stat
+                  label="Retrying"
+                  value={detail.resolution.counts.retrying.toLocaleString()}
+                  tone={detail.resolution.counts.retrying > 0 ? "warn" : "default"}
+                />
+                <Stat
+                  label="Given up"
+                  value={detail.resolution.counts.failed.toLocaleString()}
+                  tone={detail.resolution.counts.failed > 0 ? "bad" : "default"}
+                />
+              </div>
+
+              <p className="mt-1.5 text-[11px] text-muted-foreground">
+                The queue belongs to the game, not to one sweep — a work item belongs to the competition it
+                resolves. These are the counts as they stand now.
+              </p>
+
+              {detail.resolution.failures.length > 0 && (
+                <div className="mt-3 overflow-hidden rounded-lg border border-border bg-background">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border bg-secondary/40">
+                        <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Competition</th>
+                        <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Tries</th>
+                        <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Error</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {detail.resolution.failures.map(f => (
+                        <tr key={f.id} className="border-t border-border">
+                          <td className="px-3 py-2">{f.name}</td>
+                          <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">{f.attempt}</td>
+                          <td className={cn("px-3 py-2 text-xs", f.status === "FAILED" ? "text-destructive" : "text-amber-600 dark:text-amber-400")}>
+                            {f.errorMessage ?? "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {retryResolutions.data && (
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  {retryResolutions.data.requeued} competition(s) requeued.
+                </p>
+              )}
+            </Block>
+          )}
+        </>
       )}
 
       {detail.comparison && (

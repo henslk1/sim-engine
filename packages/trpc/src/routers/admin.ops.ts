@@ -1263,6 +1263,53 @@ const analyticsOpsRouter = router({
       const totalWork = Object.values(work).reduce((a, b) => a + b, 0)
       const remaining = work.pending + work.running + work.retrying
 
+      // The competition resolution queue. Not per-run — a work item belongs to
+      // a competition, not to the sweep that enqueued it — so this is the
+      // game's queue as it stands, which is the question a sweep view actually
+      // raises: the sweep wrote work down, did any of it get done?
+      const resolution =
+        run.taskType === "COMPETITION_SWEEP"
+          ? await (async () => {
+              const [groups, failures] = await Promise.all([
+                db.competitionResolutionWork.groupBy({
+                  by: ["status"],
+                  where: { gameId: input.gameId },
+                  _count: { _all: true },
+                }),
+                db.competitionResolutionWork.findMany({
+                  where: { gameId: input.gameId, status: { in: ["FAILED", "RETRYING"] } },
+                  orderBy: { completedAt: "desc" },
+                  take: 50,
+                  select: {
+                    id: true, competitionId: true, status: true, attempt: true,
+                    errorMessage: true, completedAt: true,
+                    competition: { select: { name: true } },
+                  },
+                }),
+              ])
+
+              const counts = { pending: 0, running: 0, retrying: 0, completed: 0, failed: 0 }
+              for (const row of groups) {
+                const key = row.status.toLowerCase() as keyof typeof counts
+                if (key in counts) counts[key] = row._count._all
+              }
+
+              return {
+                counts,
+                queued: counts.pending + counts.running + counts.retrying,
+                failures: failures.map((f) => ({
+                  id: f.id,
+                  competitionId: f.competitionId,
+                  name: f.competition.name,
+                  status: f.status,
+                  attempt: f.attempt,
+                  errorMessage: f.errorMessage,
+                  completedAt: f.completedAt,
+                })),
+              }
+            })()
+          : null
+
       // Pregnancies that came to term during this run. Counted from the
       // database rather than tallied by the handler, so the number survives a
       // run that was reclaimed halfway and finished by a second attempt.
@@ -1406,7 +1453,34 @@ const analyticsOpsRouter = router({
         },
         samples: sampleRows,
         comparison,
+        resolution,
       }
+    }),
+
+  /**
+   * Put a game's failed competition resolutions back in the queue.
+   *
+   * The counterpart to `retryFailed` for the nightly: an administrator saying
+   * the cause has been dealt with, so the attempt counter is reset and the
+   * resolver is free to try again. The resolver picks them up on its next
+   * sweep without anything else having to happen.
+   */
+  retryResolutions: staffProcedure
+    .input(z.object({ gameId: z.string() }))
+    .mutation(async ({ input }) => {
+      const { count } = await db.competitionResolutionWork.updateMany({
+        where: { gameId: input.gameId, status: "FAILED" },
+        data: {
+          status: "PENDING",
+          attempt: 0,
+          claimedBy: null,
+          leaseUntil: null,
+          startedAt: null,
+          completedAt: null,
+          errorMessage: null,
+        },
+      })
+      return { requeued: count }
     }),
 
   /**

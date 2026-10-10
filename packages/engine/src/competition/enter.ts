@@ -1,6 +1,7 @@
 import { db } from "@sim-engine/db";
 import { markAnimalActive } from "../animal/activity.js";
 import { nextBoundaryFor } from "../schedule/clock.js";
+import { enqueueCompetitionResolution } from "./queue.js";
 
 type Client = typeof db
 
@@ -271,7 +272,17 @@ export async function enterCompetition(
     }
 
     const entryCount = await tx.competitionEntry.count({ where: { competitionId } })
+
+    // A full competition is resolved by the resolver, not here. It used to run
+    // inline, inside the entering player's mutation, which put a whole
+    // competition's prizes and records on the critical path of one HTTP
+    // request. Enqueueing in this transaction keeps it atomic with the entry
+    // that filled it — an entry that rolls back leaves no work behind — and
+    // the caller signals the resolver once this has committed.
     const shouldRun = entryCount >= competition.maxEntries
+    if (shouldRun) {
+      await enqueueCompetitionResolution(tx, competition.gameId, competitionId)
+    }
 
     // The first entry is what starts the clock. Until this moment the
     // competition had no deadline at all, which is what kept the sweep from

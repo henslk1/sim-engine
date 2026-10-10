@@ -22,6 +22,7 @@ import {
   advanceAnimalAging,
   checkCompetitions,
   loadGameAgingCache,
+  signalCompetitionResolution,
   pruneAnimalData,
   selectEligibleAnimals,
   summariseInnateTotals,
@@ -408,14 +409,19 @@ export const runNightly: TaskHandler = async (ctx) => {
 export const runCompetitionSweep: TaskHandler = async (ctx) => {
   // The scheduler's instant, not a fresh reading: deadlines are judged against
   // the same moment that decided this sweep was due.
-  const { ran, failed, due, created } = await checkCompetitions(db, ctx.gameId, ctx.clock.now())
+  const { due, created } = await checkCompetitions(db, ctx.gameId, ctx.clock.now())
 
-  if (created > 0) console.log(`[competition] gameId=${ctx.gameId} resolved=${ran} failed=${failed} created=${created}`)
+  if (due > 0 || created > 0) {
+    console.log(`[competition] gameId=${ctx.gameId} enqueued=${due} created=${created}`)
+  }
 
-  // `failedCount` is what makes the runner mark the run as not completed, so a
-  // sweep that could not resolve a competition is visible rather than being
-  // reported as a clean run that happened to do less.
-  return { eligibleCount: due, processedCount: due, succeededCount: ran, failedCount: failed }
+  // Resolving is the resolver's job now, so the sweep no longer reports
+  // successes or failures of its own — writing down what is due is the whole
+  // of its work, and all of it succeeded. Whether those competitions actually
+  // resolve is answered by `CompetitionResolutionWork`, not by this run.
+  if (due > 0) signalCompetitionResolution()
+
+  return { eligibleCount: due, processedCount: due, succeededCount: due, failedCount: 0 }
 }
 
 export const HANDLERS: Record<ScheduledType, TaskHandler> = {

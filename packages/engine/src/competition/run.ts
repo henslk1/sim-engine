@@ -12,6 +12,22 @@ function computePersonalityMultiplier(value: number, idealMin: number, idealMax:
   return 1 - 2 * (value - idealMax) / (100 - idealMax)
 }
 
+/**
+ * How long one competition's resolution may hold its transaction.
+ *
+ * Prisma's default is five seconds, which nothing here was setting. Everything
+ * a competition does — scoring, prizes, records, season rankings, group
+ * finance — happens inside this one transaction, and a full field can take
+ * longer than that. Exceeding it is not a slow success: the transaction is
+ * closed underneath the work and the whole resolution rolls back, so a large
+ * competition would have failed every time it was tried, durably and forever
+ * once there was a work item recording it.
+ *
+ * `maxWait` is how long to wait for a connection before giving up, which is a
+ * queueing concern and stays short.
+ */
+const RESOLUTION_TX = { timeout: 120_000, maxWait: 10_000 } as const
+
 export async function runCompetition(
   client: Client,
   input: {
@@ -377,5 +393,5 @@ export async function runCompetition(
 
     return allRanked
 
-  })
+  }, RESOLUTION_TX)
 }

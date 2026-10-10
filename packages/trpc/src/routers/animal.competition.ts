@@ -1,4 +1,4 @@
-import { enterCompetition, nextBoundaryFor, runCompetition, runConformationInspection } from "@sim-engine/engine";
+import { enterCompetition, nextBoundaryFor, runConformationInspection, signalCompetitionResolution } from "@sim-engine/engine";
 import { db } from "@sim-engine/db";
 import { router, publicProcedure } from "../trpc.js";
 import { z } from "zod";
@@ -171,20 +171,18 @@ export const animalCompetitionRouter = router({
     }))
     .mutation(async ({ input }) => {
       const { entry, shouldRun } = await enterCompetition(db, input)
-      if (shouldRun) {
-        await runCompetition(db, { competitionId: input.competitionId })
-      }
+
+      // A full competition resolves on the resolver, not in this request. The
+      // work item was written inside the entry's own transaction, so by the
+      // time this runs it is durable; the signal only decides whether the
+      // player waits a moment or until the next sweep.
+      if (shouldRun) signalCompetitionResolution()
+
       return entry
     }),
   inspect: publicProcedure
     .input(z.object({ animalId: z.string() }))
     .mutation(({ input }) => runConformationInspection(db, input.animalId)),
-
-  run: publicProcedure
-    .input(z.object({
-      competitionId: z.string(),
-    }))
-    .mutation(({ input }) => runCompetition(db, input)),
 
   get: publicProcedure
     .input(z.object({ competitionId: z.string() }))

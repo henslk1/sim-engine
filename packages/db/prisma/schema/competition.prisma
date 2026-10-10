@@ -304,8 +304,62 @@ model Competition {
   // the next nightly rather than the next sweep.
   closesAt                DateTime?
 
+  resolutionWork CompetitionResolutionWork?
+
   // The sweep's query: this game's open competitions that have come due.
   @@index([gameId, status, closesAt])
+}
+
+// One competition's turn to be resolved.
+//
+// Resolution itself was already crash-safe before this existed: `runCompetition`
+// does the whole thing — the OPEN -> IN_PROGRESS claim, scoring, prizes,
+// records, rankings, group finance and the final COMPLETED — inside a single
+// transaction, so a process that dies mid-resolution rolls back and the
+// competition is simply OPEN again. IN_PROGRESS never outlives a crash; it is
+// mutual exclusion against a concurrent caller, not a persisted state.
+//
+// What this table adds is everything around that:
+//
+//   * **Retry accounting.** A competition that throws was previously retried on
+//     every sweep forever, logged to the console, never given up on and visible
+//     nowhere. `attempt` and `errorMessage` make a failing competition a record
+//     rather than a recurring surprise.
+//   * **Work off the request path.** Filling a competition used to resolve it
+//     inside the entering player's mutation.
+//   * **Chunked processing.** The sweep resolved every due competition in one
+//     serial loop while holding its lease — 571 of them took 12.5 seconds.
+//     Enqueueing instead lets the resolver take them a chunk at a time.
+//   * **Analytics**, on the same footing as `NightlyAnimalWork`.
+//
+// It reuses `ScheduledTaskRunStatus` for the same reason the nightly's queue
+// does: the states are genuinely the same ones.
+model CompetitionResolutionWork {
+  id            String @id @default(cuid())
+  // One row per competition, ever. This is what makes enqueueing idempotent —
+  // the sweep and a competition filling up can both ask for the same work and
+  // only one row results.
+  competitionId String @unique
+  gameId        String
+
+  status       ScheduledTaskRunStatus @default(PENDING)
+  attempt      Int                    @default(0)
+  claimedBy    String?
+  leaseUntil   DateTime?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  errorMessage String?
+  createdAt    DateTime               @default(now())
+
+  // Cascade, so the nightly's collection of competitions whose entrants are all
+  // buried is not blocked by a leftover work row.
+  competition Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  game        Game        @relation(fields: [gameId], references: [id])
+
+  // Claiming the next chunk for a game, and counting what is left.
+  @@index([gameId, status])
+  // Finding items whose owner died.
+  @@index([status, leaseUntil])
 }
 
 model CompetitionEntry {

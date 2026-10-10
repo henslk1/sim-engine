@@ -46,6 +46,7 @@ model Game {
   bundles                Bundle[]
   shopBreedConfigs       GameShopBreedConfig[]
   shopAnimals            GameShopAnimal[]
+  competitionResolutionWork CompetitionResolutionWork[]
   marketplaceListings    MarketplaceListing[]
   currencyExchangeOrders CurrencyExchangeOrder[]
   escrows                Escrow[]
