@@ -22,6 +22,7 @@ import {
   advanceAnimalAging,
   checkCompetitions,
   loadGameAgingCache,
+  pruneAnimalData,
   selectEligibleAnimals,
   summariseInnateTotals,
   type Clock,
@@ -73,6 +74,27 @@ const CHUNK_SIZE = 250
 /** How long a claimed chunk is owned for without a renewal. */
 const WORK_LEASE_MS = 120_000
 
+/** How long a deceased animal lies before the nightly buries it. */
+const BURIAL_DELAY_MS = 3 * 24 * 60 * 60 * 1000
+
+/**
+ * How many animals one night will bury.
+ *
+ * Burial prunes, and pruning is a transaction across nearly thirty tables, so
+ * this is the expensive half of the night's housekeeping. The rest wait a day.
+ */
+const MAX_BURIALS = 2_000
+
+/**
+ * How many dead competitions one night will collect.
+ *
+ * A cap rather than a full sweep: the set only grows as animals are buried, so
+ * whatever is left over is collected tomorrow. This is the same catch-up
+ * principle the scheduler runs on — never let one night's housekeeping grow
+ * without a ceiling.
+ */
+const MAX_DEAD_COMPETITIONS = 5_000
+
 /**
  * A stop on the drain loop. Each pass claims a chunk or discovers new work; a
  * run that somehow keeps finding more should give up rather than spin all
@@ -89,6 +111,90 @@ const MAX_PASSES = 10_000
  * `success: true` unconditionally, so a night on which every single animal
  * failed looked identical in `NightlyUpdateLog` to one that worked.
  */
+/**
+ * Delete competitions that have run and every one of whose entrants has since
+ * been buried.
+ *
+ * This is the only competition a delete can safely take. A competition's
+ * entries are kept when an animal is buried, because a placement only means
+ * something against the field it was won against — but once every entrant is
+ * buried the whole thing is unreachable. A buried animal's profile shows no
+ * competition history, so nothing in the live game can navigate to it, and
+ * `CompetitionEntry` is the only foreign key in the database that points at
+ * `Competition`.
+ *
+ * Two clauses do the protecting, and neither is optional:
+ *
+ *   * **OPEN is excluded.** An open competition is never dead however many of
+ *     its entrants are buried, because anyone can still enter it — and the
+ *     moment a living animal does, it has a field again and resolves.
+ *   * **`entries: { some: {} }`** keeps the live open set out of reach twice
+ *     over: a competition nobody has entered has no entries and never matches,
+ *     however long it waits.
+ */
+/**
+ * Bury the animals that died long enough ago, and prune each as it goes.
+ *
+ * Pruned first, status second. `pruneAnimalData` is a delete and so is safe to
+ * repeat, and a crash between the two leaves the animal DECEASED to be buried
+ * again tomorrow — which is recoverable. The other order would leave an animal
+ * BURIED but unpruned, and nothing would ever come back for it.
+ *
+ * Capped, because pruning is a transaction over nearly thirty tables per
+ * animal. Whatever is left waits for tomorrow; it has already waited three
+ * days.
+ */
+async function buryDeceased(gameId: string, cutoff: Date): Promise<number> {
+  const due = await db.animal.findMany({
+    where: { gameId, status: "DECEASED", diedAt: { lt: cutoff } },
+    take: MAX_BURIALS,
+    select: { id: true },
+  })
+
+  let count = 0
+  for (const animal of due) {
+    try {
+      await pruneAnimalData(animal.id)
+      await db.animal.update({ where: { id: animal.id }, data: { status: "BURIED" } })
+      count++
+    } catch (err) {
+      // One animal that cannot be pruned must not stop the rest, and must not
+      // take the whole nightly down with it.
+      console.error(`[nightly] could not bury animal ${animal.id}:`, err)
+    }
+  }
+
+  return count
+}
+
+async function collectDeadCompetitions(gameId: string): Promise<number> {
+  const dead = await db.competition.findMany({
+    where: {
+      gameId,
+      status: { not: "OPEN" },
+      entries: { some: {} },
+      NOT: { entries: { some: { animal: { status: { not: "BURIED" } } } } },
+    },
+    take: MAX_DEAD_COMPETITIONS,
+    select: { id: true },
+  })
+
+  if (dead.length === 0) return 0
+
+  const ids = dead.map((c) => c.id)
+
+  // CompetitionResult.entryId and CompetitionEntry.competitionId are both
+  // RESTRICT, so this is the only order Postgres will accept.
+  // CompetitionEntryStat cascades off the entry.
+  await db.$transaction([
+    db.competitionResult.deleteMany({ where: { entry: { competitionId: { in: ids } } } }),
+    db.competitionEntry.deleteMany({ where: { competitionId: { in: ids } } }),
+    db.competition.deleteMany({ where: { id: { in: ids } } }),
+  ])
+
+  return dead.length
+}
+
 export const runNightly: TaskHandler = async (ctx) => {
   const { gameId, runId, token } = ctx
   const startedAt = ctx.clock.now()
@@ -103,12 +209,19 @@ export const runNightly: TaskHandler = async (ctx) => {
   })
 
   try {
-    // Auto-bury deceased animals.
-    const cutoff = new Date(startedAt.getTime() - 3 * 24 * 60 * 60 * 1000)
-    await db.animal.updateMany({
-      where: { gameId, status: "DECEASED", diedAt: { lt: cutoff } },
-      data: { status: "BURIED" },
-    })
+    // Auto-bury deceased animals, pruning each one exactly as the player's own
+    // bury button does.
+    //
+    // This used to be a bare `updateMany` that set the status and nothing else,
+    // so an animal the nightly buried kept every record a manually buried one
+    // lost. Most animals are buried this way rather than by hand, which meant
+    // the storage that burial exists to reclaim was not being reclaimed in the
+    // common case — the only one that matters at a million animals.
+    const buried = await buryDeceased(gameId, new Date(startedAt.getTime() - BURIAL_DELAY_MS))
+
+    // Then collect the competitions those burials just finished off. Runs
+    // after the burial above so tonight's are included.
+    const collected = await collectDeadCompetitions(gameId)
 
     // One work item per animal a player interacted with during its current
     // cycle. Creating them first is what makes the night resumable: after this
@@ -258,6 +371,8 @@ export const runNightly: TaskHandler = async (ctx) => {
     const rate = processed > 0 ? (processed / (elapsedMs / 1000)).toFixed(1) : "0"
     console.log(
       `[nightly] gameId=${gameId} aged=${aged} failed=${counts.failed} outstanding=${outstanding} deaths=${deaths} transitions=${transitions}` +
+        (buried > 0 ? ` buried=${buried}` : "") +
+        (collected > 0 ? ` collected=${collected}` : "") +
         (skippedAlreadyAged > 0 ? ` (${skippedAlreadyAged} already done by an earlier attempt)` : "") +
         ` in ${elapsedMs}ms (${rate}/s)`
     )

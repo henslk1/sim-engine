@@ -24,10 +24,25 @@ function slotKey(
  * against the same instant the scheduler used to decide the sweep was due.
  */
 export async function checkCompetitions(client: Client, gameId: string, now: Date) {
-  // Due means: open, somebody has entered, and the deadline that entry started
-  // has passed. `closesAt` is null until the first entry, so an empty
-  // competition is simply never selected — it waits instead of being resolved
+  // Due means: open, somebody is still entered, and the deadline that first
+  // entry started has passed. `closesAt` is null until the first entry, so an
+  // empty competition is never selected — it waits instead of being resolved
   // with nothing in it.
+  //
+  // The entries clause is not redundant beside the `closesAt` check, which is
+  // what it looks like. `closesAt` is set once and never cleared, so on its own
+  // it only ever says "somebody entered at some point". This asks whether
+  // anyone still is.
+  //
+  // It does not care whether those entrants are alive. A competition with an
+  // entry runs, and a buried entrant is not a reason to treat it differently —
+  // entering is what made it due. Scoring survives burial better than it looks:
+  // performance disciplines read `CompetitionEntryStat`, the snapshot taken
+  // when the animal entered, which is kept with the entry, so a buried animal
+  // still scores the stats it actually had. (Conformation reads the animal's
+  // live scores and would fall to zero, and personality falls back to neutral.)
+  // Once it has run, the nightly collects it along with every other competition
+  // whose entrants are all buried.
   //
   // Tutorial competitions are excluded. The tutorial creates one, enters its
   // animal and resolves it in the same breath; a sweep landing in that window
@@ -37,6 +52,7 @@ export async function checkCompetitions(client: Client, gameId: string, now: Dat
       gameId,
       status: "OPEN",
       closesAt: { not: null, lte: now },
+      entries: { some: {} },
       tutorialPlayerAccountId: null,
     },
     select: { id: true },

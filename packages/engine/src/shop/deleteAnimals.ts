@@ -1,9 +1,22 @@
 import { db } from "@sim-engine/db"
 
 /**
- * Deletes all non-essential records for an animal, leaving the Animal row,
- * AnimalAncestor, and AnimalBreedComposition intact for pedigree integrity.
- * Called when burying an animal or before full deletion.
+ * Deletes an animal's own records, leaving the Animal row, AnimalAncestor and
+ * AnimalBreedComposition intact for pedigree integrity. Called when burying an
+ * animal or before full deletion.
+ *
+ * Burial deletes on purpose: this is a database that otherwise only grows, and
+ * a mature game holds hundreds of thousands of animals. What it may not do is
+ * damage anything a living animal depends on, which is why the pedigree rows
+ * stay.
+ *
+ * **Competition entries and results are deliberately NOT deleted here.** They
+ * are not the buried animal's records — they are the competition's, and other
+ * animals' placements only mean something against the field they were won
+ * against. Pruning them turned a competition of ten into a competition of one:
+ * a survivor who came tenth was left as the sole visible entry, and the nine
+ * animals it lost to vanished. Dead competitions are collected whole by the
+ * nightly instead, once every one of their entrants is buried.
  */
 export async function pruneAnimalData(animalId: string): Promise<void> {
   const where = { animalId }
@@ -40,9 +53,6 @@ export async function pruneAnimalData(animalId: string): Promise<void> {
     db.animalTestResult.deleteMany({ where }),
     db.trainingLog.deleteMany({ where }),
     db.clinicEntry.deleteMany({ where }),
-    // CompetitionResult.entryId is a RESTRICT FK to CompetitionEntry — must go first.
-    db.competitionResult.deleteMany({ where: { entry: where } }),
-    db.competitionEntry.deleteMany({ where }),
     db.animalAppliedItem.deleteMany({ where }),
   ])
 }
@@ -64,6 +74,13 @@ export async function deleteAnimalsWithChildren(animalIds: string[]): Promise<vo
   }
 
   const ids = animalIds
+
+  // Competition history survives burial, but not a full delete: the Animal row
+  // itself is going, and `CompetitionEntry.animalId` is a RESTRICT foreign key
+  // back to it. `CompetitionResult.entryId` is RESTRICT onto the entry, so it
+  // has to go first. (`CompetitionEntryStat` cascades off the entry.)
+  await db.competitionResult.deleteMany({ where: { entry: { animalId: { in: ids } } } })
+  await db.competitionEntry.deleteMany({ where: { animalId: { in: ids } } })
 
   const pregnancies = await db.pregnancy.findMany({ where: { animalId: { in: ids } }, select: { id: true } })
   const pregnancyIds = pregnancies.map(p => p.id)
