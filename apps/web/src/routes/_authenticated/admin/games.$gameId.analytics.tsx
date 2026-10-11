@@ -386,8 +386,7 @@ function RunDetail({ detail, vocab, gameId }: {
               </div>
 
               <p className="mt-1.5 text-[11px] text-muted-foreground">
-                The queue belongs to the game, not to one sweep — a work item belongs to the competition it
-                resolves. These are the counts as they stand now.
+                
               </p>
 
               {detail.resolution.failures.length > 0 && (

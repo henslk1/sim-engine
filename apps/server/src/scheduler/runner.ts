@@ -35,6 +35,7 @@
 import { hostname } from "node:os"
 import { randomUUID } from "node:crypto"
 import { db } from "@sim-engine/db"
+import { setGameMaintenance, syncGameMaintenance } from "@sim-engine/trpc"
 import type { Prisma, ScheduledTaskRunStatus } from "@sim-engine/db"
 import {
   SCHEDULED_TASK_TYPES,
@@ -73,6 +74,8 @@ export type SchedulerOptions = {
   instanceId?: string
   /** A guard against a planner that somehow never stops producing work. */
   maxRunsPerGamePerTick?: number
+  /** How many games may be drained at once. */
+  maxConcurrentGames?: number
   /**
    * How many times a boundary is attempted before it is given up on. A retry
    * waits for the next tick rather than happening immediately, so this is also
@@ -101,6 +104,15 @@ export type TickSummary = {
 const ACTIVE_STATUSES: ScheduledTaskRunStatus[] = ["PENDING", "RETRYING", "RUNNING"]
 
 const DEFAULTS = {
+  /**
+   * How many games are drained at once.
+   *
+   * Small on purpose. Each concurrent nightly holds its own aging cache and
+   * its own stream of per-animal transactions, so this trades directly against
+   * the connection pool: too many and every game runs slower than it would
+   * have done in turn.
+   */
+  maxConcurrentGames: 4,
   tickIntervalMs: 60_000,
   leaseMs: 120_000,
   maxRunsPerGamePerTick: 8,
@@ -146,6 +158,7 @@ export function createScheduler(options: SchedulerOptions = {}) {
   const tickIntervalMs = options.tickIntervalMs ?? DEFAULTS.tickIntervalMs
   const leaseMs = options.leaseMs ?? DEFAULTS.leaseMs
   const maxRunsPerGamePerTick = options.maxRunsPerGamePerTick ?? DEFAULTS.maxRunsPerGamePerTick
+  const maxConcurrentGames = Math.max(1, options.maxConcurrentGames ?? DEFAULTS.maxConcurrentGames)
   const maxAttempts = options.maxAttempts ?? DEFAULTS.maxAttempts
   const instanceId = options.instanceId ?? `${hostname()}:${process.pid}`
 
@@ -390,6 +403,16 @@ export function createScheduler(options: SchedulerOptions = {}) {
   async function execute(run: RunRow, gameId: string, token: string, attempt: number): Promise<Outcome> {
     const handler = handlers[run.taskType]
 
+    // Gameplay closes for the duration of a nightly, and it closes here rather
+    // than inside the handler so that it is tied to holding the claim: a run
+    // this process took over from a dead one blocks just the same, and the
+    // block lifts in the `finally` below whatever the outcome was.
+    //
+    // The per-tick sync is what covers everything this cannot — another
+    // instance's nightly, or one already in flight when this process started.
+    const blocking = run.taskType === "NIGHTLY"
+    if (blocking) setGameMaintenance(gameId, { runId: run.id, startedAt: clock.now() })
+
     // The lease is renewed on a timer rather than by the handler. Tying it to
     // progress through a loop meant a game with fewer animals than the
     // heartbeat interval never renewed at all, and one slow aggregate at the
@@ -454,12 +477,98 @@ export function createScheduler(options: SchedulerOptions = {}) {
       return held ? "failed" : "lost"
     } finally {
       clearInterval(renew)
+      if (blocking) setGameMaintenance(gameId, null)
       if (!owned) console.warn(`[scheduler] lost the lease on run ${run.id} while it was running`)
     }
   }
 
 
-  /** Claim and run what each game is ready for, one game at a time. */
+  /**
+   * Work one game's outstanding runs, newest boundary first.
+   *
+   * One run at a time within a game, which is the real constraint — a game's
+   * nightly and its competition sweep must not overlap. Across games there is
+   * no such constraint, and `drain` runs several of these at once.
+   */
+  async function drainGame(
+    gameId: string,
+    runs: RunRow[],
+    now: Date
+  ): Promise<Omit<TickSummary, "materialized">> {
+    let executed = 0
+    let failed = 0
+    let superseded = 0
+    let deferred = 0
+    let remaining = [...runs]
+
+    for (let pass = 0; pass < maxRunsPerGamePerTick; pass++) {
+      // Re-read the clock each pass. A nightly can run for half an hour, and
+      // whether the next run's lease is still live has to be judged against
+      // the present, not against when this tick started.
+      const at = pass === 0 ? now : clock.now()
+      const plan = planGameRuns(remaining, at)
+
+      if (plan.supersede.length > 0) {
+        const ids = plan.supersede.map((run) => run.id)
+        // The same predicate the claim uses, so a run the planner says is
+        // superseded is one this statement can actually cancel. Narrowing it
+        // to PENDING and RETRYING silently left abandoned RUNNING rows behind
+        // while still counting them as cancelled and dropping them from the
+        // working set — they were never touched again.
+        const { count } = await db.scheduledTaskRun.updateMany({
+          where: { id: { in: ids }, OR: claimableWhere(at) },
+          data: {
+            status: "CANCELLED",
+            completedAt: at,
+            claimedBy: null,
+            leaseUntil: null,
+            errorMessage: "Superseded by a later boundary",
+          },
+        })
+
+        superseded += count
+        if (count !== ids.length) {
+          console.warn(`[scheduler] expected to cancel ${ids.length} superseded run(s), cancelled ${count}`)
+        }
+        remaining = remaining.filter((run) => !ids.includes(run.id))
+      }
+
+      if (!plan.execute) {
+        deferred += plan.deferred.length
+        break
+      }
+
+      // Winding down: leave the rest PENDING for the next process to pick up
+      // rather than starting work this one may not finish.
+      if (stopping) {
+        deferred += plan.deferred.length + 1
+        break
+      }
+
+      const run = plan.execute
+      // Out of the working set whatever happens next, so a run that fails
+      // and goes RETRYING waits for the next tick rather than burning every
+      // attempt inside this one.
+      remaining = remaining.filter((other) => other.id !== run.id)
+
+      const token = await claim(run.id, at)
+      if (!token) continue
+
+      // `attempt` after the claim incremented it: this run's attempt number.
+      const claimed = await db.scheduledTaskRun.findUnique({
+        where: { id: run.id },
+        select: { attempt: true },
+      })
+
+      const outcome = await execute(run, gameId, token, claimed?.attempt ?? 1)
+      if (outcome === "completed") executed++
+      else if (outcome === "failed") failed++
+    }
+
+    return { executed, failed, superseded, deferred }
+  }
+
+  /** Claim and run what each game is ready for. */
   async function drain(now: Date, schedules: Map<string, GameSchedule>): Promise<Omit<TickSummary, "materialized">> {
     const rows = await db.scheduledTaskRun.findMany({
       where: { status: { in: ACTIVE_STATUSES }, gameId: { in: [...schedules.keys()] } },
@@ -481,87 +590,75 @@ export function createScheduler(options: SchedulerOptions = {}) {
       else byGame.set(row.gameId, [run])
     }
 
-    let executed = 0
-    let failed = 0
-    let superseded = 0
-    let deferred = 0
+    const totals = { executed: 0, failed: 0, superseded: 0, deferred: 0 }
 
-    // Games are drained one after another, and on a single server that means a
-    // game's long nightly does delay the games queued behind it. With one game
-    // that costs nothing, and sequential execution is one less thing to get
-    // wrong during the cutover — but it is a real limit, not an independence
-    // guarantee, and it is the first thing to change when there is a second
-    // game. The claim already permits it: nothing here assumes one game at a
+    // Games run concurrently, a few at a time. One game's half-hour nightly
+    // used to delay every game queued behind it, which was a real limit rather
+    // than an independence guarantee — the claim never assumed one game at a
     // time, only one run at a time within a game.
-    for (const [gameId, runs] of byGame) {
-      let remaining = [...runs]
+    //
+    // Bounded rather than all at once: each concurrent nightly holds its own
+    // aging cache and its own stream of transactions, so unbounded fan-out
+    // would contend for the connection pool and make every game slower than
+    // running them in turn. A worker pulls the next game off a shared cursor
+    // as it finishes, so a slow game occupies one slot instead of stalling a
+    // batch.
+    const queue = [...byGame.entries()]
+    let cursor = 0
 
-      for (let pass = 0; pass < maxRunsPerGamePerTick; pass++) {
-        // Re-read the clock each pass. A nightly can run for half an hour, and
-        // whether the next run's lease is still live has to be judged against
-        // the present, not against when this tick started.
-        const at = pass === 0 ? now : clock.now()
-        const plan = planGameRuns(remaining, at)
+    const workers = Array.from(
+      { length: Math.min(maxConcurrentGames, queue.length) },
+      async () => {
+        for (;;) {
+          const index = cursor++
+          const next = queue[index]
+          if (!next) return
 
-        if (plan.supersede.length > 0) {
-          const ids = plan.supersede.map((run) => run.id)
-          // The same predicate the claim uses, so a run the planner says is
-          // superseded is one this statement can actually cancel. Narrowing it
-          // to PENDING and RETRYING silently left abandoned RUNNING rows behind
-          // while still counting them as cancelled and dropping them from the
-          // working set — they were never touched again.
-          const { count } = await db.scheduledTaskRun.updateMany({
-            where: { id: { in: ids }, OR: claimableWhere(at) },
-            data: {
-              status: "CANCELLED",
-              completedAt: at,
-              claimedBy: null,
-              leaseUntil: null,
-              errorMessage: "Superseded by a later boundary",
-            },
-          })
-
-          superseded += count
-          if (count !== ids.length) {
-            console.warn(`[scheduler] expected to cancel ${ids.length} superseded run(s), cancelled ${count}`)
+          const [gameId, runs] = next
+          try {
+            const result = await drainGame(gameId, runs, now)
+            totals.executed += result.executed
+            totals.failed += result.failed
+            totals.superseded += result.superseded
+            totals.deferred += result.deferred
+          } catch (error) {
+            // A game that throws out here has already failed its own run
+            // handling; this is the last net, and it exists so one game cannot
+            // take the tick down for every other game.
+            console.error(`[scheduler] draining game ${gameId} failed:`, error)
           }
-          remaining = remaining.filter((run) => !ids.includes(run.id))
         }
-
-        if (!plan.execute) {
-          deferred += plan.deferred.length
-          break
-        }
-
-        // Winding down: leave the rest PENDING for the next process to pick up
-        // rather than starting work this one may not finish.
-        if (stopping) {
-          deferred += plan.deferred.length + 1
-          break
-        }
-
-        const run = plan.execute
-        // Out of the working set whatever happens next, so a run that fails
-        // and goes RETRYING waits for the next tick rather than burning every
-        // attempt inside this one.
-        remaining = remaining.filter((other) => other.id !== run.id)
-
-        const token = await claim(run.id, at)
-        if (!token) continue
-
-        // `attempt` after the claim incremented it: this run's attempt number.
-        const claimed = await db.scheduledTaskRun.findUnique({
-          where: { id: run.id },
-          select: { attempt: true },
-        })
-
-        const outcome = await execute(run, gameId, token, claimed?.attempt ?? 1)
-        if (outcome === "completed") executed++
-        else if (outcome === "failed") failed++
       }
-    }
+    )
 
-    return { executed, failed, superseded, deferred }
+    await Promise.all(workers)
+
+    return totals
+  }
+
+
+  
+  /**
+   * Reconcile the gameplay block with what is actually running.
+   *
+   * `execute` keeps this current for runs this process owns. This covers the
+   * rest: a nightly on another instance, one already in flight when this
+   * process started, and — because it takes the whole set rather than a
+   * difference — one that stopped without anything clearing it.
+   */
+  async function syncMaintenance(): Promise<void> {
+    const running = await db.scheduledTaskRun.findMany({
+      where: { taskType: "NIGHTLY", status: "RUNNING" },
+      select: { id: true, gameId: true, startedAt: true, claimedAt: true },
+    })
+
+    syncGameMaintenance(
+      running.map((run) => ({
+        gameId: run.gameId,
+        runId: run.id,
+        startedAt: run.startedAt ?? run.claimedAt ?? new Date(0),
+      }))
+    )
   }
 
   async function runTick(): Promise<TickSummary> {
@@ -570,6 +667,7 @@ export function createScheduler(options: SchedulerOptions = {}) {
     // somebody happened to restart it — and nothing would say so. Two queries
     // when there is nothing to add.
     await ensureTasks()
+    await syncMaintenance()
 
     const now = clock.now()
     const schedules = await loadGameSchedules()

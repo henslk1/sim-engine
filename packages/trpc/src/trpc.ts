@@ -2,6 +2,7 @@ import { initTRPC } from "@trpc/server"
 import { TRPCError } from "@trpc/server"
 import { db } from "@sim-engine/db"
 import { guardTutorialMutation } from "./tutorial-guard.js"
+import { guardGameMaintenance } from "./maintenance.js"
 import { noopRealtime, type RealtimeControl } from "./messaging/realtime.js"
 
 export type Context = {
@@ -20,7 +21,14 @@ export const t = initTRPC.context<Context>().create()
 
 export const router = t.router
 const baseProcedure = t.procedure.use(async ({ ctx, type, path, getRawInput, next }) => {
-  if (type === "mutation") await guardTutorialMutation(ctx.userId, path, await getRawInput())
+  if (type === "mutation") {
+    const input = await getRawInput()
+    // Before the tutorial gate, because a game that is mid-update is closed to
+    // everyone — a tutorial player included — and the reason they are refused
+    // should be the one they can act on.
+    await guardGameMaintenance(ctx.userId, path, input)
+    await guardTutorialMutation(ctx.userId, path, input)
+  }
   return next()
 })
 export const publicProcedure = baseProcedure

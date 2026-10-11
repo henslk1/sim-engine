@@ -15,7 +15,8 @@
  */
 
 import { db } from "@sim-engine/db"
-import { runCompetition, type Clock } from "@sim-engine/engine"
+import { db as database } from "@sim-engine/db"
+import { replenishOpenSet, runCompetition, type Clock } from "@sim-engine/engine"
 import {
   claimResolutions,
   finishResolution,
@@ -115,6 +116,8 @@ export function createResolver(options: { instanceId: string; clock: Clock }): R
     let resolved = 0
     let reconciled = 0
     let failed = 0
+    // Which games had a competition finish, and so have a slot to refill.
+    const touched = new Set<string>()
 
     for (let pass = 0; pass < MAX_PASSES; pass++) {
       if (stopped) break
@@ -127,9 +130,30 @@ export function createResolver(options: { instanceId: string; clock: Clock }): R
         if (outcome === "resolved") resolved++
         else if (outcome === "reconciled") reconciled++
         else failed++
+        if (outcome !== "failed") touched.add(work.gameId)
       }
 
       await heartbeatResolutions(token, clock.now(), LEASE_MS)
+    }
+
+    // A competition that runs is replaced. This used to happen inside the
+    // sweep, which resolved everything itself and then topped the set back up
+    // in the same pass. Since the sweep only enqueues, it returns while every
+    // slot is still occupied and creates nothing — leaving players an hour
+    // short of competitions until the next one. Replacing them here restores
+    // "resolve, then replace", with the resolver doing both halves.
+    //
+    // Once per drain rather than per competition: refilling 1,078 slots one at
+    // a time would cost more than the resolving did.
+    for (const gameId of touched) {
+      try {
+        const created = await replenishOpenSet(database, gameId)
+        if (created > 0) console.log(`[resolver] gameId=${gameId} replaced ${created} competition(s)`)
+      } catch (err) {
+        // The next sweep replenishes too, so this is a delay rather than a
+        // loss, and it must not fail the drain.
+        console.error(`[resolver] could not replace competitions for game ${gameId}:`, err)
+      }
     }
 
     return { resolved, reconciled, failed }

@@ -76,6 +76,15 @@ export type GameSchedule = {
 export const IMMINENT_BOUNDARY_MS = 60_000
 
 /**
+ * How long before a nightly players are warned it is coming.
+ *
+ * Here rather than in the UI because it is a property of the schedule, not of
+ * a banner: the server decides when a game is in its warning window, and the
+ * client only renders what it is told.
+ */
+export const NIGHTLY_WARNING_MS = 15 * 60_000
+
+/**
  * The task types a `ScheduledTask` row is actually created for.
  *
  * `VENUE_ROTATION` exists in the enum but is deliberately absent: rotation is

@@ -226,7 +226,20 @@ function EntryTable({ comp }: { comp: Competition }) {
                 )
               })
             )}
-            <span className="text-right text-muted-foreground">{playerAccount.username}</span>
+            {/* The grid cell is right-aligned, so the link has to sit inside a
+                span rather than being the cell: as the cell it stretched the
+                full column width and the pointer turned into a hand an inch
+                from anything clickable. Underlined because the affordance
+                should be visible before the pointer gets there. */}
+            <span className="text-right">
+              <Link
+                to="/player/$username"
+                params={{ username: playerAccount.username }}
+                className="text-muted-foreground underline underline-offset-2 transition-colors hover:text-primary"
+              >
+                {playerAccount.username}
+              </Link>
+            </span>
           </div>
         )
       })}

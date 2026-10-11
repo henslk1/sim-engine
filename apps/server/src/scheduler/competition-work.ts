@@ -13,6 +13,8 @@ import type { Prisma } from "@sim-engine/db"
 export type ClaimedResolution = {
   id: string
   competitionId: string
+  /** Carried so the resolver can replace what it resolves, per game. */
+  gameId: string
   attempt: number
 }
 
@@ -71,7 +73,7 @@ export async function claimResolutions(
       leaseUntil: new Date(now.getTime() + leaseMs),
       attempt: { increment: 1 },
     },
-    select: { id: true, competitionId: true, attempt: true },
+    select: { id: true, competitionId: true, gameId: true, attempt: true },
   })
 }
 

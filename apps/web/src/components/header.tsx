@@ -49,6 +49,13 @@ export function Header({ session }: { session: Session}) {
   )
   const pendingRequests = friendRequestData?.pendingCount ?? 0
 
+  // Inside the game you are your player account, not your login. The platform
+  // surfaces — the admin console and account settings — are the two places
+  // where the account's own name is the right answer, because that is what
+  // they are about.
+  const onPlatformSurface = location.pathname.startsWith("/admin") || location.pathname.startsWith("/account")
+  const displayName = (!onPlatformSurface && me?.username) || user.name || "?"
+
   const { data: balances } = trpc.player.balances.useQuery(
     { playerAccountId: me?.id ?? "" },
     { enabled: !!me?.id },
@@ -96,12 +103,12 @@ export function Header({ session }: { session: Session}) {
             <DropdownMenuTrigger data-tutorial-signout className="flex items-center gap-2 rounded-md px-2 py-1 text-sm text-foreground hover:bg-muted outline-none">
               <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground overflow-hidden">
                 {user.image ? (
-                  <img src={user.image} alt={user.name ?? ""} className="h-full w-full object-cover" />
+                  <img src={user.image} alt={displayName} className="h-full w-full object-cover" />
                 ) : (
-                  getInitials(user.name ?? "?")
+                  getInitials(displayName)
                 )}
               </div>
-              <span>{user.name}</span>
+              <span>{displayName}</span>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               {me?.username && (

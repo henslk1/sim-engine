@@ -3,6 +3,7 @@ import { createFileRoute, redirect, Outlet, useLocation, useRouter } from "@tans
 import { Header } from "@/components/header"
 import { trpc, trpcVanilla } from "@/lib/trpc"
 import { MessagingWidget } from "@/components/messaging-widget"
+import { NightlyBanner } from "@/components/nightly-banner"
 import { authClient } from "@/lib/auth-client"
 import { isTourRunning, destroyActiveTour, startTutorial } from "@/lib/tutorial"
 import { endClientSession } from "@/lib/session-cleanup"
@@ -155,6 +156,10 @@ export const Route = createFileRoute("/_authenticated")({
       destroyActiveTour()
       return
     }
+    // The nightly update screen is not part of the game, so the tutorial has no
+    // opinion about it. Without this a tutorial player would be bounced back to
+    // a dashboard that cannot do anything either.
+    if (location.pathname === "/new-day") return
     const routeAllowed = isTutorialRouteAllowed(
       step,
       pair?.ancestorOneId,
@@ -202,12 +207,14 @@ function TutorialRecovery() {
   const router = useRouter()
   useEffect(() => {
     if (!access.restricted) return
+    if (location.pathname === "/new-day") return
     if (location.pathname !== "/dashboard" && !access.running) {
       destroyActiveTour()
       void router.navigate({ to: "/dashboard", replace: true })
     }
   }, [access, location.pathname, location.search, router])
-  if (!access.restricted || (!access.running && location.pathname === "/dashboard")) return null
+  if (!access.restricted || location.pathname === "/new-day") return null
+  if (!access.running && location.pathname === "/dashboard") return null
   return <a
     href="/dashboard"
     data-tutorial-recovery
@@ -224,6 +231,13 @@ function AuthenticatedLayout() {
   return (
     <div className="flex h-dvh flex-col overflow-hidden">
       {isSetup ? <SetupHeader session={session!} /> : <Header session={session!} />}
+      {/* In the layout flow rather than floating over the page. There is one
+          place beneath the nav that every authenticated page shares, so the
+          banner can be global without an overlay — and an overlay would cover
+          the top of whatever is behind it, including the animal profile's own
+          header. The container is `h-dvh` with `overflow-hidden`, so this only
+          shortens `main` rather than pushing anything off screen. */}
+      {!isSetup && <NightlyBanner />}
       <main className="min-h-0 flex-1 overflow-auto">
         <Outlet />
       </main>

@@ -19,6 +19,7 @@ import { breedRouter } from "./routers/breed.js";
 import { socialRouter } from "./routers/social.js";
 import { directoryRouter } from "./routers/directory.js";
 import { messagingRouter } from "./routers/messaging.js";
+import { gameRouter } from "./routers/game.js";
 
 export const appRouter = router({
   health: publicProcedure.query(() => ({ status: "ok" })),
@@ -42,6 +43,7 @@ export const appRouter = router({
   social: socialRouter,
   directory: directoryRouter,
   messaging: messagingRouter,
+  game: gameRouter,
 })
 
 export type AppRouter = typeof appRouter

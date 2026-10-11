@@ -24,6 +24,7 @@ import { Route as AuthenticatedStudMarketRouteImport } from './routes/_authentic
 import { Route as AuthenticatedStableRouteImport } from './routes/_authenticated/stable'
 import { Route as AuthenticatedShopRouteImport } from './routes/_authenticated/shop'
 import { Route as AuthenticatedSetupRouteImport } from './routes/_authenticated/setup'
+import { Route as AuthenticatedNewDayRouteImport } from './routes/_authenticated/new-day'
 import { Route as AuthenticatedFriendRequestsRouteImport } from './routes/_authenticated/friend-requests'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
@@ -181,6 +182,11 @@ const AuthenticatedShopRoute = AuthenticatedShopRouteImport.update({
 const AuthenticatedSetupRoute = AuthenticatedSetupRouteImport.update({
   id: '/setup',
   path: '/setup',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedNewDayRoute = AuthenticatedNewDayRouteImport.update({
+  id: '/new-day',
+  path: '/new-day',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedFriendRequestsRoute =
@@ -691,6 +697,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/friend-requests': typeof AuthenticatedFriendRequestsRoute
+  '/new-day': typeof AuthenticatedNewDayRoute
   '/setup': typeof AuthenticatedSetupRoute
   '/shop': typeof AuthenticatedShopRoute
   '/stable': typeof AuthenticatedStableRoute
@@ -790,6 +797,7 @@ export interface FileRoutesByTo {
   '/account': typeof AuthenticatedAccountRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/friend-requests': typeof AuthenticatedFriendRequestsRoute
+  '/new-day': typeof AuthenticatedNewDayRoute
   '/setup': typeof AuthenticatedSetupRoute
   '/shop': typeof AuthenticatedShopRoute
   '/stable': typeof AuthenticatedStableRoute
@@ -888,6 +896,7 @@ export interface FileRoutesById {
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/friend-requests': typeof AuthenticatedFriendRequestsRoute
+  '/_authenticated/new-day': typeof AuthenticatedNewDayRoute
   '/_authenticated/setup': typeof AuthenticatedSetupRoute
   '/_authenticated/shop': typeof AuthenticatedShopRoute
   '/_authenticated/stable': typeof AuthenticatedStableRoute
@@ -990,6 +999,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/dashboard'
     | '/friend-requests'
+    | '/new-day'
     | '/setup'
     | '/shop'
     | '/stable'
@@ -1089,6 +1099,7 @@ export interface FileRouteTypes {
     | '/account'
     | '/dashboard'
     | '/friend-requests'
+    | '/new-day'
     | '/setup'
     | '/shop'
     | '/stable'
@@ -1186,6 +1197,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin'
     | '/_authenticated/dashboard'
     | '/_authenticated/friend-requests'
+    | '/_authenticated/new-day'
     | '/_authenticated/setup'
     | '/_authenticated/shop'
     | '/_authenticated/stable'
@@ -1391,6 +1403,13 @@ declare module '@tanstack/react-router' {
       path: '/setup'
       fullPath: '/setup'
       preLoaderRoute: typeof AuthenticatedSetupRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/new-day': {
+      id: '/_authenticated/new-day'
+      path: '/new-day'
+      fullPath: '/new-day'
+      preLoaderRoute: typeof AuthenticatedNewDayRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/friend-requests': {
@@ -2206,6 +2225,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedFriendRequestsRoute: typeof AuthenticatedFriendRequestsRoute
+  AuthenticatedNewDayRoute: typeof AuthenticatedNewDayRoute
   AuthenticatedSetupRoute: typeof AuthenticatedSetupRoute
   AuthenticatedShopRoute: typeof AuthenticatedShopRoute
   AuthenticatedStableRoute: typeof AuthenticatedStableRoute
@@ -2243,6 +2263,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedFriendRequestsRoute: AuthenticatedFriendRequestsRoute,
+  AuthenticatedNewDayRoute: AuthenticatedNewDayRoute,
   AuthenticatedSetupRoute: AuthenticatedSetupRoute,
   AuthenticatedShopRoute: AuthenticatedShopRoute,
   AuthenticatedStableRoute: AuthenticatedStableRoute,

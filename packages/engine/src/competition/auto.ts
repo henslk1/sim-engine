@@ -71,6 +71,9 @@ export async function checkCompetitions(client: Client, gameId: string, now: Dat
     await enqueueCompetitionResolution(client, gameId, c.id)
   }
 
+  // Still replenished here as well as by the resolver: this is what fills a
+  // slot whose competition was deleted, cancelled, or resolved by something
+  // other than the resolver, and what seeds the set for a brand new game.
   const created = await replenishOpenSet(client, gameId)
 
   return { due: due.length, created }
@@ -79,12 +82,17 @@ export async function checkCompetitions(client: Client, gameId: string, now: Dat
 /**
  * Bring every slot back up to its `maxOpenAtOnce`.
  *
+ * Exported because the sweep is no longer the only thing that should call it.
+ * A competition is replaced when it *finishes*, and since §11 the sweep only
+ * enqueues — it returns long before anything has actually been resolved — so
+ * the resolver calls this once it has drained.
+ *
  * This used to be one `count` per slot followed by one `create` per missing
  * competition — about 1,078 round trips per sweep for this game, nearly all of
  * them returning "already have one". It is now three queries to read the
  * shape of the world, a diff in memory, and a single `createMany`.
  */
-async function replenishOpenSet(client: Client, gameId: string): Promise<number> {
+export async function replenishOpenSet(client: Client, gameId: string): Promise<number> {
   const venueDisciplines = await client.venueDiscipline.findMany({
     where: { venue: { gameId } },
     include: { venue: { select: { name: true } }, disciplineDef: { select: { isConformation: true } } },
