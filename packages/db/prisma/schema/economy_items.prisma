@@ -90,6 +90,8 @@ model AnimalAppliedItem {
   appliedByPlayer   PlayerAccount @relation(fields: [appliedByPlayerId], references: [id])
   itemDef           ItemDef       @relation(fields: [itemDefId], references: [id])
   animal            Animal        @relation(fields: [animalId], references: [id])
+
+  @@index([animalId])
 }
 
 model PlayerCapacity {

@@ -4,8 +4,23 @@
 // Get a free hosted Postgres database in seconds: `npx create-db`
 
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider        = "prisma-client"
+  output          = "../generated/prisma"
+  // Relation loading as JOINs instead of one query per relation branch.
+  //
+  // Measured on `animalProfile.get`: ~75-116 statements became 1-2. Wall clock
+  // on localhost is a wash, because Postgres does the stitching instead of
+  // Node - the win is entirely in round trips, so it grows with the distance
+  // to the database. At a 2ms hosted round trip that page goes from ~340ms to
+  // ~155ms; at 15ms, from ~1.8s to ~180ms.
+  //
+  // A preview feature, which here means "not covered by Prisma's stability
+  // guarantees", not "fragile". Nothing in this repo is written against it:
+  // `include` is the same API either way, so if it is ever withdrawn the
+  // queries revert to separate statements and only the optimisation is lost.
+  // The thing to re-test after a Prisma upgrade is the heavy nested includes,
+  // where a fan-out can make a JOIN slower than separate queries.
+  previewFeatures = ["relationJoins"]
 }
 
 datasource db {

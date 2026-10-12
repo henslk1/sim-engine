@@ -175,7 +175,10 @@ model ClinicEntry {
   animal          Animal        @relation(fields: [animalId], references: [id])
   clinic          Clinic        @relation(fields: [clinicId], references: [id])
 
+  // clinicId leads the unique, so it is no help in finding a single animal's
+  // entries — which is how burial deletes them.
   @@unique([clinicId, animalId])
+  @@index([animalId])
 }
 
 model TitleDef {

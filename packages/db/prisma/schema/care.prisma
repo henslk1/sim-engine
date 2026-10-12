@@ -89,4 +89,6 @@ model AnimalBehaviorEvent {
   animal          Animal         @relation(fields: [animalId], references: [id])
   careActionDef   CareActionDef? @relation(fields: [careActionDefId], references: [id])
   createdAt       DateTime       @default(now())
+
+  @@index([animalId])
 }

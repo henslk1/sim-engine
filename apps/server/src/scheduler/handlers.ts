@@ -93,6 +93,27 @@ const WORK_LEASE_MS = 120_000
  */
 const ANIMAL_CONCURRENCY = 4
 
+/**
+ * How many animals are buried at once.
+ *
+ * Burial was the last serial loop in the nightly, and it is the heavier half:
+ * `pruneAnimalData` is thirty-one `deleteMany`s in one transaction against
+ * aging's twenty-five statements, and it runs before a single animal is aged.
+ * Measured on the live database, a burial costs about 35ms, so the 2,000-animal
+ * cap was seventy seconds of nothing else happening.
+ *
+ * Four, matching `ANIMAL_CONCURRENCY`, for the same reason and the same
+ * ceiling: each burial holds a connection for the life of its transaction, and
+ * the pool it comes from is the one serving every HTTP request this process is
+ * handling. Burial and aging never overlap — burial finishes before the first
+ * chunk is claimed — so the night's peak demand on the pool is unchanged.
+ *
+ * Safe to run in parallel because every statement in `pruneAnimalData` is
+ * keyed by `animalId`: two burials touch the same tables but never the same
+ * rows, so they cannot block or deadlock each other.
+ */
+const BURIAL_CONCURRENCY = 4
+
 /** How long a deceased animal lies before the nightly buries it. */
 const BURIAL_DELAY_MS = 3 * 24 * 60 * 60 * 1000
 
@@ -162,6 +183,12 @@ const MAX_PASSES = 10_000
  * Capped, because pruning is a transaction over nearly thirty tables per
  * animal. Whatever is left waits for tomorrow; it has already waited three
  * days.
+ *
+ * Bounded rather than serial, for the reason the aging loop is: each burial
+ * spends nearly all of its time waiting on the database, and waiting for the
+ * previous one to finish before starting the next is the whole of the cost.
+ * `forEachBounded` catches nothing, so the per-animal `try` stays — a single
+ * animal that cannot be pruned must not abandon the rest of the batch.
  */
 async function buryDeceased(gameId: string, cutoff: Date): Promise<number> {
   const due = await db.animal.findMany({
@@ -171,17 +198,19 @@ async function buryDeceased(gameId: string, cutoff: Date): Promise<number> {
   })
 
   let count = 0
-  for (const animal of due) {
+  await forEachBounded(due, BURIAL_CONCURRENCY, async (animal) => {
     try {
       await pruneAnimalData(animal.id)
       await db.animal.update({ where: { id: animal.id }, data: { status: "BURIED" } })
+      // Safe without any synchronisation: `++` is not a suspension point, so
+      // no two workers can interleave inside it.
       count++
     } catch (err) {
       // One animal that cannot be pruned must not stop the rest, and must not
       // take the whole nightly down with it.
       console.error(`[nightly] could not bury animal ${animal.id}:`, err)
     }
-  }
+  })
 
   return count
 }

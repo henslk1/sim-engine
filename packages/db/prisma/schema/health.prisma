@@ -151,6 +151,11 @@ model AnimalTreatmentRecord {
   healthRecord          AnimalHealthRecord    @relation(fields: [healthRecordId], references: [id])
 
   @@index([animalId, isActive])
+  // Aging asks "are any other treatments for this condition still open" every
+  // time a course closes, and Postgres re-checks this same reference whenever a
+  // health record is deleted — once per record, and burial deletes them all.
+  // Without this both fall back to scanning every treatment row in the game.
+  @@index([healthRecordId, isActive])
 }
 
 model ActivityRestriction {
@@ -168,6 +173,9 @@ model ActivityRestriction {
   pregnancy         Pregnancy?              @relation(fields: [pregnancyId], references: [id])
 
   @@index([treatmentRecordId, isActive])
+  @@index([animalId])
+  // Retiring a pregnancy's restrictions when gestation completes.
+  @@index([pregnancyId, isActive])
 }
 
 model AnimalTestResult {
@@ -179,6 +187,8 @@ model AnimalTestResult {
   testedAt       DateTime           @default(now())
   animal         Animal             @relation(fields: [animalId], references: [id])
   conditionDef   HealthConditionDef @relation(fields: [conditionDefId], references: [id])
+
+  @@index([animalId])
 }
 
 model HealthCertificateDef {
@@ -223,6 +233,8 @@ model VetVisitLog {
   conditionDef    HealthConditionDef? @relation(fields: [conditionDefId], references: [id])
   animal          Animal              @relation(fields: [animalId], references: [id])
   playerAccount   PlayerAccount       @relation(fields: [playerAccountId], references: [id])
+
+  @@index([animalId])
 }
 
 model AnimalImmunity {

@@ -470,8 +470,24 @@ export async function advanceAnimalAging(
       immunity && tx.animalImmunity.update({
         where: { animalId },
         data: {
+          // The ceiling is the animal's own innate maximum scaled by its life
+          // stage. `immunityCapMultiplier` has existed on `LifeStageDef` since
+          // the model was written, is editable in the admin console, and was
+          // read by nothing — so a youngster configured to cap at 60% of its
+          // adult immunity quietly recovered to 100% like everything else.
+          //
+          // It defaults to 1.0, so this changes nothing until a stage is
+          // configured. `correctStage` comes from the run's cache, so applying
+          // it costs no query.
+          //
+          // `Math.min` does both jobs: it stops a growing animal exceeding its
+          // stage's ceiling, and brings one that is already above it — because
+          // the stage changed, or the multiplier did — back down to it.
           value: allCareDone
-            ? Math.min(immunity.innateMax, immunity.value + gameConfig.immunityRecoveryRate)
+            ? Math.min(
+                immunity.innateMax * correctStage.immunityCapMultiplier,
+                immunity.value + gameConfig.immunityRecoveryRate
+              )
             : Math.max(gameConfig.immunityMin, immunity.value - gameConfig.immunityDecayRate),
         },
       }),
