@@ -365,26 +365,33 @@ export async function advanceAnimalAging(
 
     // Check if work was done this cycle — suppresses condition decay
     const currentCycle = animal.ageInCycles
-    const [workedThisCycle, allCareDone, activeHealthRecords] = await Promise.all([
-      // Only whether the animal worked at all, so each of these stops at the
-      // first row it finds instead of counting every one. Nothing here reads
-      // how many times it trained.
-      Promise.all([
-        tx.trainingLog.findFirst({ where: { animalId, cycleNumber: currentCycle }, select: { id: true } }),
-        tx.competitionEntry.findFirst({ where: { animalId, cycleNumber: currentCycle }, select: { id: true } }),
-        tx.stageActivityLog.findFirst({ where: { animalId, cycleNumber: currentCycle }, select: { id: true } }),
-      ]).then(found => found.some(row => row !== null)),
-      // Distinct actions, not log rows — see `isDailyCareComplete`. Counting
-      // rows let the same free action, performed three times, pass for having
-      // done three different ones.
-      tx.careLog
-        .findMany({
-          where: { animalId, cycleNumber: currentCycle },
-          select: { careActionDefId: true },
-          distinct: ["careActionDefId"],
-        })
-        .then(done => isDailyCareComplete(done.length, game.careActionCount)),
-      tx.animalHealthRecord.findMany({
+    // Awaited one at a time rather than through `Promise.all`. Issuing
+    // concurrent queries on one transaction's connection is a protocol
+    // violation that `pg` warns about today and removes in pg@9 — and it never
+    // bought anything: on a single connection the driver queues them, so the
+    // five reads below take the same wall time either way. Measured: 7ms median
+    // both ways.
+    //
+    // Only whether the animal worked at all, so each of these stops at the
+    // first row it finds instead of counting every one. Nothing here reads how
+    // many times it trained, and the `||` short-circuits — an animal that
+    // trained never issues the other two.
+    const workedThisCycle =
+      (await tx.trainingLog.findFirst({ where: { animalId, cycleNumber: currentCycle }, select: { id: true } })) !== null ||
+      (await tx.competitionEntry.findFirst({ where: { animalId, cycleNumber: currentCycle }, select: { id: true } })) !== null ||
+      (await tx.stageActivityLog.findFirst({ where: { animalId, cycleNumber: currentCycle }, select: { id: true } })) !== null
+
+    // Distinct actions, not log rows — see `isDailyCareComplete`. Counting
+    // rows let the same free action, performed three times, pass for having
+    // done three different ones.
+    const careDone = await tx.careLog.findMany({
+      where: { animalId, cycleNumber: currentCycle },
+      select: { careActionDefId: true },
+      distinct: ["careActionDefId"],
+    })
+    const allCareDone = isDailyCareComplete(careDone.length, game.careActionCount)
+
+    const activeHealthRecords = await tx.animalHealthRecord.findMany({
         where: { animalId, isActive: true },
         include: {
           conditionDef: {
@@ -398,8 +405,7 @@ export async function advanceAnimalAging(
             },
           },
         },
-      }),
-    ])
+    })
 
     const conditionEnergyEffect = activeHealthRecords.reduce((sum, r) => {
       const treatedThisCycle = r.treatmentRecords.some(
@@ -509,28 +515,24 @@ export async function advanceAnimalAging(
         : Math.max(gameConfig.immunityMin, immunity.value - gameConfig.immunityDecayRate)
       : null
 
-    await Promise.all([
-      energy && newEnergy !== null && newEnergy !== energy.currentEnergy && tx.animalEnergy.update({
-        where: { animalId },
-        data: { currentEnergy: newEnergy },
-      }),
-      mood && newMood !== null && newMood !== mood.value && tx.animalMood.update({
-        where: { animalId },
-        data: { value: newMood },
-      }),
-      condition && !workedThisCycle && newCondition !== null && newCondition !== condition.value && tx.animalCondition.update({
-        where: { animalId },
-        data: { value: newCondition },
-      }),
-      careScore && !allCareDone && newCareScore !== null && newCareScore !== careScore.score && tx.animalCareScore.update({
-        where: { animalId },
-        data: { score: newCareScore },
-      }),
-      immunity && newImmunity !== null && newImmunity !== immunity.value && tx.animalImmunity.update({
-        where: { animalId },
-        data: { value: newImmunity },
-      }),
-    ].filter(Boolean))
+    // Sequential for the same reason as the reads above. Written as plain `if`s
+    // rather than the `&&` chains and `.filter(Boolean)` this replaces, which
+    // said the same thing less legibly.
+    if (energy && newEnergy !== null && newEnergy !== energy.currentEnergy) {
+      await tx.animalEnergy.update({ where: { animalId }, data: { currentEnergy: newEnergy } })
+    }
+    if (mood && newMood !== null && newMood !== mood.value) {
+      await tx.animalMood.update({ where: { animalId }, data: { value: newMood } })
+    }
+    if (condition && !workedThisCycle && newCondition !== null && newCondition !== condition.value) {
+      await tx.animalCondition.update({ where: { animalId }, data: { value: newCondition } })
+    }
+    if (careScore && !allCareDone && newCareScore !== null && newCareScore !== careScore.score) {
+      await tx.animalCareScore.update({ where: { animalId }, data: { score: newCareScore } })
+    }
+    if (immunity && newImmunity !== null && newImmunity !== immunity.value) {
+      await tx.animalImmunity.update({ where: { animalId }, data: { value: newImmunity } })
+    }
 
     return {
       ...(pregnancyCompleted ? { pregnancyCompleted } : {}),

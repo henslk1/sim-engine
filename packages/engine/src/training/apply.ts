@@ -62,24 +62,22 @@ export async function applyTrainingAction(
     if (!energy) throw new Error(`No energy record for animal ${animalId}`)
     if (energy.currentEnergy < energyUsed) throw new Error("Not enough energy")
 
-    const [currentStat, config, personality] = await Promise.all([
-      tx.animalStat.findUniqueOrThrow({
-        where: { animalId_statDefId: { animalId, statDefId: action.statDefId } },
-        select: { innateValue: true, trainedValue: true },
-      }),
-      tx.gameConfig.findUniqueOrThrow({
-        where: { gameId: action.gameId },
-        select: { trainingCeilingMultiplier: true, conditionWorkGain: true },
-      }),
-      tx.animalPersonality.findMany({
-        where: { animalId },
-        select: {
-          value: true,
-          personalityModifier: true,
-          traitDef: { select: { labelRanges: { select: { minValue: true, maxValue: true, trainingModifier: true } } } },
-        },
-      }),
-    ])
+    const currentStat = await tx.animalStat.findUniqueOrThrow({
+      where: { animalId_statDefId: { animalId, statDefId: action.statDefId } },
+      select: { innateValue: true, trainedValue: true },
+    })
+    const config = await tx.gameConfig.findUniqueOrThrow({
+      where: { gameId: action.gameId },
+      select: { trainingCeilingMultiplier: true, conditionWorkGain: true },
+    })
+    const personality = await tx.animalPersonality.findMany({
+      where: { animalId },
+      select: {
+        value: true,
+        personalityModifier: true,
+        traitDef: { select: { labelRanges: { select: { minValue: true, maxValue: true, trainingModifier: true } } } },
+      },
+    })
 
     const personalityCapMod = personality.reduce((sum, p) => {
       const effective = p.value + p.personalityModifier

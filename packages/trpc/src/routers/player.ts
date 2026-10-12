@@ -40,65 +40,63 @@ export const playerRouter = router({
         const account = await tx.playerAccount.create({
           data: { userId: ctx.userId!, gameId: input.gameId, username: input.username },
         })
-        await Promise.all([
-          tx.playerBalance.createMany({
-            data: currencyDefs.map((c) => ({
-              playerAccountId: account.id,
-              currencyDefId: c.id,
-              balance: 0,
-            })),
-          }),
-          tx.playerCapacity.create({
-            data: { 
-              playerAccountId: account.id, 
-              animalSlotBase: gameConfig.defaultAnimalSlots, 
-              subContainerBase: gameConfig.defaultSubContainers, 
-              geneticStorageBase: 50, 
-            },
-          }),
-          tx.playerProfile.create({ data: { playerAccountId: account.id } }),
-          tx.playerSeniority.create({ 
-            data: { 
-              playerAccountId: account.id,
-              starterBreedOptionId: input.starterBreedOptionId,
-              tutorialDriverStep: 0,
-              starterColorOptionId: input.starterColorOptionId,
-              starterGender: input.starterGender, 
-            } ,
-          }),
-          tx.playerReputation.create({ data: { playerAccountId: account.id } }),
-          tx.notificationSetting.createMany({
-            data: topics.map((t) => ({
-              playerAccountId: account.id,
-              topicDefId: t.id,
-              isEnabled: t.isDefaultEnabled,
-            })),
-          }),
-          tx.profileVisibilitySetting.createMany({
-            data: [
-              { fieldKey: "BIO", isVisible: true },
-              { fieldKey: "GROUPS", isVisible: true },
-              { fieldKey: "ACHIEVEMENTS", isVisible: true },
-              { fieldKey: "FORUM_ACTIVITY", isVisible: true },
-              { fieldKey: "LEADERBOARD_PLACINGS", isVisible: true },
-              { fieldKey: "MARKETPLACE_LISTINGS", isVisible: true },
-              { fieldKey: "CLINICS", isVisible: false },
-              { fieldKey: "PLAYER_SHOP", isVisible: false },
-              { fieldKey: "FRIENDS", isVisible: true },
-            ].map((entry) => ({
-              playerAccountId: account.id,
-              fieldKey: entry.fieldKey as ProfileFieldKey,
-              isVisible: entry.isVisible,
-            })),
-          }),
-          tx.subContainer.create({
-            data: {
-              playerAccountId: account.id,
-              name: gameConfig.subContainerLabel!,
-              displayOrder: 1
-            }
-          })
-        ])
+        await tx.playerBalance.createMany({
+          data: currencyDefs.map((c) => ({
+            playerAccountId: account.id,
+            currencyDefId: c.id,
+            balance: 0,
+          })),
+        })
+        await tx.playerCapacity.create({
+          data: { 
+            playerAccountId: account.id, 
+            animalSlotBase: gameConfig.defaultAnimalSlots, 
+            subContainerBase: gameConfig.defaultSubContainers, 
+            geneticStorageBase: 50, 
+          },
+        })
+        await tx.playerProfile.create({ data: { playerAccountId: account.id } })
+        await tx.playerSeniority.create({ 
+          data: { 
+            playerAccountId: account.id,
+            starterBreedOptionId: input.starterBreedOptionId,
+            tutorialDriverStep: 0,
+            starterColorOptionId: input.starterColorOptionId,
+            starterGender: input.starterGender, 
+          } ,
+        })
+        await tx.playerReputation.create({ data: { playerAccountId: account.id } })
+        await tx.notificationSetting.createMany({
+          data: topics.map((t) => ({
+            playerAccountId: account.id,
+            topicDefId: t.id,
+            isEnabled: t.isDefaultEnabled,
+          })),
+        })
+        await tx.profileVisibilitySetting.createMany({
+          data: [
+            { fieldKey: "BIO", isVisible: true },
+            { fieldKey: "GROUPS", isVisible: true },
+            { fieldKey: "ACHIEVEMENTS", isVisible: true },
+            { fieldKey: "FORUM_ACTIVITY", isVisible: true },
+            { fieldKey: "LEADERBOARD_PLACINGS", isVisible: true },
+            { fieldKey: "MARKETPLACE_LISTINGS", isVisible: true },
+            { fieldKey: "CLINICS", isVisible: false },
+            { fieldKey: "PLAYER_SHOP", isVisible: false },
+            { fieldKey: "FRIENDS", isVisible: true },
+          ].map((entry) => ({
+            playerAccountId: account.id,
+            fieldKey: entry.fieldKey as ProfileFieldKey,
+            isVisible: entry.isVisible,
+          })),
+        })
+        await tx.subContainer.create({
+          data: {
+            playerAccountId: account.id,
+            name: gameConfig.subContainerLabel!,
+            displayOrder: 1
+          }
+        })
         return account
       })
     }),

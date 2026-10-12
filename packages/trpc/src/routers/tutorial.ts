@@ -339,17 +339,15 @@ export const tutorialRouter = router({
         const embryoLifeStage = sortedStages[0]!
         const embryoLifeExpectancy = breedImmunity?.lifeExpectancyBaseline ?? gameConfigForGen?.lifeExpectancyBaseline ?? null
 
-        const [{ structuralRisk, preferredTerrain, preferredClimate }, embryoPhenotypeRulesRaw] = await Promise.all([
-          computeFixedFields(tx, embryoGenotypes),
-          embryoGenotypes.length > 0
-            ? tx.expressionRule.findMany({
-                where: {
-                  OR: embryoGenotypes.map(g => ({ locusId: g.locusId, alleleOneId: g.alleleOneId, alleleTwoId: g.alleleTwoId })),
-                },
-                select: { locusId: true, alleleOneId: true, alleleTwoId: true, phenotype: true },
-              })
-            : Promise.resolve([]),
-        ])
+        const { structuralRisk, preferredTerrain, preferredClimate } = await computeFixedFields(tx, embryoGenotypes)
+        const embryoPhenotypeRulesRaw = embryoGenotypes.length > 0
+          ? await tx.expressionRule.findMany({
+              where: {
+                OR: embryoGenotypes.map(g => ({ locusId: g.locusId, alleleOneId: g.alleleOneId, alleleTwoId: g.alleleTwoId })),
+              },
+              select: { locusId: true, alleleOneId: true, alleleTwoId: true, phenotype: true },
+            })
+          : []
         const embryoPhenotypeDescription = computePhenotypeDescription(
           embryoGenotypes,
           embryoPhenotypeRulesRaw.filter((r): r is ExpressionRuleForPhenotype => r.phenotype !== null),
@@ -391,40 +389,38 @@ export const tutorialRouter = router({
           select: { id: true },
         })
 
-        await Promise.all([
-          tx.animalEnergy.create({ data: { animalId: embryo.id, currentEnergy: 100, maxEnergy: 100 } }),
-          tx.animalMood.create({ data: { animalId: embryo.id, value: 75 } }),
-          tx.animalCondition.create({ data: { animalId: embryo.id, value: 75 } }),
-          tx.animalImmunity.create({ data: { animalId: embryo.id, value: 60, innateMax: 100 } }),
-          tx.animalCareScore.create({ data: { animalId: embryo.id, score: 75 } }),
-          tx.animalBreedComposition.create({ data: { animalId: embryo.id, breedId, percentage: 1.0 } }),
-          ...embryoStats.map(s =>
-            tx.animalStat.create({
-              data: {
-                animalId: embryo.id,
-                statDefId: s.statDefId,
-                innateValue: s.innateValue,
-                trainedValue: 0,
-              },
-            })
-          ),
-          ...breedPersonalityProfiles.map(pp =>
-            tx.animalPersonality.create({
-              data: {
-                animalId: embryo.id,
-                traitDefId: pp.traitDefId,
-                value: pp.naturalMin + Math.random() * (pp.naturalMax - pp.naturalMin),
-              },
-            })
-          ),
-          ...embryoGenotypes.map(g =>
-            tx.animalGenotype.create({
-              data: { animalId: embryo.id, locusId: g.locusId, alleleOneId: g.alleleOneId, alleleTwoId: g.alleleTwoId },
-            })
-          ),
-          // LTC records are NOT created here — the embryo goes through the normal birth system
-          // (breeding.pregnancy birth handler) which creates them when status changes to ALIVE.
-        ])
+        await tx.animalEnergy.create({ data: { animalId: embryo.id, currentEnergy: 100, maxEnergy: 100 } })
+        await tx.animalMood.create({ data: { animalId: embryo.id, value: 75 } })
+        await tx.animalCondition.create({ data: { animalId: embryo.id, value: 75 } })
+        await tx.animalImmunity.create({ data: { animalId: embryo.id, value: 60, innateMax: 100 } })
+        await tx.animalCareScore.create({ data: { animalId: embryo.id, score: 75 } })
+        await tx.animalBreedComposition.create({ data: { animalId: embryo.id, breedId, percentage: 1.0 } })
+        for (const s of embryoStats) {
+          await tx.animalStat.create({
+            data: {
+              animalId: embryo.id,
+              statDefId: s.statDefId,
+              innateValue: s.innateValue,
+              trainedValue: 0,
+            },
+          })
+        }
+        for (const pp of breedPersonalityProfiles) {
+          await tx.animalPersonality.create({
+            data: {
+              animalId: embryo.id,
+              traitDefId: pp.traitDefId,
+              value: pp.naturalMin + Math.random() * (pp.naturalMax - pp.naturalMin),
+            },
+          })
+        }
+        for (const g of embryoGenotypes) {
+          await tx.animalGenotype.create({
+            data: { animalId: embryo.id, locusId: g.locusId, alleleOneId: g.alleleOneId, alleleTwoId: g.alleleTwoId },
+          })
+        }
+        await // LTC records are NOT created here — the embryo goes through the normal birth system
+        // (breeding.pregnancy birth handler) which creates them when status changes to ALIVE.
 
         // 4. TutorialAnimalPair
         await tx.tutorialAnimalPair.create({

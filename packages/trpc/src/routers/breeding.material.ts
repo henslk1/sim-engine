@@ -386,16 +386,14 @@ export const breedingMaterialRouter = router({
     }))
     .mutation(async ({ input }) => {
       return db.$transaction(async (tx) => {
-        const [sperm, egg] = await Promise.all([
-          tx.geneticMaterial.findUniqueOrThrow({
-            where: { id: input.spermId },
-            select: { id: true, materialType: true, isUsed: true, gameId: true, animalId: true, donorSnapshot: true },
-          }),
-          tx.geneticMaterial.findUniqueOrThrow({
-            where: { id: input.eggId },
-            select: { id: true, materialType: true, isUsed: true, gameId: true, animalId: true, donorSnapshot: true },
-          }),
-        ])
+        const sperm = await tx.geneticMaterial.findUniqueOrThrow({
+          where: { id: input.spermId },
+          select: { id: true, materialType: true, isUsed: true, gameId: true, animalId: true, donorSnapshot: true },
+        })
+        const egg = await tx.geneticMaterial.findUniqueOrThrow({
+          where: { id: input.eggId },
+          select: { id: true, materialType: true, isUsed: true, gameId: true, animalId: true, donorSnapshot: true },
+        })
 
         if (sperm.materialType !== "SPERM") throw new Error("First material must be of type SPERM")
         if (egg.materialType !== "EGG") throw new Error("Second material must be of type EGG")
@@ -444,46 +442,43 @@ export const breedingMaterialRouter = router({
         const sireData = snapshotToParentData(spermSnap, sperm.animalId)
         const damData = snapshotToParentData(eggSnap, egg.animalId)
 
-        const [gameConfig, gameInnateMax, gradeBread, firstLifeStage, expressionRules, personalityLabelRanges] =
-          await Promise.all([
-            tx.gameConfig.findUniqueOrThrow({
-              where: { gameId },
-              select: {
-                defaultInnateRatio: true,
-                breedingBaseGain: true,
-                breedingMinGain: true,
-                breedingVarianceFactor: true,
-                gestationCareFloor: true,
-                multiplesBirthCap: true,
-                multiplesChance: true,
-                identicalMultiplesChance: true,
-                topGradeDoubleBonusChance: true,
-                gestationCycles: true,
-                lifeExpectancyBaseline: true,
-              },
-            }),
-            tx.gameInnateMax.findFirst({
-              where: { gameId },
-              select: { maxTotalInnate: true, averageTotalInnate: true },
-            }),
-            tx.breed.findFirst({
-              where: { gameId, isUnregistered: true },
-              select: { id: true, lifeExpectancyBaseline: true },
-            }),
-            tx.lifeStageDef.findFirst({
-              where: { gameId },
-              orderBy: { stageIndex: "asc" },
-              select: { id: true },
-            }),
-            tx.expressionRule.findMany({
-              where: { locus: { gameId } },
-              select: { locusId: true, alleleOneId: true, alleleTwoId: true, phenotype: true },
-            }),
-            tx.personalityLabelRange.findMany({
-              where: { traitDef: { gameId } },
-              select: { traitDefId: true, label: true, minValue: true, maxValue: true, conceptionModifier: true },
-            }),
-          ])
+        const gameConfig = await tx.gameConfig.findUniqueOrThrow({
+          where: { gameId },
+          select: {
+            defaultInnateRatio: true,
+            breedingBaseGain: true,
+            breedingMinGain: true,
+            breedingVarianceFactor: true,
+            gestationCareFloor: true,
+            multiplesBirthCap: true,
+            multiplesChance: true,
+            identicalMultiplesChance: true,
+            topGradeDoubleBonusChance: true,
+            gestationCycles: true,
+            lifeExpectancyBaseline: true,
+          },
+        })
+        const gameInnateMax = await tx.gameInnateMax.findFirst({
+          where: { gameId },
+          select: { maxTotalInnate: true, averageTotalInnate: true },
+        })
+        const gradeBread = await tx.breed.findFirst({
+          where: { gameId, isUnregistered: true },
+          select: { id: true, lifeExpectancyBaseline: true },
+        })
+        const firstLifeStage = await tx.lifeStageDef.findFirst({
+          where: { gameId },
+          orderBy: { stageIndex: "asc" },
+          select: { id: true },
+        })
+        const expressionRules = await tx.expressionRule.findMany({
+          where: { locus: { gameId } },
+          select: { locusId: true, alleleOneId: true, alleleTwoId: true, phenotype: true },
+        })
+        const personalityLabelRanges = await tx.personalityLabelRange.findMany({
+          where: { traitDef: { gameId } },
+          select: { traitDefId: true, label: true, minValue: true, maxValue: true, conceptionModifier: true },
+        })
 
         if (!firstLifeStage) throw new Error("No life stages configured for this game")
 
@@ -583,25 +578,25 @@ export const breedingMaterialRouter = router({
             return { animalId: animal.id, traitDefId: p.traitDefId, value: p.value, traitLabel }
           })
 
-          await Promise.all([
-            tx.animalEnergy.create({ data: { animalId: animal.id, currentEnergy: 100, maxEnergy: 100 } }),
-            tx.animalMood.create({ data: { animalId: animal.id, value: 50 } }),
-            tx.animalCondition.create({ data: { animalId: animal.id, value: 70 } }),
-            tx.animalCareScore.create({ data: { animalId: animal.id, score: 100 } }),
-            // innateMax is genetic; value deferred to birth when surrogate care is known
-            tx.animalImmunity.create({ data: { animalId: animal.id, innateMax: offspring.immunity.innateMax, value: offspring.immunity.innateMax } }),
-            // Stats deferred to birth — surrogate care score applied then
-            tx.animalGenotype.createMany({
-              data: offspring.genotypes.map((g, idx) => ({ animalId: animal.id, locusId: g.locusId, alleleOneId: g.alleleOneId, alleleTwoId: g.alleleTwoId, phenotypeCode: genotypeCodes[idx]?.phenotypeCode ?? null })),
-            }),
-            tx.animalBreedComposition.createMany({
-              data: offspring.breedComposition.map((c) => ({ animalId: animal.id, breedId: c.breedId, percentage: c.percentage })),
-            }),
-            tx.animalAncestor.createMany({
-              data: Array.from(ancestorEntries.entries()).map(([ancestorId, depth]) => ({ animalId: animal.id, ancestorId, depth })),
-            }),
-            ...(personalityData.length > 0 ? [tx.animalPersonality.createMany({ data: personalityData })] : []),
-          ])
+          await tx.animalEnergy.create({ data: { animalId: animal.id, currentEnergy: 100, maxEnergy: 100 } })
+          await tx.animalMood.create({ data: { animalId: animal.id, value: 50 } })
+          await tx.animalCondition.create({ data: { animalId: animal.id, value: 70 } })
+          await tx.animalCareScore.create({ data: { animalId: animal.id, score: 100 } })
+          await // innateMax is genetic; value deferred to birth when surrogate care is known
+          tx.animalImmunity.create({ data: { animalId: animal.id, innateMax: offspring.immunity.innateMax, value: offspring.immunity.innateMax } })
+          await // Stats deferred to birth — surrogate care score applied then
+          tx.animalGenotype.createMany({
+            data: offspring.genotypes.map((g, idx) => ({ animalId: animal.id, locusId: g.locusId, alleleOneId: g.alleleOneId, alleleTwoId: g.alleleTwoId, phenotypeCode: genotypeCodes[idx]?.phenotypeCode ?? null })),
+          })
+          await tx.animalBreedComposition.createMany({
+            data: offspring.breedComposition.map((c) => ({ animalId: animal.id, breedId: c.breedId, percentage: c.percentage })),
+          })
+          await tx.animalAncestor.createMany({
+            data: Array.from(ancestorEntries.entries()).map(([ancestorId, depth]) => ({ animalId: animal.id, ancestorId, depth })),
+          })
+          if (personalityData.length > 0) {
+            await tx.animalPersonality.createMany({ data: personalityData })
+          }
 
           offspringSnapshot.push({ animalId: animal.id })
         }
@@ -619,10 +614,8 @@ export const breedingMaterialRouter = router({
           select: { id: true },
         })
 
-        await Promise.all([
-          tx.geneticMaterial.update({ where: { id: input.spermId }, data: { isUsed: true } }),
-          tx.geneticMaterial.update({ where: { id: input.eggId }, data: { isUsed: true } }),
-        ])
+        await tx.geneticMaterial.update({ where: { id: input.spermId }, data: { isUsed: true } })
+        await tx.geneticMaterial.update({ where: { id: input.eggId }, data: { isUsed: true } })
 
         return { embryoId: embryo.id, offspringCount: result.offspring.length }
       })
@@ -759,47 +752,44 @@ export const breedingMaterialRouter = router({
           })),
         }
 
-        const [gameConfig, gameInnateMax, gradeBread, firstLifeStage, expressionRules, personalityLabelRanges] =
-          await Promise.all([
-            tx.gameConfig.findUniqueOrThrow({
-              where: { gameId },
-              select: {
-                defaultInnateRatio: true,
-                breedingBaseGain: true,
-                breedingMinGain: true,
-                breedingVarianceFactor: true,
-                gestationCareFloor: true,
-                multiplesBirthCap: true,
-                multiplesChance: true,
-                identicalMultiplesChance: true,
-                topGradeDoubleBonusChance: true,
-                gestationCycles: true,
-                lifeExpectancyBaseline: true,
-                trainingCeilingMultiplier: true,
-              },
-            }),
-            tx.gameInnateMax.findFirst({
-              where: { gameId },
-              select: { maxTotalInnate: true, averageTotalInnate: true },
-            }),
-            tx.breed.findFirst({
-              where: { gameId, isUnregistered: true },
-              select: { id: true, lifeExpectancyBaseline: true },
-            }),
-            tx.lifeStageDef.findFirst({
-              where: { gameId },
-              orderBy: { stageIndex: "asc" },
-              select: { id: true },
-            }),
-            tx.expressionRule.findMany({
-              where: { locus: { gameId } },
-              select: { locusId: true, alleleOneId: true, alleleTwoId: true, phenotype: true },
-            }),
-            tx.personalityLabelRange.findMany({
-              where: { traitDef: { gameId } },
-              select: { traitDefId: true, label: true, minValue: true, maxValue: true, conceptionModifier: true },
-            }),
-          ])
+        const gameConfig = await tx.gameConfig.findUniqueOrThrow({
+          where: { gameId },
+          select: {
+            defaultInnateRatio: true,
+            breedingBaseGain: true,
+            breedingMinGain: true,
+            breedingVarianceFactor: true,
+            gestationCareFloor: true,
+            multiplesBirthCap: true,
+            multiplesChance: true,
+            identicalMultiplesChance: true,
+            topGradeDoubleBonusChance: true,
+            gestationCycles: true,
+            lifeExpectancyBaseline: true,
+            trainingCeilingMultiplier: true,
+          },
+        })
+        const gameInnateMax = await tx.gameInnateMax.findFirst({
+          where: { gameId },
+          select: { maxTotalInnate: true, averageTotalInnate: true },
+        })
+        const gradeBread = await tx.breed.findFirst({
+          where: { gameId, isUnregistered: true },
+          select: { id: true, lifeExpectancyBaseline: true },
+        })
+        const firstLifeStage = await tx.lifeStageDef.findFirst({
+          where: { gameId },
+          orderBy: { stageIndex: "asc" },
+          select: { id: true },
+        })
+        const expressionRules = await tx.expressionRule.findMany({
+          where: { locus: { gameId } },
+          select: { locusId: true, alleleOneId: true, alleleTwoId: true, phenotype: true },
+        })
+        const personalityLabelRanges = await tx.personalityLabelRange.findMany({
+          where: { traitDef: { gameId } },
+          select: { traitDefId: true, label: true, minValue: true, maxValue: true, conceptionModifier: true },
+        })
 
         if (!firstLifeStage) throw new Error("No life stages configured for this game")
 
@@ -965,56 +955,54 @@ export const breedingMaterialRouter = router({
             return { animalId: animal.id, traitDefId: p.traitDefId, value: p.value, traitLabel }
           })
 
-          await Promise.all([
-            tx.animalEnergy.create({ data: { animalId: animal.id, currentEnergy: 100, maxEnergy: 100 } }),
-            tx.animalMood.create({ data: { animalId: animal.id, value: 50 } }),
-            tx.animalCondition.create({ data: { animalId: animal.id, value: 70 } }),
-            tx.animalCareScore.create({ data: { animalId: animal.id, score: 100 } }),
-            tx.animalImmunity.create({
-              data: {
-                animalId: animal.id,
-                value: offspring.immunity.startingValue,
-                innateMax: offspring.immunity.innateMax,
-              },
-            }),
-            tx.animalStat.createMany({
-              data: offspring.stats.map((s) => ({
-                animalId: animal.id,
-                statDefId: s.statDefId,
-                innateValue: s.innateValue,
-                trainedValue: 0,
-              })),
-            }),
-            tx.animalGenotype.createMany({
-              data: offspring.genotypes.map((g, idx) => ({
-                animalId: animal.id,
-                locusId: g.locusId,
-                alleleOneId: g.alleleOneId,
-                alleleTwoId: g.alleleTwoId,
-                phenotypeCode: genotypeCodes[idx]?.phenotypeCode ?? null,
-              })),
-            }),
-            tx.animalBreedComposition.createMany({
-              data: offspring.breedComposition.map((c) => ({
-                animalId: animal.id,
-                breedId: c.breedId,
-                percentage: c.percentage,
-              })),
-            }),
-            tx.animalAncestor.createMany({
-              data: Array.from(ancestorEntries.entries()).map(([ancestorId, depth]) => ({
-                animalId: animal.id,
-                ancestorId,
-                depth,
-              })),
-            }),
-            tx.pregnancyOffspring.create({
-              data: { pregnancyId: pregnancy.id, animalId: animal.id, birthOrder: i + 1 },
-            }),
-            ...(personalityData.length > 0
-              ? [tx.animalPersonality.createMany({ data: personalityData })]
-              : []),
-          ])
+          await tx.animalEnergy.create({ data: { animalId: animal.id, currentEnergy: 100, maxEnergy: 100 } })
+          await tx.animalMood.create({ data: { animalId: animal.id, value: 50 } })
+          await tx.animalCondition.create({ data: { animalId: animal.id, value: 70 } })
+          await tx.animalCareScore.create({ data: { animalId: animal.id, score: 100 } })
+          await tx.animalImmunity.create({
+            data: {
+              animalId: animal.id,
+              value: offspring.immunity.startingValue,
+              innateMax: offspring.immunity.innateMax,
+            },
+          })
+          await tx.animalStat.createMany({
+            data: offspring.stats.map((s) => ({
+              animalId: animal.id,
+              statDefId: s.statDefId,
+              innateValue: s.innateValue,
+              trainedValue: 0,
+            })),
+          })
+          await tx.animalGenotype.createMany({
+            data: offspring.genotypes.map((g, idx) => ({
+              animalId: animal.id,
+              locusId: g.locusId,
+              alleleOneId: g.alleleOneId,
+              alleleTwoId: g.alleleTwoId,
+              phenotypeCode: genotypeCodes[idx]?.phenotypeCode ?? null,
+            })),
+          })
+          await tx.animalBreedComposition.createMany({
+            data: offspring.breedComposition.map((c) => ({
+              animalId: animal.id,
+              breedId: c.breedId,
+              percentage: c.percentage,
+            })),
+          })
+          await tx.animalAncestor.createMany({
+            data: Array.from(ancestorEntries.entries()).map(([ancestorId, depth]) => ({
+              animalId: animal.id,
+              ancestorId,
+              depth,
+            })),
+          })
+          await tx.pregnancyOffspring.create({
+            data: { pregnancyId: pregnancy.id, animalId: animal.id, birthOrder: i + 1 },
+          })
+          if (personalityData.length > 0) {
+            await tx.animalPersonality.createMany({ data: personalityData })
+          }
         }
 
         // Qualifying interaction — this is what makes the nightly age the animal.

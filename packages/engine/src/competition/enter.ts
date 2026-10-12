@@ -226,13 +226,11 @@ export async function enterCompetition(
       throw new Error("This animal is currently on a competition activity restriction")
     }
 
-    const [energy, animal] = await Promise.all([
-      tx.animalEnergy.findUnique({ where: { animalId } }),
-      tx.animal.findUniqueOrThrow({
-        where: { id: animalId },
-        select: { ageInCycles: true, lifeStage: { select: { energyCostMultiplier: true } } },
-      }),
-    ])
+    const energy = await tx.animalEnergy.findUnique({ where: { animalId } })
+    const animal = await tx.animal.findUniqueOrThrow({
+      where: { id: animalId },
+      select: { ageInCycles: true, lifeStage: { select: { energyCostMultiplier: true } } },
+    })
     if (!energy) throw new Error(`No energy record for animal ${animalId}`)
 
     const energyUsed = baseEnergyCost * animal.lifeStage.energyCostMultiplier

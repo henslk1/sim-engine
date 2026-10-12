@@ -100,7 +100,7 @@ export async function runCompetition(
     // pre-fetch world max trained value per stat for normalization
     const statWorldMaxes = new Map<string, number>()
     if (!competition.disciplineDef.isConformation) {
-      await Promise.all(competition.disciplineDef.statWeights.map(async (weight) => {
+      for (const weight of competition.disciplineDef.statWeights) {
         const recordDef = await tx.recordDef.findFirst({
           where: { statDefId: weight.statDefId, gameId: competition.gameId },
           select: { id: true },
@@ -122,7 +122,7 @@ export async function runCompetition(
           worldMax = agg._max.trainedValue ?? 1
         }
         statWorldMaxes.set(weight.statDefId, Math.max(worldMax, 1))
-      }))
+      }
     }
 
     // pre-fetch climate/terrain modifiers per animal

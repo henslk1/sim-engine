@@ -12,16 +12,14 @@ export const animalCareRouter = router({
     }))
     .mutation(async ({ input }) => {
       return db.$transaction(async (tx) => {
-        const [record, animal] = await Promise.all([
-          tx.animalLongTermCareRecord.findUniqueOrThrow({
-            where: { id: input.ltcRecordId },
-            include: { longTermCareActionDef: true },
-          }),
-          tx.animal.findUniqueOrThrow({
-            where: { id: input.animalId },
-            select: { ageInCycles: true, gameId: true, playerAccountId: true },
-          }),
-        ])
+        const record = await tx.animalLongTermCareRecord.findUniqueOrThrow({
+          where: { id: input.ltcRecordId },
+          include: { longTermCareActionDef: true },
+        })
+        const animal = await tx.animal.findUniqueOrThrow({
+          where: { id: input.animalId },
+          select: { ageInCycles: true, gameId: true, playerAccountId: true },
+        })
 
         const def = record.longTermCareActionDef
         const effectivePlayer = input.playerAccountId ?? animal.playerAccountId

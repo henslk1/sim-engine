@@ -158,27 +158,25 @@ export const breedingPregnancyRouter = router({
         const nameMap = new Map(input.names?.map((n) => [n.animalId, n.name]) ?? [])
         const gameId = pregnancy.animal.gameId
 
-        const [ltcDefs, gameConfig, gameInnateMax] = await Promise.all([
-          tx.longTermCareActionDef.findMany({
-            where: { gameId },
-            select: { id: true, intervalCycles: true },
-          }),
-          tx.gameConfig.findUnique({
-            where: { gameId },
-            select: {
-              breedingCooldownCycles: true,
-              breedingBaseGain: true,
-              breedingMinGain: true,
-              breedingVarianceFactor: true,
-              gestationCareFloor: true,
-              defaultInnateRatio: true,
-            },
-          }),
-          tx.gameInnateMax.findFirst({
-            where: { gameId },
-            select: { maxTotalInnate: true, averageTotalInnate: true },
-          }),
-        ])
+        const ltcDefs = await tx.longTermCareActionDef.findMany({
+          where: { gameId },
+          select: { id: true, intervalCycles: true },
+        })
+        const gameConfig = await tx.gameConfig.findUnique({
+          where: { gameId },
+          select: {
+            breedingCooldownCycles: true,
+            breedingBaseGain: true,
+            breedingMinGain: true,
+            breedingVarianceFactor: true,
+            gestationCareFloor: true,
+            defaultInnateRatio: true,
+          },
+        })
+        const gameInnateMax = await tx.gameInnateMax.findFirst({
+          where: { gameId },
+          select: { maxTotalInnate: true, averageTotalInnate: true },
+        })
 
         const unborn = pregnancy.offspring.filter((o) => o.animal.status === "EMBRYO_STORED")
 
@@ -434,17 +432,15 @@ export const breedingPregnancyRouter = router({
         await tx.pregnancyOffspring.deleteMany({ where: { pregnancyId: input.pregnancyId } })
 
         if (offspringAnimalIds.length > 0) {
-          await Promise.all([
-            tx.animalAncestor.deleteMany({ where: { animalId: { in: offspringAnimalIds } } }),
-            tx.animalStat.deleteMany({ where: { animalId: { in: offspringAnimalIds } } }),
-            tx.animalGenotype.deleteMany({ where: { animalId: { in: offspringAnimalIds } } }),
-            tx.animalBreedComposition.deleteMany({ where: { animalId: { in: offspringAnimalIds } } }),
-            tx.animalEnergy.deleteMany({ where: { animalId: { in: offspringAnimalIds } } }),
-            tx.animalMood.deleteMany({ where: { animalId: { in: offspringAnimalIds } } }),
-            tx.animalCondition.deleteMany({ where: { animalId: { in: offspringAnimalIds } } }),
-            tx.animalCareScore.deleteMany({ where: { animalId: { in: offspringAnimalIds } } }),
-            tx.animalImmunity.deleteMany({ where: { animalId: { in: offspringAnimalIds } } }),
-          ])
+          await tx.animalAncestor.deleteMany({ where: { animalId: { in: offspringAnimalIds } } })
+          await tx.animalStat.deleteMany({ where: { animalId: { in: offspringAnimalIds } } })
+          await tx.animalGenotype.deleteMany({ where: { animalId: { in: offspringAnimalIds } } })
+          await tx.animalBreedComposition.deleteMany({ where: { animalId: { in: offspringAnimalIds } } })
+          await tx.animalEnergy.deleteMany({ where: { animalId: { in: offspringAnimalIds } } })
+          await tx.animalMood.deleteMany({ where: { animalId: { in: offspringAnimalIds } } })
+          await tx.animalCondition.deleteMany({ where: { animalId: { in: offspringAnimalIds } } })
+          await tx.animalCareScore.deleteMany({ where: { animalId: { in: offspringAnimalIds } } })
+          await tx.animalImmunity.deleteMany({ where: { animalId: { in: offspringAnimalIds } } })
           await tx.animal.deleteMany({ where: { id: { in: offspringAnimalIds } } })
         }
 

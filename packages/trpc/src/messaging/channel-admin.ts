@@ -351,14 +351,12 @@ export async function reorderChannels(
 
   // One transaction: a half-applied reorder is a list in an order nobody chose.
   await db.$transaction(async tx => {
-    await Promise.all(
-      moved.map(entry =>
-        tx.chatChannel.update({
-          where: { id: entry.row.id },
-          data: { displayOrder: entry.displayOrder },
-        })
-      )
-    )
+    for (const entry of moved) {
+      await tx.chatChannel.update({
+        where: { id: entry.row.id },
+        data: { displayOrder: entry.displayOrder },
+      })
+    }
     await logChannelAction(actor, "chat_channels_reordered", serverId, tx)
   })
 

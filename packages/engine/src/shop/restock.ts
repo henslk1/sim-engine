@@ -184,39 +184,37 @@ export async function restockShop(
           select: { id: true },
         })
 
-        await Promise.all([
-          tx.animalEnergy.create({ data: { animalId: animal.id, currentEnergy: 100, maxEnergy: 100 } }),
-          tx.animalMood.create({ data: { animalId: animal.id, value: 75 } }),
-          tx.animalCondition.create({ data: { animalId: animal.id, value: 75 } }),
-          tx.animalImmunity.create({ data: { animalId: animal.id, innateMax: config.breed.immunityMax ?? 100, value: (config.breed.immunityMin ?? 60) + Math.random() * ((config.breed.immunityMax ?? 100) - (config.breed.immunityMin ?? 60)) } }),
-          tx.animalCareScore.create({ data: { animalId: animal.id, score: 75 } }),
-          tx.animalBreedComposition.create({ data: { animalId: animal.id, breedId: config.breedId, percentage: 1.0 } }),
-          ...stats.map((s) =>
-            tx.animalStat.create({
-              data: { animalId: animal.id, statDefId: s.statDefId, innateValue: s.innateValue, trainedValue: 0 },
-            })
-          ),
-          ...config.breed.personalityProfiles.map((pp) => {
-            const range = pp.naturalMax - pp.naturalMin
-            const value = pp.naturalMin + Math.random() * range
-            return tx.animalPersonality.create({
-              data: { animalId: animal.id, traitDefId: pp.traitDefId, value },
-            })
-          }),
-          ...genotypes.map((g) =>
-            tx.animalGenotype.create({
-              data: { animalId: animal.id, locusId: g.locusId, alleleOneId: g.alleleOneId, alleleTwoId: g.alleleTwoId },
-            })
-          ),
-          tx.gameShopAnimal.create({
-            data: { gameId, animalId: animal.id, shopBreedConfigId: config.id, isAvailable: true },
-          }),
-          ...ltcDefs.map((def) =>
-            tx.animalLongTermCareRecord.create({
-              data: { animalId: animal.id, longTermCareActionDefId: def.id, nextDueCycle: def.intervalCycles },
-            })
-          ),
-        ])
+        await tx.animalEnergy.create({ data: { animalId: animal.id, currentEnergy: 100, maxEnergy: 100 } })
+        await tx.animalMood.create({ data: { animalId: animal.id, value: 75 } })
+        await tx.animalCondition.create({ data: { animalId: animal.id, value: 75 } })
+        await tx.animalImmunity.create({ data: { animalId: animal.id, innateMax: config.breed.immunityMax ?? 100, value: (config.breed.immunityMin ?? 60) + Math.random() * ((config.breed.immunityMax ?? 100) - (config.breed.immunityMin ?? 60)) } })
+        await tx.animalCareScore.create({ data: { animalId: animal.id, score: 75 } })
+        await tx.animalBreedComposition.create({ data: { animalId: animal.id, breedId: config.breedId, percentage: 1.0 } })
+        for (const s of stats) {
+          await tx.animalStat.create({
+            data: { animalId: animal.id, statDefId: s.statDefId, innateValue: s.innateValue, trainedValue: 0 },
+          })
+        }
+        for (const pp of config.breed.personalityProfiles) {
+          const range = pp.naturalMax - pp.naturalMin
+          const value = pp.naturalMin + Math.random() * range
+          await tx.animalPersonality.create({
+            data: { animalId: animal.id, traitDefId: pp.traitDefId, value },
+          })
+        }
+        for (const g of genotypes) {
+          await tx.animalGenotype.create({
+            data: { animalId: animal.id, locusId: g.locusId, alleleOneId: g.alleleOneId, alleleTwoId: g.alleleTwoId },
+          })
+        }
+        await tx.gameShopAnimal.create({
+          data: { gameId, animalId: animal.id, shopBreedConfigId: config.id, isAvailable: true },
+        })
+        for (const def of ltcDefs) {
+          await tx.animalLongTermCareRecord.create({
+            data: { animalId: animal.id, longTermCareActionDefId: def.id, nextDueCycle: def.intervalCycles },
+          })
+        }
       })
 
       created++

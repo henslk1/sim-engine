@@ -61,25 +61,23 @@ export async function runConformationInspection(client: Client, animalId: string
     const breedId = animal.breedId
     if (!breedId) throw new Error("Purebred animal has no breed assigned")
 
-    const [sections, standards, breedCoat] = await Promise.all([
-      tx.conformationSection.findMany({
-        where: { gameId: animal.gameId },
-        select: { id: true, entries: { select: { locusId: true } } },
-      }),
-      tx.breedConformationStandard.findMany({
-        where: { breedId },
-        select: { locusId: true, idealExpressionLabel: true, weight: true },
-      }),
-      tx.breed.findUnique({
-        where: { id: breedId },
-        select: {
-          coatWeight: true,
-          coatSelections: { select: { expression: true, colorRole: true } },
-          coatDqSelections: { select: { expression: true } },
-          dqTraits: { select: { locusId: true, expression: true } },
-        },
-      }),
-    ])
+    const sections = await tx.conformationSection.findMany({
+      where: { gameId: animal.gameId },
+      select: { id: true, entries: { select: { locusId: true } } },
+    })
+    const standards = await tx.breedConformationStandard.findMany({
+      where: { breedId },
+      select: { locusId: true, idealExpressionLabel: true, weight: true },
+    })
+    const breedCoat = await tx.breed.findUnique({
+      where: { id: breedId },
+      select: {
+        coatWeight: true,
+        coatSelections: { select: { expression: true, colorRole: true } },
+        coatDqSelections: { select: { expression: true } },
+        dqTraits: { select: { locusId: true, expression: true } },
+      },
+    })
 
     const standardsByLocus = new Map<string, { idealExpressionLabel: string; weight: number }[]>()
     for (const s of standards) {
@@ -215,13 +213,11 @@ export async function runConformationInspection(client: Client, animalId: string
     // Qualifying interaction: a player action that changes this animal's state.
     await markAnimalActive(tx, { animalId })
 
-    await Promise.all([
-      tx.animalConformationScore.create({ data: { animalId, breedId, score: overallScore, isCoatDq, isTraitDq } }),
-      ...sectionScores.map((s) =>
-        tx.animalConformationSectionScore.create({
-          data: { animalId, breedId, sectionId: s.sectionId, score: s.score },
-        })
-      ),
-    ])
+    await tx.animalConformationScore.create({ data: { animalId, breedId, score: overallScore, isCoatDq, isTraitDq } })
+    for (const s of sectionScores) {
+      await tx.animalConformationSectionScore.create({
+        data: { animalId, breedId, sectionId: s.sectionId, score: s.score },
+      })
+    }
   })
 }

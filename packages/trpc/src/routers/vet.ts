@@ -73,22 +73,20 @@ export const vetRouter = router({
         })
         if (!animalStatus || animalStatus.status !== "ALIVE") throw new Error("Animal is not alive")
 
-        const [service, animal, undiagnosedRecords] = await Promise.all([
-          tx.vetServiceDef.findUniqueOrThrow({
-            where: { id: input.vetServiceDefId },
-            include: {
-              currencyDef: { select: { id: true, name: true } },
-              conditions: { select: { conditionDefId: true } },
-            },
-          }),
-          tx.animal.findUniqueOrThrow({
-            where: { id: input.animalId },
-            select: { ageInCycles: true, gameId: true },
-          }),
-          tx.animalHealthRecord.findMany({
-            where: { animalId: input.animalId, isActive: true, diagnosedAt: null },
-          }),
-        ])
+        const service = await tx.vetServiceDef.findUniqueOrThrow({
+          where: { id: input.vetServiceDefId },
+          include: {
+            currencyDef: { select: { id: true, name: true } },
+            conditions: { select: { conditionDefId: true } },
+          },
+        })
+        const animal = await tx.animal.findUniqueOrThrow({
+          where: { id: input.animalId },
+          select: { ageInCycles: true, gameId: true },
+        })
+        const undiagnosedRecords = await tx.animalHealthRecord.findMany({
+          where: { animalId: input.animalId, isActive: true, diagnosedAt: null },
+        })
 
         if (service.serviceType !== "EXAM") throw new Error("Service must be of type EXAM")
 
@@ -277,23 +275,21 @@ export const vetRouter = router({
         // Qualifying interaction: a player action that changes this animal's state.
         await markAnimalActive(tx, { animalId: input.animalId })
 
-        const [animal, healthRecord, treatmentDef] = await Promise.all([
-          tx.animal.findUniqueOrThrow({
-            where: { id: input.animalId },
-            select: { ageInCycles: true, status: true, gameId: true },
-          }),
-          tx.animalHealthRecord.findUniqueOrThrow({
-            where: { id: input.healthRecordId },
-            select: { isActive: true },
-          }),
-          tx.treatmentDef.findUniqueOrThrow({
-            where: { id: input.treatmentDefId },
-            include: {
-              restrictionDefs: true,
-              currencyDef: { select: { id: true, name: true } },
-            },
-          }),
-        ])
+        const animal = await tx.animal.findUniqueOrThrow({
+          where: { id: input.animalId },
+          select: { ageInCycles: true, status: true, gameId: true },
+        })
+        const healthRecord = await tx.animalHealthRecord.findUniqueOrThrow({
+          where: { id: input.healthRecordId },
+          select: { isActive: true },
+        })
+        const treatmentDef = await tx.treatmentDef.findUniqueOrThrow({
+          where: { id: input.treatmentDefId },
+          include: {
+            restrictionDefs: true,
+            currencyDef: { select: { id: true, name: true } },
+          },
+        })
 
         if (animal.status !== "ALIVE") throw new Error("Animal is not alive")
         if (!healthRecord.isActive) throw new Error("Condition is no longer active")
@@ -546,16 +542,14 @@ export const vetRouter = router({
     .input(z.object({ animalId: z.string(), playerAccountId: z.string(), certDefId: z.string() }))
     .mutation(({ input }) =>
       db.$transaction(async (tx) => {
-        const [animal, certDef] = await Promise.all([
-          tx.animal.findUniqueOrThrow({
-            where: { id: input.animalId },
-            select: { ageInCycles: true, status: true, gameId: true },
-          }),
-          tx.healthCertificateDef.findUniqueOrThrow({
-            where: { id: input.certDefId },
-            select: { validForCycles: true, cost: true, currencyDefId: true },
-          }),
-        ])
+        const animal = await tx.animal.findUniqueOrThrow({
+          where: { id: input.animalId },
+          select: { ageInCycles: true, status: true, gameId: true },
+        })
+        const certDef = await tx.healthCertificateDef.findUniqueOrThrow({
+          where: { id: input.certDefId },
+          select: { validForCycles: true, cost: true, currencyDefId: true },
+        })
         if (animal.status !== "ALIVE") throw new Error("Animal is not alive")
         if (certDef.cost > 0 && certDef.currencyDefId) {
           const balance = await tx.playerBalance.findUnique({
@@ -604,16 +598,14 @@ export const vetRouter = router({
     }))
     .mutation(({ input }) =>
       db.$transaction(async (tx) => {
-        const [service, animal] = await Promise.all([
-          tx.vetServiceDef.findUniqueOrThrow({
-            where: { id: input.vetServiceDefId },
-            include: { currencyDef: { select: { id: true, name: true } } },
-          }),
-          tx.animal.findUniqueOrThrow({
-            where: { id: input.animalId },
-            select: { ageInCycles: true, gameId: true },
-          }),
-        ])
+        const service = await tx.vetServiceDef.findUniqueOrThrow({
+          where: { id: input.vetServiceDefId },
+          include: { currencyDef: { select: { id: true, name: true } } },
+        })
+        const animal = await tx.animal.findUniqueOrThrow({
+          where: { id: input.animalId },
+          select: { ageInCycles: true, gameId: true },
+        })
 
         if (service.baseCost > 0) {
           const balance = await tx.playerBalance.findUnique({
