@@ -76,6 +76,8 @@ export type SchedulerOptions = {
   maxRunsPerGamePerTick?: number
   /** How many games may be drained at once. */
   maxConcurrentGames?: number
+  /** The longest the tick may sleep with nothing due. */
+  maxIdleSleepMs?: number
   /**
    * How many times a boundary is attempted before it is given up on. A retry
    * waits for the next tick rather than happening immediately, so this is also
@@ -90,6 +92,14 @@ export type SchedulerHealth = {
   lastTickAt: Date | null
   lastTickError: string | null
   consecutiveTickFailures: number
+  /**
+   * When the next tick is due.
+   *
+   * Worth exposing because the cadence is no longer fixed: a scheduler with
+   * nothing to do sleeps, and "it has not ticked for twelve minutes" needs to
+   * be distinguishable from "it has stopped ticking".
+   */
+  nextWakeAt: Date | null
 }
 
 export type TickSummary = {
@@ -114,6 +124,15 @@ const DEFAULTS = {
    */
   maxConcurrentGames: 4,
   tickIntervalMs: 60_000,
+  /**
+   * The longest the tick may sleep when nothing is due.
+   *
+   * Generous enough that a managed Postgres gets real idle time - anything
+   * past its five-minute timeout is time nobody is paying for - and short
+   * enough that work this process could not anticipate, such as a task row
+   * another instance just created, is still found quickly.
+   */
+  maxIdleSleepMs: 15 * 60_000,
   leaseMs: 120_000,
   maxRunsPerGamePerTick: 8,
   maxAttempts: 3,
@@ -159,6 +178,10 @@ export function createScheduler(options: SchedulerOptions = {}) {
   const leaseMs = options.leaseMs ?? DEFAULTS.leaseMs
   const maxRunsPerGamePerTick = options.maxRunsPerGamePerTick ?? DEFAULTS.maxRunsPerGamePerTick
   const maxConcurrentGames = Math.max(1, options.maxConcurrentGames ?? DEFAULTS.maxConcurrentGames)
+  const MAX_IDLE_SLEEP_MS = Math.max(
+    options.tickIntervalMs ?? DEFAULTS.tickIntervalMs,
+    options.maxIdleSleepMs ?? DEFAULTS.maxIdleSleepMs
+  )
   const maxAttempts = options.maxAttempts ?? DEFAULTS.maxAttempts
   const instanceId = options.instanceId ?? `${hostname()}:${process.pid}`
 
@@ -171,6 +194,7 @@ export function createScheduler(options: SchedulerOptions = {}) {
     lastTickAt: null,
     lastTickError: null,
     consecutiveTickFailures: 0,
+    nextWakeAt: null,
   }
 
   /**
@@ -205,6 +229,7 @@ export function createScheduler(options: SchedulerOptions = {}) {
             nightlyRunMinute: true,
             gameTimeZone: true,
             competitionSweepMinutes: true,
+            shopRotationMinutes: true,
           },
         },
       },
@@ -718,25 +743,106 @@ export function createScheduler(options: SchedulerOptions = {}) {
     return started
   }
 
+  /**
+   * How long to wait before the next tick.
+   *
+   * A fixed one-minute heartbeat is the simplest thing that works and it has a
+   * cost that only shows up on a bill: a managed Postgres that charges for the
+   * time it is awake never gets to sleep, because something queries it every
+   * sixty seconds forever whether or not anyone is playing. On Neon's
+   * five-minute idle timeout that is the difference between paying for a few
+   * hours a day and paying for all of them.
+   *
+   * So the tick asks how long it may sleep. The answer is the soonest of:
+   *
+   *   * the next boundary any task is waiting for — the thing it exists to be
+   *     awake for;
+   *   * the next lease expiry, so a run abandoned by a dead process is still
+   *     reclaimed promptly rather than sitting until the next boundary, which
+   *     for a nightly could be a day;
+   *   * `MAX_IDLE_SLEEP_MS`, a ceiling so that nothing this query failed to
+   *     anticipate — a task row created by another instance, a boundary moved
+   *     by an administrator — waits longer than that to be noticed.
+   *
+   * Outstanding work short-circuits all of it: a PENDING or RETRYING run is
+   * picked up by the *next tick*, so while any exists the cadence stays at the
+   * normal interval and a retry is a minute away rather than fifteen.
+   *
+   * Never shorter than `tickIntervalMs`, so this can only ever slow the tick
+   * down. Every timing guarantee in the planner is a lower bound.
+   */
+  async function nextWakeDelay(now: Date): Promise<number> {
+    const waiting = await db.scheduledTaskRun.findFirst({
+      where: { status: { in: ["PENDING", "RETRYING"] } },
+      select: { id: true },
+    })
+    if (waiting) return tickIntervalMs
+
+    const [nextTask, oldestLease] = await Promise.all([
+      db.scheduledTask.findFirst({
+        where: { enabled: true },
+        orderBy: { nextRunAt: "asc" },
+        select: { nextRunAt: true },
+      }),
+      db.scheduledTaskRun.findFirst({
+        where: { status: "RUNNING", leaseUntil: { not: null } },
+        orderBy: { leaseUntil: "asc" },
+        select: { leaseUntil: true },
+      }),
+    ])
+
+    const until = [MAX_IDLE_SLEEP_MS]
+    if (nextTask) until.push(nextTask.nextRunAt.getTime() - now.getTime())
+    if (oldestLease?.leaseUntil) until.push(oldestLease.leaseUntil.getTime() - now.getTime())
+
+    return Math.max(tickIntervalMs, Math.min(...until))
+  }
+
+  /** Arm the next tick, and record when it is due. */
+  function scheduleNext(delayMs: number): void {
+    if (stopping) return
+
+    health.nextWakeAt = new Date(clock.now().getTime() + delayMs)
+
+    timer = setTimeout(() => {
+      void (async () => {
+        await tick()
+        const delay = await nextWakeDelay(clock.now()).catch((error) => {
+          // Falling back to the normal cadence rather than stopping: a
+          // scheduler that cannot work out when to wake must still wake.
+          console.error("[scheduler] could not work out the next wake; using the normal interval:", error)
+          return tickIntervalMs
+        })
+        scheduleNext(delay)
+      })()
+    }, delayMs)
+  }
+
   function start(): void {
     if (timer) return
     stopping = false
 
-    void ensureTasks()
-      .then(() => {
+    void (async () => {
+      try {
+        await ensureTasks()
         health.started = true
-        return tick()
-      })
-      .catch((error) => {
-        // Left false on purpose. `/health` reports the scheduler as down, so a
-        // server that is serving pages while scheduling nothing is something a
-        // deployment can actually detect.
+        await tick()
+      } catch (error) {
+        // `started` is left false on purpose. `/health` reports the scheduler
+        // as down, so a server that is serving pages while scheduling nothing
+        // is something a deployment can actually detect.
         health.lastTickError = describeError(error)
         console.error("[scheduler] start failed:", error)
-      })
+      }
 
-    timer = setInterval(() => void tick(), tickIntervalMs)
-    console.log(`[scheduler] database backend started as ${instanceId}, ticking every ${tickIntervalMs / 1000}s`)
+      const delay = await nextWakeDelay(clock.now()).catch(() => tickIntervalMs)
+      scheduleNext(delay)
+    })()
+
+    console.log(
+      `[scheduler] database backend started as ${instanceId}, ticking every ${tickIntervalMs / 1000}s` +
+        ` and sleeping up to ${MAX_IDLE_SLEEP_MS / 60_000}m when there is nothing due`
+    )
   }
 
   /**
@@ -750,9 +856,10 @@ export function createScheduler(options: SchedulerOptions = {}) {
   async function stop(): Promise<void> {
     stopping = true
     if (timer) {
-      clearInterval(timer)
+      clearTimeout(timer)
       timer = null
     }
+    health.nextWakeAt = null
     if (inFlight) await inFlight.catch(() => undefined)
   }
 

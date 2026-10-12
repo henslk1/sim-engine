@@ -97,12 +97,17 @@ export function materializeTask(task: TaskRow, schedule: GameSchedule, now: Date
   }
 }
 
-// The nightly runs first when both are waiting. It is the one with a time
-// players are told, it is the long one, and the sweep it delays is idempotent
-// and will collapse to a single run when it gets its turn.
+// The nightly runs first when several are waiting. It is the one with a time
+// players are told, it is the long one, and the two it delays are both
+// idempotent and will collapse to a single run when they get their turn.
+//
+// The sweep goes ahead of the shop because it is the one with a deadline
+// attached: a competition that came due at 14:00 is a promise made to whoever
+// entered it. The shop turning over a few seconds later costs nobody anything.
 const PRIORITY: Record<ScheduledType, number> = {
   NIGHTLY: 0,
   COMPETITION_SWEEP: 1,
+  SHOP_ROTATION: 2,
 }
 
 /**

@@ -21,6 +21,7 @@ const central = {
   nightlyRunMinute: 0,
   gameTimeZone: "America/Chicago",
   competitionSweepMinutes: 60,
+  shopRotationMinutes: 60,
 }
 
 test("venue rotation is not a scheduled type", () => {
@@ -28,7 +29,7 @@ test("venue rotation is not a scheduled type", () => {
   // invitationals mechanism and invitationals are not built. Nothing creates a
   // task row for it and nothing runs it, and that is deliberate rather than an
   // oversight for someone to helpfully correct.
-  assert.deepEqual([...SCHEDULED_TASK_TYPES], ["NIGHTLY", "COMPETITION_SWEEP"])
+  assert.deepEqual([...SCHEDULED_TASK_TYPES], ["NIGHTLY", "COMPETITION_SWEEP", "SHOP_ROTATION"])
   assert.equal(isScheduledType("NIGHTLY"), true)
   assert.equal(isScheduledType("VENUE_ROTATION"), false)
 })
@@ -77,6 +78,12 @@ test("changing the configured zone moves the nightly and nothing else", () => {
 test("the sweep follows its configured interval", () => {
   const from = at("2026-10-06T12:34:56Z")
   assert.equal(nextBoundaryFor("COMPETITION_SWEEP", central, from).toISOString(), "2026-10-06T13:00:00.000Z")
+  // The shop runs on its own grid, read from its own column.
+  assert.equal(nextBoundaryFor("SHOP_ROTATION", central, from).toISOString(), "2026-10-06T13:00:00.000Z")
+  assert.equal(
+    nextBoundaryFor("SHOP_ROTATION", { ...central, shopRotationMinutes: 360 }, from).toISOString(),
+    "2026-10-06T18:00:00.000Z"
+  )
   assert.equal(
     nextBoundaryFor("COMPETITION_SWEEP", { ...central, competitionSweepMinutes: 15 }, from).toISOString(),
     "2026-10-06T12:45:00.000Z"
@@ -109,8 +116,9 @@ test("every bad field is reported, not just the first", () => {
     nightlyRunMinute: -1,
     gameTimeZone: "America/Chicargo",
     competitionSweepMinutes: 0,
+    shopRotationMinutes: 0,
   })
-  assert.equal(problems.length, 4)
+  assert.equal(problems.length, 5)
 })
 
 test("each field is checked for the thing that actually breaks it", () => {
@@ -120,6 +128,8 @@ test("each field is checked for the thing that actually breaks it", () => {
   assert.equal(validateGameSchedule({ ...central, nightlyRunMinute: 60 }).length, 1)
   assert.equal(validateGameSchedule({ ...central, competitionSweepMinutes: 0 }).length, 1)
   assert.equal(validateGameSchedule({ ...central, competitionSweepMinutes: 1.5 }).length, 1)
+  assert.equal(validateGameSchedule({ ...central, shopRotationMinutes: 0 }).length, 1)
+  assert.equal(validateGameSchedule({ ...central, shopRotationMinutes: 1.5 }).length, 1)
 })
 
 test("a time zone is validated against the runtime, not a list someone typed", () => {
@@ -158,6 +168,8 @@ test("a schedule describes itself in the game's own terms", () => {
   assert.equal(describeSchedule("COMPETITION_SWEEP", central), "hourly, on the hour")
   assert.equal(describeSchedule("COMPETITION_SWEEP", { ...central, competitionSweepMinutes: 180 }), "every 3 hours")
   assert.equal(describeSchedule("COMPETITION_SWEEP", { ...central, competitionSweepMinutes: 15 }), "every 15 minutes")
+  assert.equal(describeSchedule("SHOP_ROTATION", central), "hourly, on the hour")
+  assert.equal(describeSchedule("SHOP_ROTATION", { ...central, shopRotationMinutes: 360 }), "every 6 hours")
 })
 
 test("the system clock returns the present", () => {

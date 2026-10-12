@@ -1125,7 +1125,7 @@ const analyticsOpsRouter = router({
   runs: staffProcedure
     .input(z.object({
       gameId: z.string(),
-      taskType: z.enum(["NIGHTLY", "COMPETITION_SWEEP", "VENUE_ROTATION"]).optional(),
+      taskType: z.enum(["NIGHTLY", "COMPETITION_SWEEP", "SHOP_ROTATION", "VENUE_ROTATION"]).optional(),
       limit: z.number().int().min(1).max(100).default(25),
     }))
     .query(async ({ input }) => {
@@ -1175,7 +1175,7 @@ const analyticsOpsRouter = router({
     .input(z.object({
       gameId: z.string(),
       runId: z.string().optional(),
-      taskType: z.enum(["NIGHTLY", "COMPETITION_SWEEP", "VENUE_ROTATION"]).default("NIGHTLY"),
+      taskType: z.enum(["NIGHTLY", "COMPETITION_SWEEP", "SHOP_ROTATION", "VENUE_ROTATION"]).default("NIGHTLY"),
     }))
     .query(async ({ input }) => {
       const run = input.runId
@@ -1263,21 +1263,32 @@ const analyticsOpsRouter = router({
       const totalWork = Object.values(work).reduce((a, b) => a + b, 0)
       const remaining = work.pending + work.running + work.retrying
 
-      // The competition resolution queue. Not per-run — a work item belongs to
-      // a competition, not to the sweep that enqueued it — so this is the
-      // game's queue as it stands, which is the question a sweep view actually
-      // raises: the sweep wrote work down, did any of it get done?
+      // Read once, and before the resolution block below needs it.
+      const now = new Date()
+
+      // This sweep's share of the resolution queue.
+      //
+      // It used to be the game's whole queue, all-time, with a note explaining
+      // that a work item belongs to a competition rather than to a sweep. That
+      // was true and it was the wrong answer: work rows outlive the sweeps that
+      // created them, so every sweep in the history showed the same totals, and
+      // the one question a sweep view raises - "it wrote 1,078 competitions
+      // down, how far has the resolver got with them?" - had no answer at all.
+      //
+      // `runId` on the work item is what makes this possible. Items with no run
+      // behind them, from a competition that filled up and enqueued itself, are
+      // simply not this sweep's and do not appear here.
       const resolution =
         run.taskType === "COMPETITION_SWEEP"
           ? await (async () => {
-              const [groups, failures] = await Promise.all([
+              const [groups, failures, span] = await Promise.all([
                 db.competitionResolutionWork.groupBy({
                   by: ["status"],
-                  where: { gameId: input.gameId },
+                  where: { runId: run.id },
                   _count: { _all: true },
                 }),
                 db.competitionResolutionWork.findMany({
-                  where: { gameId: input.gameId, status: { in: ["FAILED", "RETRYING"] } },
+                  where: { runId: run.id, status: { in: ["FAILED", "RETRYING"] } },
                   orderBy: { completedAt: "desc" },
                   take: 50,
                   select: {
@@ -1286,17 +1297,54 @@ const analyticsOpsRouter = router({
                     competition: { select: { name: true } },
                   },
                 }),
+                // When the resolver first touched this sweep's work and when it
+                // last finished a piece of it. Both come from the items rather
+                // than from the run, because the run was over seconds after it
+                // enqueued them.
+                db.competitionResolutionWork.aggregate({
+                  where: { runId: run.id, startedAt: { not: null } },
+                  _min: { startedAt: true },
+                  _max: { completedAt: true },
+                }),
               ])
 
-              const counts = { pending: 0, running: 0, retrying: 0, completed: 0, failed: 0 }
+              const counts = { pending: 0, running: 0, retrying: 0, completed: 0, failed: 0, cancelled: 0 }
               for (const row of groups) {
                 const key = row.status.toLowerCase() as keyof typeof counts
                 if (key in counts) counts[key] = row._count._all
               }
 
+              const enqueued = Object.values(counts).reduce((a, b) => a + b, 0)
+              const waiting = counts.pending + counts.running + counts.retrying
+              const startedAt = span._min.startedAt
+              // Only call it finished when nothing of this sweep's is left; an
+              // in-flight queue's "last completion" is not an end time.
+              const finishedAt = waiting === 0 ? span._max.completedAt : null
+              const durationMs = startedAt
+                ? (finishedAt ?? now).getTime() - startedAt.getTime()
+                : null
+
+              // How long the work sat before the resolver reached it. The wake
+              // signal usually makes this close to nothing; a long one means
+              // the signal was missed and the fallback tick found it.
+              const queueLatencyMs =
+                run.startedAt && startedAt ? startedAt.getTime() - run.startedAt.getTime() : null
+
               return {
                 counts,
-                queued: counts.pending + counts.running + counts.retrying,
+                enqueued,
+                waiting,
+                startedAt,
+                finishedAt,
+                durationMs,
+                queueLatencyMs,
+                ratePerSecond:
+                  durationMs && durationMs > 0 ? counts.completed / (durationMs / 1000) : null,
+                // Game-wide, for the retry control, which acts on the whole
+                // game rather than on one sweep's share of it.
+                gameFailed: await db.competitionResolutionWork.count({
+                  where: { gameId: input.gameId, status: "FAILED" },
+                }),
                 failures: failures.map((f) => ({
                   id: f.id,
                   competitionId: f.competitionId,
@@ -1323,8 +1371,14 @@ const analyticsOpsRouter = router({
           })
         : 0
 
-      const now = new Date()
       const isLive = (OUTSTANDING_WORK as readonly string[]).includes(run.status)
+
+      // A sweep is over in seconds and its queue drains for minutes. Polling
+      // only while the run is live meant the page froze at whatever the queue
+      // happened to look like at that moment - 856 resolved, 222 waiting, for
+      // the rest of time. This is what keeps it refreshing until the work the
+      // run created is actually done.
+      const isSettling = (resolution?.waiting ?? 0) > 0
       const until = run.completedAt ?? (run.startedAt ? now : null)
       const elapsedMs = run.startedAt && until ? until.getTime() - run.startedAt.getTime() : null
 
@@ -1413,6 +1467,7 @@ const analyticsOpsRouter = router({
           skippedCount: run.skippedCount,
         },
         isLive,
+        isSettling,
         elapsedMs,
         work: { ...work, total: totalWork, remaining },
         retriedItems,

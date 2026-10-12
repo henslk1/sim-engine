@@ -4,10 +4,15 @@
 // The two tables do different jobs on purpose. ScheduledTask is the trigger —
 // one row per game per kind of work, holding only the next boundary. It is
 // allowed to be wrong: a tick can fire late, twice, or not at all.
-// ScheduledTaskRun is the claim, and it is what makes a run happen exactly
-// once. unique(gameId, taskType, scheduledFor) is the whole guarantee: two
+// ScheduledTaskRun is the claim, and it is what makes a boundary produce one
+// run. unique(gameId, taskType, scheduledFor) is the whole guarantee: two
 // server instances that both decide midnight is due will both try to insert
 // the same row, and only one of them can.
+//
+// One run row is not one execution. Execution is at-least-once: a process that
+// dies mid-run leaves a lease that lapses, and the next tick reclaims the same
+// row and runs it again. `runner.ts` says the same thing at more length, and
+// handlers are written to tolerate it.
 //
 // Keeping them apart is what gives catch-up. A trigger that was missed leaves
 // no trace, so the old BullMQ cron could lose a midnight forever and nothing
@@ -16,6 +21,7 @@
 enum ScheduledTaskType {
   NIGHTLY
   COMPETITION_SWEEP
+  SHOP_ROTATION
   VENUE_ROTATION
 }
 
@@ -83,6 +89,7 @@ model ScheduledTaskRun {
   animalWork     NightlyAnimalWork[]
   samples        ScheduledTaskRunSample[]
   nightlyLog     NightlyUpdateLog?
+  resolutionWork CompetitionResolutionWork[]
 
   @@unique([gameId, taskType, scheduledFor])
   @@index([status, leaseUntil])

@@ -559,6 +559,14 @@ model GameConfig {
   nightlyRunMinute                Int             @default(0)
   gameTimeZone                    String          @default("UTC")
   competitionSweepMinutes         Int             @default(60)
+  // How often the shop clears its unsold stock and generates a new set.
+  //
+  // Epoch-anchored like the competition sweep, so the shop turns over on the
+  // hour rather than drifting from whenever the server last restarted. A breed
+  // with a `rotationStartsAt` / `rotationEndsAt` window joins and leaves on one
+  // of these boundaries, which is the same rule that makes a competition
+  // entered at 13:59 run at 14:00.
+  shopRotationMinutes             Int             @default(60)
   tutorialMaleBaseTemplate        AnimalTemplate? @relation("GameConfigTutorialMale", fields: [tutorialMaleBaseTemplateId], references: [id])
   tutorialFemaleBaseTemplate      AnimalTemplate? @relation("GameConfigTutorialFemale", fields: [tutorialFemaleBaseTemplateId], references: [id])
   completeProfileTestCurrency     CurrencyDef?    @relation("CompletePrfCurrency", fields: [completeProfileTestCurrencyDefId], references: [id])

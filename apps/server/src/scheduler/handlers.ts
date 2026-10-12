@@ -9,6 +9,7 @@
  */
 
 import { db } from "@sim-engine/db"
+import { forEachBounded, withLeaseRenewal } from "./bounded.js"
 import {
   claimChunk,
   countWork,
@@ -24,6 +25,7 @@ import {
   loadGameAgingCache,
   signalCompetitionResolution,
   pruneAnimalData,
+  rotateShop,
   selectEligibleAnimals,
   summariseInnateTotals,
   type Clock,
@@ -74,6 +76,22 @@ const CHUNK_SIZE = 250
 
 /** How long a claimed chunk is owned for without a renewal. */
 const WORK_LEASE_MS = 120_000
+
+/**
+ * How many animals are aged at once.
+ *
+ * The first benchmark put this at 25.7 animals a second against the plan's
+ * 50/s floor, and the whole gap was the loop: one animal's transaction waited
+ * for the previous animal's, about 39ms each, nearly all of it the database
+ * rather than this process. Four at a time is the plan's bounded concurrency.
+ *
+ * Bounded, and deliberately small. Each one is a transaction holding a
+ * connection, this multiplies by `maxConcurrentGames`, and the same pool
+ * serves every HTTP request the process is handling — the ceiling is
+ * `DATABASE_POOL_MAX`, and going past it makes a nightly slower than the serial
+ * version while locking players out of the game waiting for it.
+ */
+const ANIMAL_CONCURRENCY = 4
 
 /** How long a deceased animal lies before the nightly buries it. */
 const BURIAL_DELAY_MS = 3 * 24 * 60 * 60 * 1000
@@ -264,36 +282,44 @@ export const runNightly: TaskHandler = async (ctx) => {
         break
       }
 
-      for (const work of chunk) {
-        try {
-          // `expectedCycle` is the idempotency guarantee. If a previous attempt
-          // aged this animal and died before closing the item out, the aging
-          // transaction sees the animal has moved on and does nothing.
-          const result = await advanceAnimalAging(db, work.animalId, cache ?? undefined, {
-            expectedCycle: work.cycleNumber,
+      // Renewed on a timer for as long as the chunk is being worked, not once
+      // after it. A chunk is 250 animals against a two-minute lease, so at the
+      // measured rate it was already finishing with seconds to spare — and a
+      // chunk of slow ones would have been reclaimed out from under itself.
+      await withLeaseRenewal(
+        () => heartbeatWork(runId, token, ctx.clock.now(), WORK_LEASE_MS),
+        Math.floor(WORK_LEASE_MS / 3),
+        () =>
+          forEachBounded(chunk, ANIMAL_CONCURRENCY, async (work) => {
+            try {
+              // `expectedCycle` is the idempotency guarantee. If a previous
+              // attempt aged this animal and died before closing the item out,
+              // the aging transaction sees the animal has moved on and does
+              // nothing.
+              const result = await advanceAnimalAging(db, work.animalId, cache ?? undefined, {
+                expectedCycle: work.cycleNumber,
+              })
+
+              if (result.alreadyAged) skippedAlreadyAged++
+              else if (result.lifeStageAdvanced) transitions++
+
+              processed++
+              await finishWork(work.id, token, ctx.clock.now(), { status: "COMPLETED" })
+            } catch (err) {
+              failed++
+              console.error(`[nightly] failed to age animal ${work.animalId}:`, err)
+              // Left RETRYING so the next pass picks it up; `attempt` on the
+              // row is the record of how many times it has been tried.
+              await finishWork(work.id, token, ctx.clock.now(), {
+                status: work.attempt >= 3 ? "FAILED" : "RETRYING",
+                errorMessage: err instanceof Error ? err.message : String(err),
+              })
+            }
           })
+      )
 
-          if (result.alreadyAged) skippedAlreadyAged++
-          else if (result.lifeStageAdvanced) transitions++
-
-          processed++
-          await finishWork(work.id, token, ctx.clock.now(), { status: "COMPLETED" })
-        } catch (err) {
-          failed++
-          console.error(`[nightly] failed to age animal ${work.animalId}:`, err)
-          // Left RETRYING so the next pass picks it up; `attempt` on the row is
-          // the record of how many times it has been tried.
-          await finishWork(work.id, token, ctx.clock.now(), {
-            status: work.attempt >= 3 ? "FAILED" : "RETRYING",
-            errorMessage: err instanceof Error ? err.message : String(err),
-          })
-        }
-      }
-
-      // One lease renewal and one progress sample per chunk. Chunks are large,
-      // so this is naturally spaced without a timer of its own.
-      const after = ctx.clock.now()
-      await heartbeatWork(runId, token, after, WORK_LEASE_MS)
+      // One progress sample per chunk, once the chunk is actually done.
+      await heartbeatWork(runId, token, ctx.clock.now(), WORK_LEASE_MS)
       await recordSample(runId, token, ctx.clock)
     }
 
@@ -409,10 +435,15 @@ export const runNightly: TaskHandler = async (ctx) => {
 export const runCompetitionSweep: TaskHandler = async (ctx) => {
   // The scheduler's instant, not a fresh reading: deadlines are judged against
   // the same moment that decided this sweep was due.
-  const { due, created } = await checkCompetitions(db, ctx.gameId, ctx.clock.now())
+  //
+  // The run id goes down with each work item so the run detail can show this
+  // sweep's share of the queue. Without it the only question answerable was
+  // "how does the game's queue look right now", which stops being about this
+  // sweep the moment another one runs.
+  const { due, enqueued, created } = await checkCompetitions(db, ctx.gameId, ctx.clock.now(), ctx.runId)
 
   if (due > 0 || created > 0) {
-    console.log(`[competition] gameId=${ctx.gameId} enqueued=${due} created=${created}`)
+    console.log(`[competition] gameId=${ctx.gameId} due=${due} enqueued=${enqueued} created=${created}`)
   }
 
   // Resolving is the resolver's job now, so the sweep no longer reports
@@ -421,10 +452,43 @@ export const runCompetitionSweep: TaskHandler = async (ctx) => {
   // resolve is answered by `CompetitionResolutionWork`, not by this run.
   if (due > 0) signalCompetitionResolution()
 
-  return { eligibleCount: due, processedCount: due, succeededCount: due, failedCount: 0 }
+  // `eligibleCount` is what came due, `succeededCount` what this sweep added.
+  // They differ by the competitions that had already enqueued themselves by
+  // filling up, which is a real thing to be able to see rather than a rounding
+  // error to hide.
+  return { eligibleCount: due, processedCount: due, succeededCount: enqueued, failedCount: 0 }
+}
+
+/** Clear the shop's unsold stock and generate a new set. */
+export const runShopRotation: TaskHandler = async (ctx) => {
+  // The scheduler's instant, so a breed's rotation window is judged against the
+  // same moment that decided this rotation was due — a breed whose run ends at
+  // 14:00 leaves on the 14:00 rotation, not on whichever side of it the handler
+  // happened to read the clock.
+  const rotation = await rotateShop(db, ctx.gameId, ctx.clock.now())
+
+  if (rotation.removed > 0 || rotation.created > 0) {
+    console.log(
+      `[shop] gameId=${ctx.gameId} cleared=${rotation.removed} created=${rotation.created}` +
+        ` across ${rotation.stocking}/${rotation.configs} breed(s)`
+    )
+  }
+
+  // Counted in animals, which is what the stock is. `claimedCount` is the one
+  // figure in breeds: how many of the game's breed configs were in their window
+  // and took part, against how many exist.
+  return {
+    eligibleCount: rotation.removed,
+    claimedCount: rotation.stocking,
+    processedCount: rotation.removed,
+    succeededCount: rotation.created,
+    failedCount: 0,
+    skippedCount: rotation.configs - rotation.stocking,
+  }
 }
 
 export const HANDLERS: Record<ScheduledType, TaskHandler> = {
   NIGHTLY: runNightly,
   COMPETITION_SWEEP: runCompetitionSweep,
+  SHOP_ROTATION: runShopRotation,
 }

@@ -16,9 +16,12 @@ function computePersonalityMultiplier(value: number, idealMin: number, idealMax:
  * How long one competition's resolution may hold its transaction.
  *
  * Prisma's default is five seconds, which nothing here was setting. Everything
- * a competition does — scoring, prizes, records, season rankings, group
- * finance — happens inside this one transaction, and a full field can take
- * longer than that. Exceeding it is not a slow success: the transaction is
+ * a competition does — scoring, results, prizes, group finance, weekly points,
+ * tier promotion, daily logs and titles — happens inside this one transaction,
+ * and a full field can take longer than that. (Records and season rankings are
+ * not among them: `recordEntry` is only *read* here, for world-max
+ * normalisation, and nothing writes a season ranking yet.) Exceeding it is not
+ * a slow success: the transaction is
  * closed underneath the work and the whole resolution rolls back, so a large
  * competition would have failed every time it was tried, durably and forever
  * once there was a work item recording it.

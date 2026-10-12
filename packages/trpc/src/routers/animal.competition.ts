@@ -32,6 +32,7 @@ export const animalCompetitionRouter = router({
           nightlyRunMinute: true,
           gameTimeZone: true,
           competitionSweepMinutes: true,
+          shopRotationMinutes: true,
         },
       })
       if (!config) return null
@@ -107,6 +108,11 @@ export const animalCompetitionRouter = router({
             },
           },
           _count: { select: { entries: true } },
+          // A competition that has been handed to the resolver is closed, even
+          // though it is still OPEN until the resolver claims it. `enter`
+          // refuses in that window, so the venue has to be able to say so
+          // rather than offering a button that throws.
+          resolutionWork: { select: { status: true } },
         },
         // Postgres sorts NULLS LAST on an ascending order, so competitions
         // that have been entered and have a deadline come first, and the ones

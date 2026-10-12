@@ -1,6 +1,6 @@
 import { db } from "@sim-engine/db";
 import type { Prisma } from "@sim-engine/db";
-import { enqueueCompetitionResolution } from "./queue.js";
+import { enqueueCompetitionResolutions } from "./queue.js";
 
 type Client = typeof db
 
@@ -29,7 +29,12 @@ function slotKey(
  * `now` is passed in rather than read here so the sweep judges deadlines
  * against the same instant the scheduler used to decide the sweep was due.
  */
-export async function checkCompetitions(client: Client, gameId: string, now: Date) {
+export async function checkCompetitions(
+  client: Client,
+  gameId: string,
+  now: Date,
+  runId: string | null = null
+) {
   // Due means: open, somebody is still entered, and the deadline that first
   // entry started has passed. `closesAt` is null until the first entry, so an
   // empty competition is never selected — it waits instead of being resolved
@@ -67,16 +72,20 @@ export async function checkCompetitions(client: Client, gameId: string, now: Dat
   // Enqueueing is idempotent, so a sweep that runs twice over the same
   // deadline — or lands on competitions a fill has already enqueued — adds
   // nothing the second time.
-  for (const c of due) {
-    await enqueueCompetitionResolution(client, gameId, c.id)
-  }
+  //
+  // One statement rather than one per competition. This was 1,078 round trips
+  // on the benchmark game and most of the sweep's 5.7 seconds.
+  const enqueued = await enqueueCompetitionResolutions(client, gameId, due.map((c) => c.id), runId)
 
   // Still replenished here as well as by the resolver: this is what fills a
   // slot whose competition was deleted, cancelled, or resolved by something
   // other than the resolver, and what seeds the set for a brand new game.
   const created = await replenishOpenSet(client, gameId)
 
-  return { due: due.length, created }
+  // `due` is what came due; `enqueued` is what this sweep actually added, which
+  // is smaller whenever a competition had already enqueued itself by filling
+  // up. The run detail reports the second.
+  return { due: due.length, enqueued, created }
 }
 
 /**
@@ -85,7 +94,10 @@ export async function checkCompetitions(client: Client, gameId: string, now: Dat
  * Exported because the sweep is no longer the only thing that should call it.
  * A competition is replaced when it *finishes*, and since §11 the sweep only
  * enqueues — it returns long before anything has actually been resolved — so
- * the resolver calls this once it has drained.
+ * the resolver calls this itself, once per chunk it works through. Per chunk
+ * rather than per drain because a sweep can bring the whole open set down at
+ * once: 1,078 competitions took 37 seconds to resolve, and replacing them only
+ * at the end left the venue pages emptying out for the whole of it.
  *
  * This used to be one `count` per slot followed by one `create` per missing
  * competition — about 1,078 round trips per sweep for this game, nearly all of

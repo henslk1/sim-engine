@@ -37,7 +37,28 @@ type Animal = {
 
 type SubContainer = { id: string; name: string }
 type Selection = "all" | "unassigned" | "archived" | string
-type SortBy = "name" | "oldest" | "youngest" | "alerts"
+type SortBy = "name" | "oldest" | "youngest" | "alerts" | "care"
+
+/**
+ * An animal the player has started on today and not finished.
+ *
+ * `carePending` is the signal, and it is narrower than "care is incomplete":
+ * the animal has been interacted with this cycle, so the nightly is going to
+ * age it tonight, and its care is short of what would have stopped its
+ * condition decaying. An animal nobody has touched is not pending anything and
+ * says nothing on the card.
+ */
+type PendingCare = {
+  animalId: string
+  careDone: number
+  careRequired: number
+  careComplete: boolean
+  interacted: boolean
+  carePending: boolean
+  ltcDue: number
+  ltcOverdue: number
+  ltcName: string | null
+}
 
 type StableFilters = {
   sex: "MALE" | "FEMALE" | ""
@@ -45,6 +66,7 @@ type StableFilters = {
   pregnant: boolean
   inspected: boolean
   hasDiscipline: boolean
+  careDue: boolean
 }
 
 const DEFAULT_FILTERS: StableFilters = {
@@ -53,18 +75,21 @@ const DEFAULT_FILTERS: StableFilters = {
   pregnant: false,
   inspected: false,
   hasDiscipline: false,
+  careDue: false,
 }
 
 // ─── Animal card ───────────────────────────────────────────────────────────────
 
 function AnimalCard({
   animal,
+  care,
   subContainers,
   cycleToAge,
   conformationName,
   tutorialAttr,
 }: {
   animal: Animal
+  care?: PendingCare
   subContainers: SubContainer[]
   cycleToAge: (n: number) => string
   conformationName: string
@@ -81,7 +106,13 @@ function AnimalCard({
   const hasAlert = animal._count.healthRecords > 0
   const isPregnant = animal.pregnancies.length > 0
   const isInspected = animal.conformationScores.length > 0
-  const hasChips = hasAlert || isPregnant || !!animal.disciplineDef || isInspected
+
+  // Only for the living, and only once the query has answered — an animal that
+  // simply has no row yet must not be drawn as neglected.
+  const careOwed = !isDeceased && care ? care.carePending : false
+  const ltcOwed = !isDeceased && care ? care.ltcDue > 0 : false
+
+  const hasChips = hasAlert || isPregnant || !!animal.disciplineDef || isInspected || careOwed || ltcOwed
 
   return (
     <div
@@ -149,6 +180,27 @@ function AnimalCard({
             {hasAlert && (
               <span className="rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium text-destructive/80">
                 {animal._count.healthRecords} condition{animal._count.healthRecords !== 1 ? "s" : ""}
+              </span>
+            )}
+            {careOwed && care && (
+              <span
+                title={`You have worked with this animal today but only completed ${care.careDone} of ${care.careRequired} care actions — its condition will decay tonight`}
+                className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400"
+              >
+                Care {care.careDone}/{care.careRequired}
+              </span>
+            )}
+            {ltcOwed && care && (
+              <span
+                title={care.ltcName ?? undefined}
+                className={cn(
+                  "rounded px-1.5 py-0.5 text-[10px] font-medium",
+                  care.ltcOverdue > 0
+                    ? "bg-destructive/10 text-destructive/80"
+                    : "bg-amber-500/15 text-amber-600 dark:text-amber-400",
+                )}
+              >
+                {care.ltcOverdue > 0 ? "Care overdue" : "Care due"}
               </span>
             )}
             {isPregnant && (
@@ -421,6 +473,16 @@ function StablePage() {
     { enabled: !!playerAccountId },
   )
 
+  // What is still owed tonight. Four queries for the whole stable, so it is
+  // cheap enough to ask on every visit rather than being hidden behind a
+  // toggle.
+  const { data: pendingCare } = trpc.care.pending.useQuery(
+    { playerAccountId: playerAccountId! },
+    { enabled: !!playerAccountId },
+  )
+
+  const careByAnimal = new Map((pendingCare?.animals ?? []).map((row) => [row.animalId, row]))
+
   const { data: tutorialPair } = trpc.tutorial.pairIds.useQuery(
     { gameId: gameId! },
     { enabled: !!gameId },
@@ -464,6 +526,7 @@ function StablePage() {
     + (filters.pregnant ? 1 : 0)
     + (filters.inspected ? 1 : 0)
     + (filters.hasDiscipline ? 1 : 0)
+    + (filters.careDue ? 1 : 0)
 
   const archivedAnimals = animals.filter((a) => a.status === "ARCHIVED") as Animal[]
   const mainAnimals = animals.filter((a) => a.status !== "ARCHIVED") as Animal[]
@@ -499,6 +562,10 @@ function StablePage() {
     if (filters.pregnant && a.pregnancies.length === 0) return false
     if (filters.inspected && a.conformationScores.length === 0) return false
     if (filters.hasDiscipline && !a.disciplineDef) return false
+    if (filters.careDue) {
+      const care = careByAnimal.get(a.id)
+      if (!care || (!care.carePending && care.ltcDue === 0)) return false
+    }
     return true
   })
 
@@ -509,6 +576,16 @@ function StablePage() {
     if (sortBy === "oldest") return b.ageInCycles - a.ageInCycles
     if (sortBy === "youngest") return a.ageInCycles - b.ageInCycles
     if (sortBy === "alerts") return b._count.healthRecords - a._count.healthRecords
+    if (sortBy === "care") {
+      // Overdue long-term care first, then anything with care still owed.
+      const weight = (x: Animal) => {
+        const care = careByAnimal.get(x.id)
+        if (!care) return 0
+        return (care.ltcOverdue > 0 ? 4 : 0) + (care.ltcDue > 0 ? 2 : 0) + (care.carePending ? 1 : 0)
+      }
+      const d = weight(b) - weight(a)
+      if (d !== 0) return d
+    }
     return a.name.localeCompare(b.name)
   })
 
@@ -535,6 +612,19 @@ function StablePage() {
             )}
             {pregnantCount > 0 && (
               <span className="text-sm text-chart-2/70">{pregnantCount} pregnant</span>
+            )}
+            {pendingCare && pendingCare.totals.carePending > 0 && (
+              <span
+                title="Worked with today, but their care is not finished"
+                className="text-sm text-amber-600 dark:text-amber-400"
+              >
+                {pendingCare.totals.carePending} awaiting care
+              </span>
+            )}
+            {pendingCare && pendingCare.totals.ltcOverdue > 0 && (
+              <span className="text-sm text-destructive/70">
+                {pendingCare.totals.ltcOverdue} overdue
+              </span>
             )}
             {selectedAlerts > 0 && selected !== "all" && (
               <span className="text-sm text-muted-foreground/50">
@@ -623,6 +713,7 @@ function StablePage() {
                         { key: "pregnant", label: "Pregnant" },
                         { key: "inspected", label: "Conformation inspected" },
                         { key: "hasDiscipline", label: "Has discipline" },
+                        { key: "careDue", label: "Started, care unfinished" },
                       ] as const).map(({ key, label }) => (
                         <label key={key} className="flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 hover:bg-secondary/30">
                           <input
@@ -651,6 +742,7 @@ function StablePage() {
               <option value="oldest">Oldest First</option>
               <option value="youngest">Youngest First</option>
               <option value="alerts">Alerts First</option>
+              <option value="care">Unfinished Care First</option>
             </select>
           )}
         </div>
@@ -753,6 +845,7 @@ function StablePage() {
               <AnimalCard
                 key={a.id}
                 animal={a}
+                care={careByAnimal.get(a.id)}
                 subContainers={subContainers}
                 cycleToAge={cycleToAge}
                 conformationName={conformationName}

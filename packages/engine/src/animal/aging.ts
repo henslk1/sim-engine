@@ -1,5 +1,6 @@
 import { db } from "@sim-engine/db";
 import { genotypeKey, indexHealthRecords, loadGameAgingCache } from "./aging-cache.js";
+import { isDailyCareComplete } from "../care/completion.js";
 import type { GameAgingCache } from "./aging-cache.js";
 
 type Client = typeof db
@@ -334,9 +335,16 @@ export async function advanceAnimalAging(
         tx.competitionEntry.count({ where: { animalId, cycleNumber: currentCycle } }),
         tx.stageActivityLog.count({ where: { animalId, cycleNumber: currentCycle } }),
       ]).then(([t, c, s]) => t + c + s > 0),
+      // Distinct actions, not log rows — see `isDailyCareComplete`. Counting
+      // rows let the same free action, performed three times, pass for having
+      // done three different ones.
       tx.careLog
-        .count({ where: { animalId, cycleNumber: currentCycle } })
-        .then(done => game.careActionCount === 0 || done >= game.careActionCount),
+        .findMany({
+          where: { animalId, cycleNumber: currentCycle },
+          select: { careActionDefId: true },
+          distinct: ["careActionDefId"],
+        })
+        .then(done => isDailyCareComplete(done.length, game.careActionCount)),
       tx.animalEnergy.findUnique({ where: { animalId } }),
       tx.animalMood.findUnique({ where: { animalId } }),
       tx.animalCondition.findUnique({ where: { animalId } }),

@@ -31,6 +31,7 @@ type Competition = {
   breed: { id: string; name: string } | null
   closesAt: Date | string | null
   _count: { entries: number }
+  resolutionWork: { status: string } | null
   tierDef: { id: string; name: string; tierIndex: number; entryFee: number } | null
   disciplineDef: {
     id: string
@@ -313,9 +314,13 @@ function CompRow({
   nextSweepAt,
 }: CompRowProps) {
   const isFull = comp._count.entries >= comp.maxEntries
+  // Queued for the resolver: still OPEN in the database, but `enter` refuses
+  // it, so it must not look enterable here either.
+  const isQueued = ["PENDING", "RETRYING", "RUNNING"].includes(comp.resolutionWork?.status ?? "")
+  const isClosed = isFull || isQueued
   const dl = deadlineInfo(comp.closesAt, nextSweepAt)
   const feeLabel = !comp.tierDef || comp.tierDef.entryFee === 0 ? "Free" : `${comp.tierDef.entryFee}`
-  const canEnter = !!playerAccountId && !isFull && !isEntering && !justEntered
+  const canEnter = !!playerAccountId && !isClosed && !isEntering && !justEntered
     && (animalMode || !!selectedAnimalId)
 
   const cols = animalMode ? TABLE_COLS_ANIMAL : TABLE_COLS_FREE
@@ -324,7 +329,7 @@ function CompRow({
     <div className={cn(
       cols,
       "items-center border-t border-border px-4 py-2.5 transition-colors",
-      isFull ? "opacity-60" : justEntered ? "bg-chart-2/5" : "hover:bg-secondary/20",
+      isClosed ? "opacity-60" : justEntered ? "bg-chart-2/5" : "hover:bg-secondary/20",
     )}>
       {/* Entries */}
       <SlotBar filled={comp._count.entries} max={comp.maxEntries} />
@@ -344,7 +349,7 @@ function CompRow({
           <select
             value={selectedAnimalId}
             onChange={(e) => onSelectAnimal(e.target.value)}
-            disabled={isFull}
+            disabled={isClosed}
             className="w-full rounded border border-border bg-background px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
           >
             <option value="">— Select —</option>
@@ -369,12 +374,20 @@ function CompRow({
             "rounded-md px-3.5 py-1.5 text-xs font-semibold transition-colors disabled:opacity-40",
             justEntered
               ? "bg-chart-2/15 text-chart-2"
-              : isFull
+              : isClosed
                 ? "bg-muted text-muted-foreground"
                 : "bg-primary text-primary-foreground hover:bg-primary/90",
           )}
         >
-          {isEntering ? "Entering…" : justEntered ? "Entered ✓" : isFull ? "Full" : "Enter"}
+          {isEntering
+            ? "Entering…"
+            : justEntered
+              ? "Entered ✓"
+              : isQueued
+                ? "Judging"
+                : isFull
+                  ? "Full"
+                  : "Enter"}
         </button>
         {animalMode && errorMsg && <span className="text-[10px] text-destructive">{errorMsg}</span>}
       </div>

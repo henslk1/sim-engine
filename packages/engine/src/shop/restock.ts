@@ -19,10 +19,46 @@ export function canonicalize(a: { id: string; symbol: string }, b: { id: string;
   return a.symbol <= b.symbol ? [a.id, b.id] : [b.id, a.id]
 }
 
-export async function restockShop(gameId: string, shopBreedConfigId?: string): Promise<number> {
+/**
+ * Whether a breed is taking part in the rotation at this moment.
+ *
+ * Both dates null is the ordinary case and means yes, always. A breed with a
+ * window joins on the first rotation after `rotationStartsAt` and is gone once
+ * `rotationEndsAt` has passed.
+ *
+ * Exported because two callers need the same answer: the rotation, deciding
+ * what to count as stocking, and `restockShop` below, which has to refuse a
+ * breed whose run is over even when something else asks it to top that breed
+ * up — the opportunistic restock after a purchase, for instance, which would
+ * otherwise quietly put a retired breed back on the shelf.
+ */
+export function shopConfigIsOpen(
+  config: { rotationStartsAt: Date | null; rotationEndsAt: Date | null },
+  now: Date
+): boolean {
+  if (config.rotationStartsAt && now < config.rotationStartsAt) return false
+  if (config.rotationEndsAt && now >= config.rotationEndsAt) return false
+  return true
+}
+
+export async function restockShop(
+  gameId: string,
+  shopBreedConfigId?: string,
+  now: Date = new Date()
+): Promise<number> {
   const [configs, firstLifeStage, shopAccount, ltcDefs, gameConfig, gameInnateMax] = await Promise.all([
     db.gameShopBreedConfig.findMany({
-      where: { gameId, isActive: true, ...(shopBreedConfigId ? { id: shopBreedConfigId } : {}) },
+      where: {
+        gameId,
+        isActive: true,
+        // The window, in the query rather than the loop, so a breed outside its
+        // run is not even loaded.
+        AND: [
+          { OR: [{ rotationStartsAt: null }, { rotationStartsAt: { lte: now } }] },
+          { OR: [{ rotationEndsAt: null }, { rotationEndsAt: { gt: now } }] },
+        ],
+        ...(shopBreedConfigId ? { id: shopBreedConfigId } : {}),
+      },
       include: {
         breed: { include: { statProfile: true, personalityProfiles: true } },
         _count: { select: { shopAnimals: { where: { isAvailable: true } } } },

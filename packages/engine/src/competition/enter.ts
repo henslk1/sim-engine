@@ -5,6 +5,18 @@ import { enqueueCompetitionResolution } from "./queue.js";
 
 type Client = typeof db
 
+/**
+ * How long one entry may hold its transaction.
+ *
+ * Prisma's unset default is five seconds, which was enough while entering was
+ * fifteen quick reads and a few writes. It is not obviously enough now that an
+ * entry can wait on the competition's row lock: the holder is a resolution, and
+ * a resolution is allowed two minutes. Twenty seconds is the judgement that a
+ * player would rather wait than be handed a transaction-closed error, without
+ * tying up a connection for the whole of a pathological resolution.
+ */
+const ENTRY_TX = { timeout: 20_000, maxWait: 5_000 } as const
+
 export async function enterCompetition(
   client: Client,
   input: {
@@ -30,8 +42,71 @@ export async function enterCompetition(
       }
     })
 
-    if (competition.status !== "OPEN") {
+    // Queued counts as closed.
+    //
+    // A competition stays OPEN between being enqueued and the resolver picking
+    // it up - seconds normally, a minute if the wake was missed and the
+    // fallback tick finds it. Entries arriving in that window are the worst
+    // kind of loss: the player pays the fee and the energy, the entry commits,
+    // and then resolution reads a field that may or may not include it
+    // depending on which transaction got there first. Refusing is honest.
+    //
+    // FAILED is deliberately not here. A competition the resolver gave up on is
+    // still open, nothing will touch it until somebody retries it from the
+    // admin console, and freezing it out of new entries in the meantime would
+    // punish players for an operational problem. When it is retried, the
+    // entries made since count.
+    const queued = await tx.competitionResolutionWork.findUnique({
+      where: { competitionId },
+      select: { status: true },
+    })
+
+    if (queued && (queued.status === "PENDING" || queued.status === "RETRYING" || queued.status === "RUNNING")) {
+      throw new Error("This competition has closed and is waiting to be judged")
+    }
+
+    // Checked before the lock below rather than under it, so that a player
+    // entering while a resolution is in flight is told no immediately instead
+    // of sitting behind that resolution's row lock. Nothing is lost by the
+    // window this leaves: work enqueued between this read and the lock cannot
+    // start resolving until the lock is free, so an entry that commits is an
+    // entry that is in the field when it does.
+
+    // Take the competition's row before anything else happens.
+    //
+    // Reading `status` and believing it is not enough, for the same reason
+    // `runCompetition` does not believe its own read: under READ COMMITTED two
+    // entries and a resolution can all see OPEN at the same moment. Writing the
+    // row - even writing back the status it already has - takes its exclusive
+    // lock, and because Postgres re-checks the `where` after the wait, the
+    // whole statement is a compare-and-swap. Zero rows means somebody else got
+    // there first and the competition is no longer open.
+    //
+    // This is also what orders the locks. `runCompetition` takes this row first
+    // and then touches balances, animals and records. An entry that validated,
+    // spent energy and debited a fee before reaching for this row would take
+    // the same locks in the opposite order, and the two would deadlock as soon
+    // as a competition filled up while somebody was entering it.
+    //
+    // The wait is a resolution's transaction, which the benchmark put at about
+    // 70ms per competition.
+    const claimed = await tx.competition.updateMany({
+      where: { id: competitionId, status: "OPEN" },
+      data: { status: "OPEN" },
+    })
+
+    if (claimed.count !== 1) {
       throw new Error("Competition is not open")
+    }
+
+    // `maxEntries` was never enforced here - it was only ever read to decide
+    // whether the competition was now full enough to run. Two players entering
+    // the last seat at once both succeeded, and a ten-horse field ran with
+    // twelve in it. The count is taken under the lock above, so it cannot move
+    // between this check and the insert below.
+    const enteredBefore = await tx.competitionEntry.count({ where: { competitionId } })
+    if (enteredBefore >= competition.maxEntries) {
+      throw new Error("This competition is full")
     }
 
     if (!competition.disciplineDef.isConformation) {
@@ -271,7 +346,9 @@ export async function enterCompetition(
       }
     }
 
-    const entryCount = await tx.competitionEntry.count({ where: { competitionId } })
+    // No need to count again: the row lock taken at the top of this
+    // transaction means nothing else can have entered since.
+    const entryCount = enteredBefore + 1
 
     // A full competition is resolved by the resolver, not here. It used to run
     // inline, inside the entering player's mutation, which put a whole
@@ -301,6 +378,7 @@ export async function enterCompetition(
           nightlyRunMinute: true,
           gameTimeZone: true,
           competitionSweepMinutes: true,
+          shopRotationMinutes: true,
         },
       })
 
@@ -316,5 +394,5 @@ export async function enterCompetition(
 
     return { entry, shouldRun }
 
-  })
+  }, ENTRY_TX)
 }

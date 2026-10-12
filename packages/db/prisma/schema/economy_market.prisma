@@ -149,6 +149,14 @@ model GameShopBreedConfig {
   gameShopFloor         Float            @default(0)
   shopAlleleQualityBias Float            @default(0)
   isActive              Boolean          @default(true)
+  // When this breed is on offer, for a breed that is only on offer sometimes.
+  //
+  // Both null is the ordinary case: the breed is stocked on every rotation,
+  // indefinitely. Setting them makes it a limited run — it is first generated
+  // on the first rotation boundary at or after `rotationStartsAt`, rotates with
+  // every boundary after that, and is cleared out and not regenerated once
+  // `rotationEndsAt` has passed. A day, five days, a season; the interval does
+  // not change, only how long the breed takes part in it.
   rotationStartsAt      DateTime?
   rotationEndsAt        DateTime?
   shopAnimals           GameShopAnimal[]

@@ -14,6 +14,7 @@ const central = {
   nightlyRunMinute: 0,
   gameTimeZone: "America/Chicago",
   competitionSweepMinutes: 60,
+  shopRotationMinutes: 60,
 }
 
 const task = (taskType: "NIGHTLY" | "COMPETITION_SWEEP", nextRunAt: string) => ({

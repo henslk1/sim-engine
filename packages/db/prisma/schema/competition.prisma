@@ -313,9 +313,9 @@ model Competition {
 // One competition's turn to be resolved.
 //
 // Resolution itself was already crash-safe before this existed: `runCompetition`
-// does the whole thing — the OPEN -> IN_PROGRESS claim, scoring, prizes,
-// records, rankings, group finance and the final COMPLETED — inside a single
-// transaction, so a process that dies mid-resolution rolls back and the
+// does the whole thing — the OPEN -> IN_PROGRESS claim, scoring, results,
+// prizes, group finance, weekly points and the final COMPLETED — inside a
+// single transaction, so a process that dies mid-resolution rolls back and the
 // competition is simply OPEN again. IN_PROGRESS never outlives a crash; it is
 // mutual exclusion against a concurrent caller, not a persisted state.
 //
@@ -351,6 +351,21 @@ model CompetitionResolutionWork {
   errorMessage String?
   createdAt    DateTime               @default(now())
 
+  // Which sweep asked for this, when a sweep did.
+  //
+  // Null on purpose for the other half: a competition that fills up enqueues
+  // itself from the entering player's transaction, and there is no run behind
+  // that. Without this column the analytics could only ever show the game's
+  // whole queue as it stands, which is honest for a sweep still draining and
+  // actively misleading for one from last week - work rows outlive their
+  // sweeps, so every old sweep showed the same all-time totals.
+  //
+  // SetNull rather than Cascade, for the same reason `NightlyUpdateLog.runId`
+  // is: runs are the prunable half of this pair, and losing the attribution is
+  // not a reason to lose the record of the work.
+  runId String?
+  run   ScheduledTaskRun? @relation(fields: [runId], references: [id], onDelete: SetNull)
+
   // Cascade, so the nightly's collection of competitions whose entrants are all
   // buried is not blocked by a leftover work row.
   competition Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
@@ -360,6 +375,8 @@ model CompetitionResolutionWork {
   @@index([gameId, status])
   // Finding items whose owner died.
   @@index([status, leaseUntil])
+  // One sweep's share of the queue, for the run detail.
+  @@index([runId])
 }
 
 model CompetitionEntry {

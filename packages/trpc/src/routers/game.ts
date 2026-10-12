@@ -30,6 +30,7 @@ export const gameRouter = router({
             nightlyRunMinute: true,
             gameTimeZone: true,
             competitionSweepMinutes: true,
+            shopRotationMinutes: true,
           },
         }),
         db.scheduledTask.findUnique({

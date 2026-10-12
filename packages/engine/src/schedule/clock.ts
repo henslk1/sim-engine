@@ -56,6 +56,8 @@ export type GameSchedule = {
   gameTimeZone: string
   /** How often the competition sweep runs, in whole minutes. */
   competitionSweepMinutes: number
+  /** How often the shop clears its stock and generates a new set. */
+  shopRotationMinutes: number
 }
 
 /**
@@ -92,7 +94,7 @@ export const NIGHTLY_WARNING_MS = 15 * 60_000
  * there is nothing to run. Adding it here is a one-line change on the day
  * there is.
  */
-export const SCHEDULED_TASK_TYPES = ["NIGHTLY", "COMPETITION_SWEEP"] as const
+export const SCHEDULED_TASK_TYPES = ["NIGHTLY", "COMPETITION_SWEEP", "SHOP_ROTATION"] as const
 
 export type ScheduledType = (typeof SCHEDULED_TASK_TYPES)[number]
 
@@ -138,6 +140,9 @@ export function validateGameSchedule(schedule: GameSchedule): string[] {
   if (!Number.isInteger(schedule.competitionSweepMinutes) || schedule.competitionSweepMinutes < 1) {
     problems.push(`competitionSweepMinutes must be a whole number of minutes, at least 1, got ${schedule.competitionSweepMinutes}`)
   }
+  if (!Number.isInteger(schedule.shopRotationMinutes) || schedule.shopRotationMinutes < 1) {
+    problems.push(`shopRotationMinutes must be a whole number of minutes, at least 1, got ${schedule.shopRotationMinutes}`)
+  }
 
   return problems
 }
@@ -146,12 +151,12 @@ export function validateGameSchedule(schedule: GameSchedule): string[] {
  * When `taskType` next falls due for a game on this schedule, strictly after
  * `after`.
  *
- * The two types are genuinely different shapes and this is where that lives:
- * the nightly is a wall-clock time in a zone, so it has to survive a day that
- * is 23 or 25 hours long; the sweep is a fixed grid, so it only has to stay
- * anchored. Collapsing them into one "every N minutes" column would mean the
- * nightly drifting an hour off its configured time for eight months of the
- * year. See `time.ts` for how each is computed.
+ * The types are genuinely different shapes and this is where that lives: the
+ * nightly is a wall-clock time in a zone, so it has to survive a day that is 23
+ * or 25 hours long; the sweep and the shop rotation are fixed grids, so they
+ * only have to stay anchored. Collapsing them into one "every N minutes" column
+ * would mean the nightly drifting an hour off its configured time for eight
+ * months of the year. See `time.ts` for how each is computed.
  */
 export function nextBoundaryFor(taskType: ScheduledType, schedule: GameSchedule, after: Date): Date {
   switch (taskType) {
@@ -163,6 +168,8 @@ export function nextBoundaryFor(taskType: ScheduledType, schedule: GameSchedule,
       )
     case "COMPETITION_SWEEP":
       return nextIntervalBoundary(after, schedule.competitionSweepMinutes)
+    case "SHOP_ROTATION":
+      return nextIntervalBoundary(after, schedule.shopRotationMinutes)
     default: {
       // Adding a value to `SCHEDULED_TASK_TYPES` without giving it a timing
       // rule fails to compile here. A nullable `intervalMinutes` column would
@@ -173,6 +180,13 @@ export function nextBoundaryFor(taskType: ScheduledType, schedule: GameSchedule,
   }
 }
 
+/** How an epoch-anchored interval reads to a person. */
+function describeInterval(minutes: number): string {
+  if (minutes === 60) return "hourly, on the hour"
+  if (minutes % 60 === 0) return `every ${minutes / 60} hours`
+  return `every ${minutes} minutes`
+}
+
 /** One line for a log or the admin screen, in the game's own terms. */
 export function describeSchedule(taskType: ScheduledType, schedule: GameSchedule): string {
   switch (taskType) {
@@ -181,12 +195,10 @@ export function describeSchedule(taskType: ScheduledType, schedule: GameSchedule
       const mm = String(schedule.nightlyRunMinute).padStart(2, "0")
       return `daily at ${hh}:${mm} ${schedule.gameTimeZone}`
     }
-    case "COMPETITION_SWEEP": {
-      const minutes = schedule.competitionSweepMinutes
-      if (minutes === 60) return "hourly, on the hour"
-      if (minutes % 60 === 0) return `every ${minutes / 60} hours`
-      return `every ${minutes} minutes`
-    }
+    case "COMPETITION_SWEEP":
+      return describeInterval(schedule.competitionSweepMinutes)
+    case "SHOP_ROTATION":
+      return describeInterval(schedule.shopRotationMinutes)
     default: {
       const unhandled: never = taskType
       throw new Error(`No description is defined for task type ${String(unhandled)}`)

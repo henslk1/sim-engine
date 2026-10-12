@@ -35,6 +35,49 @@ export async function enqueueCompetitionResolution(
   })
 }
 
+/** How many work rows go into one INSERT. */
+const ENQUEUE_BATCH = 1_000
+
+/**
+ * Ask for many competitions to be resolved, as the sweep does.
+ *
+ * The same idempotency by a different route: `skipDuplicates` leans on the
+ * unique `competitionId` exactly as the upsert's `update: {}` does, so an item
+ * already queued - or already given up on - is left alone rather than reset.
+ *
+ * This replaces a `for` loop of single upserts. The sweep found 1,078
+ * competitions due on the benchmark game and spent 1,078 round trips writing
+ * them down, which was most of its 5.7 seconds. Batching is the whole
+ * difference; the chunk size only keeps one statement from growing without
+ * bound if a very large game ever comes due all at once.
+ *
+ * `runId` is the sweep that found them, carried so the run detail can show that
+ * sweep's share of the queue rather than the game's all-time totals.
+ */
+export async function enqueueCompetitionResolutions(
+  client: Prisma.TransactionClient,
+  gameId: string,
+  competitionIds: string[],
+  runId: string | null
+): Promise<number> {
+  let created = 0
+
+  for (let i = 0; i < competitionIds.length; i += ENQUEUE_BATCH) {
+    const { count } = await client.competitionResolutionWork.createMany({
+      data: competitionIds.slice(i, i + ENQUEUE_BATCH).map((competitionId) => ({
+        competitionId,
+        gameId,
+        runId,
+        status: "PENDING" as const,
+      })),
+      skipDuplicates: true,
+    })
+    created += count
+  }
+
+  return created
+}
+
 /**
  * The server's resolver, if one is running.
  *

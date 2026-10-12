@@ -9,7 +9,7 @@ export const Route = createFileRoute("/_authenticated/admin/games/$gameId/analyt
   component: OpsAnalytics,
 })
 
-type TaskType = "NIGHTLY" | "COMPETITION_SWEEP"
+type TaskType = "NIGHTLY" | "COMPETITION_SWEEP" | "SHOP_ROTATION"
 
 /**
  * The two task types count completely different things, and sharing one set of
@@ -33,7 +33,17 @@ const TASK_VOCAB = {
     unit: "competitions",
     eligibleLabel: "Past deadline",
     eligibleHint: "open competitions",
-    doneLabel: "Resolved",
+    // Not "Resolved". A sweep writes work down and returns; resolving happens
+    // afterwards, on the resolver, and is reported below by the queue itself.
+    doneLabel: "Enqueued",
+    hasWorkQueue: false,
+  },
+  SHOP_ROTATION: {
+    label: "Shop rotation",
+    unit: "animals",
+    eligibleLabel: "Cleared",
+    eligibleHint: "unsold stock removed",
+    doneLabel: "Restocked",
     hasWorkQueue: false,
   },
 } satisfies Record<TaskType, unknown>
@@ -338,26 +348,32 @@ function RunDetail({ detail, vocab, gameId }: {
           )}
         </>
       ) : (
-        /* A sweep has no work queue, no samples and no population outcomes. It
-           resolves competitions whose deadline has passed, and that is the only
-           honest thing to report about it. */
+        /* A sweep has no work queue of its own, no samples and no population
+           outcomes. It finds the competitions whose deadline has passed, writes
+           them down and returns - so what it did is two numbers, and what came
+           of it is the block below. */
         <>
           <Block title="This sweep">
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               <Stat label={vocab.eligibleLabel} value={detail.run.eligibleCount.toLocaleString()} hint={vocab.eligibleHint} />
-              <Stat label="Enqueued" value={detail.run.succeededCount.toLocaleString()} hint="handed to the resolver" />
-              <Stat label="Took" value={formatDuration(detail.elapsedMs)} />
+              <Stat
+                label="Enqueued"
+                value={detail.run.succeededCount.toLocaleString()}
+                hint={
+                  detail.run.succeededCount < detail.run.eligibleCount
+                    ? `${(detail.run.eligibleCount - detail.run.succeededCount).toLocaleString()} were already queued`
+                    : "handed to the resolver"
+                }
+              />
+              <Stat label="Took" value={formatDuration(detail.elapsedMs)} hint="finding and queueing" />
             </div>
-            <p className="mt-1.5 text-[11px] text-muted-foreground">
-             
-            </p>
           </Block>
 
           {detail.resolution && (
             <Block
-              title="Resolution queue"
+              title="What the resolver did with it"
               aside={
-                detail.resolution.counts.failed > 0 ? (
+                detail.resolution.gameFailed > 0 ? (
                   <Button
                     size="sm"
                     variant="outline"
@@ -365,14 +381,37 @@ function RunDetail({ detail, vocab, gameId }: {
                     onClick={() => retryResolutions.mutate({ gameId })}
                   >
                     <RotateCcw className="size-3.5" />
-                    Retry failed
+                    Retry {detail.resolution.gameFailed} failed in this game
                   </Button>
                 ) : undefined
               }
             >
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <Stat label="Waiting" value={detail.resolution.queued.toLocaleString()} hint="not yet resolved" />
-                <Stat label="Resolved" value={detail.resolution.counts.completed.toLocaleString()} hint="all time" />
+                <Stat
+                  label="Resolved"
+                  value={detail.resolution.counts.completed.toLocaleString()}
+                  hint={`of ${detail.resolution.enqueued.toLocaleString()} this sweep queued`}
+                />
+                <Stat
+                  label="Waiting"
+                  value={detail.resolution.waiting.toLocaleString()}
+                  hint={detail.resolution.waiting > 0 ? "still to run" : "queue drained"}
+                  tone={detail.resolution.waiting > 0 ? "warn" : "default"}
+                />
+                <Stat
+                  label="Took"
+                  value={formatDuration(detail.resolution.durationMs)}
+                  hint={detail.resolution.finishedAt ? "start to last result" : "so far"}
+                />
+                <Stat label="Rate" value={formatRate(detail.resolution.ratePerSecond)} hint="competitions/second" />
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <Stat
+                  label="Picked up after"
+                  value={formatDuration(detail.resolution.queueLatencyMs)}
+                  hint="sweep start to first claim"
+                />
                 <Stat
                   label="Retrying"
                   value={detail.resolution.counts.retrying.toLocaleString()}
@@ -385,8 +424,16 @@ function RunDetail({ detail, vocab, gameId }: {
                 />
               </div>
 
+              {detail.resolution.counts.cancelled > 0 && (
+                <p className="mt-1.5 text-[11px] text-muted-foreground">
+                  {detail.resolution.counts.cancelled.toLocaleString()} were cancelled before they could run, and were
+                  not judged.
+                </p>
+              )}
+
               <p className="mt-1.5 text-[11px] text-muted-foreground">
-                
+                This sweep&rsquo;s own work only. A competition that filled up and queued itself belongs to no sweep and
+                is not counted here.
               </p>
 
               {detail.resolution.failures.length > 0 && (
@@ -473,7 +520,10 @@ function OpsAnalytics() {
       enabled: Boolean(expandedId),
       // A run that is still going is worth watching; a finished one is not
       // worth a request every few seconds.
-      refetchInterval: (query) => (query.state.data?.isLive ? 3_000 : false),
+      // A sweep finishes in seconds and its queue drains for minutes, so the
+      // run being over is not the end of anything worth watching.
+      refetchInterval: (query) =>
+        query.state.data?.isLive || query.state.data?.isSettling ? 3_000 : false,
     },
   )
 

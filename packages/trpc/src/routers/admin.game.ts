@@ -102,6 +102,7 @@ export const gameAdminRouter = router({
           .refine(isValidTimeZone, "Not a time zone this server recognises")
           .default("UTC"),
         competitionSweepMinutes: z.number().int().min(1).max(1440).default(60),
+        shopRotationMinutes: z.number().int().min(1).max(1440).default(60),
       }))
       .mutation(async ({ input }) => {
         const { gameId, containerLabel, subContainerLabel, lifeExpectancyBaseline, maxBreedingSlots, tutorialMaleBaseTemplateId, tutorialFemaleBaseTemplateId, completeProfileTestCurrencyDefId, ...rest } = input
@@ -150,6 +151,7 @@ export const gameAdminRouter = router({
           nightlyRunMinute: true,
           gameTimeZone: true,
           competitionSweepMinutes: true,
+          shopRotationMinutes: true,
         },
       })
       if (!config) return []

@@ -92,6 +92,7 @@ function GameConfigPage() {
     nightlyRunMinute: 0,
     gameTimeZone: "UTC",
     competitionSweepMinutes: 60,
+    shopRotationMinutes: 60,
   })
 
   function n(key: keyof typeof cf, float = false) {
@@ -165,6 +166,7 @@ function GameConfigPage() {
           nightlyRunMinute: g.nightlyRunMinute,
           gameTimeZone: g.gameTimeZone,
           competitionSweepMinutes: g.competitionSweepMinutes,
+          shopRotationMinutes: g.shopRotationMinutes,
         })
       }
     }
@@ -343,6 +345,7 @@ function GameConfigPage() {
                 <F label="Nightly Hour (0–23)"><Input type="number" step="1" min="0" max="23" {...n("nightlyRunHour")} /></F>
                 <F label="Nightly Minute (0–59)"><Input type="number" step="1" min="0" max="59" {...n("nightlyRunMinute")} /></F>
                 <F label="Competition Sweep (minutes)"><Input type="number" step="1" min="1" max="1440" {...n("competitionSweepMinutes")} /></F>
+                <F label="Shop Rotation (minutes)"><Input type="number" step="1" min="1" max="1440" {...n("shopRotationMinutes")} /></F>
                 <F label="Game Time Zone">
                   <select
                     className="h-8 rounded-md border border-input bg-background px-2 text-sm text-foreground"

@@ -18,17 +18,6 @@ export type ClaimedResolution = {
   attempt: number
 }
 
-export type ResolutionCounts = {
-  pending: number
-  running: number
-  retrying: number
-  completed: number
-  failed: number
-}
-
-/** The statuses that mean an item still needs doing. */
-const OUTSTANDING = ["PENDING", "RETRYING", "RUNNING"] as const
-
 /**
  * The database's view of "this item can be claimed", which has to agree with
  * every other claim predicate in the scheduler: a candidate the query offers
@@ -53,10 +42,14 @@ export async function claimResolutions(
   token: string,
   now: Date,
   leaseMs: number,
-  chunkSize: number
+  chunkSize: number,
+  excludeGameIds: string[] = []
 ): Promise<ClaimedResolution[]> {
   const candidates = await db.competitionResolutionWork.findMany({
-    where: { OR: claimableWhere(now) },
+    where: {
+      OR: claimableWhere(now),
+      ...(excludeGameIds.length > 0 && { gameId: { notIn: excludeGameIds } }),
+    },
     orderBy: { createdAt: "asc" },
     take: chunkSize,
     select: { id: true },
@@ -97,14 +90,19 @@ export async function finishResolution(
   id: string,
   token: string,
   now: Date,
-  outcome: { status: "COMPLETED" } | { status: "RETRYING" | "FAILED"; errorMessage: string }
+  outcome:
+    | { status: "COMPLETED" }
+    | { status: "CANCELLED" }
+    | { status: "RETRYING" | "FAILED"; errorMessage: string }
 ): Promise<boolean> {
+  const settled = outcome.status === "COMPLETED" || outcome.status === "CANCELLED"
+
   const { count } = await db.competitionResolutionWork.updateMany({
     where: { id, claimedBy: token, status: "RUNNING" },
     data: {
       status: outcome.status,
       completedAt: outcome.status === "RETRYING" ? null : now,
-      errorMessage: outcome.status === "COMPLETED" ? null : outcome.errorMessage,
+      errorMessage: settled ? null : outcome.errorMessage,
       leaseUntil: null,
     },
   })
@@ -112,26 +110,62 @@ export async function finishResolution(
   return count === 1
 }
 
-/** How a game's resolution work stands. Used by the admin analytics. */
-export async function countResolutions(gameId: string): Promise<ResolutionCounts> {
-  const rows = await db.competitionResolutionWork.groupBy({
-    by: ["status"],
-    where: { gameId },
-    _count: { _all: true },
+/**
+ * Give up on work whose owner died too many times.
+ *
+ * `attempt` increments on every claim, so a crashed worker's item carries its
+ * count forward and the clean failure path honours it. The reclaim path did
+ * not: an item that kills the process never reaches that path, so it was
+ * reclaimed, killed the process again, and was reclaimed again - with nothing
+ * anywhere saying it had been tried four times. This is where it stops being
+ * tried and starts being a failure somebody can see.
+ *
+ * Scoped to RUNNING with a lapsed lease, which is exactly "claimed and then
+ * abandoned". An item reset by an administrator comes back with `attempt` at
+ * zero, so a deliberate retry is never caught by this.
+ */
+export async function abandonExhaustedResolutions(now: Date, maxAttempts: number): Promise<number> {
+  const { count } = await db.competitionResolutionWork.updateMany({
+    where: {
+      status: "RUNNING",
+      attempt: { gte: maxAttempts },
+      OR: [{ leaseUntil: { lte: now } }, { leaseUntil: null }],
+    },
+    data: {
+      status: "FAILED",
+      completedAt: now,
+      leaseUntil: null,
+      errorMessage: `Abandoned after ${maxAttempts} attempts — the worker holding it stopped without finishing`,
+    },
   })
 
-  const counts: ResolutionCounts = { pending: 0, running: 0, retrying: 0, completed: 0, failed: 0 }
-  for (const row of rows) {
-    const key = row.status.toLowerCase() as keyof ResolutionCounts
-    if (key in counts) counts[key] = row._count._all
+  if (count > 0) {
+    console.warn(`[resolver] gave up on ${count} competition(s) abandoned mid-resolution ${maxAttempts} times`)
   }
-  return counts
+
+  return count
 }
 
-/** Whether anything is still waiting to be resolved anywhere. */
-export async function hasOutstandingResolutions(): Promise<boolean> {
-  const outstanding = await db.competitionResolutionWork.count({
-    where: { status: { in: [...OUTSTANDING] } },
+/**
+ * The games whose nightly update is running right now.
+ *
+ * The resolver holds these back. A nightly and a competition sweep are already
+ * serialised against each other — the planner works one run at a time within a
+ * game — but the resolver is not part of that: it runs on its own timer and
+ * would happily resolve a few hundred competitions against the same connection
+ * pool a nightly is working through, competing for connections with the thing
+ * players are locked out of the game waiting for.
+ *
+ * A lapsed lease does not count as running. Such a run is one the scheduler is
+ * about to reclaim, and treating it as live would stall the queue for that game
+ * indefinitely if a process died mid-nightly.
+ */
+export async function gamesInNightly(now: Date): Promise<string[]> {
+  const running = await db.scheduledTaskRun.findMany({
+    where: { taskType: "NIGHTLY", status: "RUNNING", leaseUntil: { gt: now } },
+    select: { gameId: true },
+    distinct: ["gameId"],
   })
-  return outstanding > 0
+
+  return running.map((run) => run.gameId)
 }
