@@ -34,7 +34,7 @@ export function genotypeKey(parts: GenotypeKeyParts): string {
  * admin-configured definitions, and nothing in a nightly writes to them.
  */
 export async function loadGameAgingCache(client: CacheClient, gameId: string) {
-  const [gameConfig, lifeStageDefs, careActionCount, expressionRules, illnessPool, injuryPool] =
+  const [gameConfig, lifeStageDefs, careActionCount, expressionRules, conditionDefs, illnessPool, injuryPool] =
     await Promise.all([
       client.gameConfig.findUniqueOrThrow({ where: { gameId } }),
       client.lifeStageDef.findMany({ where: { gameId }, orderBy: { stageIndex: "asc" } }),
@@ -43,6 +43,13 @@ export async function loadGameAgingCache(client: CacheClient, gameId: string) {
         where: { locus: { gameId } },
         include: { ruleConditions: { include: { healthConditionDef: true } } },
       }),
+      // Every condition definition in the game, by id. Aging used to ask
+      // Postgres for the fatal ones an animal currently has — a second read of
+      // `AnimalHealthRecord` filtered on `conditionDef.isFatal`, on top of the
+      // one it had already done for the in-memory index. The records are now
+      // read once and the definitions joined to them here, which is 51 rows
+      // once per run against one query per animal per night.
+      client.healthConditionDef.findMany({ where: { gameId } }),
       // The per-animal part of these two queries — "conditions this animal does
       // not already have" — is applied in memory from the animal's own health
       // records. What is left is game-scoped and identical every time.
@@ -74,6 +81,7 @@ export async function loadGameAgingCache(client: CacheClient, gameId: string) {
     lifeStageDefs,
     careActionCount,
     expressionRulesByGenotype: new Map(expressionRules.map(rule => [genotypeKey(rule), rule])),
+    conditionDefsById: new Map(conditionDefs.map(def => [def.id, def])),
     illnessPool,
     injuryPool,
   }

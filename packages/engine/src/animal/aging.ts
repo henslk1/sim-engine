@@ -53,9 +53,42 @@ export async function advanceAnimalAging(
         condition: true,
         careScore: true,
         immunity: true,
+        // Four more reads on the same argument: nothing between here and the
+        // point each was read writes to its table. `AnimalHealthRecord` is
+        // written further down — by the illness roll, the genetic-onset pass,
+        // the treatment close-out and the overwork injury — but every one of
+        // those happens after both places this copy is used, and the second
+        // read of it below deliberately stays where it is so that it sees them.
+        //
+        // `AnimalPersonality` and `AnimalLongTermCareRecord` are never written
+        // by aging at all; `Pregnancy` is written only after it is read.
+        healthRecords: { select: { conditionDefId: true, isActive: true, resolvedCycle: true } },
+        // Was a lazy per-animal read, on the grounds that neither the illness
+        // roll nor the genetic-onset pass might be reached. In a nightly that
+        // is not what happens: the genetic pass runs unconditionally for every
+        // animal that is not a tutorial animal, so the read fired every time
+        // and the laziness only ever paid off on the death paths above, which
+        // return before reaching it. One join beats one round trip per animal.
+        genotypes: { select: { locusId: true, alleleOneId: true, alleleTwoId: true } },
+        pregnancies: { where: { isCompleted: false }, take: 1 },
+        personality: {
+          select: {
+            value: true,
+            personalityModifier: true,
+            traitDef: { select: { labelRanges: { select: { minValue: true, maxValue: true, moodModifier: true } } } },
+          },
+        },
+        longTermCareRecords: {
+          select: {
+            nextDueCycle: true,
+            longTermCareActionDef: { select: { gracePeriodCycles: true } },
+          },
+        },
       },
     })
     const { energy, mood, condition, careScore, immunity } = animal
+    const personalityRecords = animal.personality
+    const ltcRecords = animal.longTermCareRecords
 
     // The work this transaction was asked to do has already happened.
     if (options?.expectedCycle !== undefined && animal.ageInCycles !== options.expectedCycle) {
@@ -73,20 +106,7 @@ export async function advanceAnimalAging(
     // Read once and answered in memory from here on. Every "does this animal
     // already have condition X" and "when did X last resolve" below used to be
     // its own round trip, several of them inside loops.
-    const healthRecords = indexHealthRecords(
-      await tx.animalHealthRecord.findMany({
-        where: { animalId },
-        select: { conditionDefId: true, isActive: true, resolvedCycle: true },
-      })
-    )
-
-    // Both the illness roll and the genetic-onset pass walk the animal's
-    // genotypes; neither may be reached, so this stays lazy.
-    let genotypeRows: { locusId: string; alleleOneId: string; alleleTwoId: string }[] | null = null
-    const loadGenotypes = async () => genotypeRows ??= await tx.animalGenotype.findMany({
-      where: { animalId },
-      select: { locusId: true, alleleOneId: true, alleleTwoId: true },
-    })
+    const healthRecords = indexHealthRecords(animal.healthRecords)
 
     const newAge = animal.ageInCycles + 1
 
@@ -120,24 +140,31 @@ export async function advanceAnimalAging(
       }
     }
 
-    // Fatal condition death checks
-    const fatalRecords = await tx.animalHealthRecord.findMany({
-      where: { animalId, isActive: true, conditionDef: { isFatal: true } },
-      include: { conditionDef: true },
-    })
+    // Fatal condition death checks.
+    //
+    // The same rows the index above was built from, matched against the run's
+    // condition definitions rather than asked for again with a `conditionDef:
+    // { isFatal: true }` filter. A definition missing from the cache would mean
+    // a record pointing at a condition from another game, which cannot happen —
+    // but it is skipped rather than assumed, because the alternative is a crash
+    // in the middle of the night.
+    const fatalDefs = animal.healthRecords
+      .filter(record => record.isActive)
+      .map(record => game.conditionDefsById.get(record.conditionDefId))
+      .filter((def): def is NonNullable<typeof def> => def != null && def.isFatal)
 
-    for (const record of fatalRecords) {
-      if (record.conditionDef.fatalMaxCycle !== null && newAge >= record.conditionDef.fatalMaxCycle) {
+    for (const conditionDef of fatalDefs) {
+      if (conditionDef.fatalMaxCycle !== null && newAge >= conditionDef.fatalMaxCycle) {
         await tx.animal.update({
           where: { id: animalId },
-          data: { ageInCycles: newAge, status: "DECEASED", diedAt: new Date(), causeOfDeath: record.conditionDef.name },
+          data: { ageInCycles: newAge, status: "DECEASED", diedAt: new Date(), causeOfDeath: conditionDef.name },
         })
         return {}
       }
-      if (record.conditionDef.fatalityChance !== null && Math.random() < record.conditionDef.fatalityChance) {
+      if (conditionDef.fatalityChance !== null && Math.random() < conditionDef.fatalityChance) {
         await tx.animal.update({
           where: { id: animalId },
-          data: { ageInCycles: newAge, status: "DECEASED", diedAt: new Date(), causeOfDeath: record.conditionDef.name },
+          data: { ageInCycles: newAge, status: "DECEASED", diedAt: new Date(), causeOfDeath: conditionDef.name },
         })
         return {}
       }
@@ -180,7 +207,7 @@ export async function advanceAnimalAging(
           return newAge >= lastResolved + cond.flareupCooldownCycles
         })
         if (eligibleFiltered.length > 0) {
-          const genotypes = await loadGenotypes()
+          const genotypes = animal.genotypes
           const genotypeSet = new Set(genotypes.map(genotypeKey))
           const weights = eligibleFiltered.map(cond => {
             const bonus = cond.ruleConditions
@@ -205,7 +232,7 @@ export async function advanceAnimalAging(
 
     if (!animal.isTutorialAnimal) {
       // Genetic condition onset rolls
-      const genotypes = await loadGenotypes()
+      const genotypes = animal.genotypes
       for (const genotype of genotypes) {
         const rule = game.expressionRulesByGenotype.get(genotypeKey(genotype))
 
@@ -237,9 +264,7 @@ export async function advanceAnimalAging(
     }
 
     // Advance gestation if pregnant
-    const pregnancy = await tx.pregnancy.findFirst({
-      where: { animalId, isCompleted: false },
-    })
+    const pregnancy = animal.pregnancies[0] ?? null
 
     let pregnancyCompleted: string | undefined
     if (pregnancy) {
@@ -340,7 +365,7 @@ export async function advanceAnimalAging(
 
     // Check if work was done this cycle — suppresses condition decay
     const currentCycle = animal.ageInCycles
-    const [workedThisCycle, allCareDone, activeHealthRecords, personalityRecords, ltcRecords] = await Promise.all([
+    const [workedThisCycle, allCareDone, activeHealthRecords] = await Promise.all([
       // Only whether the animal worked at all, so each of these stops at the
       // first row it finds instead of counting every one. Nothing here reads
       // how many times it trained.
@@ -372,21 +397,6 @@ export async function advanceAnimalAging(
               treatmentDef: { select: { treatmentType: true } },
             },
           },
-        },
-      }),
-      tx.animalPersonality.findMany({
-        where: { animalId },
-        select: {
-          value: true,
-          personalityModifier: true,
-          traitDef: { select: { labelRanges: { select: { minValue: true, maxValue: true, moodModifier: true } } } },
-        },
-      }),
-      tx.animalLongTermCareRecord.findMany({
-        where: { animalId },
-        select: {
-          nextDueCycle: true,
-          longTermCareActionDef: { select: { gracePeriodCycles: true } },
         },
       }),
     ])
