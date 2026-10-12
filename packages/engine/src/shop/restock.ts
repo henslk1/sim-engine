@@ -152,6 +152,16 @@ export async function restockShop(
 
       await db.$transaction(async (tx) => {
         const { structuralRisk, preferredTerrain, preferredClimate } = await computeFixedFields(tx, genotypes)
+
+        // Resolved before the animal is created so `totalInnate` can be written
+        // with it, rather than as a second pass over rows this already has.
+        const totalPool = (gameConfig?.defaultInnateRatio ?? 0.5) * (gameInnateMax?.averageTotalInnate ?? 1000)
+        const statWeightTotal = config.breed.statProfile.reduce((s, sp) => s + sp.weight, 0) || 1
+        const stats = config.breed.statProfile.map((sp) => ({
+          statDefId: sp.statDefId,
+          innateValue: totalPool * (sp.weight / statWeightTotal),
+        }))
+
         const animal = await tx.animal.create({
           data: {
             gameId,
@@ -169,6 +179,7 @@ export async function restockShop(
             structuralRisk,
             preferredTerrain: preferredTerrain as any,
             preferredClimate: preferredClimate as any,
+            totalInnate: stats.reduce((sum, s) => sum + s.innateValue, 0),
           },
           select: { id: true },
         })
@@ -180,16 +191,11 @@ export async function restockShop(
           tx.animalImmunity.create({ data: { animalId: animal.id, innateMax: config.breed.immunityMax ?? 100, value: (config.breed.immunityMin ?? 60) + Math.random() * ((config.breed.immunityMax ?? 100) - (config.breed.immunityMin ?? 60)) } }),
           tx.animalCareScore.create({ data: { animalId: animal.id, score: 75 } }),
           tx.animalBreedComposition.create({ data: { animalId: animal.id, breedId: config.breedId, percentage: 1.0 } }),
-          ...(() => {
-            const totalPool = (gameConfig?.defaultInnateRatio ?? 0.5) * (gameInnateMax?.averageTotalInnate ?? 1000)
-            const totalWeight = config.breed.statProfile.reduce((s, sp) => s + sp.weight, 0) || 1
-            return config.breed.statProfile.map((sp) => {
-              const innateValue = totalPool * (sp.weight / totalWeight)
-              return tx.animalStat.create({
-                data: { animalId: animal.id, statDefId: sp.statDefId, innateValue, trainedValue: 0 },
-              })
+          ...stats.map((s) =>
+            tx.animalStat.create({
+              data: { animalId: animal.id, statDefId: s.statDefId, innateValue: s.innateValue, trainedValue: 0 },
             })
-          })(),
+          ),
           ...config.breed.personalityProfiles.map((pp) => {
             const range = pp.naturalMax - pp.naturalMin
             const value = pp.naturalMin + Math.random() * range

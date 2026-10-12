@@ -355,6 +355,16 @@ export const tutorialRouter = router({
           embryoPhenotypeRulesRaw.filter((r): r is ExpressionRuleForPhenotype => r.phenotype !== null),
         )
 
+        // Resolved before the create so `totalInnate` can be written with the
+        // animal. Unlike an IVF embryo, this one gets its stat rows right away.
+        const embryoStatWeightTotal = breedWeights.reduce((s, w) => s + w.weight, 0) || 1
+        // Use averageTotalInnate — embryo is a foundation-quality animal, not an exceptional one
+        const embryoStatPool = (gameConfigForGen?.defaultInnateRatio ?? 0.5) * (gameInnateMaxRecord?.averageTotalInnate ?? gameInnateMaxRecord?.maxTotalInnate ?? 100)
+        const embryoStats = breedWeights.map(sp => ({
+          statDefId: sp.statDefId,
+          innateValue: embryoStatPool * (sp.weight / embryoStatWeightTotal),
+        }))
+
         const embryo = await tx.animal.create({
           data: {
             gameId,
@@ -376,6 +386,7 @@ export const tutorialRouter = router({
             structuralRisk,
             preferredTerrain: preferredTerrain as any,
             preferredClimate: preferredClimate as any,
+            totalInnate: embryoStats.reduce((sum, s) => sum + s.innateValue, 0),
           },
           select: { id: true },
         })
@@ -387,21 +398,16 @@ export const tutorialRouter = router({
           tx.animalImmunity.create({ data: { animalId: embryo.id, value: 60, innateMax: 100 } }),
           tx.animalCareScore.create({ data: { animalId: embryo.id, score: 75 } }),
           tx.animalBreedComposition.create({ data: { animalId: embryo.id, breedId, percentage: 1.0 } }),
-          ...(() => {
-            const totalW = breedWeights.reduce((s, w) => s + w.weight, 0) || 1
-            // Use averageTotalInnate — embryo is a foundation-quality animal, not an exceptional one
-            const pool = (gameConfigForGen?.defaultInnateRatio ?? 0.5) * (gameInnateMaxRecord?.averageTotalInnate ?? gameInnateMaxRecord?.maxTotalInnate ?? 100)
-            return breedWeights.map(sp =>
-              tx.animalStat.create({
-                data: {
-                  animalId: embryo.id,
-                  statDefId: sp.statDefId,
-                  innateValue: pool * (sp.weight / totalW),
-                  trainedValue: 0,
-                },
-              })
-            )
-          })(),
+          ...embryoStats.map(s =>
+            tx.animalStat.create({
+              data: {
+                animalId: embryo.id,
+                statDefId: s.statDefId,
+                innateValue: s.innateValue,
+                trainedValue: 0,
+              },
+            })
+          ),
           ...breedPersonalityProfiles.map(pp =>
             tx.animalPersonality.create({
               data: {

@@ -264,6 +264,15 @@ export const breedingPregnancyRouter = router({
 
               if (stats.length > 0) {
                 await tx.animalStat.createMany({ data: stats })
+                // The only place the stat rows and the animal are created apart.
+                // An IVF offspring is a stored embryo for its whole gestation
+                // and has no stats until here, so `totalInnate` — null since
+                // its creation, which is what kept it out of the game average
+                // while unborn — is written now, with the rows it summarises.
+                await tx.animal.update({
+                  where: { id: o.animal.id },
+                  data: { totalInnate: stats.reduce((sum, x) => sum + x.innateValue, 0) },
+                })
               }
             }
           }

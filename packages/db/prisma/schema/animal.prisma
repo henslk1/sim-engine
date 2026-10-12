@@ -183,6 +183,21 @@ model Animal {
   breedingCooldownUntilCycle          Int?
   geneticCollectionCooldownUntilCycle Int?
   subContainerId                      String?
+
+  // The sum of this animal's AnimalStat.innateValue, written once when the
+  // stat rows are created and never touched again - `innateValue` has no update
+  // path anywhere in the codebase, only training's `trainedValue` does.
+  //
+  // Exists so the nightly can recalculate GameInnateMax without reading every
+  // stat row of every living animal. That query returned one row per animal for
+  // Node to sum; `max()`/`avg()` over this column returns one row full stop.
+  //
+  // Nullable on purpose. An IVF embryo is created with no stat rows and gets
+  // them at birth, so for its whole gestation it has no total - and the grouped
+  // query this replaces simply produced no row for such an animal. A required
+  // column defaulting to 0 would start counting them as zeros and drag the
+  // game average down. Null means "no stats yet", and aggregates skip it.
+  totalInnate                         Float?
   stats                               AnimalStat[]
   statHistory                         AnimalStatHistory[]
   ancestors                           AnimalAncestor[]                 @relation("AnimalLineage")

@@ -16,7 +16,6 @@ export {
 } from "./competition/queue.js"
 export { advanceAnimalAging } from "./animal/aging.js"
 export { loadGameAgingCache, genotypeKey, indexHealthRecords } from "./animal/aging-cache.js"
-export { summariseInnateTotals } from "./animal/nightly.js"
 export { markAnimalActive, markAnimalsActive, ANIMAL_ACTIVITY_SOURCES, NON_QUALIFYING } from "./animal/activity.js"
 export type { MarkAnimalActiveInput, AnimalActivitySource } from "./animal/activity.js"
 export { selectEligibleAnimals, countEligibleAnimals } from "./animal/eligibility.js"

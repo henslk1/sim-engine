@@ -36,11 +36,26 @@ export async function advanceAnimalAging(
     const animal = await tx.animal.findUniqueOrThrow({
       where: { id: animalId },
       include: {
-        lifeStage: true,
         disciplineDef: { select: { minLifeStageIndex: true, maxLifeStageIndex: true } },
         secondaryDisciplineDef: { select: { minLifeStageIndex: true, maxLifeStageIndex: true } },
+        // The five per-animal state rows, read here rather than one `findUnique`
+        // each further down. They are all one-to-one with the animal and none of
+        // them is written between this read and the point each is used, so
+        // reading them early changes nothing except the number of round trips —
+        // under `relationJoins` these are joins on a query that already runs.
+        //
+        // `lifeStage` used to be included here and was never read: the code
+        // wants `animal.lifeStageId`, which is a scalar already on the row, and
+        // the stage it actually works from is `correctStage`, found in the
+        // run's cache by age.
+        energy: true,
+        mood: true,
+        condition: true,
+        careScore: true,
+        immunity: true,
       },
     })
+    const { energy, mood, condition, careScore, immunity } = animal
 
     // The work this transaction was asked to do has already happened.
     if (options?.expectedCycle !== undefined && animal.ageInCycles !== options.expectedCycle) {
@@ -152,10 +167,6 @@ export async function advanceAnimalAging(
     })
 
     // Illness contraction roll
-    const [immunity, careScore] = await Promise.all([
-      tx.animalImmunity.findUnique({ where: { animalId } }),
-      tx.animalCareScore.findUnique({ where: { animalId } }),
-    ])
     if (!animal.isTutorialAnimal && immunity && immunity.innateMax > 0) {
       const immunityRatio = immunity.value / 100
       const careRatio = careScore ? careScore.score / 100 : 1
@@ -329,12 +340,15 @@ export async function advanceAnimalAging(
 
     // Check if work was done this cycle — suppresses condition decay
     const currentCycle = animal.ageInCycles
-    const [workedThisCycle, allCareDone, energy, mood, condition, activeHealthRecords, personalityRecords, ltcRecords] = await Promise.all([
+    const [workedThisCycle, allCareDone, activeHealthRecords, personalityRecords, ltcRecords] = await Promise.all([
+      // Only whether the animal worked at all, so each of these stops at the
+      // first row it finds instead of counting every one. Nothing here reads
+      // how many times it trained.
       Promise.all([
-        tx.trainingLog.count({ where: { animalId, cycleNumber: currentCycle } }),
-        tx.competitionEntry.count({ where: { animalId, cycleNumber: currentCycle } }),
-        tx.stageActivityLog.count({ where: { animalId, cycleNumber: currentCycle } }),
-      ]).then(([t, c, s]) => t + c + s > 0),
+        tx.trainingLog.findFirst({ where: { animalId, cycleNumber: currentCycle }, select: { id: true } }),
+        tx.competitionEntry.findFirst({ where: { animalId, cycleNumber: currentCycle }, select: { id: true } }),
+        tx.stageActivityLog.findFirst({ where: { animalId, cycleNumber: currentCycle }, select: { id: true } }),
+      ]).then(found => found.some(row => row !== null)),
       // Distinct actions, not log rows — see `isDailyCareComplete`. Counting
       // rows let the same free action, performed three times, pass for having
       // done three different ones.
@@ -345,9 +359,6 @@ export async function advanceAnimalAging(
           distinct: ["careActionDefId"],
         })
         .then(done => isDailyCareComplete(done.length, game.careActionCount)),
-      tx.animalEnergy.findUnique({ where: { animalId } }),
-      tx.animalMood.findUnique({ where: { animalId } }),
-      tx.animalCondition.findUnique({ where: { animalId } }),
       tx.animalHealthRecord.findMany({
         where: { animalId, isActive: true },
         include: {
@@ -439,57 +450,75 @@ export async function advanceAnimalAging(
       }
     }
 
+    // Each of the five values below is computed first and written only if it
+    // actually moved. These are the clamped ends of decay curves, so a large
+    // share of any population is sitting on one of them: measured against the
+    // live database, the condition write was writing 0 over 0 for every animal
+    // without exception, and energy was writing the maximum over the maximum
+    // for 57% of them.
+    //
+    // Safe because the only other thing an update to these tables does is move
+    // `updatedAt`, and nothing in the engine, the routers or the web app reads
+    // `updatedAt` on any of the five.
+    const newMood = mood
+      ? Math.max(0, Math.min(100,
+          mood.value
+          - gameConfig.moodDecayRate * (isOverworked ? 3 : ltcOverdue ? 2 : 1)
+          + conditionMoodEffect
+          + personalityRecords.reduce((sum, p) => {
+              const effective = p.value + p.personalityModifier
+              const range = p.traitDef.labelRanges.find(r => effective >= r.minValue && effective <= r.maxValue)
+              return sum + (range?.moodModifier ?? 0)
+            }, 0)
+        ))
+      : null
+    const newCondition = condition
+      ? Math.max(0, condition.value - gameConfig.conditionDecayRate)
+      : null
+    const newCareScore = careScore
+      ? Math.max(gameConfig.careScoreFloor, careScore.score - gameConfig.careScoreDecayRate)
+      : null
+    // The ceiling is the animal's own innate maximum scaled by its life stage.
+    // `immunityCapMultiplier` has existed on `LifeStageDef` since the model was
+    // written, is editable in the admin console, and was read by nothing — so a
+    // youngster configured to cap at 60% of its adult immunity quietly
+    // recovered to 100% like everything else.
+    //
+    // It defaults to 1.0, so this changes nothing until a stage is configured.
+    // `correctStage` comes from the run's cache, so applying it costs no query.
+    //
+    // `Math.min` does both jobs: it stops a growing animal exceeding its
+    // stage's ceiling, and brings one that is already above it — because the
+    // stage changed, or the multiplier did — back down to it.
+    const newImmunity = immunity
+      ? allCareDone
+        ? Math.min(
+            immunity.innateMax * correctStage.immunityCapMultiplier,
+            immunity.value + gameConfig.immunityRecoveryRate
+          )
+        : Math.max(gameConfig.immunityMin, immunity.value - gameConfig.immunityDecayRate)
+      : null
+
     await Promise.all([
-      newEnergy !== null && tx.animalEnergy.update({
+      energy && newEnergy !== null && newEnergy !== energy.currentEnergy && tx.animalEnergy.update({
         where: { animalId },
         data: { currentEnergy: newEnergy },
       }),
-      mood && tx.animalMood.update({
+      mood && newMood !== null && newMood !== mood.value && tx.animalMood.update({
         where: { animalId },
-        data: {
-          value: Math.max(0, Math.min(100,
-            mood.value
-            - gameConfig.moodDecayRate * (isOverworked ? 3 : ltcOverdue ? 2 : 1)
-            + conditionMoodEffect
-            + personalityRecords.reduce((sum, p) => {
-                const effective = p.value + p.personalityModifier
-                const range = p.traitDef.labelRanges.find(r => effective >= r.minValue && effective <= r.maxValue)
-                return sum + (range?.moodModifier ?? 0)
-              }, 0)
-          )),
-        },
+        data: { value: newMood },
       }),
-      condition && !workedThisCycle && tx.animalCondition.update({
+      condition && !workedThisCycle && newCondition !== null && newCondition !== condition.value && tx.animalCondition.update({
         where: { animalId },
-        data: { value: Math.max(0, condition.value - gameConfig.conditionDecayRate) },
+        data: { value: newCondition },
       }),
-      careScore && !allCareDone && tx.animalCareScore.update({
+      careScore && !allCareDone && newCareScore !== null && newCareScore !== careScore.score && tx.animalCareScore.update({
         where: { animalId },
-        data: { score: Math.max(gameConfig.careScoreFloor, careScore.score - gameConfig.careScoreDecayRate) },
+        data: { score: newCareScore },
       }),
-      immunity && tx.animalImmunity.update({
+      immunity && newImmunity !== null && newImmunity !== immunity.value && tx.animalImmunity.update({
         where: { animalId },
-        data: {
-          // The ceiling is the animal's own innate maximum scaled by its life
-          // stage. `immunityCapMultiplier` has existed on `LifeStageDef` since
-          // the model was written, is editable in the admin console, and was
-          // read by nothing — so a youngster configured to cap at 60% of its
-          // adult immunity quietly recovered to 100% like everything else.
-          //
-          // It defaults to 1.0, so this changes nothing until a stage is
-          // configured. `correctStage` comes from the run's cache, so applying
-          // it costs no query.
-          //
-          // `Math.min` does both jobs: it stops a growing animal exceeding its
-          // stage's ceiling, and brings one that is already above it — because
-          // the stage changed, or the multiplier did — back down to it.
-          value: allCareDone
-            ? Math.min(
-                immunity.innateMax * correctStage.immunityCapMultiplier,
-                immunity.value + gameConfig.immunityRecoveryRate
-              )
-            : Math.max(gameConfig.immunityMin, immunity.value - gameConfig.immunityDecayRate),
-        },
+        data: { value: newImmunity },
       }),
     ].filter(Boolean))
 

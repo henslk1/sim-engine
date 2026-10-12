@@ -152,6 +152,9 @@ export async function generateFromTemplate(tx: Tx, opts: GenerateFromTemplateOpt
       structuralRisk,
       preferredTerrain: preferredTerrain as any,
       preferredClimate: preferredClimate as any,
+      // Written here rather than derived later: the stat rows go in below, in
+      // this same transaction, from this same array.
+      totalInnate: stats.reduce((sum, s) => sum + s.innateValue, 0),
     },
     select: { id: true }
   })

@@ -950,6 +950,10 @@ export const breedingMaterialRouter = router({
               structuralRisk,
               preferredTerrain: preferredTerrain as any,
               preferredClimate: preferredClimate as any,
+              // This path writes the stat rows below, so the total is known now.
+              // The IVF create earlier in this file deliberately leaves it null:
+              // those stats are not resolved until birth.
+              totalInnate: offspring.stats.reduce((sum, s) => sum + s.innateValue, 0),
             },
             select: { id: true },
           })

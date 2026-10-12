@@ -27,7 +27,6 @@ import {
   pruneAnimalData,
   rotateShop,
   selectEligibleAnimals,
-  summariseInnateTotals,
   type Clock,
   type ScheduledType,
 } from "@sim-engine/engine"
@@ -367,22 +366,34 @@ export const runNightly: TaskHandler = async (ctx) => {
 
     // Recalculate GameInnateMax from the living population.
     //
-    // Postgres does the per-animal sum, so this returns one row per animal
-    // rather than every stat row of every animal. Tutorial animals are excluded
-    // — they are handed generous fixed stats and would drag the game's ceiling
-    // around for everyone.
-    const innateTotals = await db.animalStat.groupBy({
-      by: ["animalId"],
-      where: { animal: { gameId, status: "ALIVE", isTutorialAnimal: false } },
-      _sum: { innateValue: true },
+    // `Animal.totalInnate` is the sum of that animal's stat rows, written when
+    // the rows are. Postgres takes the max and the mean over the column and
+    // hands back a single row.
+    //
+    // This used to group the whole of `AnimalStat` by animal and return one
+    // row per living animal for Node to reduce — a result set that grew with
+    // the population, and one that `summariseInnateTotals` existed to loop
+    // over by hand because spreading it into `Math.max(...)` would throw
+    // RangeError somewhere past 100,000 animals. Nothing is sent to Node now,
+    // so that cliff is gone along with the helper.
+    //
+    // Tutorial animals are excluded — they are handed generous fixed stats and
+    // would drag the game's ceiling around for everyone. An animal with no stat
+    // rows has a null total and is skipped, which is what the grouped query did
+    // implicitly by producing no row for it; the filter says so out loud.
+    const innate = await db.animal.aggregate({
+      where: { gameId, status: "ALIVE", isTutorialAnimal: false, totalInnate: { not: null } },
+      _max: { totalInnate: true },
+      _avg: { totalInnate: true },
     })
 
-    const innate = summariseInnateTotals(innateTotals.map((row) => row._sum.innateValue ?? 0))
-    if (innate) {
+    const maxTotalInnate = innate._max.totalInnate
+    const averageTotalInnate = innate._avg.totalInnate
+    if (maxTotalInnate !== null && averageTotalInnate !== null) {
       await db.gameInnateMax.upsert({
         where: { gameId },
-        create: { gameId, maxTotalInnate: innate.max, averageTotalInnate: innate.average },
-        update: { maxTotalInnate: innate.max, averageTotalInnate: innate.average },
+        create: { gameId, maxTotalInnate, averageTotalInnate },
+        update: { maxTotalInnate, averageTotalInnate },
       })
     }
 
