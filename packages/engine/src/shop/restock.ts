@@ -1,5 +1,7 @@
 import { db } from "@sim-engine/db"
 import { computeFixedFields } from "../animal/computeFixedFields.js"
+import { initialImmunity, sampleBreedPersonality } from "../animal/creationValues.js"
+import { computePhenotypeDescription, computePhenotypeCodes, type ExpressionRuleForPhenotype } from "../breeding/computePhenotype.js"
 
 export function weightedSample(items: { id: string; symbol: string; frequency: number }[]): { id: string; symbol: string } {
   const total = items.reduce((s, i) => s + i.frequency, 0)
@@ -79,7 +81,7 @@ export async function restockShop(
     }),
     db.gameConfig.findUnique({
       where: { gameId },
-      select: { lifeExpectancyBaseline: true, defaultInnateRatio: true },
+      select: { lifeExpectancyBaseline: true, defaultInnateRatio: true, immunityMax: true },
     }),
     db.gameInnateMax.findFirst({
       where: { gameId },
@@ -140,15 +142,21 @@ export async function restockShop(
       }
 
       // Apply numeric gene modifiers to life expectancy
-      const lifeModifierRules = genotypes.length > 0 ? (await db.expressionRule.findMany({
+      const matchingRules = genotypes.length > 0 ? await db.expressionRule.findMany({
         where: {
           OR: genotypes.map(g => ({ locusId: g.locusId, alleleOneId: g.alleleOneId, alleleTwoId: g.alleleTwoId })),
         },
-        select: { numericModifier: true },
-      })).filter(r => r.numericModifier !== null) : []
-      const totalModifier = lifeModifierRules.reduce((s, r) => s + (r.numericModifier ?? 0), 0)
+        select: { locusId: true, alleleOneId: true, alleleTwoId: true, phenotype: true, numericModifier: true },
+      }) : []
+      const phenotypeRules = matchingRules.filter(
+        (r): r is typeof r & ExpressionRuleForPhenotype => r.phenotype !== null,
+      )
+      const phenotypeDescription = computePhenotypeDescription(genotypes, phenotypeRules)
+      const genotypeCodes = computePhenotypeCodes(genotypes, phenotypeRules)
+      const totalModifier = matchingRules.reduce((s, r) => s + (r.numericModifier ?? 0), 0)
       const lifeExpectancyBase = config.breed.lifeExpectancyBaseline ?? gameConfig?.lifeExpectancyBaseline ?? null
       const lifeExpectancy = lifeExpectancyBase !== null ? Math.round(lifeExpectancyBase * (1 + totalModifier)) : null
+      const immunity = initialImmunity(config.breed.immunityMin, config.breed.immunityMax, gameConfig?.immunityMax ?? null)
 
       await db.$transaction(async (tx) => {
         const { structuralRisk, preferredTerrain, preferredClimate } = await computeFixedFields(tx, genotypes)
@@ -176,6 +184,7 @@ export async function restockShop(
             inbreedingCoefficient: 0,
             breedGeneration: 1,
             lifeExpectancy,
+            phenotypeDescription,
             structuralRisk,
             preferredTerrain: preferredTerrain as any,
             preferredClimate: preferredClimate as any,
@@ -187,7 +196,7 @@ export async function restockShop(
         await tx.animalEnergy.create({ data: { animalId: animal.id, currentEnergy: 100, maxEnergy: 100 } })
         await tx.animalMood.create({ data: { animalId: animal.id, value: 75 } })
         await tx.animalCondition.create({ data: { animalId: animal.id, value: 75 } })
-        await tx.animalImmunity.create({ data: { animalId: animal.id, innateMax: config.breed.immunityMax ?? 100, value: (config.breed.immunityMin ?? 60) + Math.random() * ((config.breed.immunityMax ?? 100) - (config.breed.immunityMin ?? 60)) } })
+        await tx.animalImmunity.create({ data: { animalId: animal.id, ...immunity } })
         await tx.animalCareScore.create({ data: { animalId: animal.id, score: 75 } })
         await tx.animalBreedComposition.create({ data: { animalId: animal.id, breedId: config.breedId, percentage: 1.0 } })
         for (const s of stats) {
@@ -196,15 +205,14 @@ export async function restockShop(
           })
         }
         for (const pp of config.breed.personalityProfiles) {
-          const range = pp.naturalMax - pp.naturalMin
-          const value = pp.naturalMin + Math.random() * range
+          const value = sampleBreedPersonality(pp)
           await tx.animalPersonality.create({
             data: { animalId: animal.id, traitDefId: pp.traitDefId, value },
           })
         }
-        for (const g of genotypes) {
+        for (const [index, g] of genotypes.entries()) {
           await tx.animalGenotype.create({
-            data: { animalId: animal.id, locusId: g.locusId, alleleOneId: g.alleleOneId, alleleTwoId: g.alleleTwoId },
+            data: { animalId: animal.id, locusId: g.locusId, alleleOneId: g.alleleOneId, alleleTwoId: g.alleleTwoId, phenotypeCode: genotypeCodes[index]?.phenotypeCode ?? null },
           })
         }
         await tx.gameShopAnimal.create({

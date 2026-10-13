@@ -5,8 +5,10 @@ import { Brain, HelpCircle } from "lucide-react"
 type Trait = AnimalProfile["personality"][number]
 
 function resolveLabel(trait: Trait): string | null {
+  // Match the displayed whole-number value and the training panel's label lookup.
+  const value = Math.round(trait.value)
   const range = trait.traitDef.labelRanges.find(
-    (r) => trait.value >= r.minValue && trait.value <= r.maxValue
+    (r) => value >= r.minValue && value <= r.maxValue
   )
   return range?.label ?? trait.traitLabel ?? null
 }

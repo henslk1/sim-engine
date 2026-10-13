@@ -1,6 +1,14 @@
 import { router, publicProcedure } from "../trpc.js"
 import { db } from "@sim-engine/db"
 import { z } from "zod"
+import { isValidPersonalityRange } from "@sim-engine/engine"
+
+const personalityRange = {
+  naturalMin: z.number(),
+  naturalMax: z.number(),
+  baseline: z.number(),
+}
+const personalityRangeError = { message: "Baseline must be between the natural minimum and maximum", path: ["baseline"] }
 
 export const breedAdminRouter = router({
   list: publicProcedure
@@ -203,10 +211,8 @@ export const breedAdminRouter = router({
       id: z.string().optional(),
       breedId: z.string(),
       traitDefId: z.string(),
-      naturalMin: z.number(),
-      naturalMax: z.number(),
-      baseline: z.number(),
-    }))
+      ...personalityRange,
+    }).refine(isValidPersonalityRange, personalityRangeError))
     .mutation(({ input }) => {
       const { id, breedId, ...data } = input
       if (id) return db.breedPersonalityProfile.update({ where: { id }, data })
@@ -221,10 +227,8 @@ export const breedAdminRouter = router({
       breedId: z.string(),
       profiles: z.array(z.object({
         traitDefId: z.string(),
-        naturalMin: z.number(),
-        naturalMax: z.number(),
-        baseline: z.number(),
-      }))
+        ...personalityRange,
+      }).refine(isValidPersonalityRange, personalityRangeError))
     }))
     .mutation(({ input }) =>
       db.$transaction(async tx => {

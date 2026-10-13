@@ -1,7 +1,8 @@
 import { Prisma, AnimalSex, AnimalStatMode, PersonalityMode } from "@sim-engine/db"
 import { weightedSample, canonicalize } from "../shop/restock.js"
 import { computeFixedFields } from "./computeFixedFields.js"
-import { computePhenotypeDescription } from "../breeding/computePhenotype.js"
+import { computePhenotypeDescription, computePhenotypeCodes } from "../breeding/computePhenotype.js"
+import { initialImmunity, sampleBreedPersonality, type BreedPersonalityRange } from "./creationValues.js"
 import type { ExpressionRuleForPhenotype } from "../breeding/computePhenotype.js"
 
 type Tx = Prisma.TransactionClient
@@ -35,9 +36,10 @@ interface GenerateFromTemplateOpts {
   breedWeights: { statDefId: string; weight: number }[]
   defaultInnateRatio: number
   gameInnateMax: number | null
-  breedPersonalityProfiles: { traitDefId: string; naturalMin: number; naturalMax: number }[]
+  breedPersonalityProfiles: (BreedPersonalityRange & { traitDefId: string })[]
   immunityMin: number | null
   immunityMax: number | null
+  gameConfigImmunityMax: number | null
   lifeExpectancyBaseline: number | null
   gameConfigLifeExpectancyBaseline: number | null
   ltcDefs: { id: string; intervalCycles: number }[]
@@ -99,7 +101,7 @@ export async function generateFromTemplate(tx: Tx, opts: GenerateFromTemplateOpt
     } else if (template.personalityMode === "RANGE" && template.personalityMin != null && template.personalityMax != null) {
       value = template.personalityMin + Math.random() * (template.personalityMax - template.personalityMin)
     } else {
-      value = pp.naturalMin + Math.random() * (pp.naturalMax - pp.naturalMin)
+      value = sampleBreedPersonality(pp)
     }
     return { traitDefId: pp.traitDefId, value }
   })
@@ -120,6 +122,8 @@ export async function generateFromTemplate(tx: Tx, opts: GenerateFromTemplateOpt
     (r): r is typeof r & ExpressionRuleForPhenotype => r.phenotype !== null
   )
   const phenotypeDescription = computePhenotypeDescription(genotypes, phenotypeRules)
+  const genotypeCodes = computePhenotypeCodes(genotypes, phenotypeRules)
+  const immunity = initialImmunity(opts.immunityMin, opts.immunityMax, opts.gameConfigImmunityMax)
   const totalModifier = lifeModifierRules.reduce((s, r) => s + (r.numericModifier ?? 0), 0)
   const lifeExpectancyBase = opts.lifeExpectancyBaseline ?? opts.gameConfigLifeExpectancyBaseline ?? null
   const lifeExpectancy = lifeExpectancyBase !== null ? Math.round(lifeExpectancyBase * (1 + totalModifier)) : null
@@ -163,7 +167,7 @@ export async function generateFromTemplate(tx: Tx, opts: GenerateFromTemplateOpt
     tx.animalEnergy.create({ data: { animalId: animal.id, currentEnergy: 100, maxEnergy: 100 } }),
     tx.animalMood.create({ data: { animalId: animal.id, value: 75 } }),
     tx.animalCondition.create({ data: { animalId: animal.id, value: 75 } }),
-    tx.animalImmunity.create({ data: { animalId: animal.id, innateMax: opts.immunityMax ?? 100, value: (opts.immunityMin ?? 60) + Math.random() * ((opts.immunityMax ?? 100) - (opts.immunityMin ?? 60)) } }),
+    tx.animalImmunity.create({ data: { animalId: animal.id, ...immunity } }),
     tx.animalCareScore.create({ data: { animalId: animal.id, score: 75 } }),
     ...(template.breedId ? [
       tx.animalBreedComposition.create({ data: { animalId: animal.id, breedId: template.breedId, percentage: 1.0 } }),
@@ -178,9 +182,9 @@ export async function generateFromTemplate(tx: Tx, opts: GenerateFromTemplateOpt
         data: { animalId: animal.id, traitDefId: p.traitDefId, value: p.value },
       })
     ),
-    ...genotypes.map((g) =>
+    ...genotypes.map((g, index) =>
       tx.animalGenotype.create({
-        data: { animalId: animal.id, locusId: g.locusId, alleleOneId: g.alleleOneId, alleleTwoId: g.alleleTwoId, isTestedByOwner: g.isTestedByOwner ?? false },
+        data: { animalId: animal.id, locusId: g.locusId, alleleOneId: g.alleleOneId, alleleTwoId: g.alleleTwoId, phenotypeCode: genotypeCodes[index]?.phenotypeCode ?? null, isTestedByOwner: g.isTestedByOwner ?? false },
       })
     ),
     ...opts.ltcDefs.map((def) =>

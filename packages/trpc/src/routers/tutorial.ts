@@ -3,7 +3,7 @@ import { TRPCError } from "@trpc/server"
 import { canTransitionTutorial, TUTORIAL_STEPS } from "../tutorial-policy.js"
 import { router, protectedProcedure } from "../trpc.js"
 import { db, AnimalSex } from "@sim-engine/db"
-import { generateFromTemplate, weightedSample, canonicalize, deleteAnimalsWithChildren, computeFixedFields, computePhenotypeDescription, enterCompetition, runCompetition } from "@sim-engine/engine"
+import { generateFromTemplate, weightedSample, canonicalize, deleteAnimalsWithChildren, computeFixedFields, computePhenotypeDescription, computePhenotypeCodes, sampleBreedPersonality, initialImmunity, enterCompetition, runCompetition } from "@sim-engine/engine"
 import type { ExpressionRuleForPhenotype } from "@sim-engine/engine"
 
 export const tutorialRouter = router({
@@ -161,13 +161,14 @@ export const tutorialRouter = router({
       // Batch 3
       const [breedWeights, breedPersonalityProfiles, breedImmunity, gameConfigForGen, breedAlleleFreqs, gameInnateMaxRecord] = await Promise.all([
         db.breedStatProfile.findMany({ where: { breedId }, select: { statDefId: true, weight: true } }),
-        db.breedPersonalityProfile.findMany({ where: { breedId }, select: { traitDefId: true, naturalMin: true, naturalMax: true } }),
+        db.breedPersonalityProfile.findMany({ where: { breedId }, select: { traitDefId: true, naturalMin: true, naturalMax: true, baseline: true } }),
         db.breed.findUnique({ where: { id: breedId }, select: { immunityMin: true, immunityMax: true, lifeExpectancyBaseline: true } }),
         db.gameConfig.findUnique({
           where: { gameId },
           select: {
             lifeExpectancyBaseline: true,
             defaultInnateRatio: true,
+            immunityMax: true,
             tutorialMaleBaseTemplate: {
               select: {
                 sex: true, fertility: true, startingAgeInCycles: true,
@@ -269,6 +270,7 @@ export const tutorialRouter = router({
         breedPersonalityProfiles,
         immunityMin: breedImmunity?.immunityMin ?? null,
         immunityMax: breedImmunity?.immunityMax ?? null,
+        gameConfigImmunityMax: gameConfigForGen?.immunityMax ?? null,
         lifeExpectancyBaseline: breedImmunity?.lifeExpectancyBaseline ?? null,
         gameConfigLifeExpectancyBaseline: gameConfigForGen?.lifeExpectancyBaseline ?? null,
         ltcDefs,
@@ -348,10 +350,10 @@ export const tutorialRouter = router({
               select: { locusId: true, alleleOneId: true, alleleTwoId: true, phenotype: true },
             })
           : []
-        const embryoPhenotypeDescription = computePhenotypeDescription(
-          embryoGenotypes,
-          embryoPhenotypeRulesRaw.filter((r): r is ExpressionRuleForPhenotype => r.phenotype !== null),
-        )
+        const embryoPhenotypeRules = embryoPhenotypeRulesRaw.filter((r): r is ExpressionRuleForPhenotype => r.phenotype !== null)
+        const embryoPhenotypeDescription = computePhenotypeDescription(embryoGenotypes, embryoPhenotypeRules)
+        const embryoGenotypeCodes = computePhenotypeCodes(embryoGenotypes, embryoPhenotypeRules)
+        const embryoImmunity = initialImmunity(sharedOpts.immunityMin, sharedOpts.immunityMax, sharedOpts.gameConfigImmunityMax)
 
         // Resolved before the create so `totalInnate` can be written with the
         // animal. Unlike an IVF embryo, this one gets its stat rows right away.
@@ -392,7 +394,7 @@ export const tutorialRouter = router({
         await tx.animalEnergy.create({ data: { animalId: embryo.id, currentEnergy: 100, maxEnergy: 100 } })
         await tx.animalMood.create({ data: { animalId: embryo.id, value: 75 } })
         await tx.animalCondition.create({ data: { animalId: embryo.id, value: 75 } })
-        await tx.animalImmunity.create({ data: { animalId: embryo.id, value: 60, innateMax: 100 } })
+        await tx.animalImmunity.create({ data: { animalId: embryo.id, ...embryoImmunity } })
         await tx.animalCareScore.create({ data: { animalId: embryo.id, score: 75 } })
         await tx.animalBreedComposition.create({ data: { animalId: embryo.id, breedId, percentage: 1.0 } })
         for (const s of embryoStats) {
@@ -410,13 +412,13 @@ export const tutorialRouter = router({
             data: {
               animalId: embryo.id,
               traitDefId: pp.traitDefId,
-              value: pp.naturalMin + Math.random() * (pp.naturalMax - pp.naturalMin),
+              value: sampleBreedPersonality(pp),
             },
           })
         }
-        for (const g of embryoGenotypes) {
+        for (const [index, g] of embryoGenotypes.entries()) {
           await tx.animalGenotype.create({
-            data: { animalId: embryo.id, locusId: g.locusId, alleleOneId: g.alleleOneId, alleleTwoId: g.alleleTwoId },
+            data: { animalId: embryo.id, locusId: g.locusId, alleleOneId: g.alleleOneId, alleleTwoId: g.alleleTwoId, phenotypeCode: embryoGenotypeCodes[index]?.phenotypeCode ?? null },
           })
         }
         await // LTC records are NOT created here — the embryo goes through the normal birth system
