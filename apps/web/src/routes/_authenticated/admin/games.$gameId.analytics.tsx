@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router"
+import { createFileRoute, Link } from "@tanstack/react-router"
 import { trpc, type RouterOutputs } from "@/lib/trpc"
 import { useState } from "react"
 import { cn } from "@/lib/utils"
@@ -247,6 +247,58 @@ function RunDetail({ detail, vocab, gameId }: {
             <p className="mt-1.5 text-[11px] text-muted-foreground">
              </p>
           </Block>
+
+          {detail.timing && (
+            <Block
+              title="Per-animal time"
+              aside={
+                <span className="text-[11px] text-muted-foreground">
+                  {detail.timing.measured.toLocaleString()} measured
+                </span>
+              }
+            >
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <Stat label="Median" value={formatDuration(detail.timing.p50Ms)} hint="half were faster" />
+                <Stat label="p95" value={formatDuration(detail.timing.p95Ms)} hint="slowest 1 in 20" />
+                <Stat label="p99" value={formatDuration(detail.timing.p99Ms)} hint="slowest 1 in 100" />
+                <Stat
+                  label="Slowest"
+                  value={formatDuration(detail.timing.maxMs)}
+                  hint={`fastest ${formatDuration(detail.timing.minMs)}`}
+                />
+              </div>
+
+              {detail.slowest.length > 0 && (
+                <div className="mt-3 rounded-lg border border-border bg-background p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Slowest animals
+                  </p>
+                  <ul className="mt-1.5 space-y-0.5 text-xs">
+                    {detail.slowest.map((item) => (
+                      <li key={item.id} className="flex items-baseline justify-between gap-3">
+                        <Link
+                          to="/animal/$animalId"
+                          params={{ animalId: item.animalId }}
+                          className="truncate text-foreground hover:underline"
+                        >
+                          {item.animalName}
+                        </Link>
+                        <span className="shrink-0 tabular-nums text-muted-foreground">
+                          {formatDuration(item.durationMs)}
+                          {item.attempt > 1 && ` · attempt ${item.attempt}`}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <p className="mt-1.5 text-[11px] text-muted-foreground">
+                Elapsed time per animal under the run's own concurrency, so these rank animals
+                against each other within this run rather than giving an isolated cost.
+              </p>
+            </Block>
+          )}
 
           <Block title="Work">
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">

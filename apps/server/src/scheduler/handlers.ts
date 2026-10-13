@@ -377,6 +377,16 @@ export const runNightly: TaskHandler = async (ctx) => {
         Math.floor(WORK_LEASE_MS / 3),
         () =>
           forEachBounded(chunk, ANIMAL_CONCURRENCY, async (work) => {
+            // Read before the `try` so the failure path can report a duration
+            // too - how long an animal spun before giving up is worth as much
+            // as how long a successful one took.
+            //
+            // This is elapsed time under the run's real concurrency, not
+            // isolated cost: `ANIMAL_CONCURRENCY` animals are in flight at
+            // once and contend for the pool. That makes it the right number
+            // for ranking animals against each other within a run, and the
+            // wrong one for "this animal costs N ms" in isolation.
+            const itemStartedAt = ctx.clock.now()
             try {
               // `expectedCycle` is the idempotency guarantee. If a previous
               // attempt aged this animal and died before closing the item out,
@@ -390,16 +400,32 @@ export const runNightly: TaskHandler = async (ctx) => {
               else if (result.lifeStageAdvanced) transitions++
 
               processed++
-              await finishWork(work.id, token, ctx.clock.now(), { status: "COMPLETED" })
+              // One clock reading for both the timestamp and the duration, so
+              // the two can never disagree about when this item ended.
+              const finishedAt = ctx.clock.now()
+              await finishWork(
+                work.id,
+                token,
+                finishedAt,
+                finishedAt.getTime() - itemStartedAt.getTime(),
+                { status: "COMPLETED" }
+              )
             } catch (err) {
               failed++
               console.error(`[nightly] failed to age animal ${work.animalId}:`, err)
               // Left RETRYING so the next pass picks it up; `attempt` on the
               // row is the record of how many times it has been tried.
-              await finishWork(work.id, token, ctx.clock.now(), {
-                status: work.attempt >= 3 ? "FAILED" : "RETRYING",
-                errorMessage: err instanceof Error ? err.message : String(err),
-              })
+              const finishedAt = ctx.clock.now()
+              await finishWork(
+                work.id,
+                token,
+                finishedAt,
+                finishedAt.getTime() - itemStartedAt.getTime(),
+                {
+                  status: work.attempt >= 3 ? "FAILED" : "RETRYING",
+                  errorMessage: err instanceof Error ? err.message : String(err),
+                }
+              )
             }
           })
       )

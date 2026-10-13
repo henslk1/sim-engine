@@ -1117,6 +1117,68 @@ function rateBetween(from: RateSample, to: RateSample): number | null {
   return (to.succeededTotal - from.succeededTotal) / seconds
 }
 
+/** How many of a run's slowest animals the detail view lists. */
+const SLOWEST_ITEMS = 10
+
+/**
+ * The spread of per-animal durations within one run.
+ *
+ * Percentiles rather than an average, because the average is the statistic a
+ * latency distribution most reliably hides things behind: one animal that took
+ * thirty seconds moves the mean of a thousand and says nothing about where the
+ * rest of them sat. The run already reports an average rate; this is the shape
+ * underneath it.
+ *
+ * Nearest-rank, read as three indexed offsets rather than `percentile_cont` in
+ * raw SQL. The tRPC layer has no raw SQL anywhere, and this is not the query to
+ * introduce it for: interpolating between two adjacent millisecond readings
+ * would change the answer by less than a millisecond, and the typed path keeps
+ * working through a column rename.
+ *
+ * Null when a run has nothing measured, which is every run from before
+ * `durationMs` existed - the column is deliberately not backfilled, because the
+ * only value that could be invented for it is the one that misled us.
+ */
+async function timingFor(runId: string) {
+  const measuredWhere = { runId, durationMs: { not: null } } as const
+
+  const spread = await db.nightlyAnimalWork.aggregate({
+    where: measuredWhere,
+    _count: { _all: true },
+    _avg: { durationMs: true },
+    _min: { durationMs: true },
+    _max: { durationMs: true },
+  })
+
+  const measured = spread._count._all
+  if (measured === 0) return null
+
+  /** The value at nearest rank `fraction`, ascending. */
+  const at = async (fraction: number): Promise<number | null> => {
+    const index = Math.min(measured - 1, Math.max(0, Math.ceil(fraction * measured) - 1))
+    const row = await db.nightlyAnimalWork.findFirst({
+      where: measuredWhere,
+      orderBy: { durationMs: "asc" },
+      skip: index,
+      select: { durationMs: true },
+    })
+    return row?.durationMs ?? null
+  }
+
+  // Outside a transaction, so these genuinely run on separate connections.
+  const [p50Ms, p95Ms, p99Ms] = await Promise.all([at(0.5), at(0.95), at(0.99)])
+
+  return {
+    measured,
+    averageMs: spread._avg.durationMs,
+    minMs: spread._min.durationMs,
+    maxMs: spread._max.durationMs,
+    p50Ms,
+    p95Ms,
+    p99Ms,
+  }
+}
+
 const analyticsOpsRouter = router({
   /**
    * The run history, newest first. This is the comparison table: one row per
@@ -1197,7 +1259,7 @@ const analyticsOpsRouter = router({
 
       if (!run) return null
 
-      const [sampleRows, workGroups, retriedItems, oldest, failures, log, previous] =
+      const [sampleRows, workGroups, retriedItems, oldest, failures, log, previous, slowest] =
         await Promise.all([
           db.scheduledTaskRunSample.findMany({
             where: { runId: run.id },
@@ -1253,7 +1315,25 @@ const analyticsOpsRouter = router({
             take: COMPARISON_RUNS,
             select: { startedAt: true, completedAt: true, succeededCount: true },
           }),
+          // The run's most expensive animals, as a starting point rather than
+          // an answer: a name and a link to go and look at what is different
+          // about them.
+          db.nightlyAnimalWork.findMany({
+            where: { runId: run.id, durationMs: { not: null } },
+            orderBy: { durationMs: "desc" },
+            take: SLOWEST_ITEMS,
+            select: {
+              id: true,
+              animalId: true,
+              durationMs: true,
+              attempt: true,
+              animal: { select: { name: true } },
+            },
+          }),
         ])
+
+      // Second round: the percentile offsets need the measured count first.
+      const timing = await timingFor(run.id)
 
       const work = { pending: 0, running: 0, retrying: 0, completed: 0, failed: 0, cancelled: 0 }
       for (const row of workGroups) {
@@ -1507,6 +1587,14 @@ const analyticsOpsRouter = router({
           pregnanciesCompleted,
         },
         samples: sampleRows,
+        timing,
+        slowest: slowest.map((item) => ({
+          id: item.id,
+          animalId: item.animalId,
+          animalName: item.animal.name,
+          durationMs: item.durationMs,
+          attempt: item.attempt,
+        })),
         comparison,
         resolution,
       }

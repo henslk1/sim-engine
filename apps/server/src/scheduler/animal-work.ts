@@ -135,11 +135,17 @@ export async function heartbeatWork(runId: string, token: string, now: Date, lea
  * The same fencing the run claim uses: a worker whose lease lapsed and whose
  * items were reclaimed must not write its result over the attempt that took
  * over from it.
+ *
+ * `durationMs` is how long the work itself took and has to be measured by the
+ * caller, because this function is only reached once it is over. It cannot be
+ * derived here from `startedAt`: that column is stamped on a whole chunk at
+ * claim time, so the difference would measure queue position, not cost.
  */
 export async function finishWork(
   id: string,
   token: string,
   now: Date,
+  durationMs: number,
   outcome: { status: "COMPLETED" } | { status: "RETRYING" | "FAILED"; errorMessage: string }
 ): Promise<boolean> {
   const { count } = await db.nightlyAnimalWork.updateMany({
@@ -147,6 +153,10 @@ export async function finishWork(
     data: {
       status: outcome.status,
       completedAt: outcome.status === "RETRYING" ? null : now,
+      // Cleared on RETRYING alongside `completedAt`, on the same reasoning: an
+      // item that is going round again has no finished attempt to describe
+      // yet, and the attempt that eventually succeeds overwrites this.
+      durationMs: outcome.status === "RETRYING" ? null : durationMs,
       errorMessage: outcome.status === "COMPLETED" ? null : outcome.errorMessage,
       leaseUntil: null,
     },

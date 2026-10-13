@@ -75,6 +75,26 @@ model NightlyAnimalWork {
   completedAt  DateTime?
   errorMessage String?
 
+  // How long aging this animal actually took, in milliseconds.
+  //
+  // Deliberately not `completedAt - startedAt`. `startedAt` is stamped by
+  // `claimChunk` on every item in the chunk at once, so that difference is
+  // "how long after the chunk was claimed did this animal finish" - dominated
+  // by the item's position in the queue rather than by its cost. Segmenting on
+  // it produces confident, wrong answers: the first measurement taken this way
+  // reported animals under treatment at 2.8x the rest, which was entirely an
+  // artefact of those animals sharing a contiguous id range and so landing
+  // together in one part of one chunk.
+  //
+  // This is measured around the aging call itself and excludes the item's own
+  // close-out write, which is scheduler overhead and roughly constant.
+  //
+  // Null while an item is outstanding, and null again on RETRYING, exactly as
+  // `completedAt` is - a retried animal reports the attempt that succeeded.
+  // Nothing backfills it, so it is only meaningful from the run that
+  // introduced it onwards.
+  durationMs   Int?
+
   run    ScheduledTaskRun @relation(fields: [runId], references: [id], onDelete: Cascade)
   animal Animal           @relation(fields: [animalId], references: [id], onDelete: Cascade)
 
