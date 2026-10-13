@@ -2,6 +2,8 @@ import { db } from "@sim-engine/db";
 import { markAnimalActive } from "../animal/activity.js";
 import { nextBoundaryFor } from "../schedule/clock.js";
 import { enqueueCompetitionResolution } from "./queue.js";
+import { requireLifeStageAction } from "../animal/actionGuards.js"
+import { grantConditionWorkGain } from "../animal/conditionWork.js"
 
 type Client = typeof db
 
@@ -41,6 +43,17 @@ export async function enterCompetition(
         }
       }
     })
+    const animal = await tx.animal.findUniqueOrThrow({
+      where: { id: animalId },
+      select: { gameId: true, status: true, ageInCycles: true, lifeStage: { select: { canCompete: true, stageIndex: true, energyCostMultiplier: true } } },
+    })
+    requireLifeStageAction(animal, "canCompete")
+    if (animal.gameId !== competition.gameId) throw new Error("Animal and competition must be in the same game")
+    const { minLifeStageIndex, maxLifeStageIndex } = competition.disciplineDef
+    if ((minLifeStageIndex != null && animal.lifeStage.stageIndex < minLifeStageIndex)
+      || (maxLifeStageIndex != null && animal.lifeStage.stageIndex > maxLifeStageIndex)) {
+      throw new Error("Animal is outside this discipline's life-stage range")
+    }
 
     // Queued counts as closed.
     //
@@ -227,10 +240,6 @@ export async function enterCompetition(
     }
 
     const energy = await tx.animalEnergy.findUnique({ where: { animalId } })
-    const animal = await tx.animal.findUniqueOrThrow({
-      where: { id: animalId },
-      select: { ageInCycles: true, lifeStage: { select: { energyCostMultiplier: true } } },
-    })
     if (!energy) throw new Error(`No energy record for animal ${animalId}`)
 
     const energyUsed = baseEnergyCost * animal.lifeStage.energyCostMultiplier
@@ -268,15 +277,7 @@ export async function enterCompetition(
       where: { gameId: competition.gameId },
       select: { conditionWorkGain: true },
     })
-    if (gameConfig && gameConfig.conditionWorkGain > 0) {
-      const condition = await tx.animalCondition.findUnique({ where: { animalId } })
-      if (condition) {
-        await tx.animalCondition.update({
-          where: { animalId },
-          data: { value: Math.min(100, condition.value + gameConfig.conditionWorkGain) },
-        })
-      }
-    }
+    await grantConditionWorkGain(tx, animalId, animal.ageInCycles, gameConfig?.conditionWorkGain ?? 0)
 
     if (entryFee > 0) {
       const baseCurrency = await tx.currencyDef.findFirstOrThrow({

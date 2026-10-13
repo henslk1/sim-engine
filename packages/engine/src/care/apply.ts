@@ -1,5 +1,6 @@
 import { db } from "@sim-engine/db";
 import { markAnimalActive } from "../animal/activity.js";
+import { requireLifeStageAction } from "../animal/actionGuards.js"
 
 type Client = typeof db
 
@@ -20,6 +21,13 @@ export async function applyCareAction(
       where: { id: careActionDefId },
       include: { items: true },
     })
+    const animal = await tx.animal.findUniqueOrThrow({
+      where: { id: animalId },
+      select: { status: true, gameId: true, ageInCycles: true, lifeStage: { select: { canReceiveCare: true } } },
+    })
+    requireLifeStageAction(animal, "canReceiveCare")
+    if (animal.gameId !== action.gameId) throw new Error("Care action belongs to another game")
+    if (animal.ageInCycles !== cycleNumber) throw new Error("Animal cycle changed; refresh and try again")
 
     switch(action.costType) {
 

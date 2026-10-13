@@ -1,5 +1,6 @@
 import { TRPCError } from "@trpc/server"
 import { db, ProfileFieldKey } from "@sim-engine/db"
+import { stableSortSchema, stableFiltersSchema, readStablePreferences } from "../stable-preferences.js"
 import { router, publicProcedure, protectedProcedure } from "../trpc.js"
 import { z } from "zod"
 
@@ -116,15 +117,28 @@ export const playerRouter = router({
       })
     }),
 
+  saveSubContainerPreferences: protectedProcedure
+    .input(z.object({ id: z.string(), sortDefault: stableSortSchema, filterConfig: stableFiltersSchema }))
+    .mutation(async ({ ctx, input }) => {
+      const result = await db.subContainer.updateMany({
+        where: { id: input.id, playerAccount: { userId: ctx.userId } },
+        data: { sortDefault: input.sortDefault, filterConfig: input.filterConfig },
+      })
+      if (result.count !== 1) throw new TRPCError({ code: "NOT_FOUND", message: "Paddock not found" })
+      return input
+    }),
+
   listSubContainers: publicProcedure
     .input(z.object({ playerAccountId: z.string() }))
-    .query(({ input }) =>
-      db.subContainer.findMany({
+    .query(async ({ input }) => {
+      const paddocks = await db.subContainer.findMany({
         where: { playerAccountId: input.playerAccountId },
-        select: { id: true, name: true },
+        select: { id: true, name: true, sortDefault: true, filterConfig: true },
         orderBy: { displayOrder: "asc" },
       })
-    ),
+      // Normalize legacy JSON at the boundary, also keeping the wire type finite.
+      return paddocks.map(paddock => ({ ...paddock, ...readStablePreferences(paddock) }))
+    }),
 
   balances: publicProcedure
     .input(z.object({ playerAccountId: z.string() }))

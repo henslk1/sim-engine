@@ -1,8 +1,7 @@
 import { useState } from "react"
 import type { AnimalProfile } from "../types"
 import { Badge, ActionButton } from "@/components/game/ui"
-import { Heart, CheckCircle, Ban, AlertTriangle, Loader2, CheckCircle2, Store } from "lucide-react"
-import { getActiveRestrictions } from "../utils"
+import { Heart, CheckCircle, AlertTriangle, Loader2, CheckCircle2, Store } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { trpc } from "@/lib/trpc"
 import { Link } from "@tanstack/react-router"
@@ -61,8 +60,6 @@ export function DailyCarePanel({ animal, playerAccountId }: { animal: AnimalProf
     })
   }
 
-  const restrictions = getActiveRestrictions(animal)
-  const careRestricted = restrictions.has("CARE_ACTION") || restrictions.has("ALL")
 
   const groomActionId = animal.game.careActionDefs.find(a => a.name === "Groom")?.id ?? null
 
@@ -104,12 +101,6 @@ export function DailyCarePanel({ animal, playerAccountId }: { animal: AnimalProf
             <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               Daily Actions
             </h4>
-            {careRestricted && (
-              <div className="mb-2 flex items-center gap-1.5 rounded-md bg-destructive/10 px-2.5 py-1.5 text-[11px] text-destructive">
-                <Ban className="size-3 shrink-0" />
-                Care actions restricted due to active treatment
-              </div>
-            )}
             <div className="space-y-1.5">
               {animal.game.careActionDefs.map((action: CareAction) => {
                 const isDone = doneIds.has(action.id)
@@ -133,13 +124,13 @@ export function DailyCarePanel({ animal, playerAccountId }: { animal: AnimalProf
                       <CostBadge action={action} currencySymbol={currencySymbol} />
                       {isDone ? (
                         <span className="text-[11px] font-medium text-chart-2">Done</span>
-                      ) : !careRestricted && !hasItems(action) ? (
+                      ) : !hasItems(action) ? (
                         <Link to="/shop">
                           <ActionButton variant="soft" disabled className="h-6 px-2 text-[11px]">
                             <Store className="size-3" /> Visit Store
                           </ActionButton>
                         </Link>
-                      ) : !careRestricted ? (
+                      ) : (
                         <ActionButton
                           variant="soft"
                           disabled={isPending}
@@ -152,10 +143,6 @@ export function DailyCarePanel({ animal, playerAccountId }: { animal: AnimalProf
                           })}
                         >
                           {isPending ? <Loader2 className="size-3 animate-spin" /> : "Perform"}
-                        </ActionButton>
-                      ) : (
-                        <ActionButton variant="soft" disabled className="h-6 px-2 text-[11px]">
-                          Perform
                         </ActionButton>
                       )}
                     </div>
@@ -196,7 +183,7 @@ export function DailyCarePanel({ animal, playerAccountId }: { animal: AnimalProf
                           data-tutorial="ltc-perform"
                           variant="soft"
                           className="h-6 px-2 text-[11px]"
-                          disabled={ltcPendingId === record.id || careRestricted}
+                          disabled={ltcPendingId === record.id}
                           onClick={() => performLtc({ animalId: animal.id, ltcRecordId: record.id, playerAccountId })}
                         >
                           {ltcPendingId === record.id

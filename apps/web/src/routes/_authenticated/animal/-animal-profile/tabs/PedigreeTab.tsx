@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router"
+import { pedigreeLayout, pedigreeRow } from "@/lib/pedigree-layout"
 import type { AnimalProfile } from "../types"
 import { Badge } from "@/components/game/ui"
 import { cn } from "@/lib/utils"
@@ -6,17 +7,6 @@ import { getCOIColor } from "../utils"
 
 type Ancestor = AnimalProfile["ancestors"][number]
 
-
-const TOTAL_ROWS = 8
-const ROW_HEIGHT = "2.25rem"
-
-function getGridRowStyle(position: number) {
-  const depth = Math.floor(Math.log2(position))
-  const indexInDepth = position - Math.pow(2, depth)
-  const rowSpan = TOTAL_ROWS / Math.pow(2, depth)
-  const rowStart = indexInDepth * rowSpan + 1
-  return { gridRow: `${rowStart} / span ${rowSpan}` }
-}
 
 function buildPositionMap(ancestors: Ancestor[]) {
   const map = new Map<number, Ancestor>()
@@ -47,20 +37,10 @@ function buildPositionMap(ancestors: Ancestor[]) {
 function centerYPct(position: number): string {
   const depth = Math.floor(Math.log2(position))
   const indexInDepth = position - Math.pow(2, depth)
-  const rowsPerNode = TOTAL_ROWS / Math.pow(2, depth)
-  const rowStart = indexInDepth * rowsPerNode
-  return `${((rowStart + rowsPerNode / 2) / TOTAL_ROWS) * 100}%`
+  return `${((indexInDepth + 0.5) / Math.pow(2, depth)) * 100}%`
 }
 
-function PedigreeConnectors({ positionMap }: { positionMap: Map<number, Ancestor> }) {
-  // Approximate column edge positions as % of total grid width (3 equal cols, gap-1)
-  const C1R = "33%"
-  const MID12 = "33.5%"
-  const C2L = "34%"
-  const C2R = "66%"
-  const MID23 = "66.5%"
-  const C3L = "67%"
-
+function PedigreeConnectors({ positionMap, columns }: { positionMap: Map<number, Ancestor>; columns: number[][] }) {
   const lines: React.ReactElement[] = []
 
   function addBranch(parentPos: number, c1r: string, mid: string, c2l: string) {
@@ -83,12 +63,12 @@ function PedigreeConnectors({ positionMap }: { positionMap: Map<number, Ancestor
       lines.push(<line key={`h2-${child2}`} x1={mid} y1={c2Y} x2={c2l} y2={c2Y} />)
   }
 
-  // col 1 → col 2
-  addBranch(2, C1R, MID12, C2L)
-  addBranch(3, C1R, MID12, C2L)
-
-  // col 2 → col 3
-  for (const p of [4, 5, 6, 7]) addBranch(p, C2R, MID23, C3L)
+  for (let column = 0; column < columns.length - 1; column++) {
+    const boundary = ((column + 1) / columns.length) * 100
+    for (const position of columns[column]!) {
+      addBranch(position, `calc(${boundary}% - 0.5rem)`, `${boundary}%`, `calc(${boundary}% + 0.5rem)`)
+    }
+  }
 
   return (
     <svg
@@ -121,22 +101,24 @@ function PedigreeNode({ ancestor }: { ancestor: Ancestor }) {
 function PedigreeColumn({
   positions,
   positionMap,
+  rows,
 }: {
   positions: number[]
+  rows: number
   positionMap: Map<number, Ancestor>
 }) {
   return (
     <div
       style={{
         display: "grid",
-        gridTemplateRows: `repeat(${TOTAL_ROWS}, ${ROW_HEIGHT})`,
-        gap: "0.125rem",
+        gridTemplateRows: `repeat(${rows}, 2.375rem)`,
+
       }}
     >
       {positions.map((pos) => {
         const ancestor = positionMap.get(pos)
         return (
-          <div key={pos} style={getGridRowStyle(pos)} className="flex items-center justify-center">
+          <div key={pos} style={{ gridRow: `${pedigreeRow(pos, rows).start} / span ${pedigreeRow(pos, rows).span}` }} className="flex items-center justify-center">
             {ancestor && <PedigreeNode ancestor={ancestor} />}
           </div>
         )
@@ -147,7 +129,8 @@ function PedigreeColumn({
 
 export function PedigreeTab({ animal }: { animal: AnimalProfile }) {
   const coiColor = getCOIColor(animal.inbreedingCoefficient)
-  const ancestors = animal.ancestors
+  const { depth, rows, columns } = pedigreeLayout(animal.game.gameConfig?.pedigreeDisplayDepth)
+  const ancestors = animal.ancestors.filter(a => a.depth <= depth)
   const positionMap = buildPositionMap(ancestors)
 
   return (
@@ -183,11 +166,15 @@ export function PedigreeTab({ animal }: { animal: AnimalProfile }) {
       {ancestors.length === 0 ? (
         <p className="text-[11px] text-muted-foreground">No pedigree on record.</p>
       ) : (
-        <div className="relative grid grid-cols-3 gap-1">
-          <PedigreeConnectors positionMap={positionMap} />
-          <PedigreeColumn positions={[2, 3]} positionMap={positionMap} />
-          <PedigreeColumn positions={[4, 5, 6, 7]} positionMap={positionMap} />
-          <PedigreeColumn positions={[8, 9, 10, 11, 12, 13, 14, 15]} positionMap={positionMap} />
+        <div className="overflow-x-auto">
+          <div className="relative grid" style={{ gridTemplateColumns: `repeat(${depth}, minmax(0, 1fr))`, minWidth: `${depth * 10}rem` }}>
+            <PedigreeConnectors positionMap={positionMap} columns={columns} />
+            {columns.map((positions, i) => (
+              <div className="px-2" key={i}>
+                <PedigreeColumn positions={positions} positionMap={positionMap} rows={rows} />
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

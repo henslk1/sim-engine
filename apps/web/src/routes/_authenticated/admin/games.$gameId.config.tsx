@@ -45,7 +45,7 @@ function GameConfigPage() {
   const [cf, setCf] = useState({
     defaultInnateRatio: 0,
     trainingCeilingMultiplier: 0,
-    pedigreeDisplayDepth: 0,
+    pedigreeDisplayDepth: 3,
     predictorDailyLimitFree: 0,
     breedingEnergyCost: 0,
     maxBreedingSlots: "",
@@ -237,7 +237,7 @@ function GameConfigPage() {
               <div className="grid grid-cols-2 gap-2">
                 <F label="Innate Ratio"><Input type="number" step="0.01" min="0" max="1" {...n("defaultInnateRatio", true)} /></F>
                 <F label="Training Ceiling"><Input type="number" step="0.1" min="0" {...n("trainingCeilingMultiplier", true)} /></F>
-                <F label="Pedigree Depth"><Input type="number" step="1" min="1" {...n("pedigreeDisplayDepth")} /></F>
+                <F label="Pedigree Depth"><Input type="number" step="1" min="1" max="6" {...n("pedigreeDisplayDepth")} /></F>
                 <F label="Container Label"><Input {...s("containerLabel")} placeholder="Stable" /></F>
                 <F label="Sub-Container Label" ><Input {...s("subContainerLabel")} placeholder="Stall" /></F>
               </div>

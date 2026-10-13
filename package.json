@@ -8,9 +8,11 @@
     "test:tutorial": "node --import tsx --test packages/trpc/test/tutorial-policy.test.ts packages/trpc/test/tutorial-guard.test.ts packages/trpc/test/tutorial-markers.test.ts",
     "test:messaging": "node --import tsx --test packages/trpc/test/messaging-permissions.test.ts packages/trpc/test/messaging-messages.test.ts packages/trpc/test/messaging-channels.test.ts packages/trpc/test/messaging-rate-limit.test.ts packages/trpc/test/messaging-architecture.test.ts",
     "test:socket": "node --import tsx --test apps/server/test/socket.test.ts",
-    "test:engine": "node --import tsx --test packages/engine/test/aging-cache.test.ts packages/engine/test/conformation.test.ts packages/engine/test/creation-values.test.ts packages/engine/test/schedule-time.test.ts packages/engine/test/schedule-clock.test.ts packages/engine/test/schedule-plan.test.ts packages/engine/test/schedule-architecture.test.ts",
+    "test:engine": "node --import tsx --test packages/engine/test/aging-cache.test.ts packages/engine/test/action-guards.test.ts packages/engine/test/conformation.test.ts packages/engine/test/creation-values.test.ts packages/engine/test/schedule-time.test.ts packages/engine/test/schedule-clock.test.ts packages/engine/test/schedule-plan.test.ts packages/engine/test/schedule-architecture.test.ts",
+    "test:animal-actions": "node --import tsx --test packages/trpc/test/animal-actions.test.ts packages/trpc/test/stable-preferences.test.ts",
+    "test:condition-work:db": "cross-env RUN_DATABASE_TESTS=1 node --env-file=.env --import tsx --test packages/db/test/condition-work.integration.test.ts",
     "test:breeds": "node --import tsx --test packages/trpc/test/breed-personality.test.ts",
-    "test": "pnpm test:tutorial && pnpm test:messaging && pnpm test:socket && pnpm test:engine && pnpm test:breeds"
+    "test": "pnpm test:tutorial && pnpm test:messaging && pnpm test:socket && pnpm test:engine && pnpm test:breeds && pnpm test:animal-actions"
   },
   "devDependencies": {
     "cross-env": "^7.0.3",

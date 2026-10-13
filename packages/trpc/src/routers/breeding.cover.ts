@@ -1,7 +1,7 @@
 import { db } from "@sim-engine/db"
 import { router, publicProcedure } from "../trpc.js"
 import { z } from "zod"
-import { generateOffspring, computePhenotypeDescription, computePhenotypeCodes, computeBreedingQuality, computeCOI, computeFixedFields, markAnimalActive } from "@sim-engine/engine"
+import { generateOffspring, computePhenotypeDescription, computePhenotypeCodes, computeBreedingQuality, computeCOI, computeFixedFields, markAnimalActive, requireBreedingAllowed } from "@sim-engine/engine"
 
 async function buildBreedFreqMap(
   sireComp: Array<{ breedId: string; percentage: number }>,
@@ -295,22 +295,22 @@ export const breedingCoverRouter = router({
       price: z.number().min(0).default(0),
       fromListing: z.boolean().default(false),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input }) => db.$transaction(async (tx) => {
       const [sire, dam] = await Promise.all([
-        db.animal.findUniqueOrThrow({
+        tx.animal.findUniqueOrThrow({
           where: { id: input.sireId },
           select: {
-            sex: true, gameId: true, ageInCycles: true,
+            status: true, sex: true, gameId: true, ageInCycles: true,
             lifeStage: { select: { canBreed: true } },
             isCastrated: true,
             energy: { select: { currentEnergy: true } },
             game: { select: { gameConfig: { select: { breedingEnergyCost: true } } } },
           },
         }),
-        db.animal.findUniqueOrThrow({
+        tx.animal.findUniqueOrThrow({
           where: { id: input.damId },
           select: {
-            sex: true, gameId: true,
+            status: true, sex: true, gameId: true,
             lifeStage: { select: { canBreed: true } },
             energy: { select: { currentEnergy: true } },
           },
@@ -324,11 +324,14 @@ export const breedingCoverRouter = router({
       if (!dam.lifeStage.canBreed) throw new Error("Dam cannot breed at this life stage")
       if (sire.gameId !== dam.gameId) throw new Error("Animals must be in the same game")
 
+      if (sire.status !== "ALIVE" || dam.status !== "ALIVE") throw new Error("Both animals must be alive")
+      await requireBreedingAllowed(tx, [input.sireId, input.damId])
+
       const energyCost = sire.game.gameConfig?.breedingEnergyCost ?? 0
       if (energyCost > 0 && !input.fromListing) {
         if ((sire.energy?.currentEnergy ?? 0) < energyCost)
           throw new Error("Sire does not have enough energy to send a cover offer")
-        await db.animalEnergy.update({
+        await tx.animalEnergy.update({
           where: { animalId: input.sireId },
           data: { currentEnergy: { decrement: energyCost } },
         })
@@ -338,7 +341,7 @@ export const breedingCoverRouter = router({
           throw new Error("Dam does not have enough energy for this breeding")
       }
 
-      const offer = await db.coverOffer.create({
+      const offer = await tx.coverOffer.create({
         data: {
           gameId: sire.gameId,
           sireId: input.sireId,
@@ -350,9 +353,9 @@ export const breedingCoverRouter = router({
       })
 
       // Qualifying interaction — this is what makes the nightly age the animal.
-      await markAnimalActive(db, { animalId: input.sireId, cycleNumber: sire.ageInCycles })
+      await markAnimalActive(tx, { animalId: input.sireId, cycleNumber: sire.ageInCycles })
 
-      await db.animalDailyLog.create({
+      await tx.animalDailyLog.create({
         data: {
           animalId: input.sireId,
           cycleNumber: sire.ageInCycles,
@@ -363,7 +366,7 @@ export const breedingCoverRouter = router({
       })
 
       return offer
-    }),
+    })),
 
   accept: publicProcedure
     .input(z.object({ offerId: z.string() }))
@@ -384,6 +387,8 @@ export const breedingCoverRouter = router({
           where: { id: offer.damId },
           select: { status: true, isCastrated: true, ageInCycles: true, breedingCooldownUntilCycle: true, lifeStage: { select: { canBreed: true } } },
         })
+
+        await requireBreedingAllowed(tx, [offer.sireId, offer.damId])
 
         if (!sireStatus || sireStatus.status !== "ALIVE") throw new Error("Sire is no longer alive")
         if (sireStatus.isCastrated) throw new Error("Sire has been castrated")

@@ -63,7 +63,7 @@ type AliveAnimal = {
   sex: string
   breed: { id: string; name: string; isUnregistered: boolean } | null
   breedName: string | null
-  lifeStage: { name: string; stageIndex: number }
+  lifeStage: { name: string; stageIndex: number; canCompete: boolean }
   disciplineDefId: string | null
   secondaryDisciplineDefId: string | null
   compTiers: { disciplineDefId: string; tierDefId: string }[]
@@ -643,6 +643,7 @@ function VenueDetailPage() {
 
   function eligibleAnimalsFor(comp: Competition): AliveAnimal[] {
     return aliveAnimals.filter((a) => {
+      if (!a.lifeStage.canCompete) return false
       if (comp.breedId && a.breed?.id !== comp.breedId) return false
       if (!comp.disciplineDef.isConformation && a.disciplineDefId !== comp.disciplineDef.id && a.secondaryDisciplineDefId !== comp.disciplineDef.id) return false
       if (comp.disciplineDef.minLifeStageIndex !== null && a.lifeStage.stageIndex < comp.disciplineDef.minLifeStageIndex) return false
@@ -672,13 +673,15 @@ function VenueDetailPage() {
   const animalForFilter = isAnimalMode ? aliveAnimals.find((a) => a.id === initialAnimalId) : undefined
 
   const uninspectedPurebreds = aliveAnimals.filter(
-    (a) => !!a.breed && !a.breed.isUnregistered && (a.conformationScores ?? []).length === 0
+    (a) => a.lifeStage.canCompete && a.ageInCycles >= (gameData?.gameConfig?.conformationInspectionMinCycle ?? 0)
+      && !!a.breed && !a.breed.isUnregistered && (a.conformationScores ?? []).length === 0
   )
   const showInspection = isAnimalMode
-    ? !!(animalForFilter?.breed && !animalForFilter.breed.isUnregistered && (animalForFilter.conformationScores ?? []).length === 0)
+    ? uninspectedPurebreds.some(a => a.id === animalForFilter?.id)
     : uninspectedPurebreds.length > 0
 
   function isEligibleForAnimal(comp: Competition, animal: AliveAnimal): boolean {
+    if (!animal.lifeStage.canCompete) return false
     if (comp.breedId && animal.breed?.id !== comp.breedId) return false
     if (!comp.disciplineDef.isConformation && animal.disciplineDefId !== comp.disciplineDef.id && animal.secondaryDisciplineDefId !== comp.disciplineDef.id) return false
     if (comp.disciplineDef.minLifeStageIndex !== null && animal.lifeStage.stageIndex < comp.disciplineDef.minLifeStageIndex) return false

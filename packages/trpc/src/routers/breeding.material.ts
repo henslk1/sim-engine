@@ -1,7 +1,7 @@
 import { db } from "@sim-engine/db"
 import { router, publicProcedure } from "../trpc.js"
 import { z } from "zod"
-import { generateOffspring, computePhenotypeDescription, computePhenotypeCodes, computeBreedingQuality, computeFixedFields, type BlendedAlleleFrequency, markAnimalActive } from "@sim-engine/engine"
+import { generateOffspring, computePhenotypeDescription, computePhenotypeCodes, computeBreedingQuality, computeFixedFields, type BlendedAlleleFrequency, markAnimalActive, requireBreedingAllowed, loadMaterialInheritanceWeights } from "@sim-engine/engine"
 
 async function buildBreedFreqMap(
   sireComp: Array<{ breedId: string; percentage: number }>,
@@ -74,6 +74,7 @@ export const breedingMaterialRouter = router({
     }))
     .mutation(async ({ input }) => {
       return db.$transaction(async (tx) => {
+        await requireBreedingAllowed(tx, [input.animalId])
         // Qualifying interaction: a player action that changes this animal's state.
         await markAnimalActive(tx, { animalId: input.animalId })
 
@@ -85,6 +86,9 @@ export const breedingMaterialRouter = router({
             ageInCycles: true,
             name: true,
             sex: true,
+            status: true,
+            isCastrated: true,
+            lifeStage: { select: { canBreed: true } },
             breedId: true,
             breedName: true,
             inbreedingCoefficient: true,
@@ -170,6 +174,10 @@ export const breedingMaterialRouter = router({
             },
           },
         })
+
+        if (animal.status !== "ALIVE") throw new Error("Donor must be alive")
+        if (animal.isCastrated || !animal.lifeStage.canBreed) throw new Error("Donor cannot breed at this life stage")
+        if ((input.materialType === "SPERM") !== (animal.sex === "MALE")) throw new Error("Material type does not match donor sex")
 
         const config = animal.game.gameConfig
         const groupId = animal.groupAnimals[0]?.groupId ?? null
@@ -404,6 +412,8 @@ export const breedingMaterialRouter = router({
         const gameId = sperm.gameId
         const spermSnap = sperm.donorSnapshot as any
         const eggSnap = egg.donorSnapshot as any
+        const inheritanceWeights = await loadMaterialInheritanceWeights(tx, gameId,
+          [...(spermSnap.genotypes ?? []), ...(eggSnap.genotypes ?? [])].map((g: any) => g.locusId))
 
         // Build ParentData entirely from snapshots — live animal state is irrelevant
         function snapshotToParentData(snap: any, animalId: string) {
@@ -427,7 +437,7 @@ export const breedingMaterialRouter = router({
               alleleTwoId: g.alleleTwoId,
               alleleOne: { id: g.alleleOneId, symbol: g.alleleOneSymbol },
               alleleTwo: { id: g.alleleTwoId, symbol: g.alleleTwoSymbol },
-              locus: { inheritanceWeight: 1.0 },
+              locus: { inheritanceWeight: inheritanceWeights.get(g.locusId)! },
             })),
             breedComposition: snap.breedComposition ?? [],
             immunity: snap.immunity ?? null,
@@ -639,6 +649,9 @@ export const breedingMaterialRouter = router({
 
         const gameId = sperm.gameId
         const spermSnap = sperm.donorSnapshot as any
+        const inheritanceWeights = await loadMaterialInheritanceWeights(tx, gameId,
+          (spermSnap.genotypes ?? []).map((g: any) => g.locusId))
+        await requireBreedingAllowed(tx, [input.damId])
 
         const dam = await tx.animal.findUniqueOrThrow({
           where: { id: input.damId },
@@ -741,7 +754,7 @@ export const breedingMaterialRouter = router({
             alleleTwoId: g.alleleTwoId,
             alleleOne: { id: g.alleleOneId, symbol: g.alleleOneSymbol },
             alleleTwo: { id: g.alleleTwoId, symbol: g.alleleTwoSymbol },
-            locus: { inheritanceWeight: 1.0 },
+            locus: { inheritanceWeight: inheritanceWeights.get(g.locusId)! },
           })),
           breedComposition: spermSnap.breedComposition ?? [],
           immunity: spermSnap.immunity ?? null,
@@ -1169,7 +1182,8 @@ export const breedingMaterialRouter = router({
             status: true,
             ageInCycles: true,
             isCastrated: true,
-            lifeStage: { select: { canBreed: true } },
+            gameId: true,
+            lifeStage: { select: { canSurrogate: true } },
             breedingCooldownUntilCycle: true,
           },
         })
@@ -1177,7 +1191,9 @@ export const breedingMaterialRouter = router({
         if (surrogate.sex !== "FEMALE") throw new Error("Surrogate must be female")
         if (surrogate.status !== "ALIVE") throw new Error("Surrogate must be alive")
         if (surrogate.isCastrated) throw new Error("Surrogate is castrated")
-        if (!surrogate.lifeStage.canBreed) throw new Error("Surrogate cannot breed at this life stage")
+        if (!surrogate.lifeStage.canSurrogate) throw new Error("Surrogacy is not available at this life stage")
+        if (surrogate.gameId !== embryo.gameId) throw new Error("Embryo and surrogate must be in the same game")
+        await requireBreedingAllowed(tx, [input.surrogateAnimalId])
         if ((surrogate.breedingCooldownUntilCycle ?? 0) > surrogate.ageInCycles) {
           throw new Error(`Surrogate is on a breeding cooldown until cycle ${surrogate.breedingCooldownUntilCycle}`)
         }
@@ -1241,6 +1257,7 @@ export const breedingMaterialRouter = router({
           data: {
             animalId: input.surrogateAnimalId,
             breedingRecordId: embryo.producedByBreedingRecordId,
+            isSurrogate: true,
             requiredCycles: gameConfig?.gestationCycles ?? 12,
           },
           select: { id: true },

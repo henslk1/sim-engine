@@ -112,7 +112,8 @@ type AliveAnimal = {
   breed: { name: string } | null
   breedName: string | null
   sex: string
-  lifeStage: { name: string }
+  lifeStage: { name: string; canSurrogate: boolean; canBreed: boolean }
+  activityRestrictions: { restrictionType: string }[]
   status: string
   ageInCycles: number
   isCastrated: boolean
@@ -598,7 +599,7 @@ function CollectPanel({
   const utils = trpc.useUtils()
 
   const filteredAnimals = aliveAnimals.filter(a => {
-    if (a.isCastrated) return false
+    if (a.isCastrated || !a.lifeStage.canBreed || a.activityRestrictions.length > 0) return false
     if (a.geneticCollectionCooldownUntilCycle !== null && a.geneticCollectionCooldownUntilCycle > a.ageInCycles) return false
     if (materialType === "SPERM") return a.sex === "MALE"
     return a.sex === "FEMALE" && a.pregnancies.length === 0
@@ -777,6 +778,7 @@ function ImplantEmbryoPanel({
 
   const filteredSurrogates = aliveAnimals.filter(a =>
     a.sex === "FEMALE" &&
+    a.lifeStage.canSurrogate && !a.isCastrated && a.activityRestrictions.length === 0 &&
     a.pregnancies.length === 0 &&
     (a.breedingCooldownUntilCycle === null || a.breedingCooldownUntilCycle <= a.ageInCycles)
   )
@@ -852,6 +854,7 @@ function AIPanel({
   const utils = trpc.useUtils()
 
   const filteredFemales = aliveAnimals.filter(a =>
+    a.lifeStage.canBreed && !a.isCastrated && a.activityRestrictions.length === 0 &&
     a.sex === "FEMALE" &&
     a.pregnancies.length === 0 &&
     (a.breedingCooldownUntilCycle === null || a.breedingCooldownUntilCycle <= a.ageInCycles)

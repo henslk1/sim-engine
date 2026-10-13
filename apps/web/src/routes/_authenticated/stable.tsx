@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import { trpc } from "@/lib/trpc"
+import { DEFAULT_FILTERS, readStablePreferences, type StableFilters, type StablePreferences } from "@sim-engine/trpc/stable-preferences"
 import { useEffect, useRef, useState } from "react"
 import {
   Plus, Pencil, Trash2, Check, X,
@@ -60,26 +61,6 @@ type PendingCare = {
   ltcOverdue: number
   ltcName: string | null
 }
-
-type StableFilters = {
-  sex: "MALE" | "FEMALE" | ""
-  hasAlerts: boolean
-  pregnant: boolean
-  inspected: boolean
-  hasDiscipline: boolean
-  careDue: boolean
-}
-
-const DEFAULT_FILTERS: StableFilters = {
-  sex: "",
-  hasAlerts: false,
-  pregnant: false,
-  inspected: false,
-  hasDiscipline: false,
-  careDue: false,
-}
-
-// ─── Animal card ───────────────────────────────────────────────────────────────
 
 function AnimalCard({
   animal,
@@ -515,8 +496,46 @@ function StablePage() {
   })
   const [selected, setSelected] = useState<Selection>("all")
   const [nameFilter, setNameFilter] = useState("")
-  const [sortBy, setSortBy] = useState<SortBy>("name")
-  const [filters, setFilters] = useState<StableFilters>(DEFAULT_FILTERS)
+  const [preferenceDrafts, setPreferenceDrafts] = useState<Record<string, StablePreferences>>({})
+  const draftsRef = useRef(preferenceDrafts)
+  const [saveErrors, setSaveErrors] = useState<Record<string, string>>({})
+  const saveQueue = useRef<Promise<void>>(Promise.resolve())
+  const savePreferences = trpc.player.saveSubContainerPreferences.useMutation()
+  const selectedPaddock = subContainers.find(sc => sc.id === selected)
+  const preferenceKey = `${playerAccountId}:${selected}`
+  const preferences = preferenceDrafts[preferenceKey] ?? readStablePreferences(selectedPaddock)
+  const sortBy = preferences.sortDefault
+  const filters = preferences.filterConfig
+
+  function persistPreferences(value: StablePreferences) {
+    if (!selectedPaddock || !playerAccountId) return
+    const id = selectedPaddock.id
+    const accountId = playerAccountId
+    const key = preferenceKey
+    // Serialize writes so a slower earlier request cannot overwrite a later choice.
+    saveQueue.current = saveQueue.current.then(async () => {
+      try {
+        await savePreferences.mutateAsync({ id, ...value })
+        utils.player.listSubContainers.setData({ playerAccountId: accountId }, previous =>
+          previous?.map(sc => sc.id === id ? { ...sc, ...value } : sc))
+        setSaveErrors(previous => { const next = { ...previous }; delete next[key]; return next })
+      } catch (error) {
+        setSaveErrors(previous => ({ ...previous, [key]: error instanceof Error ? error.message : "Could not save preferences" }))
+      }
+    })
+  }
+
+  function updatePreferences(patch: Partial<StablePreferences>) {
+    const next = { ...(draftsRef.current[preferenceKey] ?? preferences), ...patch }
+    draftsRef.current = { ...draftsRef.current, [preferenceKey]: next }
+    setPreferenceDrafts(draftsRef.current)
+    persistPreferences(next)
+  }
+  function setSortBy(sort: SortBy) { updatePreferences({ sortDefault: sort }) }
+  function setFilters(value: StableFilters | ((current: StableFilters) => StableFilters)) {
+    const current = draftsRef.current[preferenceKey]?.filterConfig ?? filters
+    updatePreferences({ filterConfig: typeof value === "function" ? value(current) : value })
+  }
   const [filterOpen, setFilterOpen] = useState(false)
   const filterRef = useRef<HTMLDivElement>(null)
 
@@ -748,6 +767,17 @@ function StablePage() {
               <option value="alerts">Alerts First</option>
               <option value="care">Unfinished Care First</option>
             </select>
+          )}
+          {selectedPaddock && (
+            <button type="button" className="text-xs text-muted-foreground hover:text-foreground" onClick={() => updatePreferences(readStablePreferences())}>
+              Reset view
+            </button>
+          )}
+          {saveErrors[preferenceKey] && (
+            <span role="alert" className="text-xs text-destructive">
+              View preferences were not saved. {saveErrors[preferenceKey]}{" "}
+              <button type="button" className="underline" onClick={() => persistPreferences(preferences)}>Retry</button>
+            </span>
           )}
         </div>
       </div>

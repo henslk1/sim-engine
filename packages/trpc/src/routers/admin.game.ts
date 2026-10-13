@@ -49,7 +49,7 @@ export const gameAdminRouter = router({
         gameId: z.string(),
         defaultInnateRatio: z.number().min(0).max(1),
         trainingCeilingMultiplier: z.number().min(0),
-        pedigreeDisplayDepth: z.number().int().min(1),
+        pedigreeDisplayDepth: z.number().int().min(1).max(6),
         predictorDailyLimitFree: z.number().int().min(0),
         breedingEnergyCost: z.number().min(0).default(0),
         maxBreedingSlots: z.number().int().min(1).nullish(),

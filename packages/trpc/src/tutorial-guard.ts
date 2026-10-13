@@ -20,6 +20,8 @@ export async function guardTutorialMutation(userId: string | null, path: string,
   // carries its own authorization: messagingProcedure resolves the acting player
   // from the session, and channelAdminProcedure requires admin in this game.
   if (path.startsWith("messaging.")) return
+  // Presentation preferences do not advance or bypass tutorial gameplay.
+  if (path === "player.saveSubContainerPreferences") return
   if (path.startsWith("admin.")) {
     if (!await db.staffRole.findFirst({ where: { userId } })) throw denied()
     return

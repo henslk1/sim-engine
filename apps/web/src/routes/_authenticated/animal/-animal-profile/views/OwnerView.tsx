@@ -142,7 +142,7 @@ export function OwnerView({ animal, animalId, playerAccountId }: { animal: Anima
 
           {/* Col 1 — Breeding / Health / Notes */}
           <div className="flex min-h-0 flex-col gap-3 min-[1400px]:grid min-[1400px]:grid-rows-[auto_minmax(0,1fr)]">
-            {animal.lifeStage.canBreed && <BreedingPanel animal={animal} breedingGrade={breedingGrade} />}
+            {(animal.lifeStage.canBreed || animal.lifeStage.canSurrogate) && <BreedingPanel animal={animal} breedingGrade={breedingGrade} />}
             <HealthPanel animal={animal} playerAccountId={playerAccountId} />
             <NotesPanel animal={animal} animalId={animalId} />
           </div>

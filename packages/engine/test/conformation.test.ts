@@ -3,11 +3,12 @@ import assert from "node:assert/strict"
 import { runConformationInspection } from "../src/animal/conformation.ts"
 
 // Exercise the persisted inspection result, not a second copy of the formula.
-async function inspect(coatWeight: number, coat: string, disqualified = false) {
+async function inspect(coatWeight: number, coat: string, disqualified = false, ageInCycles = 20) {
   const scores: Record<string, unknown>[] = []
   const sections: Record<string, unknown>[] = []
   const animal = {
-    gameId: "game", breedId: "breed", status: "ALIVE", ageInCycles: 20,
+    gameId: "game", breedId: "breed", status: "ALIVE", ageInCycles,
+    game: { gameConfig: { conformationInspectionMinCycle: 10 } },
     lifeStage: { canCompete: true, name: "Adult" },
     breedComposition: [{ breedId: "breed" }], conformationScores: [],
     phenotypeDescription: coat,
@@ -63,4 +64,9 @@ test("coat and trait disqualification remain separate from the weighted score", 
   assert.equal(score.score, 75)
   assert.equal(score.isCoatDq, true)
   assert.equal(score.isTraitDq, true)
+})
+
+ test("inspection rejects animals below the configured minimum age", async () => {
+  await assert.rejects(inspect(2, "Black", false, 9), /minimum inspection age/)
+  assert.equal((await inspect(2, "Black", false, 10)).score, 75)
 })

@@ -43,6 +43,8 @@ export async function runConformationInspection(client: Client, animalId: string
       where: { id: animalId },
       select: {
         gameId: true,
+        ageInCycles: true,
+        game: { select: { gameConfig: { select: { conformationInspectionMinCycle: true } } } },
         breedId: true,
         status: true,
         lifeStage: { select: { canCompete: true, name: true } },
@@ -57,6 +59,9 @@ export async function runConformationInspection(client: Client, animalId: string
     if (animal.breedComposition.length !== 1) throw new Error("Conformation inspection is only available for purebred animals")
     if (animal.conformationScores.length > 0) throw new Error("Animal has already been inspected")
     if (!animal.lifeStage.canCompete) throw new Error(`Inspection is not available at the ${animal.lifeStage.name} stage`)
+    if (animal.ageInCycles < (animal.game.gameConfig?.conformationInspectionMinCycle ?? 0)) {
+      throw new Error("Animal has not reached the minimum inspection age")
+    }
 
     const breedId = animal.breedId
     if (!breedId) throw new Error("Purebred animal has no breed assigned")

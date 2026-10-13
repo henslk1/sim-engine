@@ -362,6 +362,7 @@ export const animalProfileRouter = router({
               gameConfig: {
                 select: {
                   cyclesPerYear: true,
+                  pedigreeDisplayDepth: true,
                   trainingCeilingMultiplier: true,
                   immunityMin: true,
                   immunityMax: true,

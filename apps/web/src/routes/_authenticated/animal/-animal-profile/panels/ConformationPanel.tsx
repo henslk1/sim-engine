@@ -38,7 +38,7 @@ export function ConformationPanel({ animal, readonly = false }: { animal: Animal
   const minCycle = animal.game.gameConfig?.conformationInspectionMinCycle ?? 0
   const firstCompetingStage = animal.game.lifeStageDefs?.[0]
   const awaitingAge = !isCross && !overallScore && animal.ageInCycles < minCycle
-  const eligibleForInspection = !isCross && !overallScore && animal.ageInCycles >= minCycle
+  const eligibleForInspection = animal.status === "ALIVE" && animal.lifeStage.canCompete && !isCross && !overallScore && animal.ageInCycles >= minCycle
 
   const sectionScores = (animal.conformationSectionScores ?? [])
     .filter((s) => s.breedId === overallScore?.breedId)

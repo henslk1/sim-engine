@@ -63,6 +63,7 @@ model AnimalCondition {
   id        String   @id @default(cuid())
   animalId  String   @unique
   value     Float
+  lastWorkGainCycle Int?
   updatedAt DateTime @updatedAt
   animal    Animal   @relation(fields: [animalId], references: [id])
 }

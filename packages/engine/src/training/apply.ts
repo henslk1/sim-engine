@@ -1,5 +1,7 @@
 import { db } from "@sim-engine/db";
 import { markAnimalActive } from "../animal/activity.js";
+import { requireLifeStageAction } from "../animal/actionGuards.js"
+import { grantConditionWorkGain } from "../animal/conditionWork.js"
 
 type Client = typeof db
 
@@ -55,8 +57,11 @@ export async function applyTrainingAction(
 
     const animalStage = await tx.animal.findUniqueOrThrow({
       where: { id: animalId },
-      select: { isTutorialAnimal: true, lifeStage: { select: { energyCostMultiplier: true } } },
+      select: { gameId: true, status: true, ageInCycles: true, isTutorialAnimal: true, lifeStage: { select: { canTrain: true, energyCostMultiplier: true } } },
     })
+    requireLifeStageAction(animalStage, "canTrain")
+    if (animalStage.gameId !== action.gameId) throw new Error("Training action belongs to another game")
+    if (animalStage.ageInCycles !== cycleNumber) throw new Error("Animal cycle changed; refresh and try again")
     const energyUsed = tier.energyCost * animalStage.lifeStage.energyCostMultiplier
     const energy = await tx.animalEnergy.findUnique({ where: { animalId } })
     if (!energy) throw new Error(`No energy record for animal ${animalId}`)
@@ -99,15 +104,7 @@ export async function applyTrainingAction(
       data: { currentEnergy: energy.currentEnergy - energyUsed },
     })
 
-    if (config.conditionWorkGain > 0) {
-      const condition = await tx.animalCondition.findUnique({ where: { animalId } })
-      if (condition) {
-        await tx.animalCondition.update({
-          where: { animalId },
-          data: { value: Math.min(100, condition.value + config.conditionWorkGain) },
-        })
-      }
-    }
+    await grantConditionWorkGain(tx, animalId, cycleNumber, config.conditionWorkGain)
 
     const stat = await tx.animalStat.update({
       where: { animalId_statDefId: { animalId, statDefId: action.statDefId } },

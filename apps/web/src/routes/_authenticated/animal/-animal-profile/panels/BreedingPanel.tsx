@@ -113,7 +113,7 @@ export function BreedingPanel({
 
   const openCycle = animal.game.gameConfig?.ultrasoundOpenCycle ?? 0
   const ultrasoundWindowOpen = !!preg && preg.currentCycles >= openCycle
-  const canUltrasound = !!preg && !preg.ultrasoundUsed && !isRestricted && ultrasoundWindowOpen
+  const canUltrasound = !!preg && !preg.ultrasoundUsed && ultrasoundWindowOpen
 
   useEffect(() => {
     if (preg && !preg.ultrasoundUsed && ultrasoundWindowOpen) {
@@ -189,7 +189,7 @@ export function BreedingPanel({
         <p className="text-[11px] text-muted-foreground">
           {animal.isCastrated ? "Not eligible for breeding." : "Not available at this life stage."}
         </p>
-      ) : canBreed && tab === "info" ? (
+      ) : tab === "info" ? (
         <div className="space-y-2">
 
           {/* Pregnancy block (female) */}
@@ -266,7 +266,7 @@ export function BreedingPanel({
                         variant="soft"
                         className="flex-1 justify-center"
                         data-tutorial="flush-embryo-btn"
-                        disabled={flushPending || isRestricted}
+                        disabled={flushPending}
                         onClick={() => flushEmbryo({ pregnancyId: preg.id })}
                       >
                         {flushPending
@@ -334,11 +334,16 @@ export function BreedingPanel({
             ) : (
               <div className="space-y-2">
                 <p className="text-[11px] text-muted-foreground">Not pregnant</p>
-                {!readonly && (
+                {!readonly && canBreed && (
                   <Link to="/stud-market" search={{ fromAnimalId: animal.id, fromAnimalName: animal.name }} data-tutorial="browse-stud-market" className="w-full">
                     <ActionButton variant="soft" className="w-full justify-center">
                       <Search className="size-3.5" /> Browse Stud Market
                     </ActionButton>
+                  </Link>
+                )}
+                {!readonly && canSurrogate && !isRestricted && (
+                  <Link to="/vet" search={{ animalId: animal.id, service: "embryo-implant" }} className="w-full">
+                    <ActionButton variant="soft" className="w-full justify-center">Implant Embryo</ActionButton>
                   </Link>
                 )}
               </div>
@@ -596,7 +601,7 @@ export function BreedingPanel({
           )}
 
           {/* Genetic material collect + storage */}
-          {!readonly && (
+          {!readonly && canBreed && (
             <GeneticMaterialSection
               animal={animal}
               storageType={storageType}
