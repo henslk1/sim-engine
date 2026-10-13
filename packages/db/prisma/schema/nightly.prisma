@@ -84,8 +84,20 @@ model NightlyAnimalWork {
   // repeat — including the late-activity sweep that runs just before a nightly
   // is allowed to finish.
   @@unique([runId, animalId])
-  // Claiming the next chunk, and counting what is left.
+  // Counting what is left.
   @@index([runId, status])
+  // Claiming the next chunk.
+  //
+  // `claimChunk` asks for one run's claimable items in creation order, and
+  // "claimable" is an OR across three status/lease shapes. That OR defeated
+  // `[runId, status]`: EXPLAIN showed the planner satisfying it with
+  // `[status, leaseUntil]` instead and applying `runId` as a filter afterwards,
+  // so every chunk scanned every PENDING, RETRYING and RUNNING row in the
+  // table - across every run that had ever left one behind - and discarded the
+  // ones belonging to other runs. Leading with `runId` bounds the scan to the
+  // run doing the asking, and `createdAt` behind it supplies the sort so the
+  // limit can stop early.
+  @@index([runId, createdAt, status])
   // Finding items whose owner died.
   @@index([status, leaseUntil])
 }
