@@ -126,7 +126,7 @@ export const disciplineAdminRouter = router({
       id: z.string().optional(),
       disciplineDefId: z.string(),
       itemDefId: z.string(),
-      quantity: z.number().int().min(1).default(1),
+      quantity: z.literal(1).default(1),
       requirementGroup: z.string().nullish(),
     }))
     .mutation(({ input }) => {

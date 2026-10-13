@@ -68,7 +68,7 @@ export function Header({ session }: { session: Session}) {
       <div className="flex h-14 items-center justify-between px-4">
         <div className="flex items-center gap-4">
           <span className="font-serif text-lg font-semibold text-foreground"><Link to="/">Sim Engine</Link></span>
-          <Link to="/stable" data-tutorial="stable-nav" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Stable</Link>
+          <Link to="/stable" data-tutorial="stable-nav" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{gameData?.gameConfig?.containerLabel ?? "Stable"}</Link>
           <Link to="/town" data-tutorial="town-nav" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Town</Link>
           <Link to="/shop" data-tutorial="shop-nav" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Shop</Link>
           <Link to="/directory" data-tutorial="directory-nav" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Directory</Link>

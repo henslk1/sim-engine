@@ -652,13 +652,15 @@ function StandardsContent({
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
+type PersonalityValues = { naturalMin: string; naturalMax: string; baseline: string }
+
 function BreedsPage() {
   const { gameId } = Route.useParams()
   const [editing, setEditing] = useState<BreedForm | null>(null)
   const [wizardStep, setWizardStep] = useState<WizardStep>(null)
   const [activePanel, setActivePanel] = useState<ActivePanel>("stats")
   const [statValues, setStatValues] = useState<Record<string, { weight: string }>>({})
-  const [personalityValues, setPersonalityValues] = useState<Record<string, { naturalMin: string; naturalMax: string; baseline: string }>>({})
+  const [personalityDrafts, setPersonalityDrafts] = useState<Record<string, Record<string, Partial<PersonalityValues>>>>({})
   const [freqValues, setFreqValues] = useState<Record<string, { frequency: string; isDq: boolean }>>({})
   const [confirmDelete, setConfirmDelete] = useState(false)
 
@@ -680,7 +682,7 @@ function BreedsPage() {
   const { data: coatSelections } = trpc.admin.breed.listCoatSelections.useQuery(
     { breedId: editing?.id! }, { enabled: !!editing?.id }
   )
-  const { data: personalityProfiles } = trpc.admin.breed.listPersonalityProfiles.useQuery(
+  const { data: personalityProfiles, isSuccess: personalityProfilesReady, error: personalityProfilesError } = trpc.admin.breed.listPersonalityProfiles.useQuery(
     { breedId: editing?.id! }, { enabled: !!editing?.id }
   )
   const { data: alleleFrequencies } = trpc.admin.breed.listAlleleFrequencies.useQuery(
@@ -701,21 +703,19 @@ function BreedsPage() {
     })
   }, [stats, statProfiles])
 
-  useEffect(() => {
-    if (!personalityTraits) return
-    setPersonalityValues(prev => {
-      const next: typeof prev = {}
-      for (const trait of personalityTraits) {
-        const p = personalityProfiles?.find(pp => pp.traitDefId === trait.id)
-        next[trait.id] = prev[trait.id] ?? {
-          naturalMin: p?.naturalMin.toString() ?? "0",
-          naturalMax: p?.naturalMax.toString() ?? "100",
-          baseline: p?.baseline.toString() ?? "50",
-        }
-      }
-      return next
-    })
-  }, [personalityTraits, personalityProfiles])
+  // Saved values remain authoritative until a field is edited. Drafts are scoped
+  // to the breed so delayed queries/refetches cannot overwrite edits or leak them.
+  const personalityValues: Record<string, PersonalityValues> = Object.fromEntries(
+    (personalityTraits ?? []).map(trait => {
+      const profile = personalityProfiles?.find(p => p.traitDefId === trait.id)
+      return [trait.id, {
+        naturalMin: profile?.naturalMin.toString() ?? "0",
+        naturalMax: profile?.naturalMax.toString() ?? "100",
+        baseline: profile?.baseline.toString() ?? "50",
+        ...(editing?.id ? personalityDrafts[editing.id]?.[trait.id] : undefined),
+      }]
+    }),
+  )
 
   useEffect(() => {
     if (!alleles) return
@@ -776,7 +776,14 @@ function BreedsPage() {
     onSuccess: () => utils.admin.breed.listCoatDqSelections.invalidate(),
   })
   const saveAllPersonalityProfiles = trpc.admin.breed.saveAllPersonalityProfiles.useMutation({
-    onSuccess: () => utils.admin.breed.listPersonalityProfiles.invalidate(),
+    onSuccess: async (_result, input) => {
+      await utils.admin.breed.listPersonalityProfiles.invalidate({ breedId: input.breedId })
+      setPersonalityDrafts(prev => {
+        const next = { ...prev }
+        delete next[input.breedId]
+        return next
+      })
+    },
   })
   const saveAllAlleleFreqs = trpc.admin.breed.saveAllAlleleFrequencies.useMutation({
     onSuccess: () => utils.admin.breed.listAlleleFrequencies.invalidate({ breedId: editing?.id }),
@@ -836,11 +843,19 @@ function BreedsPage() {
   }
 
   function handlePersonalityChange(traitDefId: string, field: string, value: string) {
-    setPersonalityValues(prev => ({ ...prev, [traitDefId]: { ...prev[traitDefId]!, [field]: value } }))
+    const breedId = editing?.id
+    if (!breedId) return
+    setPersonalityDrafts(prev => ({
+      ...prev,
+      [breedId]: {
+        ...prev[breedId],
+        [traitDefId]: { ...prev[breedId]?.[traitDefId], [field]: value },
+      },
+    }))
   }
 
   function handleSaveAllPersonality() {
-    if (!editing?.id || !personalityTraits) return
+    if (!editing?.id || !personalityTraits || !personalityProfilesReady) return
     saveAllPersonalityProfiles.mutate({
       breedId: editing.id,
       profiles: personalityTraits.map(trait => {
@@ -919,7 +934,7 @@ function BreedsPage() {
             <div className="flex flex-col">
               <div className="flex items-center justify-between border-b border-border bg-secondary/40 px-3 py-2">
                 <h2 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">All Breeds</h2>
-                <Button size="sm" variant="ghost" onClick={() => { setEditing({ ...emptyBreed }); setWizardStep(1); setStatValues({}); setPersonalityValues({}); setFreqValues({}) }}>+ New</Button>
+                <Button size="sm" variant="ghost" onClick={() => { setEditing({ ...emptyBreed }); setWizardStep(1); setStatValues({}); setFreqValues({}) }}>+ New</Button>
               </div>
               <div className="divide-y divide-border overflow-y-auto">
                 {breeds?.map((b) => (
@@ -948,7 +963,7 @@ function BreedsPage() {
             </div>
             <div className="flex flex-col items-center justify-center gap-3 py-16 px-8 text-center">
               <p className="text-sm text-muted-foreground">Select a breed to view and edit its details, genetics, and standards.</p>
-              <Button size="sm" variant="outline" onClick={() => { setEditing({ ...emptyBreed }); setWizardStep(1); setStatValues({}); setPersonalityValues({}); setFreqValues({}) }}>Add New Breed</Button>
+              <Button size="sm" variant="outline" onClick={() => { setEditing({ ...emptyBreed }); setWizardStep(1); setStatValues({}); setFreqValues({}) }}>Add New Breed</Button>
             </div>
           </div>
         </div>
@@ -1285,10 +1300,14 @@ function BreedsPage() {
             )}
 
             {activePanel === "personality" && (
-              !personalityTraits?.length ? (
+              !personalityProfilesReady ? (
+                <p className="px-4 py-4 text-sm text-muted-foreground">
+                  {personalityProfilesError ? "Could not load personality profiles. Reload before editing." : "Loading personality profiles…"}
+                </p>
+              ) : !personalityTraits?.length ? (
                 <p className="px-4 py-4 text-sm text-muted-foreground">Configure personality traits in the Animals section first.</p>
               ) : (
-                <div className="space-y-2">
+                <fieldset disabled={saveAllPersonalityProfiles.isPending} className="space-y-2">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-border bg-secondary/40"><TH>Trait</TH><TH>Natural Min</TH><TH>Natural Max</TH><TH>Baseline</TH></tr>
@@ -1306,7 +1325,8 @@ function BreedsPage() {
                       {saveAllPersonalityProfiles.isPending ? "Saving…" : "Save All"}
                     </Button>
                   </div>
-                </div>
+                  {saveAllPersonalityProfiles.error && <p className="px-2 text-sm text-destructive">{saveAllPersonalityProfiles.error.message}</p>}
+                </fieldset>
               )
             )}
           </div>

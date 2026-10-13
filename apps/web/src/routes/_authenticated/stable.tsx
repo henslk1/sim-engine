@@ -23,7 +23,7 @@ type Animal = {
   isPinned: boolean
   breed: { id: string; name: string } | null
   breedName: string | null
-  lifeStage: { name: string }
+  lifeStage: { name: string; stageIndex: number }
   subContainerId: string | null
   ageInCycles: number
   isCastrated: boolean
@@ -31,6 +31,7 @@ type Animal = {
   _count: { healthRecords: number }
   healthCertificates: { certDefId: string; isValid: boolean; expiresAtCycle: number }[]
   disciplineDef: { name: string; isConformation: boolean } | null
+  compTiers: { disciplineDefId: string; tierDefId: string }[]
   conformationScores: { breedId: string }[]
   equipment: { itemDef: { id: string } }[]
 }
@@ -206,7 +207,7 @@ function AnimalCard({
             {isPregnant && (
               <span className="rounded bg-chart-2/10 px-1.5 py-0.5 text-[10px] font-medium text-chart-2/70">Pregnant</span>
             )}
-            {animal.disciplineDef && (
+            {animal.disciplineDef && !animal.disciplineDef.isConformation && (
               <DisciplineBadge
                 name={animal.disciplineDef.name}
                 isConformation={false}
@@ -466,7 +467,15 @@ function StablePage() {
     { gameId: gameId! },
     { enabled: !!gameId },
   )
-  const conformationName = disciplines?.find((d) => d.isConformation)?.name ?? "Conformation"
+  function conformationNameFor(animal: Animal): string {
+    const eligible = disciplines?.filter(d => d.isConformation
+      && (d.minLifeStageIndex == null || animal.lifeStage.stageIndex >= d.minLifeStageIndex)
+      && (d.maxLifeStageIndex == null || animal.lifeStage.stageIndex <= d.maxLifeStageIndex)) ?? []
+    const competing = eligible.filter(d => animal.compTiers.some(t => t.disciplineDefId === d.id))
+    // Prefer the horse's current discipline; an inspection alone doesn't assign one.
+    const matches = competing.length > 0 ? competing : eligible
+    return matches.length === 1 ? matches[0]!.name : "Conformation"
+  }
 
   const { data: animals = [], isLoading: animalsLoading } = trpc.animal.list.useQuery(
     { playerAccountId: playerAccountId!, includeTutorial: true },
@@ -619,11 +628,6 @@ function StablePage() {
                 className="text-sm text-amber-600 dark:text-amber-400"
               >
                 {pendingCare.totals.carePending} awaiting care
-              </span>
-            )}
-            {pendingCare && pendingCare.totals.ltcOverdue > 0 && (
-              <span className="text-sm text-destructive/70">
-                {pendingCare.totals.ltcOverdue} overdue
               </span>
             )}
             {selectedAlerts > 0 && selected !== "all" && (
@@ -848,7 +852,7 @@ function StablePage() {
                 care={careByAnimal.get(a.id)}
                 subContainers={subContainers}
                 cycleToAge={cycleToAge}
-                conformationName={conformationName}
+                conformationName={conformationNameFor(a)}
                 tutorialAttr={a.id === tutorialMareId ? "tutorial-mare-stable-card" : a.id === tutorialFoalId ? "tutorial-foal-stable-card" : undefined}
               />
             ))}

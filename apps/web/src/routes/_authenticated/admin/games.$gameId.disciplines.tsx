@@ -402,7 +402,7 @@ function DisciplinesPage() {
     onSuccess: () => {
       utils.admin.discipline.listEquipmentRequirements.invalidate({ disciplineDefId: editing?.id })
       utils.admin.discipline.list.invalidate()
-      setNewEquipReq({ itemDefId: "", quantity: "1", requirementGroup: "" })
+      setNewEquipReq({ itemDefId: "", requirementGroup: "" })
     },
   })
   const removeEquipReq = trpc.admin.discipline.removeEquipmentRequirement.useMutation({
@@ -415,7 +415,7 @@ function DisciplinesPage() {
   const [editingPersonalityWeightId, setEditingPersonalityWeightId] = useState<string | null>(null)
   const [editingPersonalityWeight, setEditingPersonalityWeight] = useState({ idealMin: "", idealMax: "", bonusPercent: "" })
   const [newPersonalityWeight, setNewPersonalityWeight] = useState({ traitDefId: "", idealMin: "", idealMax: "", bonusPercent: "" })
-  const [newEquipReq, setNewEquipReq] = useState({ itemDefId: "", quantity: "1", requirementGroup: "" })
+  const [newEquipReq, setNewEquipReq] = useState({ itemDefId: "", requirementGroup: "" })
 
   const usedTraitIds = new Set(personalityWeights?.map((w) => w.traitDefId) ?? [])
   const availableTraits = traits?.filter((t) => !usedTraitIds.has(t.id)) ?? []
@@ -425,7 +425,7 @@ function DisciplinesPage() {
     setActiveTab("stats")
     setEditingPersonalityWeightId(null); setEditingPersonalityWeight({ idealMin: "", idealMax: "", bonusPercent: "" })
     setNewPersonalityWeight({ traitDefId: "", idealMin: "", idealMax: "", bonusPercent: "" })
-    setNewEquipReq({ itemDefId: "", quantity: "1", requirementGroup: "" })
+    setNewEquipReq({ itemDefId: "", requirementGroup: "" })
   }
 
   function submitDiscipline() {
@@ -688,7 +688,7 @@ function DisciplinesPage() {
                             </select>
                           </td>
                           <td className="px-3 py-2">
-                            <Input type="number" step="1" min="1" value={newEquipReq.quantity} onChange={(e) => setNewEquipReq(r => ({ ...r, quantity: e.target.value }))} placeholder="1" className="h-7 text-sm max-w-20" />
+                            <span className="text-sm text-muted-foreground">1</span>
                           </td>
                           <td className="px-3 py-2">
                             <Input value={newEquipReq.requirementGroup} onChange={(e) => setNewEquipReq(r => ({ ...r, requirementGroup: e.target.value }))} placeholder="e.g. saddle (optional)" className="h-7 text-sm" />
@@ -699,7 +699,7 @@ function DisciplinesPage() {
                               saveEquipReq.mutate({
                                 disciplineDefId: editing.id,
                                 itemDefId: newEquipReq.itemDefId,
-                                quantity: parseInt(newEquipReq.quantity) || 1,
+                                quantity: 1,
                                 requirementGroup: newEquipReq.requirementGroup || null,
                               })
                             }} disabled={saveEquipReq.isPending || !newEquipReq.itemDefId}>

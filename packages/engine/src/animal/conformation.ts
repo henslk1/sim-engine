@@ -111,7 +111,6 @@ export async function runConformationInspection(client: Client, animalId: string
       const matched = expressions.find((e) => e.idealExpressionLabel === phenotype)
       totalSumMatched += matched?.weight ?? 0
     }
-    const overallScore = totalSumWeights > 0 ? (totalSumMatched / totalSumWeights) * 100 : 0
 
     // Coat color DQ — two paths:
     // 1. Splash / DW variants: visible in artwork, absent from coat name → raw code check
@@ -190,6 +189,9 @@ export async function runConformationInspection(client: Client, animalId: string
     if (acceptable.has(animal.phenotypeDescription) && passesMarkings) totalSumMatched += breedCoat.coatWeight
       }
     }
+
+    // Coat weight contributes to the overall total, but not the structural section breakdowns.
+    const overallScore = totalSumWeights > 0 ? (totalSumMatched / totalSumWeights) * 100 : 0
 
     const sectionScores: { sectionId: string; score: number }[] = []
     for (const section of sections) {
