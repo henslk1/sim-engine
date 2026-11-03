@@ -1,15 +1,16 @@
 import { useEffect, useState } from "react"
 import { useLocation, useRouter } from "@tanstack/react-router"
 import { trpc } from "@/lib/trpc"
+import { useNightlyState } from "@/lib/nightly"
 import { AlertTriangle } from "lucide-react"
 
 /**
  * The run-up to the nightly, and the door closing when it starts.
  *
- * Polled rather than pushed. A socket event arrives sooner but it is also
- * missable — a refresh, a reconnect, a second tab — and the plan is explicit
- * that the schedule in the database stays authoritative and must be readable
- * over HTTP for exactly that reason. The countdown is computed here from an
+ * Pushed *and* polled. The socket event shortens the wait when the door shuts;
+ * the poll below is what makes a missed event survivable, and the schedule in
+ * the database stays the thing both of them end at — see `useNightlyState`,
+ * which holds the three-way arrangement. The countdown is computed here from an
  * instant the server sent, so a sleeping tab or a slow response cannot leave a
  * clock running behind: it recalculates from the real time every second.
  */
@@ -72,17 +73,10 @@ export function NightlyBanner() {
   const { data: game } = trpc.admin.game.get.useQuery()
   const gameId = game?.id
 
-  const { data: state } = trpc.game.nightlyState.useQuery(
-    { gameId: gameId! },
-    {
-      enabled: !!gameId,
-      // Often enough that the door shuts promptly, rarely enough that an idle
-      // tab costs nothing. The countdown does not depend on this — it ticks
-      // locally from `nextNightlyAt`.
-      refetchInterval: (query) => pollInterval(query.state.data ?? undefined),
-      refetchIntervalInBackground: true,
-    },
-  )
+  // The cadence below is unchanged, but its job is not: it is the floor under
+  // a missed event now, rather than the only way the door is noticed closing.
+  // The countdown never depended on it — it ticks locally from `nextNightlyAt`.
+  const { data: state } = useNightlyState(gameId, pollInterval)
 
   // A local clock, so the countdown is smooth between polls.
   const [now, setNow] = useState(() => Date.now())
@@ -94,14 +88,27 @@ export function NightlyBanner() {
 
   const onNewDay = location.pathname === "/new-day"
 
-  // The update has started: everything stops. The server refuses gameplay
+  /**
+   * Administration keeps working, because this is when it is needed.
+   *
+   * `isExempt` on the server lets every `admin.*` mutation through an update
+   * on purpose — a stuck nightly is exactly when staff need their recovery
+   * controls — and this redirect was quietly taking that away again: it fired
+   * on every authenticated route, so a member of staff opening the operations
+   * console mid-update was bounced to the waiting page with the controls on
+   * the other side of it. The route itself is already gated; `_authenticated`
+   * sends anybody without a staff role to the dashboard before this runs.
+   */
+  const onAdmin = location.pathname === "/admin" || location.pathname.startsWith("/admin/")
+
+  // The update has started: everything else stops. The server refuses gameplay
   // mutations regardless — this is the courtesy that stops a player meeting
   // that as an error on a page that looks like it should work.
   useEffect(() => {
-    if (state?.status === "RUNNING" && !onNewDay) {
+    if (state?.status === "RUNNING" && !onNewDay && !onAdmin) {
       void router.navigate({ to: "/new-day", replace: true })
     }
-  }, [state?.status, onNewDay, router])
+  }, [state?.status, onNewDay, onAdmin, router])
 
   if (!state || state.status !== "WARNING" || !state.nextNightlyAt) return null
 

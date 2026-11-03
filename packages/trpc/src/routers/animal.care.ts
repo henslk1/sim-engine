@@ -1,7 +1,9 @@
-import { applyCareAction, isDailyCareComplete, markAnimalActive } from "@sim-engine/engine"
+import { applyCareActionTx, isDailyCareComplete, markAnimalActive } from "@sim-engine/engine"
 import { db } from "@sim-engine/db"
 import { router, publicProcedure } from "../trpc.js"
+import { assertParticipantsInGame, enterGameplayForAnimal } from "../maintenance.js"
 import { z } from "zod"
+import { TRPCError } from "@trpc/server"
 
 export const animalCareRouter = router({
   performLtc: publicProcedure
@@ -12,10 +14,33 @@ export const animalCareRouter = router({
     }))
     .mutation(async ({ input }) => {
       return db.$transaction(async (tx) => {
+        const gameId = await enterGameplayForAnimal(tx, input.animalId)
+
         const record = await tx.animalLongTermCareRecord.findUniqueOrThrow({
           where: { id: input.ltcRecordId },
           include: { longTermCareActionDef: true },
         })
+
+        // The record has to be this animal's.
+        //
+        // Locking the animal's game proves nothing about the record: the two
+        // arrive as separate ids, and nothing here had ever checked they
+        // belonged together. A care record in another game could be advanced -
+        // and charged for - while this one's game was the only one checked and
+        // the only one closed.
+        if (record.animalId !== input.animalId) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "That care record belongs to a different animal.",
+          })
+        }
+
+        // And whoever is paying has to be in that game too.
+        if (input.playerAccountId) {
+          await assertParticipantsInGame(tx, gameId, {
+            playerAccountIds: [input.playerAccountId],
+          })
+        }
         const animal = await tx.animal.findUniqueOrThrow({
           where: { id: input.animalId },
           select: { ageInCycles: true, gameId: true, playerAccountId: true },
@@ -87,19 +112,30 @@ export const animalCareRouter = router({
       careActionDefId: z.string(),
       playerAccountId: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
-      const animal = await db.animal.findUniqueOrThrow({
-        where: { id: input.animalId },
-        select: { ageInCycles: true },
-      })
+    .mutation(async ({ input }) =>
+      db.$transaction(async (tx) => {
+        const gameId = await enterGameplayForAnimal(tx, input.animalId)
+        if (input.playerAccountId) {
+          await assertParticipantsInGame(tx, gameId, {
+            playerAccountIds: [input.playerAccountId],
+          })
+        }
 
-      return applyCareAction(db, {
-        animalId: input.animalId,
-        careActionDefId: input.careActionDefId,
-        performedByPlayerId: input.playerAccountId || null,
-        cycleNumber: animal.ageInCycles,
+        // Read under the lock: the cycle decides which cycle the care is
+        // credited to, and the nightly is what moves it.
+        const animal = await tx.animal.findUniqueOrThrow({
+          where: { id: input.animalId },
+          select: { ageInCycles: true },
+        })
+
+        return applyCareActionTx(tx, {
+          animalId: input.animalId,
+          careActionDefId: input.careActionDefId,
+          performedByPlayerId: input.playerAccountId || null,
+          cycleNumber: animal.ageInCycles,
+        })
       })
-    }),
+    ),
 
   /**
    * Which animals a player has started on today and not finished.

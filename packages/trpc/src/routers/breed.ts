@@ -2,24 +2,7 @@ import { z } from "zod"
 import { router, protectedProcedure } from "../trpc.js"
 import { db } from "@sim-engine/db"
 import { computeCoatFromCodes } from "@sim-engine/engine"
-
-function* cartesianGen(arrays: (string | null)[][]): Generator<(string | null)[]> {
-  const n = arrays.length
-  if (n === 0) { yield []; return }
-  if (arrays.some((array) => array.length === 0)) return
-  const indices = new Array<number>(n).fill(0)
-  while (true) {
-    yield indices.map((idx, i) => arrays[i]![idx]!)
-    let pos = n - 1
-    while (pos >= 0) {
-      const nextIndex = indices[pos]! + 1
-      indices[pos] = nextIndex
-      if (nextIndex < arrays[pos]!.length) break
-      indices[pos--] = 0
-    }
-    if (pos < 0) break
-  }
-}
+import { breedCoatOptions, enumerateBreedCoats } from "../breed-coats.js"
 
 export const breedRouter = router({
   list: protectedProcedure
@@ -48,7 +31,7 @@ export const breedRouter = router({
     .query(async ({ input }) => {
       const [breed, gameConfig, disciplineWeights, gameInnateMax, colorAlleleFreqs] = await Promise.all([
         db.breed.findUniqueOrThrow({
-          where: { id: input.breedId },
+          where: { id: input.breedId, gameId: input.gameId },
           include: {
             species: { select: { name: true } },
             foundingPlayer: { select: { username: true } },
@@ -157,6 +140,7 @@ export const breedRouter = router({
         db.breedAlleleFrequency.findMany({
           where: {
             breedId: input.breedId,
+            breed: { gameId: input.gameId },
             frequency: { gt: 0 },
             allele: {
               locus: { panelEntries: { some: { panelDef: { panelType: { in: ["COLOR", "VARIANCE"] } } } } },
@@ -201,156 +185,11 @@ export const breedRouter = router({
       }
 
       // ── Possible coat colors ─────────────────────────────────────────────────
-      // Build per-locus code options from the breed's allele pool, then enumerate
-      // every modifier combination exhaustively. A supplemental single-modifier
-      // pass guarantees every locus code appears in the display even if it falls
-      // alphabetically between the first-20/last-20 sampling windows.
+      // Resolve only genotypes reachable from the configured allele pool.
 
-      const BASE_CODES = new Set(["chestnut_base", "bay_modifier", "black_base", "seal_brown"])
-      const OVERRIDE_CODES = new Set(["dominant_white_full", "lethal_overo", "gray_modifier", "two_sabino"])
-
-      const pairPhenotype = new Map<string, string>()
-      for (const af of colorAlleleFreqs) {
-        for (const rule of af.allele.expressionRulesAsAlleleOne) {
-          if (rule.phenotype.length > 0) {
-            pairPhenotype.set(`${af.allele.id}:${rule.alleleTwoId}`, rule.phenotype)
-          }
-        }
-      }
-
-      const allelesByLocus = new Map<string, string[]>()
-      for (const af of colorAlleleFreqs) {
-        if (!allelesByLocus.has(af.allele.locusId)) allelesByLocus.set(af.allele.locusId, [])
-        allelesByLocus.get(af.allele.locusId)!.push(af.allele.id)
-      }
-
-      const overrideColors = new Set<string>()
-      const baseLociOptions: (string | null)[][] = []
-      const modifierLociOptions: (string | null)[][] = []
-      // True when an override locus has no null genotype (N allele absent) —
-      // meaning every animal in the breed expresses that override and the
-      // underlying base/modifier colors are all masked and irrelevant to show.
-      let alwaysOverridden = false
-
-      for (const alleleIds of allelesByLocus.values()) {
-        const possibleCodes = new Set<string | null>()
-        for (const a of alleleIds) {
-          for (const b of alleleIds) {
-            possibleCodes.add(pairPhenotype.get(`${a}:${b}`) ?? pairPhenotype.get(`${b}:${a}`) ?? null)
-          }
-        }
-        const nonNull = [...possibleCodes].filter((c): c is string => c !== null)
-        if (nonNull.length === 0) continue
-
-        for (const code of nonNull) {
-          if (OVERRIDE_CODES.has(code)) {
-            const c = computeCoatFromCodes(new Set([code]))
-            if (c) overrideColors.add(c)
-          }
-        }
-
-        const nonOverride = nonNull.filter(c => !OVERRIDE_CODES.has(c))
-        if (nonOverride.length === 0) {
-          // All non-null codes at this locus are overrides. If null is also
-          // impossible (no wild-type allele in the pool), every animal carries
-          // the override and underlying colors are irrelevant.
-          if (!possibleCodes.has(null)) alwaysOverridden = true
-          continue
-        }
-
-        // Only include null when the locus can genuinely produce it — if a breed
-        // has only one allele at a locus (e.g. A=1.0 for agouti), every animal is
-        // homozygous and null is not a real possibility. Including phantom null
-        // would create phantom base colors (e.g. "black" when all animals are bay).
-        const opts = possibleCodes.has(null) ? [null, ...nonOverride] : [...nonOverride]
-        if (nonOverride.every(c => BASE_CODES.has(c))) {
-          baseLociOptions.push(opts)
-        } else {
-          modifierLociOptions.push(opts)
-        }
-      }
-
-      // Deduplicate base combos: chestnut_base overrides bay_modifier/seal_brown
-      // so E×A produces multiple combos that resolve to the same base color.
-      const seenBase = new Set<string>()
-      const dedupedBaseCombos: (string | null)[][] = []
-      for (const baseCombo of cartesianGen(baseLociOptions)) {
-        const bc = new Set(baseCombo.filter((c): c is string => c !== null))
-        const resolved = bc.has("chestnut_base") ? "chestnut"
-          : (bc.has("bay_modifier") && bc.has("seal_brown")) ? "seal_brown"
-          : bc.has("bay_modifier") ? "bay"
-          : "black"
-        if (!seenBase.has(resolved)) {
-          seenBase.add(resolved)
-          dedupedBaseCombos.push(baseCombo)
-        }
-      }
-
-      const allFoundColors = new Set<string>()
-      const sampledColors = new Set<string>()
-
-      // When every animal in the breed carries an always-active override (e.g.
-      // dominant white W13/W20 with N absent), the underlying base/modifier
-      // enumeration is skipped — all those colors are visually masked anyway.
-      if (!alwaysOverridden) {
-      // 2M cap — unique color saturation occurs well before this limit for any
-      // realistic breed; the remaining iterations beyond saturation are all
-      // duplicates that don't affect the count or display.
-      const MAX_ITERS = 2_000_000
-      let iters = 0
-      let capped = false
-
-      // Each base gets an equal share of the ~100-chip display budget so no
-      // single base crowds out the others when there are many combinations.
-      const perBaseTarget = Math.max(10, Math.ceil(100 / Math.max(1, dedupedBaseCombos.length)))
-
-      for (const baseCombo of dedupedBaseCombos) {
-        if (capped) break
-        const baseCodes = new Set(baseCombo.filter((c): c is string => c !== null))
-        const uniqueForBase = new Set<string>()
-
-        // Always include the plain base color (no modifier overlay).
-        const plainBase = computeCoatFromCodes(baseCodes)
-        if (plainBase) uniqueForBase.add(plainBase)
-
-        for (const modCombo of cartesianGen(modifierLociOptions)) {
-          if (iters++ >= MAX_ITERS) { capped = true; break }
-          const codes = new Set([...baseCodes, ...modCombo.filter((c): c is string => c !== null)])
-          const color = computeCoatFromCodes(codes)
-          if (color) uniqueForBase.add(color)
-        }
-
-        // Single-modifier pass: add base+code for each non-null modifier code so
-        // every locus effect is in uniqueForBase even if the main loop was capped.
-        const singleModColors = new Set<string>()
-        for (const modOpts of modifierLociOptions) {
-          for (const code of modOpts) {
-            if (code === null) continue
-            const color = computeCoatFromCodes(new Set([...baseCodes, code]))
-            if (color) {
-              uniqueForBase.add(color)
-              singleModColors.add(color)
-            }
-          }
-        }
-
-        for (const c of uniqueForBase) allFoundColors.add(c)
-        const sorted = [...uniqueForBase].sort()
-        for (const c of sorted.slice(0, perBaseTarget)) sampledColors.add(c)
-        for (const c of sorted.slice(-perBaseTarget)) sampledColors.add(c)
-        // Guarantee single-modifier colors are visible even if they fall between
-        // the alphabetical sampling windows.
-        for (const c of singleModColors) sampledColors.add(c)
-
-        // Always surface the plain base color regardless of window position.
-        if (plainBase) sampledColors.add(plainBase)
-      }
-      } // end if (!alwaysOverridden)
-
-      const coatColors = [...overrideColors].sort()
-        .concat([...sampledColors].sort())
-        .filter(c => c.trim().length > 0)
-      const coatColorOverflow = Math.max(0, allFoundColors.size - sampledColors.size)
+      const { coatColors, coatColorOverflow, allCoatColors, coatColorsTruncated } = enumerateBreedCoats(
+        breedCoatOptions(colorAlleleFreqs),
+      )
 
       const breedWeightMap = new Map(breed.statProfile.map(s => [s.statDefId, s.weight]))
       const disciplineScores = new Map<string, { id: string; name: string; score: number }>()
@@ -492,6 +331,8 @@ export const breedRouter = router({
         breed,
         coatColors,
         coatColorOverflow,
+        allCoatColors,
+        coatColorsTruncated,
         coatStandardDisplay,
         healthConditions: [...healthConditions.values()].sort(),
         compatibleDisciplines,

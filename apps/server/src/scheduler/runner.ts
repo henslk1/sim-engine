@@ -35,11 +35,19 @@
 import { hostname } from "node:os"
 import { randomUUID } from "node:crypto"
 import { db } from "@sim-engine/db"
-import { setGameMaintenance, syncGameMaintenance } from "@sim-engine/trpc"
-import type { Prisma, ScheduledTaskRunStatus } from "@sim-engine/db"
+import {
+  setGameMaintenance,
+  syncGameMaintenance,
+  lockGameForMaintenance,
+  GameplayDrainTimeout,
+  lockGameSchedule,
+  ScheduleLockTimeout,
+} from "@sim-engine/trpc"
+import type { Prisma, ScheduledTaskRunStatus, ScheduledTaskType } from "@sim-engine/db"
 import {
   SCHEDULED_TASK_TYPES,
   describeSchedule,
+  isLeaseLive,
   isScheduledType,
   materializeTask,
   nextBoundaryFor,
@@ -53,6 +61,7 @@ import {
   type TaskRow,
 } from "@sim-engine/engine"
 import { HANDLERS, type HandlerCounts, type TaskHandler } from "./handlers.js"
+import { realtimeControl } from "../realtime.js"
 
 export type SchedulerOptions = {
   /** Where "now" comes from. Overridden in tests. */
@@ -84,6 +93,19 @@ export type SchedulerOptions = {
    * what stops a reclaim loop.
    */
   maxAttempts?: number
+  /**
+   * Tell a game's players that its maintenance window may have changed.
+   *
+   * A nudge, not a state update. Everything that decides anything - the guard,
+   * the lock, the banner, the redirect - reads the run row; this only shortens
+   * the wait before somebody reads it again. So it is deliberately sent on
+   * "something happened here" rather than on a transition anybody has reasoned
+   * about: a spurious one costs a query, and a lost one costs nothing at all,
+   * because the poll underneath it has not gone anywhere.
+   *
+   * Replaceable so the announcement can be observed without a socket server.
+   */
+  announceMaintenance?: (gameId: string) => void
 }
 
 export type SchedulerHealth = {
@@ -100,6 +122,28 @@ export type SchedulerHealth = {
    * be distinguishable from "it has stopped ticking".
    */
   nextWakeAt: Date | null
+  /**
+   * Nightlies that could not start because gameplay was still draining.
+   *
+   * Expected in small numbers and self-correcting - the run stays claimable and
+   * the next tick retries. A count that keeps climbing means gameplay
+   * transactions are routinely outlasting `CLAIM_TX.timeout`, which is a
+   * different problem from the scheduler being broken, and worth being able to
+   * tell apart from one.
+   */
+  claimContentionCount: number
+  lastClaimContentionAt: Date | null
+  /**
+   * Games whose draining threw, and the last one to do it.
+   *
+   * One game is caught so it cannot take the tick down for the others, and
+   * that catch used to be the end of it: a run would stay PENDING for ever
+   * while `/health` said `ok`, `lastTickError` said null and the only record
+   * was a line in the log. A failure nothing can see is the same as one
+   * nobody fixes, so it is counted and the reason is kept.
+   */
+  gameErrorCount: number
+  lastGameError: { gameId: string; message: string; at: Date } | null
 }
 
 export type TickSummary = {
@@ -108,6 +152,15 @@ export type TickSummary = {
   failed: number
   superseded: number
   deferred: number
+  /**
+   * Games whose draining threw where nothing else could catch it.
+   *
+   * Counted separately from `failed`, which is runs that were attempted and
+   * did not succeed. This is a game that never got that far - a schema the
+   * code disagrees with, a connection that would not come - and the run it was
+   * about is still sitting there PENDING with nothing recorded against it.
+   */
+  gameErrors: number
 }
 
 /** The statuses a run can still be acted on from. */
@@ -171,6 +224,7 @@ function describeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
+
 export function createScheduler(options: SchedulerOptions = {}) {
   const clock = options.clock ?? systemClock
   const handlers = options.handlers ?? HANDLERS
@@ -184,10 +238,36 @@ export function createScheduler(options: SchedulerOptions = {}) {
   )
   const maxAttempts = options.maxAttempts ?? DEFAULTS.maxAttempts
   const instanceId = options.instanceId ?? `${hostname()}:${process.pid}`
+  const announceMaintenance =
+    options.announceMaintenance ??
+    ((gameId: string) => {
+      // Through the Redis adapter, so a nightly running on one instance reaches
+      // the players connected to every other one. `realtimeControl` tolerates
+      // there being no socket server at all, which is the case in scripts and
+      // for the seconds before `initSocket` has run.
+      realtimeControl.emitToGame(gameId, "maintenance:changed", { gameId })
+    })
 
   let timer: NodeJS.Timeout | null = null
   let inFlight: Promise<TickSummary> | null = null
   let stopping = false
+
+  /**
+   * The games the last reconciliation saw a nightly running in.
+   *
+   * Only so the tick can tell a change from a repetition - a thirty-minute
+   * nightly on another instance is RUNNING for thirty ticks, and announcing it
+   * on each of them would send every player's client to re-read the same
+   * answer thirty times.
+   *
+   * It deliberately does not know about runs this process is executing. It
+   * cannot meet one: `tick` refuses to start while another is in flight, and
+   * the reconciliation runs at the top of a tick, so a game being drained is
+   * never reconciled against halfway through. If that ever stops being true
+   * the cost is one redundant nudge, not a wrong answer - which is the whole
+   * reason the event carries no state.
+   */
+  let seenRunning = new Set<string>()
 
   const health: SchedulerHealth = {
     started: false,
@@ -195,6 +275,25 @@ export function createScheduler(options: SchedulerOptions = {}) {
     lastTickError: null,
     consecutiveTickFailures: 0,
     nextWakeAt: null,
+    claimContentionCount: 0,
+    lastClaimContentionAt: null,
+    gameErrorCount: 0,
+    lastGameError: null,
+  }
+
+  /**
+   * Announce, never fail.
+   *
+   * Telling players to look again is not part of the work, and a run that aged
+   * ten thousand animals must not be recorded as failed because a socket was
+   * not there to hear about it.
+   */
+  function announce(gameId: string): void {
+    try {
+      announceMaintenance(gameId)
+    } catch (error) {
+      console.error(`[scheduler] could not announce maintenance for game ${gameId}:`, error)
+    }
   }
 
   /**
@@ -370,23 +469,148 @@ export function createScheduler(options: SchedulerOptions = {}) {
    * still running, and the counts would be the losing attempt's. Matching on
    * the token means a stale writer changes nothing, and finds out.
    */
-  async function claim(runId: string, now: Date): Promise<string | null> {
+  /**
+   * How long a nightly may wait for gameplay to drain before giving up.
+   *
+   * The claim transaction takes the game's maintenance lock exclusively, so it
+   * waits behind every gameplay transaction already holding it in shared mode.
+   * That means this has to exceed the longest gameplay transaction, and the
+   * longest one is competition entry at twenty seconds - it takes the
+   * competition's row lock and can queue behind a resolution. The default five
+   * seconds was shorter than that, so a perfectly ordinary entry could make the
+   * nightly fail to start.
+   *
+   * Bounded rather than patient: a claim that times out has written nothing and
+   * leaves the run claimable, so the next tick retries. Waiting for ever would
+   * turn one stuck transaction into a nightly that never runs.
+   */
+  const CLAIM_TX = { timeout: 40_000, maxWait: 10_000 } as const
+
+  /**
+   * How long the claim waits for gameplay to let go of the game.
+   *
+   * Bounded below `CLAIM_TX.timeout` on purpose, so the wait ends as a lock
+   * timeout - which is attributable - rather than as the transaction expiring,
+   * which is not. It still has to exceed the longest gameplay transaction, and
+   * that is competition entry at twenty seconds.
+   */
+  const DRAIN_WAIT_MS = 25_000
+
+  /**
+   * How long the claim waits for another scheduler to finish claiming.
+   *
+   * Short, because the thing being waited for is a claim and not any work: the
+   * only reason it is ever slow is that the other instance's claim is itself
+   * draining gameplay. Giving up then is the right answer - that instance is
+   * about to own this game, so there is nothing here worth queueing for.
+   *
+   * `SCHEDULE_WAIT_MS + DRAIN_WAIT_MS` is what `CLAIM_TX.timeout` has to cover,
+   * which is why it is forty seconds rather than thirty.
+   */
+  const SCHEDULE_WAIT_MS = 5_000
+
+  async function claim(
+    runId: string,
+    now: Date,
+    run: { gameId: string; taskType: ScheduledTaskType }
+  ): Promise<string | null> {
     const token = `${instanceId}#${randomUUID()}`
 
-    const { count } = await db.scheduledTaskRun.updateMany({
-      where: { id: runId, OR: claimableWhere(now) },
-      data: {
-        status: "RUNNING",
-        claimedBy: token,
-        claimedAt: now,
-        startedAt: now,
-        heartbeatAt: now,
-        leaseUntil: new Date(now.getTime() + leaseMs),
-        attempt: { increment: 1 },
-      },
-    })
+    try {
+      return await db.$transaction(async (tx) => {
+        // One scheduler at a time for this game, before anything else is read
+        // or decided. The planner's "one run at a time within a game" was only
+        // ever true inside a process: two instances planned from their own
+        // snapshots, both taken before either claim, so each claimed whatever
+        // the other had not - A the nightly, B the sweep behind it - and both
+        // claims succeeded because they were different rows.
+        //
+        // Always before the maintenance lock, never after. Gameplay never
+        // takes this one, so there is no cycle for the two to deadlock on.
+        await lockGameSchedule(tx, run.gameId, SCHEDULE_WAIT_MS)
 
-    return count === 1 ? token : null
+        // Now that this game is held: is anything else already running in it?
+        // The complement of `claimableWhere` - RUNNING with a live lease - so
+        // a run abandoned by a dead process is not mistaken for a live one and
+        // left to block the game for ever.
+        const active = await tx.scheduledTaskRun.findFirst({
+          where: {
+            gameId: run.gameId,
+            id: { not: runId },
+            status: "RUNNING",
+            leaseUntil: { gt: now },
+          },
+          select: { id: true, taskType: true },
+        })
+        if (active) {
+          console.log(
+            `[scheduler] game ${run.gameId}: not starting ${run.taskType} — ${active.taskType} is still running`
+          )
+          return null
+        }
+
+        // A nightly takes the game's maintenance lock exclusively before it
+        // becomes RUNNING. Gameplay mutations hold the same lock in shared mode
+        // for as long as their own write is in flight, so this waits for the ones
+        // already running and makes them land before the nightly touches
+        // anything. A status check alone cannot do that: a nightly can begin in
+        // the gap between a mutation checking and writing.
+        //
+        // Held for this transaction only. From here on the run's status is what
+        // refuses later mutations, and keeping the lock for the length of the
+        // nightly would queue every player behind it to no purpose.
+          if (run.taskType === "NIGHTLY") {
+          await lockGameForMaintenance(tx, run.gameId, DRAIN_WAIT_MS)
+        }
+
+        const { count } = await tx.scheduledTaskRun.updateMany({
+          where: { id: runId, OR: claimableWhere(now) },
+          data: {
+            status: "RUNNING",
+            claimedBy: token,
+            claimedAt: now,
+            startedAt: now,
+            heartbeatAt: now,
+            leaseUntil: new Date(now.getTime() + leaseMs),
+            attempt: { increment: 1 },
+          },
+        })
+
+          return count === 1 ? token : null
+      }, CLAIM_TX)
+    } catch (error) {
+      // Another scheduler was mid-claim for this game and took longer than we
+      // were prepared to wait - almost always because its own claim is
+      // draining gameplay. Nothing written, run still claimable, next tick.
+      if (error instanceof ScheduleLockTimeout) {
+        console.log(
+          `[scheduler] game ${run.gameId}: another scheduler is claiming it, leaving ${run.taskType} for the next tick`
+        )
+        return null
+      }
+
+      // One expected failure, and it identifies itself.
+      //
+      // `lockGameForMaintenance` raises this only when Postgres cancelled the
+      // lock wait itself, so it means "gameplay was still holding this game"
+      // and nothing else. Every other failure - a pool with no connections
+      // left, an expired transaction, a mistake in this file - propagates, or
+      // it becomes an invisible retry loop behind a tick that reports success.
+      if (!(error instanceof GameplayDrainTimeout)) throw error
+
+      // A gameplay transaction held the game's lock for longer than
+      // `CLAIM_TX.timeout`. Nothing has been written - the claim and the lock
+      // are the same transaction - so the run is still claimable and the next
+      // tick tries again. Reported rather than thrown, so one stubborn game
+      // does not take the rest of the tick with it.
+      health.lastClaimContentionAt = clock.now()
+      health.claimContentionCount++
+      console.warn(
+        `[scheduler] run ${runId} could not take game ${run.gameId} within ${DRAIN_WAIT_MS}ms;` +
+          " gameplay is still draining, retrying next tick"
+      )
+      return null
+    }
   }
 
   /** Push the lease out. False means this process no longer owns the run. */
@@ -436,7 +660,16 @@ export function createScheduler(options: SchedulerOptions = {}) {
     // The per-tick sync is what covers everything this cannot — another
     // instance's nightly, or one already in flight when this process started.
     const blocking = run.taskType === "NIGHTLY"
-    if (blocking) setGameMaintenance(gameId, { runId: run.id, startedAt: clock.now() })
+    // Built once and reused by every refresh below. `startedAt` is what the
+    // countdown counts from, so it has to stay the moment the run began rather
+    // than advancing each time the entry is renewed.
+    const window = blocking ? { runId: run.id, startedAt: clock.now() } : null
+    if (window) {
+      setGameMaintenance(gameId, window)
+      // After the claim committed, so the first thing a client does in response
+      // - ask the database - already finds the run RUNNING.
+      announce(gameId)
+    }
 
     // The lease is renewed on a timer rather than by the handler. Tying it to
     // progress through a loop meant a game with fewer animals than the
@@ -444,6 +677,21 @@ export function createScheduler(options: SchedulerOptions = {}) {
     // end could outlast the lease however many animals there were.
     let owned = true
     const renew = setInterval(() => {
+      // The gameplay block is refreshed here too, not only when the run starts.
+      //
+      // It is held in memory with a five-minute backstop so that a process
+      // which stops refreshing cannot lock players out for ever. Nothing was
+      // refreshing it during a run: this heartbeat renewed the database lease,
+      // and the per-tick `syncMaintenance` cannot help because the tick is
+      // itself awaiting this handler. So any nightly lasting longer than five
+      // minutes quietly reopened gameplay while it was still aging animals -
+      // which is precisely the window the block exists for, since a short
+      // nightly barely needs one.
+      //
+      // Renewal is a third of the lease, 40s by default, so the entry is
+      // refreshed seven times over before the backstop could expire it.
+      if (window) setGameMaintenance(gameId, window)
+
       void heartbeat(run.id, token).then((held) => {
         owned = held
       })
@@ -502,11 +750,34 @@ export function createScheduler(options: SchedulerOptions = {}) {
       return held ? "failed" : "lost"
     } finally {
       clearInterval(renew)
-      if (blocking) setGameMaintenance(gameId, null)
+      if (window) {
+        setGameMaintenance(gameId, null)
+        // After `finish` wrote the outcome, and sent whatever that outcome was.
+        // A run that went RETRYING has not reopened the game, and saying
+        // "changed, look again" rather than "open" is what keeps this from
+        // being a lie in that case: the client looks, and is told to keep
+        // waiting.
+        announce(gameId)
+      }
       if (!owned) console.warn(`[scheduler] lost the lease on run ${run.id} while it was running`)
     }
   }
 
+
+  /** This game's outstanding runs, as they are right now. */
+  async function activeRunsFor(gameId: string): Promise<RunRow[]> {
+    const rows = await db.scheduledTaskRun.findMany({
+      where: { status: { in: ACTIVE_STATUSES }, gameId },
+      select: { id: true, taskType: true, scheduledFor: true, status: true, leaseUntil: true },
+    })
+    return rows.filter((row) => isScheduledType(row.taskType)).map((row) => ({
+      id: row.id,
+      taskType: row.taskType as ScheduledType,
+      scheduledFor: row.scheduledFor,
+      status: row.status,
+      leaseUntil: row.leaseUntil,
+    }))
+  }
 
   /**
    * Work one game's outstanding runs, newest boundary first.
@@ -525,6 +796,8 @@ export function createScheduler(options: SchedulerOptions = {}) {
     let superseded = 0
     let deferred = 0
     let remaining = [...runs]
+    /** Runs this game has already offered up, so a refresh cannot re-offer them. */
+    const attempted = new Set<string>()
 
     for (let pass = 0; pass < maxRunsPerGamePerTick; pass++) {
       // Re-read the clock each pass. A nightly can run for half an hour, and
@@ -574,10 +847,25 @@ export function createScheduler(options: SchedulerOptions = {}) {
       // Out of the working set whatever happens next, so a run that fails
       // and goes RETRYING waits for the next tick rather than burning every
       // attempt inside this one.
+      attempted.add(run.id)
       remaining = remaining.filter((other) => other.id !== run.id)
 
-      const token = await claim(run.id, at)
-      if (!token) continue
+      const token = await claim(run.id, at, { gameId, taskType: run.taskType })
+      if (!token) {
+        // Losing a claim is news about this game, not just about this run:
+        // somebody else is working it. Carrying on against the snapshot is how
+        // two instances ended up running a nightly and a sweep together - this
+        // loop dropped the run it lost and then claimed the next one down a
+        // plan that no longer had the blocker in it.
+        //
+        // So re-read. A run already attempted is dropped so the loop cannot
+        // offer it again - *unless* somebody else now holds it, which is the
+        // one case where it has to stay: it is the blocker, and a plan built
+        // without it is the stale plan all over again.
+        const live = await activeRunsFor(gameId)
+        remaining = live.filter((other) => !attempted.has(other.id) || isLeaseLive(other, at))
+        continue
+      }
 
       // `attempt` after the claim incremented it: this run's attempt number.
       const claimed = await db.scheduledTaskRun.findUnique({
@@ -590,7 +878,7 @@ export function createScheduler(options: SchedulerOptions = {}) {
       else if (outcome === "failed") failed++
     }
 
-    return { executed, failed, superseded, deferred }
+    return { executed, failed, superseded, deferred, gameErrors: 0 }
   }
 
   /** Claim and run what each game is ready for. */
@@ -615,7 +903,7 @@ export function createScheduler(options: SchedulerOptions = {}) {
       else byGame.set(row.gameId, [run])
     }
 
-    const totals = { executed: 0, failed: 0, superseded: 0, deferred: 0 }
+    const totals = { executed: 0, failed: 0, superseded: 0, deferred: 0, gameErrors: 0 }
 
     // Games run concurrently, a few at a time. One game's half-hour nightly
     // used to delay every game queued behind it, which was a real limit rather
@@ -650,7 +938,18 @@ export function createScheduler(options: SchedulerOptions = {}) {
             // A game that throws out here has already failed its own run
             // handling; this is the last net, and it exists so one game cannot
             // take the tick down for every other game.
+            //
+            // Caught, but not forgiven. The other games carry on, and this one
+            // is counted and named - `/health` reporting `ok` while a run sat
+            // PENDING for ever was how a missing column went unnoticed.
             console.error(`[scheduler] draining game ${gameId} failed:`, error)
+            totals.gameErrors++
+            health.gameErrorCount++
+            health.lastGameError = {
+              gameId,
+              message: describeError(error),
+              at: clock.now(),
+            }
           }
         }
       }
@@ -684,6 +983,20 @@ export function createScheduler(options: SchedulerOptions = {}) {
         startedAt: run.startedAt ?? run.claimedAt ?? new Date(0),
       }))
     )
+
+    // The same reconciliation, for the announcement. It catches the transitions
+    // `execute` cannot: a worker that died before reaching its `finally`, and a
+    // nightly that began on another instance while this one was down. Both
+    // directions matter — whichever way it went, what a client is holding is
+    // now the wrong answer.
+    const current = new Set(running.map((run) => run.gameId))
+    for (const gameId of current) {
+      if (!seenRunning.has(gameId)) announce(gameId)
+    }
+    for (const gameId of seenRunning) {
+      if (!current.has(gameId)) announce(gameId)
+    }
+    seenRunning = current
   }
 
   async function runTick(): Promise<TickSummary> {
@@ -698,7 +1011,7 @@ export function createScheduler(options: SchedulerOptions = {}) {
     const schedules = await loadGameSchedules()
 
     if (schedules.size === 0) {
-      return { materialized: 0, executed: 0, failed: 0, superseded: 0, deferred: 0 }
+      return { materialized: 0, executed: 0, failed: 0, superseded: 0, deferred: 0, gameErrors: 0 }
     }
 
     const materialized = await materializeDue(now, schedules)
@@ -733,7 +1046,7 @@ export function createScheduler(options: SchedulerOptions = {}) {
         health.lastTickAt = clock.now()
         health.lastTickError = describeError(error)
         health.consecutiveTickFailures++
-        return { materialized: 0, executed: 0, failed: 0, superseded: 0, deferred: 0 }
+        return { materialized: 0, executed: 0, failed: 0, superseded: 0, deferred: 0, gameErrors: 0 }
       })
       .finally(() => {
         inFlight = null

@@ -16,11 +16,13 @@
 
 import { db } from "@sim-engine/db"
 import { db as database } from "@sim-engine/db"
-import { replenishOpenSet, runCompetition, type Clock } from "@sim-engine/engine"
+import { replenishOpenSet, runCompetitionTx, RESOLUTION_TX, type Clock } from "@sim-engine/engine"
+import { enterGameplay, isMaintenanceBlock } from "@sim-engine/trpc"
 import { forEachBounded, withLeaseRenewal } from "./bounded.js"
 import {
   abandonExhaustedResolutions,
   claimResolutions,
+  deferResolution,
   finishResolution,
   gamesInNightly,
   heartbeatResolutions,
@@ -91,6 +93,8 @@ export type DrainTotals = {
   reconciled: number
   cancelled: number
   failed: number
+  /** Handed back because the game shut between the claim and the work. */
+  deferred: number
 }
 
 export type Resolver = {
@@ -116,12 +120,34 @@ export function createResolver(options: { instanceId: string; clock: Clock }): R
   async function resolveOne(
     work: ClaimedResolution,
     token: string
-  ): Promise<"resolved" | "reconciled" | "cancelled" | "failed"> {
+  ): Promise<"resolved" | "reconciled" | "cancelled" | "failed" | "deferred"> {
     try {
-      await runCompetition(db, { competitionId: work.competitionId })
+      // Through the game's shared lock, exactly as a player's own entry is.
+      //
+      // Excluding busy games at claim time is not enough on its own: a chunk
+      // is claimed in one moment and worked over the next several seconds, and
+      // a nightly starting in between would take the game while this was
+      // halfway through writing placements into it. The lock is what the
+      // nightly's own claim waits on, and the recheck under it is what refuses
+      // this one if the nightly got there first.
+      await db.$transaction(async (tx) => {
+        await enterGameplay(tx, work.gameId)
+        await runCompetitionTx(tx, { competitionId: work.competitionId })
+      }, RESOLUTION_TX)
       await finishResolution(work.id, token, clock.now(), { status: "COMPLETED" })
       return "resolved"
     } catch (err) {
+      // The game shut between the claim and here. Nothing was attempted, so
+      // the item goes back as the claim found it — status, owner, attempt and
+      // whatever error its last real attempt left — and the next drain picks
+      // it up once the game reopens. Recording it as a failure would spend one
+      // of three attempts on a competition that was never tried, and three
+      // closed games would retire it as abandoned.
+      if (isMaintenanceBlock(err)) {
+        await deferResolution(work, token)
+        return "deferred"
+      }
+
       // The competition may simply have been resolved already — by the tutorial,
       // which runs its own synchronously, or by an earlier attempt of this item
       // whose result committed before it could be closed out. `runCompetition`
@@ -188,6 +214,7 @@ export function createResolver(options: { instanceId: string; clock: Clock }): R
     let reconciled = 0
     let cancelled = 0
     let failed = 0
+    let deferred = 0
 
     // Before claiming anything: items a dead worker left behind that have used
     // up their attempts. The clean failure path gives up after `MAX_ATTEMPTS`
@@ -228,8 +255,11 @@ export function createResolver(options: { instanceId: string; clock: Clock }): R
             if (outcome === "resolved") resolved++
             else if (outcome === "reconciled") reconciled++
             else if (outcome === "cancelled") cancelled++
+            else if (outcome === "deferred") deferred++
             else failed++
-            if (outcome !== "failed") touched.add(work.gameId)
+            // A deferred competition is still open and still in its slot, and
+            // a failed one never left it either: neither leaves a hole to fill.
+            if (outcome !== "failed" && outcome !== "deferred") touched.add(work.gameId)
           })
       )
 
@@ -246,7 +276,7 @@ export function createResolver(options: { instanceId: string; clock: Clock }): R
       await replaceResolved(touched)
     }
 
-    return { resolved, reconciled, cancelled, failed }
+    return { resolved, reconciled, cancelled, failed, deferred }
   }
 
   async function drain(): Promise<DrainTotals> {
@@ -257,7 +287,7 @@ export function createResolver(options: { instanceId: string; clock: Clock }): R
       return draining
     }
 
-    const totals: DrainTotals = { resolved: 0, reconciled: 0, cancelled: 0, failed: 0 }
+    const totals: DrainTotals = { resolved: 0, reconciled: 0, cancelled: 0, failed: 0, deferred: 0 }
 
     draining = (async () => {
       do {
@@ -267,6 +297,7 @@ export function createResolver(options: { instanceId: string; clock: Clock }): R
         totals.reconciled += pass.reconciled
         totals.cancelled += pass.cancelled
         totals.failed += pass.failed
+        totals.deferred += pass.deferred
       } while (again && !stopped)
 
       return totals

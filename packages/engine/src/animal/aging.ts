@@ -1,4 +1,5 @@
 import { db } from "@sim-engine/db";
+import type { Prisma } from "@sim-engine/db"
 import { genotypeKey, indexHealthRecords, loadGameAgingCache } from "./aging-cache.js";
 import { isDailyCareComplete } from "../care/completion.js";
 import type { GameAgingCache } from "./aging-cache.js";
@@ -12,6 +13,30 @@ type Client = typeof db
  * and hands the same object to every animal; a one-off caller may leave it out
  * and the animal's own game is loaded for it, exactly as before.
  */
+export type AgingResult = {
+  pregnancyCompleted?: string
+  lifeStageAdvanced?: boolean
+  ageInCycles?: number
+  alreadyAged?: boolean
+}
+
+/**
+ * Age one animal, on a transaction the caller owns.
+ *
+ * Split out so the tutorial's manual "advance age" can run inside the
+ * transaction holding the game's maintenance lock. Of every action in the game
+ * that one is the most important to keep out of a nightly's way: it does
+ * exactly what the nightly does, to an animal the nightly may be aging.
+ */
+export async function advanceAnimalAgingTx(
+  tx: Prisma.TransactionClient,
+  animalId: string,
+  cache?: GameAgingCache,
+  options?: { expectedCycle?: number }
+): Promise<AgingResult> {
+  return agingBody(tx, animalId, cache, options)
+}
+
 export async function advanceAnimalAging(
   client: Client,
   animalId: string,
@@ -31,8 +56,18 @@ export async function advanceAnimalAging(
      */
     expectedCycle?: number
   }
-): Promise<{ pregnancyCompleted?: string; lifeStageAdvanced?: boolean; ageInCycles?: number; alreadyAged?: boolean }> {
-  return client.$transaction(async (tx) => {
+): Promise<AgingResult> {
+  return client.$transaction((tx) => agingBody(tx, animalId, cache, options))
+}
+
+/** The work itself. Both entry points above run exactly this. */
+async function agingBody(
+  tx: Prisma.TransactionClient,
+  animalId: string,
+  cache?: GameAgingCache,
+  options?: { expectedCycle?: number }
+): Promise<AgingResult> {
+  {
     const animal = await tx.animal.findUniqueOrThrow({
       where: { id: animalId },
       include: {
@@ -539,5 +574,5 @@ export async function advanceAnimalAging(
       ...(lifeStageAdvanced ? { lifeStageAdvanced: true } : {}),
       ageInCycles: newAge,
     }
-  })
+  }
 }

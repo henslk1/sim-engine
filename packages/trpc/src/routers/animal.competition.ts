@@ -1,7 +1,11 @@
-import { enterCompetition, nextBoundaryFor, runConformationInspection, signalCompetitionResolution } from "@sim-engine/engine";
+import { enterCompetitionTx, nextBoundaryFor, applyConformationInspection, signalCompetitionResolution } from "@sim-engine/engine";
+import { assertParticipantsInGame, enterGameplayForAnimal } from "../maintenance.js";
 import { db } from "@sim-engine/db";
 import { router, publicProcedure } from "../trpc.js";
 import { z } from "zod";
+
+/** Mirrors the allowance `enterCompetition` used when it owned the transaction. */
+const ENTRY_TX = { timeout: 20_000, maxWait: 5_000 } as const;
 
 export const animalCompetitionRouter = router({
   listVenues: publicProcedure
@@ -176,19 +180,39 @@ export const animalCompetitionRouter = router({
       playerAccountId: z.string(),
     }))
     .mutation(async ({ input }) => {
-      const { entry, shouldRun } = await enterCompetition(db, input)
+      const { entry, shouldRun } = await db.$transaction(
+        async (tx) => {
+          const gameId = await enterGameplayForAnimal(tx, input.animalId)
+          await assertParticipantsInGame(tx, gameId, {
+            playerAccountIds: [input.playerAccountId],
+          })
+          return enterCompetitionTx(tx, input)
+        },
+        // Entry takes the competition's row lock and can queue behind a
+        // resolution, which is why this path has always had the longest
+        // allowance of any gameplay transaction.
+        ENTRY_TX
+      )
 
       // A full competition resolves on the resolver, not in this request. The
       // work item was written inside the entry's own transaction, so by the
       // time this runs it is durable; the signal only decides whether the
       // player waits a moment or until the next sweep.
+      //
+      // After the commit, not inside it: an external effect must not fire for
+      // a transaction that then rolls back.
       if (shouldRun) signalCompetitionResolution()
 
       return entry
     }),
   inspect: publicProcedure
     .input(z.object({ animalId: z.string() }))
-    .mutation(({ input }) => runConformationInspection(db, input.animalId)),
+    .mutation(({ input }) =>
+      db.$transaction(async (tx) => {
+        await enterGameplayForAnimal(tx, input.animalId)
+        return applyConformationInspection(tx, input.animalId)
+      })
+    ),
 
   get: publicProcedure
     .input(z.object({ competitionId: z.string() }))

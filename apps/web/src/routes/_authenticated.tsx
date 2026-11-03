@@ -159,7 +159,16 @@ export const Route = createFileRoute("/_authenticated")({
     // The nightly update screen is not part of the game, so the tutorial has no
     // opinion about it. Without this a tutorial player would be bounced back to
     // a dashboard that cannot do anything either.
-    if (location.pathname === "/new-day") return
+    //
+    // The running tour is torn down rather than left in place. Driver.js keeps
+    // its overlay and its spotlight on whatever element the step was about,
+    // which on this page is nothing — a highlight over empty space, on top of
+    // the one screen whose whole content is "wait". The saved step is
+    // untouched, so the dashboard resumes it when the game reopens.
+    if (location.pathname === "/new-day") {
+      destroyActiveTour()
+      return
+    }
     const routeAllowed = isTutorialRouteAllowed(
       step,
       pair?.ancestorOneId,

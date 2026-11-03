@@ -1,4 +1,5 @@
 import { db } from "@sim-engine/db";
+import type { Prisma } from "@sim-engine/db"
 import { markAnimalActive } from "../animal/activity.js";
 import { nextBoundaryFor } from "../schedule/clock.js";
 import { enqueueCompetitionResolution } from "./queue.js";
@@ -19,8 +20,16 @@ type Client = typeof db
  */
 const ENTRY_TX = { timeout: 20_000, maxWait: 5_000 } as const
 
-export async function enterCompetition(
-  client: Client,
+/**
+ * enterCompetition, on a transaction the caller owns.
+ *
+ * Split out so a gameplay mutation can run it inside the transaction holding
+ * the game's maintenance lock. A helper that opens its own transaction escapes
+ * that lock however carefully the caller was written: its reads and writes land
+ * on another connection, outside both the lock and the caller's rollback.
+ */
+export async function enterCompetitionTx(
+  tx: Prisma.TransactionClient,
   input: {
     animalId: string
     competitionId: string
@@ -28,7 +37,6 @@ export async function enterCompetition(
   },
   now: Date = new Date()
 ) {
-  return client.$transaction(async (tx) => {
 
     const { animalId, competitionId, playerAccountId } = input
 
@@ -393,5 +401,19 @@ export async function enterCompetition(
 
     return { entry, shouldRun }
 
-  }, ENTRY_TX)
+}
+
+/** The same work, for a caller with no transaction of its own. */
+export async function enterCompetition(
+  client: Client,
+  input: {
+    animalId: string
+    competitionId: string
+    playerAccountId: string
+  },
+  now: Date = new Date()
+) {
+  // ENTRY_TX carries the longer timeout this path needs: entry takes the
+  // competition's row lock, so it can wait behind a resolution in progress.
+  return client.$transaction((tx) => enterCompetitionTx(tx, input, now), ENTRY_TX)
 }

@@ -19,6 +19,7 @@ import {
   heartbeatWork,
   recordSample,
 } from "./animal-work.js"
+import { finalizeRunSummary, pruneScheduledWork } from "./retention.js"
 import {
   advanceAnimalAging,
   checkCompetitions,
@@ -141,63 +142,6 @@ const MAX_DEAD_COMPETITIONS = 5_000
  */
 const MAX_PASSES = 10_000
 
-/**
- * How long finished scheduled runs, and interaction markers, are kept.
- *
- * Deleting a run takes its `NightlyAnimalWork` and `ScheduledTaskRunSample`
- * rows with it — both cascade — which is the whole point: at a hundred thousand
- * animals a night, one work row each, thirty days is three million rows that
- * nothing reads. The history players and admins actually look at lives in
- * `NightlyUpdateLog`, whose `runId` is `SetNull` rather than `Cascade`, so it
- * survives its run being pruned.
- */
-const WORK_RETENTION_MS = 30 * 24 * 60 * 60 * 1000
-
-/**
- * Housekeeping, run at the end of a nightly rather than the start.
- *
- * Nothing here is urgent — it removes rows that have been dead for a month — so
- * it has no business standing between the boundary and the first animal being
- * aged. It is deliberately not the fix for what claiming a chunk costs either:
- * that was the missing `[runId, createdAt, status]` index, and no amount of
- * pruning would have helped while the planner was ignoring `runId` entirely.
- *
- * Only runs in a terminal state are touched, so nothing that could still be
- * reclaimed after a crash is removed.
- *
- * An activity marker is safe to drop on age alone. It decides eligibility only
- * at the animal's *current* cycle, and an animal that ages leaves its marker
- * behind for good — a new one has to be written for it to age again. So a
- * marker still sitting at an animal's current cycle after thirty days means the
- * nightly has not run for a month, and a missing marker is not that game's
- * problem.
- *
- * Failures are logged and swallowed. A nightly that aged every animal must not
- * be reported as failed because a delete of month-old rows hit a lock.
- */
-async function pruneScheduledWork(gameId: string, now: Date): Promise<void> {
-  try {
-    const cutoff = new Date(now.getTime() - WORK_RETENTION_MS)
-
-    const runs = await db.scheduledTaskRun.deleteMany({
-      where: {
-        gameId,
-        status: { in: ["COMPLETED", "FAILED", "CANCELLED"] },
-        completedAt: { lt: cutoff },
-      },
-    })
-
-    const markers = await db.animalCycleActivity.deleteMany({
-      where: { gameId, lastInteractionAt: { lt: cutoff } },
-    })
-
-    if (runs.count > 0 || markers.count > 0) {
-      console.log(`[nightly] pruned ${runs.count} old run(s) and ${markers.count} stale activity marker(s)`)
-    }
-  } catch (err) {
-    console.error("[nightly] could not prune old scheduled work:", err)
-  }
-}
 
 /**
  * Age every animal in a game that was cared for during its current cycle, then
@@ -517,6 +461,11 @@ export const runNightly: TaskHandler = async (ctx) => {
         lifeStageTransitions: { increment: transitions },
       },
     })
+
+    // Before the detail is allowed to expire, and before anything can be
+    // pruned, turn this run's work rows and samples into the summary the
+    // analytics will read once they are gone.
+    await finalizeRunSummary(runId, completedAt)
 
     await pruneScheduledWork(gameId, completedAt)
 

@@ -1,11 +1,20 @@
 import { db } from "@sim-engine/db";
+import type { Prisma } from "@sim-engine/db"
 import { markAnimalActive } from "../animal/activity.js";
 import { requireLifeStageAction } from "../animal/actionGuards.js"
 
 type Client = typeof db
 
-export async function applyCareAction(
-  client: Client,
+/**
+ * applyCareAction, on a transaction the caller owns.
+ *
+ * Split out so a gameplay mutation can run it inside the transaction holding
+ * the game's maintenance lock. A helper that opens its own transaction escapes
+ * that lock however carefully the caller was written: its reads and writes land
+ * on another connection, outside both the lock and the caller's rollback.
+ */
+export async function applyCareActionTx(
+  tx: Prisma.TransactionClient,
   input: {
     animalId: string
     careActionDefId: string
@@ -13,7 +22,6 @@ export async function applyCareAction(
     cycleNumber: number
   }
 ) {
-  return client.$transaction(async (tx) => {
 
     const { animalId, careActionDefId, performedByPlayerId, cycleNumber } = input
 
@@ -195,5 +203,17 @@ export async function applyCareAction(
 
     return careLog
 
-  })
+}
+
+/** The same work, for a caller with no transaction of its own. */
+export async function applyCareAction(
+  client: Client,
+  input: {
+    animalId: string
+    careActionDefId: string
+    performedByPlayerId: string | null
+    cycleNumber: number
+  }
+) {
+  return client.$transaction((tx) => applyCareActionTx(tx, input))
 }

@@ -1,5 +1,6 @@
 import { TRPCError } from "@trpc/server"
 import { router, publicProcedure, protectedProcedure } from "../trpc.js"
+import { enterGameplayForAnimal } from "../maintenance.js"
 import { db } from "@sim-engine/db"
 import { markAnimalActive } from "@sim-engine/engine"
 import { z } from "zod"
@@ -9,6 +10,7 @@ export const animalGeneticsRouter = router({
     .input(z.object({ animalId: z.string(), locusId: z.string() }))
     .mutation(async ({ input }) => {
       return db.$transaction(async (tx) => {
+        await enterGameplayForAnimal(tx, input.animalId)
         const animal = await tx.animal.findUniqueOrThrow({
           where: { id: input.animalId },
           select: { ageInCycles: true, gameId: true },
@@ -51,6 +53,7 @@ export const animalGeneticsRouter = router({
     .input(z.object({ animalId: z.string(), panelDefId: z.string() }))
     .mutation(async ({ input }) => {
       return db.$transaction(async (tx) => {
+        await enterGameplayForAnimal(tx, input.animalId)
         const animal = await tx.animal.findUniqueOrThrow({
           where: { id: input.animalId },
           select: { ageInCycles: true, gameId: true, playerAccountId: true },
@@ -146,6 +149,7 @@ export const animalGeneticsRouter = router({
     .input(z.object({ animalId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       return db.$transaction(async (tx) => {
+        await enterGameplayForAnimal(tx, input.animalId)
         const animal = await tx.animal.findUniqueOrThrow({
           where: { id: input.animalId },
           select: { ageInCycles: true, gameId: true, playerAccountId: true, playerAccount: { select: { userId: true } } },

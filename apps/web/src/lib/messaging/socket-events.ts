@@ -1,5 +1,9 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useSyncExternalStore } from "react"
 import { socket } from "@/lib/socket"
+import { createGameSession, type MessagingConnection } from "./connection"
+// Re-exported so callers keep importing the connection's shape from the module
+// they already use for every other socket concern.
+export type { ConnectionStatus, MessagingConnection } from "./connection"
 
 // The client half of the socket contract. The server's side is in
 // apps/server/src/socket.ts; the two files have to agree on event names and
@@ -104,70 +108,20 @@ export function leaveChannel(channelId: string) {
   return request<null>("channel:leave", { channelId })
 }
 
-export type ConnectionStatus = "connecting" | "online" | "offline"
+// The shared connection, bound to this page's one socket. The state machine
+// itself is in connection.ts, where it can be driven without a socket or a
+// React tree; this hook is a view onto it.
+const session = createGameSession(socket, gameId => request<null>("game:enter", { gameId }))
 
-export type MessagingConnection = {
-  status: ConnectionStatus
-  // Increments every time the socket (re)enters the game. Views watch it to
-  // know they should reconcile against the database: Socket.IO's own recovery
-  // is best-effort, so anything that happened while the connection was down has
-  // to be refetched rather than assumed to have arrived.
-  epoch: number
-}
-
-// Opens the connection and claims a game on it.
-//
-// Entering a game is what resolves the acting player on the server, and every
-// other event refuses to run until it has happened — so it is re-sent on every
-// connect, including the automatic reconnects Socket.IO makes on its own.
+/** Opens the connection, claims a game on it, and reports both. */
 export function useMessagingSocket(gameId: string | undefined): MessagingConnection {
-  const [status, setStatus] = useState<ConnectionStatus>("connecting")
-  const [epoch, setEpoch] = useState(0)
+  const current = useSyncExternalStore(session.watch, session.snapshot)
 
   useEffect(() => {
-    if (!gameId) return
-
-    let cancelled = false
-
-    async function enterGame() {
-      setStatus("connecting")
-      const result = await request<null>("game:enter", { gameId })
-      if (cancelled) return
-      // A refusal here is a real answer — banned, or no character in this game.
-      // Treating it as offline would hide it behind "Reconnecting…" forever.
-      setStatus(result.ok ? "online" : "offline")
-      if (result.ok) setEpoch(current => current + 1)
-    }
-
-    function onConnect() {
-      void enterGame()
-    }
-    function onDisconnect() {
-      if (!cancelled) setStatus("offline")
-    }
-
-    socket.on("connect", onConnect)
-    socket.on("disconnect", onDisconnect)
-    socket.on("connect_error", onDisconnect)
-
-    if (socket.connected) void enterGame()
-    else {
-      socket.connect()
-    }
-
-    return () => {
-      cancelled = true
-      socket.off("connect", onConnect)
-      socket.off("disconnect", onDisconnect)
-      socket.off("connect_error", onDisconnect)
-      // Deliberately not disconnecting. The socket is a module-level singleton
-      // shared by everything on the page, and signing out is what closes it —
-      // see lib/session-cleanup.ts. Dropping it here would also mean a remount
-      // costs a fresh handshake for nothing.
-    }
+    if (gameId) session.ensure(gameId)
   }, [gameId])
 
-  return { status, epoch }
+  return current
 }
 
 // Subscribes to one server event for the lifetime of a component.

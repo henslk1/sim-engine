@@ -84,6 +84,44 @@ model ScheduledTaskRun {
   failedCount    Int                    @default(0)
   retriedCount   Int                    @default(0)
   skippedCount   Int                    @default(0)
+
+  // ── Finalized summary ─────────────────────────────────────────────────────
+  //
+  // Everything below is derived from this run's `NightlyAnimalWork` and
+  // `ScheduledTaskRunSample` rows, computed once when the run finishes and
+  // stored here so the analytics survive those rows being pruned.
+  //
+  // Retention deletes the detail, never the run. A run row is tiny and there
+  // are three a day; the detail is one row per animal per night, which at a
+  // hundred thousand animals is what actually grows. Keeping the run means the
+  // history, the comparisons and the timing baseline all keep working, and
+  // `detailPrunedAt` is how the panel says "no longer retained" instead of
+  // drawing a zero.
+  //
+  // All nullable: a run from before this existed has no summary and never
+  // will, which is a different thing from a run that genuinely did nothing.
+
+  /** Items that needed more than one attempt. Not `retriedCount`, which counts retries of the run itself. */
+  retriedItemCount    Int?
+  /** Pregnancies that came to term during this run. */
+  pregnanciesCompleted Int?
+  /** Best rate between two consecutive progress samples. */
+  peakRatePerSecond   Float?
+  /** Worker-seconds spent, which is what separates per-worker rate from wall-clock rate. */
+  workerSeconds       Float?
+
+  /** How many items contributed a measured duration. Zero-but-not-null means the run had none. */
+  durationMeasured    Int?
+  durationMinMs       Int?
+  durationAvgMs       Float?
+  durationP50Ms       Int?
+  durationP95Ms       Int?
+  durationP99Ms       Int?
+  durationMaxMs       Int?
+
+  /** When this run's per-animal work and progress samples were deleted. */
+  detailPrunedAt      DateTime?
+
   task           ScheduledTask          @relation(fields: [taskId], references: [id], onDelete: Cascade)
   game           Game                   @relation(fields: [gameId], references: [id])
   animalWork     NightlyAnimalWork[]

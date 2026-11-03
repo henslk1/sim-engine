@@ -1,4 +1,5 @@
 import { router, publicProcedure } from "../trpc.js"
+import { assertParticipantsInGame, enterGameplayForAnimal } from "../maintenance.js"
 import { db } from "@sim-engine/db"
 import { markAnimalActive } from "@sim-engine/engine"
 import { z } from "zod"
@@ -67,6 +68,7 @@ export const vetRouter = router({
     }))
     .mutation(({ input }) =>
       db.$transaction(async (tx) => {
+        await enterGameplayForAnimal(tx, input.animalId)
         const animalStatus = await tx.animal.findUnique({
           where: { id: input.animalId },
           select: { status: true },
@@ -157,6 +159,19 @@ export const vetRouter = router({
     .input(z.object({ treatmentRecordId: z.string(), playerAccountId: z.string() }))
     .mutation(({ input }) =>
       db.$transaction(async (tx) => {
+        // The game is the treated animal's, not whichever account was passed
+        // in. Locking the caller's game and then writing to an animal in
+        // another one checks nothing: both have to be the same game, and this
+        // is where that is established.
+        const treated = await tx.animalTreatmentRecord.findUniqueOrThrow({
+          where: { id: input.treatmentRecordId },
+          select: { animalId: true },
+        })
+        const gameId = await enterGameplayForAnimal(tx, treated.animalId)
+        await assertParticipantsInGame(tx, gameId, {
+          playerAccountIds: [input.playerAccountId],
+        })
+
         const treatmentAnimal = await tx.animalTreatmentRecord.findUnique({
           where: { id: input.treatmentRecordId },
           select: { animalId: true, animal: { select: { status: true } } },
@@ -272,6 +287,7 @@ export const vetRouter = router({
     }))
     .mutation(({ input }) =>
       db.$transaction(async (tx) => {
+        await enterGameplayForAnimal(tx, input.animalId)
         // Qualifying interaction: a player action that changes this animal's state.
         await markAnimalActive(tx, { animalId: input.animalId })
 
@@ -503,6 +519,7 @@ export const vetRouter = router({
     .input(z.object({ animalId: z.string() }))
     .mutation(({ input }) =>
       db.$transaction(async (tx) => {
+        await enterGameplayForAnimal(tx, input.animalId)
         const animal = await tx.animal.findUniqueOrThrow({
           where: { id: input.animalId },
           select: { status: true },
@@ -542,6 +559,7 @@ export const vetRouter = router({
     .input(z.object({ animalId: z.string(), playerAccountId: z.string(), certDefId: z.string() }))
     .mutation(({ input }) =>
       db.$transaction(async (tx) => {
+        await enterGameplayForAnimal(tx, input.animalId)
         const animal = await tx.animal.findUniqueOrThrow({
           where: { id: input.animalId },
           select: { ageInCycles: true, status: true, gameId: true },
@@ -598,6 +616,7 @@ export const vetRouter = router({
     }))
     .mutation(({ input }) =>
       db.$transaction(async (tx) => {
+        await enterGameplayForAnimal(tx, input.animalId)
         const service = await tx.vetServiceDef.findUniqueOrThrow({
           where: { id: input.vetServiceDefId },
           include: { currencyDef: { select: { id: true, name: true } } },

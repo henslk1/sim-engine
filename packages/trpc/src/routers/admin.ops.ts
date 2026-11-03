@@ -1135,12 +1135,25 @@ const SLOWEST_ITEMS = 10
  * would change the answer by less than a millisecond, and the typed path keeps
  * working through a column rename.
  *
+ * **Finished attempts only.** The filter is `status: COMPLETED`, not merely a
+ * non-null duration, and the difference is not cosmetic:
+ *
+ * - a FAILED item's duration measures how long it spun before giving up, which
+ *   is a different quantity from how long aging an animal takes, and mixing the
+ *   two moves the tail without telling anyone. Failed items have their own list.
+ * - an item requeued by `retryFailed` goes back to PENDING. Its duration is
+ *   cleared now, but scoping by status means outstanding work cannot reach this
+ *   aggregate even if a row is left carrying one.
+ *
+ * So these numbers describe the attempt that succeeded, per animal - not total
+ * time across retries, which nothing currently records.
+ *
  * Null when a run has nothing measured, which is every run from before
  * `durationMs` existed - the column is deliberately not backfilled, because the
  * only value that could be invented for it is the one that misled us.
  */
 async function timingFor(runId: string) {
-  const measuredWhere = { runId, durationMs: { not: null } } as const
+  const measuredWhere = { runId, status: "COMPLETED", durationMs: { not: null } } as const
 
   const spread = await db.nightlyAnimalWork.aggregate({
     where: measuredWhere,
@@ -1319,7 +1332,9 @@ const analyticsOpsRouter = router({
           // an answer: a name and a link to go and look at what is different
           // about them.
           db.nightlyAnimalWork.findMany({
-            where: { runId: run.id, durationMs: { not: null } },
+            // Same finished-attempt scoping as `timingFor`, so the list and the
+            // percentiles above it describe the same set of work.
+            where: { runId: run.id, status: "COMPLETED", durationMs: { not: null } },
             orderBy: { durationMs: "desc" },
             take: SLOWEST_ITEMS,
             select: {
@@ -1333,14 +1348,55 @@ const analyticsOpsRouter = router({
         ])
 
       // Second round: the percentile offsets need the measured count first.
-      const timing = await timingFor(run.id)
+      //
+      // Stored first, for the same reason as the pregnancies above: the live
+      // version reads per-animal work rows, which expire. `durationMeasured`
+      // is non-null exactly when a summary was finalized, and a summary that
+      // measured nothing is reported the same way an unmeasured run is - as
+      // no distribution at all, rather than a panel full of dashes.
+      const timing =
+        run.durationMeasured !== null
+          ? run.durationMeasured > 0
+            ? {
+                measured: run.durationMeasured,
+                averageMs: run.durationAvgMs,
+                minMs: run.durationMinMs,
+                maxMs: run.durationMaxMs,
+                p50Ms: run.durationP50Ms,
+                p95Ms: run.durationP95Ms,
+                p99Ms: run.durationP99Ms,
+              }
+            : null
+          : await timingFor(run.id)
 
       const work = { pending: 0, running: 0, retrying: 0, completed: 0, failed: 0, cancelled: 0 }
       for (const row of workGroups) {
         const key = row.status.toLowerCase() as keyof typeof work
         if (key in work) work[key] = row._count._all
       }
-      const totalWork = Object.values(work).reduce((a, b) => a + b, 0)
+      let totalWork = Object.values(work).reduce((a, b) => a + b, 0)
+
+      // A finalized summary exists, so the detail is no longer the source of
+      // truth for this run. `durationMeasured` is non-null exactly when one was
+      // written.
+      const summarised = run.durationMeasured !== null
+
+      // Detail partly or wholly gone, run still here. The groupBy above counts
+      // only rows that survive, so a pruned night renders as zero completed and
+      // zero failed - the same shape as a night that did nothing - and a night
+      // *mid-prune* renders as some arbitrary fraction of itself, which is
+      // worse because it looks plausible. Cleanup is bounded and resumes the
+      // next night, so that window is real and lasts as long as the arrears do.
+      //
+      // The run's own counters were always written independently of the work
+      // rows, so they are what the panel falls back to the moment the detail
+      // stops agreeing with them.
+      if (summarised && totalWork < run.succeededCount + run.failedCount) {
+        work.completed = run.succeededCount
+        work.failed = run.failedCount
+        totalWork = run.succeededCount + run.failedCount
+      }
+
       const remaining = work.pending + work.running + work.retrying
 
       // Read once, and before the resolution block below needs it.
@@ -1441,15 +1497,23 @@ const analyticsOpsRouter = router({
       // Pregnancies that came to term during this run. Counted from the
       // database rather than tallied by the handler, so the number survives a
       // run that was reclaimed halfway and finished by a second attempt.
-      const pregnanciesCompleted = run.startedAt
-        ? await db.pregnancy.count({
-            where: {
-              isCompleted: true,
-              completedAt: { gte: run.startedAt },
-              animal: { nightlyWork: { some: { runId: run.id } } },
-            },
-          })
-        : 0
+      //
+      // The stored summary wins where it exists. It is written when the run
+      // finishes, from exactly this query, and it is the only thing left once
+      // the run's work rows have been pruned - the join below goes through
+      // `nightlyWork`, so a pruned run would otherwise report zero pregnancies
+      // rather than the number it actually delivered.
+      const pregnanciesCompleted =
+        run.pregnanciesCompleted ??
+        (run.startedAt
+          ? await db.pregnancy.count({
+              where: {
+                isCompleted: true,
+                completedAt: { gte: run.startedAt },
+                animal: { nightlyWork: { some: { runId: run.id } } },
+              },
+            })
+          : 0)
 
       const isLive = (OUTSTANDING_WORK as readonly string[]).includes(run.status)
 
@@ -1497,7 +1561,12 @@ const analyticsOpsRouter = router({
         isLive && trail.length >= 2 ? rateBetween(trail[0]!, trail[trail.length - 1]!) : null
 
       const wallClockRate = elapsedMs && elapsedMs > 0 ? succeeded / (elapsedMs / 1000) : null
-      const processingRate = workerSeconds > 0 ? succeeded / workerSeconds : null
+      // The stored value where there is one, so a pruned run still reports a
+      // per-worker rate instead of silently dropping to null the moment its
+      // samples expire.
+      const effectiveWorkerSeconds = run.workerSeconds ?? workerSeconds
+      const processingRate =
+        effectiveWorkerSeconds > 0 ? succeeded / effectiveWorkerSeconds : null
       const projectionRate = currentRate && currentRate > 0 ? currentRate : wallClockRate
 
       const estimatedCompletionAt =
@@ -1545,18 +1614,24 @@ const analyticsOpsRouter = router({
           failedCount: run.failedCount,
           retriedCount: run.retriedCount,
           skippedCount: run.skippedCount,
+          // When this run's per-animal work and samples were cleared. The
+          // panel uses it to say "no longer retained" where it would otherwise
+          // draw an empty list and let it read as "nothing happened".
+          detailPrunedAt: run.detailPrunedAt,
         },
         isLive,
         isSettling,
         elapsedMs,
         work: { ...work, total: totalWork, remaining },
-        retriedItems,
+        retriedItems: run.retriedItemCount ?? retriedItems,
         rates: {
           current: currentRate,
           average: wallClockRate,
-          peak: peakRate,
+          // Both are derived from progress samples, which expire with the rest
+          // of the detail; the finalized summary is what keeps them.
+          peak: run.peakRatePerSecond ?? peakRate,
           processing: processingRate,
-          workerSeconds,
+          workerSeconds: effectiveWorkerSeconds,
         },
         activeWorkers: samples.length > 0 ? samples[samples.length - 1]!.activeWorkers : 0,
         estimatedCompletionAt,
@@ -1636,7 +1711,7 @@ const analyticsOpsRouter = router({
    */
   retryFailed: staffProcedure
     .input(z.object({ gameId: z.string(), runId: z.string() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const run = await db.scheduledTaskRun.findFirst({
         where: { id: input.runId, gameId: input.gameId },
         select: { id: true, status: true },
@@ -1650,7 +1725,22 @@ const analyticsOpsRouter = router({
         })
       }
 
-      return db.$transaction(async (tx) => {
+      // Nothing to reopen is not a quiet no-op. Reopening clears the stored
+      // summary so the new attempt can write a fresh one, and a run with no
+      // failed work has nothing to re-run - so it would come back, find an
+      // empty queue, complete, and finalize a summary from no detail at all.
+      // A night that aged seven hundred animals would end up reporting zero.
+      const failed = await db.nightlyAnimalWork.count({
+        where: { runId: run.id, status: "FAILED" },
+      })
+      if (failed === 0) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "This run has no failed work to retry.",
+        })
+      }
+
+      const result = await db.$transaction(async (tx) => {
         const { count } = await tx.nightlyAnimalWork.updateMany({
           where: { runId: run.id, status: "FAILED" },
           data: {
@@ -1660,6 +1750,13 @@ const analyticsOpsRouter = router({
             leaseUntil: null,
             startedAt: null,
             completedAt: null,
+            // Cleared with the rest of the attempt, for the same reason an
+            // automatic retry clears it: the measurement belongs to the
+            // attempt that produced it, and that attempt is being abandoned.
+            // Left behind, it is a finished duration sitting on work that has
+            // not started - which the timing panel would have shown as a
+            // completed measurement for an item still in the queue.
+            durationMs: null,
             errorMessage: null,
           },
         })
@@ -1667,6 +1764,13 @@ const analyticsOpsRouter = router({
         // RETRYING rather than PENDING: the run has been attempted, and
         // RETRYING is the scheduler's own word for "pick this up again". The
         // next tick claims it like any other outstanding run.
+        //
+        // The finalized summary is cleared with the rest of the attempt. It
+        // describes a run that has just stopped being over, and the panel
+        // prefers stored values over live ones — so leaving it would have the
+        // reopened run reporting the previous attempt's throughput and timing
+        // while a new one was visibly in progress. The next completion writes
+        // a fresh one.
         await tx.scheduledTaskRun.update({
           where: { id: run.id },
           data: {
@@ -1677,11 +1781,32 @@ const analyticsOpsRouter = router({
             leaseUntil: null,
             completedAt: null,
             errorMessage: null,
+            retriedItemCount: null,
+            pregnanciesCompleted: null,
+            peakRatePerSecond: null,
+            workerSeconds: null,
+            durationMeasured: null,
+            durationMinMs: null,
+            durationAvgMs: null,
+            durationP50Ms: null,
+            durationP95Ms: null,
+            durationP99Ms: null,
+            durationMaxMs: null,
           },
         })
 
         return { requeued: count }
       })
+
+      // Reopening a run shuts the game again - RETRYING is one of the statuses
+      // the gameplay guard refuses on - and nothing else would say so. The
+      // scheduler's own reconciliation only watches RUNNING, so without this a
+      // player keeps playing against a closed game until their next poll, which
+      // on an idle banner is as much as ten minutes away. After the commit, so
+      // the client that asks on hearing it is told the truth.
+      ctx.realtime.emitToGame(input.gameId, "maintenance:changed", { gameId: input.gameId })
+
+      return result
     }),
 })
 

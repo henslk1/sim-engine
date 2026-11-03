@@ -188,6 +188,33 @@ test("nothing anywhere computes a boundary except through nextBoundaryFor", () =
   assert.deepEqual(failures, [])
 })
 
+test("the gameplay block is refreshed for as long as a run holds it", () => {
+  // The block lives in memory with a five-minute backstop, so that a process
+  // which stops refreshing cannot lock a game's players out indefinitely. The
+  // consequence is that something has to keep refreshing it, and during a run
+  // there is exactly one thing that can: the lease-renewal timer in `execute`.
+  // The per-tick `syncMaintenance` cannot, because the tick is awaiting the
+  // handler it would be covering.
+  //
+  // This was missed once, and the symptom was the worst available: a nightly
+  // short enough not to need a block kept one, and a nightly long enough to
+  // matter dropped it five minutes in and reopened gameplay mid-update.
+  const runner = readFileSync(
+    fileURLToPath(new URL("../../../apps/server/src/scheduler/runner.ts", import.meta.url)),
+    "utf8"
+  )
+
+  const renewAt = runner.indexOf("const renew = setInterval(")
+  assert.notEqual(renewAt, -1, "the lease-renewal timer has moved or been renamed")
+
+  const body = runner.slice(renewAt, runner.indexOf("renew.unref()", renewAt))
+  assert.match(
+    body,
+    /setGameMaintenance\(/,
+    "the lease-renewal timer must also refresh the in-memory gameplay block"
+  )
+})
+
 test("there is exactly one clock reading in the whole scheduler", () => {
   // The allowlist above lets clock.ts construct a date; this pins it to the one
   // line that defines `systemClock`, so the exemption cannot quietly grow.

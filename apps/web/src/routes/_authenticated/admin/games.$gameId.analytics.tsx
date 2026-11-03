@@ -226,6 +226,15 @@ function RunDetail({ detail, vocab, gameId }: {
 
       {vocab.hasWorkQueue ? (
         <>
+          {detail.run.detailPrunedAt && (
+            <div className="rounded-lg border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
+              Per-animal detail for this run was cleared on{" "}
+              <span className="text-foreground">{formatClock(detail.run.detailPrunedAt)}</span>.
+              The totals, rates and timing below are the summary kept when it finished; the
+              progress curve, the per-animal list and the failure detail are not retained.
+            </div>
+          )}
+
           <Block title={`Throughput (${vocab.unit} per second)`}>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <Stat
@@ -268,6 +277,13 @@ function RunDetail({ detail, vocab, gameId }: {
                 />
               </div>
 
+              {detail.slowest.length === 0 && detail.run.detailPrunedAt && (
+                <p className="mt-3 text-[11px] text-muted-foreground">
+                  The per-animal list is part of the cleared detail. The distribution above was
+                  finalized before it went.
+                </p>
+              )}
+
               {detail.slowest.length > 0 && (
                 <div className="mt-3 rounded-lg border border-border bg-background p-3">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -294,8 +310,9 @@ function RunDetail({ detail, vocab, gameId }: {
               )}
 
               <p className="mt-1.5 text-[11px] text-muted-foreground">
-                Elapsed time per animal under the run's own concurrency, so these rank animals
-                against each other within this run rather than giving an isolated cost.
+                Successful attempts only. Elapsed time per animal under the run's own
+                concurrency, so these rank animals against each other within this run rather
+                than giving an isolated cost.
               </p>
             </Block>
           )}

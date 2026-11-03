@@ -66,6 +66,49 @@ function AutoGrid({ minWidth = 110, children }: { minWidth?: number; children: R
   )
 }
 
+function CoatColorPreview({ data }: { data: BreedDetail }) {
+  const [page, setPage] = useState<number | null>(null)
+  const [filter, setFilter] = useState("")
+  const pageSize = 100
+  const matching = data.allCoatColors.filter(color => color.toLowerCase().includes(filter.trim().toLowerCase()))
+  const currentPage = Math.min(page ?? 0, Math.max(0, Math.ceil(matching.length / pageSize) - 1))
+  const start = currentPage * pageSize
+  const visible = page === null ? data.coatColors : matching.slice(start, start + pageSize)
+  return (
+    <Panel title="Coat Colors" fit className="w-fit">
+      {page !== null && (
+        <input
+          aria-label="Filter coat colors"
+          placeholder="Filter coat colors…"
+          value={filter}
+          onChange={event => { setFilter(event.target.value); setPage(0) }}
+          className="mb-2 w-full rounded-md border border-border bg-background px-2 py-1 text-xs"
+        />
+      )}
+      <div className="flex flex-wrap gap-1.5">
+        {visible.map(color => (
+          <span key={color} className="rounded-md border border-border/70 bg-secondary/30 px-2 py-1 text-xs text-foreground">{color}</span>
+        ))}
+      </div>
+      {page !== null && (
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+          <button type="button" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)} className="text-primary underline disabled:opacity-40">Previous colors</button>
+          <span className="text-muted-foreground">{matching.length ? `${start + 1}–${Math.min(start + pageSize, matching.length)} of ${matching.length.toLocaleString()}` : "No matching colors"}</span>
+          <button type="button" disabled={start + pageSize >= matching.length} onClick={() => setPage(currentPage + 1)} className="text-primary underline disabled:opacity-40">Next colors</button>
+        </div>
+      )}
+      {data.coatColorOverflow > 0 && (
+        <button type="button" className="mt-2 text-xs text-primary underline underline-offset-2" onClick={() => { setPage(page === null ? 0 : null); setFilter("") }}>
+          {page === null ? `Show ${data.coatColorOverflow.toLocaleString()} more combinations` : "Show fewer colors"}
+        </button>
+      )}
+      {data.coatColorsTruncated && (
+        <p className="mt-2 text-xs text-muted-foreground">Additional combinations may be possible.</p>
+      )}
+    </Panel>
+  )
+}
+
 
 function SectionGroup({ name, children }: { name: string; children: React.ReactNode }) {
   return (
@@ -476,7 +519,7 @@ function BreedDetailPage() {
   if (isLoading) return <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Loading...</div>
   if (error || !data) return <div className="flex h-full items-center justify-center text-sm text-destructive">Breed not found.</div>
 
-  const { breed, coatColors, coatColorOverflow, coatStandardDisplay, healthConditions, compatibleDisciplines, lifeExpectancyYears, defaultInnateRatio, averageTotalInnate } = data
+  const { breed, coatColors, coatStandardDisplay, healthConditions, compatibleDisciplines, lifeExpectancyYears, defaultInnateRatio, averageTotalInnate } = data
   const dateAdded = new Date(breed.createdAt).toLocaleDateString(undefined, { year: "numeric", month: "short" })
 
   return (
@@ -592,16 +635,7 @@ function BreedDetailPage() {
           {/* Right column — coat colors */}
           <div className="flex flex-col gap-3 pr-4">
             {coatColors.length > 0 && (
-              <Panel title="Coat Colors" fit className="w-fit">
-                <div className="flex flex-wrap gap-1.5">
-                  {coatColors.map(c => (
-                    <span key={c} className="rounded-md border border-border/70 bg-secondary/30 px-2 py-1 text-xs text-foreground">{c}</span>
-                  ))}
-                </div>
-                {coatColorOverflow > 0 && (
-                  <p className="mt-2 text-xs text-muted-foreground">+{coatColorOverflow} other combinations</p>
-                )}
-              </Panel>
+              <CoatColorPreview key={breed.id} data={data} />
             )}
           </div>
 

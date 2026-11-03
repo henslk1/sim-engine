@@ -1,6 +1,7 @@
 import { useEffect } from "react"
 import { createFileRoute, useRouter } from "@tanstack/react-router"
 import { trpc } from "@/lib/trpc"
+import { useNightlyState } from "@/lib/nightly"
 import { authClient } from "@/lib/auth-client"
 import { endClientSession } from "@/lib/session-cleanup"
 import { Button } from "@/components/ui/button"
@@ -19,7 +20,11 @@ export const Route = createFileRoute("/_authenticated/new-day")({
  *
  * Signing out keeps working, which is the one thing the plan insists on: a
  * player must never be held inside a game they cannot leave. It does not go
- * through tRPC at all, so the block cannot touch it.
+ * through tRPC at all, so the block cannot touch it — but that only covers the
+ * server. A tutorial player was still held here by the *client*: the tutorial's
+ * interaction guard stays armed on this page, and it refuses anything without a
+ * permitted marker, so the one button on the page did nothing at all. Hence
+ * `data-tutorial-signout` below, and the teardown in `_authenticated`.
  */
 function NewDay() {
   const router = useRouter()
@@ -27,16 +32,12 @@ function NewDay() {
   const { data: game } = trpc.admin.game.get.useQuery()
   const gameId = game?.id
 
-  const { data: state } = trpc.game.nightlyState.useQuery(
-    { gameId: gameId! },
-    {
-      enabled: !!gameId,
-      // Frequently, and in the background: this page's only job is to notice
-      // the moment the game reopens.
-      refetchInterval: 3_000,
-      refetchIntervalInBackground: true,
-    },
-  )
+  // The scheduler announces the end of the run, so the usual way off this page
+  // is a socket event rather than a poll. The poll stays, a little slower than
+  // it was, for the reconnect that misses it and for the progress bar, which
+  // has nothing to push it along — and in the background, because the player
+  // who wandered off is exactly the one who should come back to a live game.
+  const { data: state } = useNightlyState(gameId, () => 5_000)
 
   // Back to the game the moment the update finishes. `replace` so the update
   // screen is not somewhere the back button can return to.
@@ -90,7 +91,13 @@ function NewDay() {
           <p className="mt-6 text-xs text-muted-foreground">Getting started…</p>
         )}
 
-        <Button variant="ghost" size="sm" className="mt-8 text-muted-foreground" onClick={handleSignOut}>
+        <Button
+          data-tutorial-signout
+          variant="ghost"
+          size="sm"
+          className="mt-8 text-muted-foreground"
+          onClick={handleSignOut}
+        >
           Sign out
         </Button>
       </div>

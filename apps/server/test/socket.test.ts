@@ -80,6 +80,7 @@ const db = {
 Object.assign(globalThis, { prisma: db })
 
 const { initSocket, sweepConnections } = await import("../src/socket.ts")
+const { realtimeControl } = await import("../src/realtime.ts")
 const { resetMessagingRateLimits } = await import("@sim-engine/trpc/messaging")
 
 let httpServer: HttpServer
@@ -218,6 +219,48 @@ test("switching games leaves the previous game's rooms behind", async () => {
   // Otherwise this socket would keep hearing about channels in a game it left.
   assert.equal((await server.in(`game:${GAME}`).fetchSockets()).length, 0)
   assert.equal((await server.in("game:game-2").fetchSockets()).length, 1)
+  socket.close()
+})
+
+/**
+ * The maintenance nudge, delivered the same way a channel event is.
+ *
+ * It is the scheduler's only way of saying "this game's door moved" without
+ * everybody polling for it. What it must never do is say it to the wrong game:
+ * a player in a quiet game being sent to re-read their maintenance state is
+ * harmless, but it is also pointless traffic every night, for every game, to
+ * every connected player.
+ */
+test("the maintenance nudge reaches the game it names and nobody else", async () => {
+  const here = await authed()
+  await emit(here.socket, "game:enter", { gameId: GAME })
+
+  const elsewhere = await authed()
+  await emit(elsewhere.socket, "game:enter", { gameId: "game-2" })
+
+  const heard = nextEvent(here.socket, "maintenance:changed")
+  const notHeard = nextEvent(elsewhere.socket, "maintenance:changed")
+
+  realtimeControl.emitToGame(GAME, "maintenance:changed", { gameId: GAME })
+
+  assert.deepEqual(await heard, { gameId: GAME })
+  assert.equal(await notHeard, null, "another game's update is not this player's business")
+
+  here.socket.close()
+  elsewhere.socket.close()
+})
+
+test("a socket that has not entered a game hears no maintenance nudge", async () => {
+  // The gap between connecting and `game:enter` — and the whole of a
+  // reconnect. Nothing is addressed to a socket in no game, which is why the
+  // client re-reads the window itself on every re-entry rather than waiting to
+  // be told about one it may have missed.
+  const { socket } = await authed()
+  const heard = nextEvent(socket, "maintenance:changed")
+
+  realtimeControl.emitToGame(GAME, "maintenance:changed", { gameId: GAME })
+
+  assert.equal(await heard, null)
   socket.close()
 })
 

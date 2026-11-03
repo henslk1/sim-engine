@@ -7,7 +7,13 @@ export type ExpressionRuleForPhenotype = {
 
 type CoatBase = "chestnut" | "bay" | "black" | "seal_brown"
 
-function resolveAppaloosaPattern(codes: Set<string>): string | null {
+/** Concrete animals use a Set; breed previews can resolve these queries lazily. */
+export type CoatCodeSource = {
+  has(code: string): boolean
+  hasAnyCode(): boolean
+}
+
+function resolveAppaloosaPattern(codes: CoatCodeSource): string | null {
   const oneLeopard = codes.has("one_leopard")
   const twoLeopard = codes.has("two_leopard")
 
@@ -88,7 +94,11 @@ function resolveAppaloosaPattern(codes: Set<string>): string | null {
 // Core coat color logic that operates on a set of phenotype codes.
 // Exported so callers can enumerate possible combinations without fake genotypes.
 export function computeCoatFromCodes(codes: Set<string>): string | null {
-  if (codes.size === 0) return null
+  return computeCoatFromSource({ has: code => codes.has(code), hasAnyCode: () => codes.size > 0 })
+}
+
+export function computeCoatFromSource(codes: CoatCodeSource): string | null {
+  if (!codes.hasAnyCode()) return null
 
   // ── Absolute visual overrides ─────────────────────────────────────────────
   //

@@ -1,4 +1,11 @@
 import { db } from "@sim-engine/db"
+import type { Prisma } from "@sim-engine/db"
+
+/**
+ * Deleting one animal touches roughly thirty tables, and the tutorial deletes
+ * two at once - more than the default five seconds allows.
+ */
+const DELETE_TX = { timeout: 30_000, maxWait: 5_000 } as const
 
 /**
  * Deletes an animal's own records, leaving the Animal row, AnimalAncestor and
@@ -18,43 +25,52 @@ import { db } from "@sim-engine/db"
  * animals it lost to vanished. Dead competitions are collected whole by the
  * nightly instead, once every one of their entrants is buried.
  */
-export async function pruneAnimalData(animalId: string): Promise<void> {
+/**
+ * Remove everything that hangs off one animal, on a caller's transaction.
+ *
+ * The `Tx` form exists so this can run inside a transaction that already holds
+ * the game's maintenance lock. Opening its own would release nothing and
+ * protect nothing: the deletions would land on another connection, outside the
+ * lock and outside the caller's rollback.
+ */
+export async function pruneAnimalDataTx(tx: Prisma.TransactionClient, animalId: string): Promise<void> {
   const where = { animalId }
 
-  await db.$transaction([
-    db.animalStat.deleteMany({ where }),
-    db.animalStatHistory.deleteMany({ where }),
-    db.animalEnergy.deleteMany({ where }),
-    db.animalMood.deleteMany({ where }),
-    db.animalCondition.deleteMany({ where }),
-    db.animalImmunity.deleteMany({ where }),
-    db.animalCareScore.deleteMany({ where }),
-    db.animalPersonality.deleteMany({ where }),
-    db.animalLongTermCareRecord.deleteMany({ where }),
-    db.animalBehaviorEvent.deleteMany({ where }),
-    db.animalDailyLog.deleteMany({ where }),
-    db.animalGenotype.deleteMany({ where }),
-    db.animalConformationScore.deleteMany({ where }),
-    db.animalConformationSectionScore.deleteMany({ where }),
-    // AnimalTreatmentRecord.healthRecordId is a RESTRICT FK to AnimalHealthRecord —
-    // must go first, or deleting a health record with any treatment history fails.
-    db.animalTreatmentRecord.deleteMany({ where }),
-    db.animalHealthRecord.deleteMany({ where }),
-    db.activityRestriction.deleteMany({ where }),
-    db.careLog.deleteMany({ where }),
-    db.stageActivityLog.deleteMany({ where }),
-    db.animalCompetitionTier.deleteMany({ where }),
-    db.animalWeeklyPoints.deleteMany({ where }),
-    db.animalBrand.deleteMany({ where }),
-    db.animalTitle.deleteMany({ where }),
-    db.animalEquipment.deleteMany({ where }),
-    db.healthCertificate.deleteMany({ where }),
-    db.vetVisitLog.deleteMany({ where }),
-    db.animalTestResult.deleteMany({ where }),
-    db.trainingLog.deleteMany({ where }),
-    db.clinicEntry.deleteMany({ where }),
-    db.animalAppliedItem.deleteMany({ where }),
-  ])
+  await tx.animalStat.deleteMany({ where })
+  await tx.animalStatHistory.deleteMany({ where })
+  await tx.animalEnergy.deleteMany({ where })
+  await tx.animalMood.deleteMany({ where })
+  await tx.animalCondition.deleteMany({ where })
+  await tx.animalImmunity.deleteMany({ where })
+  await tx.animalCareScore.deleteMany({ where })
+  await tx.animalPersonality.deleteMany({ where })
+  await tx.animalLongTermCareRecord.deleteMany({ where })
+  await tx.animalBehaviorEvent.deleteMany({ where })
+  await tx.animalDailyLog.deleteMany({ where })
+  await tx.animalGenotype.deleteMany({ where })
+  await tx.animalConformationScore.deleteMany({ where })
+  await tx.animalConformationSectionScore.deleteMany({ where })
+  await tx.animalTreatmentRecord.deleteMany({ where })
+  await tx.animalHealthRecord.deleteMany({ where })
+  await tx.activityRestriction.deleteMany({ where })
+  await tx.careLog.deleteMany({ where })
+  await tx.stageActivityLog.deleteMany({ where })
+  await tx.animalCompetitionTier.deleteMany({ where })
+  await tx.animalWeeklyPoints.deleteMany({ where })
+  await tx.animalBrand.deleteMany({ where })
+  await tx.animalTitle.deleteMany({ where })
+  await tx.animalEquipment.deleteMany({ where })
+  await tx.healthCertificate.deleteMany({ where })
+  await tx.vetVisitLog.deleteMany({ where })
+  await tx.animalTestResult.deleteMany({ where })
+  await tx.trainingLog.deleteMany({ where })
+  await tx.clinicEntry.deleteMany({ where })
+  await tx.animalAppliedItem.deleteMany({ where })
+}
+
+/** The same work, for a caller with no transaction of its own. */
+export async function pruneAnimalData(animalId: string): Promise<void> {
+  await db.$transaction((tx) => pruneAnimalDataTx(tx, animalId))
 }
 
 /**
@@ -66,11 +82,24 @@ export async function pruneAnimalData(animalId: string): Promise<void> {
  * the animal rows themselves — an animal that ever bred, was bred to, or held
  * a stud listing would otherwise silently fail to delete.
  */
-export async function deleteAnimalsWithChildren(animalIds: string[]): Promise<void> {
+/**
+ * Delete animals and everything that references them, on a caller's
+ * transaction.
+ *
+ * Tutorial completion runs this against the simulation-only ancestors. It has
+ * to be the *same* transaction that deleted the pairing naming them: on another
+ * connection it blocks on that uncommitted delete until the transaction times
+ * out, and after the commit it runs with the game's lock already released, so a
+ * nightly can start underneath it.
+ */
+export async function deleteAnimalsWithChildrenTx(
+  tx: Prisma.TransactionClient,
+  animalIds: string[]
+): Promise<void> {
   if (animalIds.length === 0) return
 
   for (const animalId of animalIds) {
-    await pruneAnimalData(animalId)
+    await pruneAnimalDataTx(tx, animalId)
   }
 
   const ids = animalIds
@@ -79,31 +108,37 @@ export async function deleteAnimalsWithChildren(animalIds: string[]): Promise<vo
   // itself is going, and `CompetitionEntry.animalId` is a RESTRICT foreign key
   // back to it. `CompetitionResult.entryId` is RESTRICT onto the entry, so it
   // has to go first. (`CompetitionEntryStat` cascades off the entry.)
-  await db.competitionResult.deleteMany({ where: { entry: { animalId: { in: ids } } } })
-  await db.competitionEntry.deleteMany({ where: { animalId: { in: ids } } })
+  await tx.competitionResult.deleteMany({ where: { entry: { animalId: { in: ids } } } })
+  await tx.competitionEntry.deleteMany({ where: { animalId: { in: ids } } })
 
-  const pregnancies = await db.pregnancy.findMany({ where: { animalId: { in: ids } }, select: { id: true } })
+  const pregnancies = await tx.pregnancy.findMany({ where: { animalId: { in: ids } }, select: { id: true } })
   const pregnancyIds = pregnancies.map(p => p.id)
   if (pregnancyIds.length > 0) {
-    await db.pregnancyOffspring.deleteMany({ where: { pregnancyId: { in: pregnancyIds } } })
-    await db.surrogacyRecord.deleteMany({ where: { pregnancyId: { in: pregnancyIds } } })
-    await db.pregnancy.deleteMany({ where: { id: { in: pregnancyIds } } })
+    await tx.pregnancyOffspring.deleteMany({ where: { pregnancyId: { in: pregnancyIds } } })
+    await tx.surrogacyRecord.deleteMany({ where: { pregnancyId: { in: pregnancyIds } } })
+    await tx.pregnancy.deleteMany({ where: { id: { in: pregnancyIds } } })
   }
-  await db.breedingRecord.deleteMany({ where: { OR: [{ sireId: { in: ids } }, { damId: { in: ids } }] } })
-  await db.coverOffer.deleteMany({ where: { OR: [{ sireId: { in: ids } }, { damId: { in: ids } }] } })
+  await tx.breedingRecord.deleteMany({ where: { OR: [{ sireId: { in: ids } }, { damId: { in: ids } }] } })
+  await tx.coverOffer.deleteMany({ where: { OR: [{ sireId: { in: ids } }, { damId: { in: ids } }] } })
 
-  const listings = await db.breedingListing.findMany({ where: { animalId: { in: ids } }, select: { id: true } })
+  const listings = await tx.breedingListing.findMany({ where: { animalId: { in: ids } }, select: { id: true } })
   const listingIds = listings.map(l => l.id)
   if (listingIds.length > 0) {
-    await db.breedingSlot.deleteMany({ where: { listingId: { in: listingIds } } })
-    await db.breedingListingBreedRestriction.deleteMany({ where: { listingId: { in: listingIds } } })
-    await db.breedingListingStatMinimum.deleteMany({ where: { listingId: { in: listingIds } } })
-    await db.breedingListing.deleteMany({ where: { id: { in: listingIds } } })
+    await tx.breedingSlot.deleteMany({ where: { listingId: { in: listingIds } } })
+    await tx.breedingListingBreedRestriction.deleteMany({ where: { listingId: { in: listingIds } } })
+    await tx.breedingListingStatMinimum.deleteMany({ where: { listingId: { in: listingIds } } })
+    await tx.breedingListing.deleteMany({ where: { id: { in: listingIds } } })
   }
 
-  await db.animalDailyLog.deleteMany({ where: { partnerAnimalId: { in: ids } } })
-  await db.animalAncestor.deleteMany({ where: { animalId: { in: ids } } })
-  await db.animalAncestor.deleteMany({ where: { ancestorId: { in: ids } } })
-  await db.animalBreedComposition.deleteMany({ where: { animalId: { in: ids } } })
-  await db.animal.deleteMany({ where: { id: { in: ids } } })
+  await tx.animalDailyLog.deleteMany({ where: { partnerAnimalId: { in: ids } } })
+  await tx.animalAncestor.deleteMany({ where: { animalId: { in: ids } } })
+  await tx.animalAncestor.deleteMany({ where: { ancestorId: { in: ids } } })
+  await tx.animalBreedComposition.deleteMany({ where: { animalId: { in: ids } } })
+  await tx.animal.deleteMany({ where: { id: { in: ids } } })
+}
+
+/** The same work, for a caller with no transaction of its own. */
+export async function deleteAnimalsWithChildren(animalIds: string[]): Promise<void> {
+  if (animalIds.length === 0) return
+  await db.$transaction((tx) => deleteAnimalsWithChildrenTx(tx, animalIds), DELETE_TX)
 }

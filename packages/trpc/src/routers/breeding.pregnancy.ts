@@ -2,6 +2,7 @@ import { db } from "@sim-engine/db"
 import { markAnimalActive } from "@sim-engine/engine"
 import { TRPCError } from "@trpc/server"
 import { router, protectedProcedure, publicProcedure } from "../trpc.js"
+import { enterGameplayForPregnancy } from "../maintenance.js"
 import { z } from "zod"
 
 export const breedingPregnancyRouter = router({
@@ -9,6 +10,7 @@ export const breedingPregnancyRouter = router({
     .input(z.object({ pregnancyId: z.string() }))
     .mutation(async ({ input }) => {
       return db.$transaction(async (tx) => {
+        await enterGameplayForPregnancy(tx, input.pregnancyId)
         const pregnancy = await tx.pregnancy.findUniqueOrThrow({
           where: { id: input.pregnancyId },
           include: {
@@ -134,6 +136,7 @@ export const breedingPregnancyRouter = router({
     }))
     .mutation(async ({ input }) => {
       return db.$transaction(async (tx) => {
+        await enterGameplayForPregnancy(tx, input.pregnancyId)
         const pregnancy = await tx.pregnancy.findUniqueOrThrow({
           where: { id: input.pregnancyId },
           select: {
@@ -366,6 +369,7 @@ export const breedingPregnancyRouter = router({
     .input(z.object({ pregnancyId: z.string() }))
     .mutation(async ({ input, ctx }) => {
       return db.$transaction(async (tx) => {
+        await enterGameplayForPregnancy(tx, input.pregnancyId)
         const pregnancy = await tx.pregnancy.findUniqueOrThrow({
           where: { id: input.pregnancyId },
           select: {

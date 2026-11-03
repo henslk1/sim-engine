@@ -1,5 +1,6 @@
 import { db } from "@sim-engine/db"
 import { router, publicProcedure } from "../trpc.js"
+import { assertParticipantsInGame, enterGameplayForAnimal, enterGameplayForCoverOffer } from "../maintenance.js"
 import { z } from "zod"
 import { generateOffspring, computePhenotypeDescription, computePhenotypeCodes, computeBreedingQuality, computeCOI, computeFixedFields, markAnimalActive, requireBreedingAllowed } from "@sim-engine/engine"
 
@@ -296,6 +297,13 @@ export const breedingCoverRouter = router({
       fromListing: z.boolean().default(false),
     }))
     .mutation(async ({ input }) => db.$transaction(async (tx) => {
+      // Both animals, one game. The sire's game is the one locked, and the dam
+      // has to be in it - a cover takes two animals and nothing here had ever
+      // checked they belonged to the same game, so a lock on one left the
+      // other unguarded.
+      const gameId = await enterGameplayForAnimal(tx, input.sireId)
+      await assertParticipantsInGame(tx, gameId, { animalIds: [input.damId] })
+
       const [sire, dam] = await Promise.all([
         tx.animal.findUniqueOrThrow({
           where: { id: input.sireId },
@@ -372,6 +380,7 @@ export const breedingCoverRouter = router({
     .input(z.object({ offerId: z.string() }))
     .mutation(async ({ input }) => {
       return db.$transaction(async (tx) => {
+        await enterGameplayForCoverOffer(tx, input.offerId)
         const offer = await tx.coverOffer.findUniqueOrThrow({
           where: { id: input.offerId },
           select: { status: true, gameId: true, sireId: true, damId: true, price: true, fromListing: true },
@@ -860,40 +869,50 @@ export const breedingCoverRouter = router({
 
   decline: publicProcedure
     .input(z.object({ offerId: z.string() }))
-    .mutation(async ({ input }) => {
-      const offer = await db.coverOffer.findUniqueOrThrow({
-        where: { id: input.offerId },
-        select: { status: true, sireId: true, damId: true },
-      })
-      if (offer.status !== "PENDING") throw new Error("Offer is no longer pending")
+    .mutation(async ({ input }) =>
+      db.$transaction(async (tx) => {
+        await enterGameplayForCoverOffer(tx, input.offerId)
 
-      const [sireAnimal, damAnimal] = await Promise.all([
-        db.animal.findUnique({ where: { id: offer.sireId }, select: { ageInCycles: true } }),
-        db.animal.findUnique({ where: { id: offer.damId }, select: { ageInCycles: true } }),
-      ])
+        // Read under the lock. The offer's status is the decision, and both
+        // cycle numbers are written into the log the nightly also advances.
+        const offer = await tx.coverOffer.findUniqueOrThrow({
+          where: { id: input.offerId },
+          select: { status: true, sireId: true, damId: true },
+        })
+        if (offer.status !== "PENDING") throw new Error("Offer is no longer pending")
 
-      await db.animalDailyLog.createMany({
-        data: [
-          {
-            animalId: offer.sireId,
-            cycleNumber: sireAnimal?.ageInCycles ?? 0,
-            eventType: "COVER_DECLINED",
-            partnerAnimalId: offer.damId,
-          },
-          {
-            animalId: offer.damId,
-            cycleNumber: damAnimal?.ageInCycles ?? 0,
-            eventType: "COVER_DECLINED",
-            partnerAnimalId: offer.sireId,
-          },
-        ],
-      })
+        const sireAnimal = await tx.animal.findUnique({
+          where: { id: offer.sireId },
+          select: { ageInCycles: true },
+        })
+        const damAnimal = await tx.animal.findUnique({
+          where: { id: offer.damId },
+          select: { ageInCycles: true },
+        })
 
-      return db.coverOffer.update({
-        where: { id: input.offerId },
-        data: { status: "DECLINED" },
+        await tx.animalDailyLog.createMany({
+          data: [
+            {
+              animalId: offer.sireId,
+              cycleNumber: sireAnimal?.ageInCycles ?? 0,
+              eventType: "COVER_DECLINED",
+              partnerAnimalId: offer.damId,
+            },
+            {
+              animalId: offer.damId,
+              cycleNumber: damAnimal?.ageInCycles ?? 0,
+              eventType: "COVER_DECLINED",
+              partnerAnimalId: offer.sireId,
+            },
+          ],
+        })
+
+        return tx.coverOffer.update({
+          where: { id: input.offerId },
+          data: { status: "DECLINED" },
+        })
       })
-    }),
+    ),
 
   previewPair: publicProcedure
     .input(z.object({

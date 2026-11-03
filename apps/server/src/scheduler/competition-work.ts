@@ -9,6 +9,7 @@
 
 import { db } from "@sim-engine/db"
 import type { Prisma } from "@sim-engine/db"
+import { MAINTENANCE_STATUSES } from "@sim-engine/trpc"
 
 export type ClaimedResolution = {
   id: string
@@ -111,6 +112,51 @@ export async function finishResolution(
 }
 
 /**
+ * Hand an item back unclaimed, as it was before the claim.
+ *
+ * Not a failure and not an attempt: the item was claimed a moment before its
+ * game shut, and nothing about it was tried. Undoing the claim means undoing
+ * all three of the things the claim wrote.
+ *
+ * `attempt`, because the claim incremented it — otherwise a game that closed
+ * three times while its queue was busy would retire a perfectly good
+ * competition as abandoned, having never once attempted it.
+ *
+ * The status, because PENDING and RETRYING are not the same thing to anybody
+ * reading this queue: one has never been tried, the other has already failed.
+ * Sending everything back as PENDING made an item that had failed twice look
+ * brand new — erasing the history on exactly the item most likely to need it.
+ *
+ * And `errorMessage`, by leaving it alone. It was being cleared along with the
+ * rest, so the only record of why the last attempt failed was wiped by an
+ * interruption that had nothing to do with it.
+ *
+ * The status is restored from `attempt` rather than from a status carried
+ * alongside it. The claim increments the counter, so the value it was claimed
+ * with already says whether anything had been tried before — the same fact,
+ * read from the row instead of remembered next to it. (`startedAt` is the one
+ * thing not put back: the claim overwrote it, so the previous attempt's is
+ * already gone, and null is the honest answer for an item that is not running.)
+ */
+export async function deferResolution(
+  work: Pick<ClaimedResolution, "id" | "attempt">,
+  token: string
+): Promise<boolean> {
+  const { count } = await db.competitionResolutionWork.updateMany({
+    where: { id: work.id, claimedBy: token, status: "RUNNING" },
+    data: {
+      status: work.attempt > 1 ? "RETRYING" : "PENDING",
+      claimedBy: null,
+      startedAt: null,
+      leaseUntil: null,
+      attempt: { decrement: 1 },
+    },
+  })
+
+  return count === 1
+}
+
+/**
  * Give up on work whose owner died too many times.
  *
  * `attempt` increments on every claim, so a crashed worker's item carries its
@@ -147,22 +193,30 @@ export async function abandonExhaustedResolutions(now: Date, maxAttempts: number
 }
 
 /**
- * The games whose nightly update is running right now.
+ * The games whose nightly update is outstanding.
  *
  * The resolver holds these back. A nightly and a competition sweep are already
  * serialised against each other — the planner works one run at a time within a
- * game — but the resolver is not part of that: it runs on its own timer and
- * would happily resolve a few hundred competitions against the same connection
- * pool a nightly is working through, competing for connections with the thing
- * players are locked out of the game waiting for.
+ * game, and the claim now holds the game while it decides — but the resolver is
+ * not part of that: it runs on its own timer and would happily resolve a few
+ * hundred competitions against the same connection pool a nightly is working
+ * through, competing for connections with the thing players are locked out of
+ * the game waiting for.
  *
- * A lapsed lease does not count as running. Such a run is one the scheduler is
- * about to reclaim, and treating it as live would stall the queue for that game
- * indefinitely if a process died mid-nightly.
+ * `MAINTENANCE_STATUSES`, not a definition of its own. This used to be RUNNING
+ * with a live lease, which is narrower than the gameplay guard twice over: a
+ * RETRYING nightly closes the game, and so does a RUNNING one whose worker
+ * died — the lapsed lease means recovery is pending, which the guard treats as
+ * the last moment to let anything in, not the first. Both were games the
+ * resolver went on writing to while players were refused.
+ *
+ * Holding back is not the same as stalling. A run nobody is renewing is
+ * reclaimed by the next tick, and a game that is shut has nothing to gain from
+ * its competitions being resolved while nobody can enter them.
  */
-export async function gamesInNightly(now: Date): Promise<string[]> {
+export async function gamesInNightly(_now: Date): Promise<string[]> {
   const running = await db.scheduledTaskRun.findMany({
-    where: { taskType: "NIGHTLY", status: "RUNNING", leaseUntil: { gt: now } },
+    where: { taskType: "NIGHTLY", status: { in: [...MAINTENANCE_STATUSES] } },
     select: { gameId: true },
     distinct: ["gameId"],
   })

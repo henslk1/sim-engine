@@ -17,6 +17,17 @@ export type ServerToClientEvent =
   | "messaging:activity"
   | "messaging:permissions"
   | "notification:created"
+  // Not messaging, but this is the one place the two halves of the socket
+  // contract agree on event names, and the scheduler delivers it through the
+  // same `emitToGame` room.
+  //
+  // It carries no state on purpose. It says "this game's maintenance window may
+  // have changed, ask again" and nothing more, so that a client acts on the
+  // database's answer rather than on a packet. That is what makes losing one
+  // cost only latency: a dropped event, a socket that was reconnecting, a run
+  // that went to RETRYING rather than finishing - none of them can open a game
+  // the server still has shut, because none of them is what the client reads.
+  | "maintenance:changed"
 
 export type MessagingActivityAudience = {
   gameId: string

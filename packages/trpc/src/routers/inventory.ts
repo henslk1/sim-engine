@@ -1,4 +1,5 @@
 import { router, publicProcedure } from "../trpc.js"
+import { assertParticipantsInGame, enterGameplay, enterGameplayForAnimal } from "../maintenance.js"
 import { db } from "@sim-engine/db"
 import { restockShop } from "@sim-engine/engine"
 import { z } from "zod"
@@ -39,6 +40,16 @@ export const inventoryRouter = router({
     }))
     .mutation(async ({ input }) =>
       db.$transaction(async (tx) => {
+        // The listing's game, and the buyer must be in it.
+        const listingGame = await tx.storeListing.findUniqueOrThrow({
+          where: { id: input.listingId },
+          select: { gameId: true },
+        })
+        await enterGameplay(tx, listingGame.gameId)
+        await assertParticipantsInGame(tx, listingGame.gameId, {
+          playerAccountIds: [input.playerAccountId],
+        })
+
         const listing = await tx.storeListing.findUniqueOrThrow({
           where: { id: input.listingId },
           include: { itemDef: { select: { id: true, name: true } }, currencyDef: { select: { id: true, name: true } } },
@@ -91,6 +102,7 @@ export const inventoryRouter = router({
     }))
     .mutation(async ({ input }) =>
       db.$transaction(async (tx) => {
+        await enterGameplayForAnimal(tx, input.animalId)
         const itemDef = await tx.itemDef.findUniqueOrThrow({
           where: { id: input.itemDefId },
           select: { itemType: true, name: true },
@@ -126,6 +138,16 @@ export const inventoryRouter = router({
     .input(z.object({ equipmentId: z.string(), playerAccountId: z.string() }))
     .mutation(async ({ input }) =>
       db.$transaction(async (tx) => {
+        // The equipped animal's game, and the account must be in it.
+        const equipped = await tx.animalEquipment.findUniqueOrThrow({
+          where: { id: input.equipmentId },
+          select: { animalId: true },
+        })
+        const gameId = await enterGameplayForAnimal(tx, equipped.animalId)
+        await assertParticipantsInGame(tx, gameId, {
+          playerAccountIds: [input.playerAccountId],
+        })
+
         const equipment = await tx.animalEquipment.findUniqueOrThrow({
           where: { id: input.equipmentId },
           select: { itemDefId: true },
@@ -174,6 +196,18 @@ export const inventoryRouter = router({
     .input(z.object({ gameShopAnimalId: z.string(), playerAccountId: z.string() }))
     .mutation(async ({ input }) => {
       const result = await db.$transaction(async (tx) => {
+        // The shop animal's game, and the buyer has to be in it. Resolving
+        // from the account instead would let a purchase in one game be
+        // checked against another.
+        const shopGame = await tx.gameShopAnimal.findUniqueOrThrow({
+          where: { id: input.gameShopAnimalId },
+          select: { animal: { select: { gameId: true } } },
+        })
+        await enterGameplay(tx, shopGame.animal.gameId)
+        await assertParticipantsInGame(tx, shopGame.animal.gameId, {
+          playerAccountIds: [input.playerAccountId],
+        })
+
         const shopAnimal = await tx.gameShopAnimal.findUniqueOrThrow({
           where: { id: input.gameShopAnimalId },
           include: {

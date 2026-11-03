@@ -1,6 +1,4 @@
-import { db } from "@sim-engine/db";
-
-type Client = typeof db
+import type { Prisma } from "@sim-engine/db";
 
 function computePersonalityMultiplier(value: number, idealMin: number, idealMax: number): number {
   if (value >= idealMin && value <= idealMax) return 1.0
@@ -29,372 +27,396 @@ function computePersonalityMultiplier(value: number, idealMin: number, idealMax:
  * `maxWait` is how long to wait for a connection before giving up, which is a
  * queueing concern and stays short.
  */
-const RESOLUTION_TX = { timeout: 120_000, maxWait: 10_000 } as const
+export const RESOLUTION_TX = { timeout: 120_000, maxWait: 10_000 } as const
 
-export async function runCompetition(
-  client: Client,
+/**
+ * Resolve a competition, on a transaction the caller owns.
+ *
+ * Split out so the tutorial's conformation show can run it inside the
+ * transaction holding the game's maintenance lock. A helper that opens its own
+ * transaction escapes that lock: its reads and writes land on another
+ * connection, outside both the lock and the caller's rollback.
+ */
+export async function runCompetitionTx(
+  tx: Prisma.TransactionClient,
   input: {
     competitionId: string
   }
 ) {
-  return client.$transaction(async (tx) => {
 
-    const { competitionId } = input
+  const { competitionId } = input
 
-    const competition = await tx.competition.findUniqueOrThrow({
-      where: { id: competitionId },
-      include: {
-        venue: {
-          include: {
-            group: {
-              include: {
-                prestige: { include: { tierDef: true } }
-              }
-            }
-          }
-        },
-        disciplineDef: {
-          include: {
-            statWeights: true,
-            personalityWeights: true,
-          }
-        },
-        entries: {
-          include: {
-            tierDef: { include: { tierPrizes: true } },
-            entryStats: true,
-            animal: {
-              include: {
-                personality: true,
-                conformationScores: { select: { score: true, breedId: true, isCoatDq: true, isTraitDq: true } },
-              }
-            }
-          }
-        },
-      }
-    })
-
-    if (competition.status !== "OPEN") {
-      throw new Error("Competition is not open")
-    }
-
-    // Claim the competition conditionally rather than reading OPEN above and
-    // trusting it. Under READ COMMITTED the read happens against a snapshot,
-    // so two callers can both see OPEN, both reach here, and both award prizes
-    // — the second UPDATE simply queues behind the first and then applies.
-    // Matching on the status makes the transition itself the claim: zero rows
-    // means somebody else is already running it.
-    //
-    // This matters more than it used to. The scheduler's lease recovery means a
-    // sweep that was interrupted is re-run, so duplicate execution is now a
-    // path the system takes deliberately rather than a freak event.
-    const { count } = await tx.competition.updateMany({
-      where: { id: competitionId, status: "OPEN" },
-      data: { status: "IN_PROGRESS" },
-    })
-
-    if (count !== 1) {
-      throw new Error("Competition is not open")
-    }
-
-    // pre-fetch world max trained value per stat for normalization
-    const statWorldMaxes = new Map<string, number>()
-    if (!competition.disciplineDef.isConformation) {
-      for (const weight of competition.disciplineDef.statWeights) {
-        const recordDef = await tx.recordDef.findFirst({
-          where: { statDefId: weight.statDefId, gameId: competition.gameId },
-          select: { id: true },
-        })
-        let worldMax: number | null = null
-        if (recordDef) {
-          const best = await tx.recordEntry.findFirst({
-            where: { recordDefId: recordDef.id },
-            orderBy: { value: "desc" },
-            select: { value: true },
-          })
-          worldMax = best?.value ?? null
-        }
-        if (!worldMax) {
-          const agg = await tx.animalStat.aggregate({
-            _max: { trainedValue: true },
-            where: { statDefId: weight.statDefId },
-          })
-          worldMax = agg._max.trainedValue ?? 1
-        }
-        statWorldMaxes.set(weight.statDefId, Math.max(worldMax, 1))
-      }
-    }
-
-    // pre-fetch climate/terrain modifiers per animal
-    const animalEnvMods = new Map<string, number>()
-    {
-      const expressionRulesWithMods = await tx.expressionRule.findMany({
-        where: {
-          OR: [
-            { climateModifiers: { some: { climate: competition.venue.climate } } },
-            { terrainModifiers: { some: { terrain: competition.venue.terrain } } },
-          ],
-        },
-        select: {
-          locusId: true,
-          alleleOneId: true,
-          alleleTwoId: true,
-          climateModifiers: { where: { climate: competition.venue.climate }, select: { modifier: true } },
-          terrainModifiers: { where: { terrain: competition.venue.terrain }, select: { modifier: true } },
-        },
-      })
-      const exprModMap = new Map<string, number>()
-      for (const rule of expressionRulesWithMods) {
-        const key = `${rule.locusId}:${rule.alleleOneId}:${rule.alleleTwoId}`
-        const climMod = rule.climateModifiers[0]?.modifier ?? 0
-        const terrMod = rule.terrainModifiers[0]?.modifier ?? 0
-        exprModMap.set(key, climMod + terrMod)
-      }
-      const animalIds = competition.entries.map((e) => e.animalId)
-      const genotypes = await tx.animalGenotype.findMany({
-        where: { animalId: { in: animalIds } },
-        select: { animalId: true, locusId: true, alleleOneId: true, alleleTwoId: true },
-      })
-      for (const g of genotypes) {
-        const mod = exprModMap.get(`${g.locusId}:${g.alleleOneId}:${g.alleleTwoId}`)
-        if (mod) animalEnvMods.set(g.animalId, (animalEnvMods.get(g.animalId) ?? 0) + mod)
-      }
-    }
-
-    // score all entries
-    const scored = competition.entries.map((entry) => {
-      let score = 0
-
-      if (competition.disciplineDef.isConformation) {
-        const conformationScore = entry.animal.conformationScores.find(
-          s => s.breedId === entry.animal.breedId
-        )
-        const baseScore = (conformationScore?.isCoatDq || conformationScore?.isTraitDq) ? 0 : (conformationScore?.score ?? 0)
-        let personalityMultiplier = 1.0
-        for (const weight of competition.disciplineDef.personalityWeights) {
-          const trait = entry.animal.personality.find(p => p.traitDefId === weight.traitDefId)
-          const effectiveValue = trait ? Math.min(100, Math.max(0, trait.value + trait.personalityModifier)) : 50
-          const mult = computePersonalityMultiplier(effectiveValue, weight.idealMin, weight.idealMax)
-          personalityMultiplier += (weight.bonusPercent / 100) * mult
-        }
-        const envMod = animalEnvMods.get(entry.animalId) ?? 0
-        score = Math.max(0, baseScore * personalityMultiplier * (1 + envMod / 100))
-      } else {
-        let statScore = 0
-        for (const weight of competition.disciplineDef.statWeights) {
-          const stat = entry.entryStats.find(s => s.statDefId === weight.statDefId)
-          const worldMax = statWorldMaxes.get(weight.statDefId) ?? 1
-          statScore += weight.weight * ((stat?.trainedValue ?? 0) / worldMax)
-        }
-        let personalityMultiplier = 1.0
-        for (const weight of competition.disciplineDef.personalityWeights) {
-          const trait = entry.animal.personality.find(p => p.traitDefId === weight.traitDefId)
-          const effectiveValue = trait ? Math.min(100, Math.max(0, trait.value + trait.personalityModifier)) : 50
-          const mult = computePersonalityMultiplier(effectiveValue, weight.idealMin, weight.idealMax)
-          personalityMultiplier += (weight.bonusPercent / 100) * mult
-        }
-        const envMod = animalEnvMods.get(entry.animalId) ?? 0
-        score = Math.max(0, statScore * 100 * personalityMultiplier * (1 + envMod / 100))
-      }
-
-      const variance = (Math.random() - 0.5) * score * 0.2
-      return {
-        entryId: entry.id,
-        animalId: entry.animalId,
-        playerAccountId: entry.playerAccountId,
-        tierDefId: entry.tierDefId,
-        tierDef: entry.tierDef,
-        score: score + variance,
-      }
-    })
-
-    // group by tier and rank within each group
-    const byTier = new Map<string, typeof scored>()
-    for (const entry of scored) {
-      const group = byTier.get(entry.tierDefId) ?? []
-      group.push(entry)
-      byTier.set(entry.tierDefId, group)
-    }
-
-    const allRanked: (typeof scored[number] & { placement: number })[] = []
-
-    for (const [, entries] of byTier) {
-      const ranked = [...entries]
-        .sort((a, b) => b.score - a.score)
-        .map((entry, i) => ({ ...entry, placement: i + 1 }))
-      allRanked.push(...ranked)
-    }
-
-    for (const entry of allRanked) {
-      await tx.competitionResult.create({
-        data: { entryId: entry.entryId, placement: entry.placement, score: entry.score },
-      })
-    }
-
-    // prizes per tier group
-    for (const [, entries] of byTier) {
-      const tierDef = entries[0]!.tierDef
-      const prizes = tierDef.tierPrizes.filter(
-        p => p.isInvitational === competition.isInvitational
-      )
-      const ranked = allRanked.filter(e => e.tierDefId === tierDef.id)
-
-      for (const prize of prizes) {
-        if (!prize.currencyDefId) continue
-        const winner = ranked.find(e => e.placement === prize.placement)
-        if (!winner) continue
-
-        await tx.playerBalance.upsert({
-          where: { playerAccountId_currencyDefId: { playerAccountId: winner.playerAccountId, currencyDefId: prize.currencyDefId } },
-          create: { playerAccountId: winner.playerAccountId, currencyDefId: prize.currencyDefId, balance: prize.amount },
-          update: { balance: { increment: prize.amount } },
-        })
-
-        await tx.transaction.create({
-          data: { gameId: competition.gameId, toPlayerAccountId: winner.playerAccountId, currencyDefId: prize.currencyDefId, amount: prize.amount, txnType: "PRIZE" },
-        })
-      }
-    }
-
-    // entry fee share to group if venue is group-owned
-    const group = competition.venue.group
-    const entryFeeSharePercent = group?.prestige?.tierDef?.entryFeeSharePercent ?? 0
-    if (group && entryFeeSharePercent > 0) {
-      const totalEntryFees = allRanked.reduce((sum, e) => sum + e.tierDef.entryFee, 0)
-      const shareAmount = Math.floor(totalEntryFees * (entryFeeSharePercent / 100))
-
-      if (shareAmount > 0) {
-        const baseCurrency = await tx.currencyDef.findFirstOrThrow({
-          where: { gameId: competition.gameId, currencyType: "BASE" },
-          select: { id: true },
-        })
-
-        await tx.groupFinance.upsert({
-          where: { groupId_currencyDefId: { groupId: group.id, currencyDefId: baseCurrency.id } },
-          create: { groupId: group.id, currencyDefId: baseCurrency.id, balance: shareAmount },
-          update: { balance: { increment: shareAmount } },
-        })
-
-        await tx.transaction.create({
-          data: {
-            gameId: competition.gameId,
-            toGroupId: group.id,
-            currencyDefId: baseCurrency.id,
-            amount: shareAmount,
-            txnType: "GROUP_CONTRIBUTION",
-          },
-        })
-      }
-    }
-
-    const now = new Date()
-    const day = now.getUTCDay()
-    const weekStart = new Date(now)
-    weekStart.setUTCDate(now.getUTCDate() - (day === 0 ? 6 : day - 1))
-    weekStart.setUTCHours(0, 0, 0, 0)
-
-    for (const entry of allRanked) {
-      await tx.animalWeeklyPoints.upsert({
-        where: { animalId_disciplineDefId_weekStart: { animalId: entry.animalId, disciplineDefId: competition.disciplineDefId, weekStart } },
-        create: { animalId: entry.animalId, disciplineDefId: competition.disciplineDefId, weekStart, points: entry.score },
-        update: { points: { increment: entry.score } },
-      })
-    }
-
-    // tier advancement — check every competing animal's career total in the
-    // discipline against their tier's threshold. Deliberately not the weekly
-    // bucket written above: that exists for invitational eligibility and resets
-    // every Monday, which would wipe a horse's progress toward the next tier
-    // partway through earning it.
-    const uniqueAnimalIds = [...new Set(allRanked.map((e) => e.animalId))]
-    for (const animalId of uniqueAnimalIds) {
-      const animalTier = await tx.animalCompetitionTier.findUnique({
-        where: { animalId_disciplineDefId: { animalId, disciplineDefId: competition.disciplineDefId } },
+  const competition = await tx.competition.findUniqueOrThrow({
+    where: { id: competitionId },
+    include: {
+      venue: {
         include: {
-          tierDef: { select: { tierIndex: true, advancementThreshold: true } },
-        },
-      })
-      if (!animalTier || animalTier.tierDef.advancementThreshold == null) continue
-
-      const career = await tx.competitionResult.aggregate({
-        _sum: { score: true },
-        where: { entry: { animalId, competition: { disciplineDefId: competition.disciplineDefId } } },
-      })
-      if ((career._sum.score ?? 0) < animalTier.tierDef.advancementThreshold) continue
-
-      const nextTier = await tx.competitionTierDef.findFirst({
-        where: {
-          disciplineDefId: competition.disciplineDefId,
-          tierIndex: { gt: animalTier.tierDef.tierIndex },
-        },
-        orderBy: { tierIndex: "asc" },
-        select: { id: true, name: true },
-      })
-      if (!nextTier) continue
-
-      await tx.animalCompetitionTier.update({
-        where: { animalId_disciplineDefId: { animalId, disciplineDefId: competition.disciplineDefId } },
-        data: { tierDefId: nextTier.id },
-      })
-
-      const entryForCycle = allRanked.find((e) => e.animalId === animalId)
-      const entryRecord = entryForCycle
-        ? competition.entries.find((e) => e.animalId === animalId)
-        : null
-      await tx.animalDailyLog.create({
-        data: {
-          animalId,
-          cycleNumber: (entryRecord as { cycleNumber?: number } | null)?.cycleNumber ?? 0,
-          eventType: "TIER_ADVANCED",
-          context: {
-            newTierName: nextTier.name,
-            disciplineName: competition.disciplineDef.name,
-          },
-        },
-      })
-    }
-
-    // Award titles based on placement matching rankOrder — max tier only
-    for (const entry of allRanked) {
-      if (entry.tierDef.advancementThreshold !== null) continue
-      const titleDef = await tx.titleDef.findFirst({
-        where: {
-          disciplineDefId: competition.disciplineDefId,
-          rankOrder: entry.placement,
-          animalTitles: { none: { animalId: entry.animalId } },
-        },
-        select: { id: true, requiredPlacements: true },
-      })
-      if (titleDef) {
-        const placingCount = await tx.competitionResult.count({
-          where: {
-            placement: entry.placement,
-            entry: {
-              animalId: entry.animalId,
-              tierDef: { advancementThreshold: null },
-              competition: { disciplineDefId: competition.disciplineDefId },
-            },
-          },
-        })
-        if (placingCount >= titleDef.requiredPlacements) {
-          const entryRecord = competition.entries.find((e) => e.animalId === entry.animalId)
-          await tx.animalTitle.create({
-            data: {
-              animalId: entry.animalId,
-              titleDefId: titleDef.id,
-              cycleNumber: (entryRecord as { cycleNumber?: number } | null)?.cycleNumber ?? 0,
-            },
-          })
+          group: {
+            include: {
+              prestige: { include: { tierDef: true } }
+            }
+          }
         }
+      },
+      disciplineDef: {
+        include: {
+          statWeights: true,
+          personalityWeights: true,
+        }
+      },
+      entries: {
+        include: {
+          tierDef: { include: { tierPrizes: true } },
+          entryStats: true,
+          animal: {
+            include: {
+              personality: true,
+              conformationScores: { select: { score: true, breedId: true, isCoatDq: true, isTraitDq: true } },
+            }
+          }
+        }
+      },
+    }
+  })
+
+  if (competition.status !== "OPEN") {
+    throw new Error("Competition is not open")
+  }
+
+  // Claim the competition conditionally rather than reading OPEN above and
+  // trusting it. Under READ COMMITTED the read happens against a snapshot,
+  // so two callers can both see OPEN, both reach here, and both award prizes
+  // — the second UPDATE simply queues behind the first and then applies.
+  // Matching on the status makes the transition itself the claim: zero rows
+  // means somebody else is already running it.
+  //
+  // This matters more than it used to. The scheduler's lease recovery means a
+  // sweep that was interrupted is re-run, so duplicate execution is now a
+  // path the system takes deliberately rather than a freak event.
+  const { count } = await tx.competition.updateMany({
+    where: { id: competitionId, status: "OPEN" },
+    data: { status: "IN_PROGRESS" },
+  })
+
+  if (count !== 1) {
+    throw new Error("Competition is not open")
+  }
+
+  // pre-fetch world max trained value per stat for normalization
+  const statWorldMaxes = new Map<string, number>()
+  if (!competition.disciplineDef.isConformation) {
+    for (const weight of competition.disciplineDef.statWeights) {
+      const recordDef = await tx.recordDef.findFirst({
+        where: { statDefId: weight.statDefId, gameId: competition.gameId },
+        select: { id: true },
+      })
+      let worldMax: number | null = null
+      if (recordDef) {
+        const best = await tx.recordEntry.findFirst({
+          where: { recordDefId: recordDef.id },
+          orderBy: { value: "desc" },
+          select: { value: true },
+        })
+        worldMax = best?.value ?? null
       }
+      if (!worldMax) {
+        const agg = await tx.animalStat.aggregate({
+          _max: { trainedValue: true },
+          where: { statDefId: weight.statDefId },
+        })
+        worldMax = agg._max.trainedValue ?? 1
+      }
+      statWorldMaxes.set(weight.statDefId, Math.max(worldMax, 1))
+    }
+  }
+
+  // pre-fetch climate/terrain modifiers per animal
+  const animalEnvMods = new Map<string, number>()
+  {
+    const expressionRulesWithMods = await tx.expressionRule.findMany({
+      where: {
+        OR: [
+          { climateModifiers: { some: { climate: competition.venue.climate } } },
+          { terrainModifiers: { some: { terrain: competition.venue.terrain } } },
+        ],
+      },
+      select: {
+        locusId: true,
+        alleleOneId: true,
+        alleleTwoId: true,
+        climateModifiers: { where: { climate: competition.venue.climate }, select: { modifier: true } },
+        terrainModifiers: { where: { terrain: competition.venue.terrain }, select: { modifier: true } },
+      },
+    })
+    const exprModMap = new Map<string, number>()
+    for (const rule of expressionRulesWithMods) {
+      const key = `${rule.locusId}:${rule.alleleOneId}:${rule.alleleTwoId}`
+      const climMod = rule.climateModifiers[0]?.modifier ?? 0
+      const terrMod = rule.terrainModifiers[0]?.modifier ?? 0
+      exprModMap.set(key, climMod + terrMod)
+    }
+    const animalIds = competition.entries.map((e) => e.animalId)
+    const genotypes = await tx.animalGenotype.findMany({
+      where: { animalId: { in: animalIds } },
+      select: { animalId: true, locusId: true, alleleOneId: true, alleleTwoId: true },
+    })
+    for (const g of genotypes) {
+      const mod = exprModMap.get(`${g.locusId}:${g.alleleOneId}:${g.alleleTwoId}`)
+      if (mod) animalEnvMods.set(g.animalId, (animalEnvMods.get(g.animalId) ?? 0) + mod)
+    }
+  }
+
+  // score all entries
+  const scored = competition.entries.map((entry) => {
+    let score = 0
+
+    if (competition.disciplineDef.isConformation) {
+      const conformationScore = entry.animal.conformationScores.find(
+        s => s.breedId === entry.animal.breedId
+      )
+      const baseScore = (conformationScore?.isCoatDq || conformationScore?.isTraitDq) ? 0 : (conformationScore?.score ?? 0)
+      let personalityMultiplier = 1.0
+      for (const weight of competition.disciplineDef.personalityWeights) {
+        const trait = entry.animal.personality.find(p => p.traitDefId === weight.traitDefId)
+        const effectiveValue = trait ? Math.min(100, Math.max(0, trait.value + trait.personalityModifier)) : 50
+        const mult = computePersonalityMultiplier(effectiveValue, weight.idealMin, weight.idealMax)
+        personalityMultiplier += (weight.bonusPercent / 100) * mult
+      }
+      const envMod = animalEnvMods.get(entry.animalId) ?? 0
+      score = Math.max(0, baseScore * personalityMultiplier * (1 + envMod / 100))
+    } else {
+      let statScore = 0
+      for (const weight of competition.disciplineDef.statWeights) {
+        const stat = entry.entryStats.find(s => s.statDefId === weight.statDefId)
+        const worldMax = statWorldMaxes.get(weight.statDefId) ?? 1
+        statScore += weight.weight * ((stat?.trainedValue ?? 0) / worldMax)
+      }
+      let personalityMultiplier = 1.0
+      for (const weight of competition.disciplineDef.personalityWeights) {
+        const trait = entry.animal.personality.find(p => p.traitDefId === weight.traitDefId)
+        const effectiveValue = trait ? Math.min(100, Math.max(0, trait.value + trait.personalityModifier)) : 50
+        const mult = computePersonalityMultiplier(effectiveValue, weight.idealMin, weight.idealMax)
+        personalityMultiplier += (weight.bonusPercent / 100) * mult
+      }
+      const envMod = animalEnvMods.get(entry.animalId) ?? 0
+      score = Math.max(0, statScore * 100 * personalityMultiplier * (1 + envMod / 100))
     }
 
-    await tx.competition.update({
-      where: { id: competitionId },
-      data: { status: "COMPLETED" },
+    const variance = (Math.random() - 0.5) * score * 0.2
+    return {
+      entryId: entry.id,
+      animalId: entry.animalId,
+      playerAccountId: entry.playerAccountId,
+      tierDefId: entry.tierDefId,
+      tierDef: entry.tierDef,
+      score: score + variance,
+    }
+  })
+
+  // group by tier and rank within each group
+  const byTier = new Map<string, typeof scored>()
+  for (const entry of scored) {
+    const group = byTier.get(entry.tierDefId) ?? []
+    group.push(entry)
+    byTier.set(entry.tierDefId, group)
+  }
+
+  const allRanked: (typeof scored[number] & { placement: number })[] = []
+
+  for (const [, entries] of byTier) {
+    const ranked = [...entries]
+      .sort((a, b) => b.score - a.score)
+      .map((entry, i) => ({ ...entry, placement: i + 1 }))
+    allRanked.push(...ranked)
+  }
+
+  for (const entry of allRanked) {
+    await tx.competitionResult.create({
+      data: { entryId: entry.entryId, placement: entry.placement, score: entry.score },
+    })
+  }
+
+  // prizes per tier group
+  for (const [, entries] of byTier) {
+    const tierDef = entries[0]!.tierDef
+    const prizes = tierDef.tierPrizes.filter(
+      p => p.isInvitational === competition.isInvitational
+    )
+    const ranked = allRanked.filter(e => e.tierDefId === tierDef.id)
+
+    for (const prize of prizes) {
+      if (!prize.currencyDefId) continue
+      const winner = ranked.find(e => e.placement === prize.placement)
+      if (!winner) continue
+
+      await tx.playerBalance.upsert({
+        where: { playerAccountId_currencyDefId: { playerAccountId: winner.playerAccountId, currencyDefId: prize.currencyDefId } },
+        create: { playerAccountId: winner.playerAccountId, currencyDefId: prize.currencyDefId, balance: prize.amount },
+        update: { balance: { increment: prize.amount } },
+      })
+
+      await tx.transaction.create({
+        data: { gameId: competition.gameId, toPlayerAccountId: winner.playerAccountId, currencyDefId: prize.currencyDefId, amount: prize.amount, txnType: "PRIZE" },
+      })
+    }
+  }
+
+  // entry fee share to group if venue is group-owned
+  const group = competition.venue.group
+  const entryFeeSharePercent = group?.prestige?.tierDef?.entryFeeSharePercent ?? 0
+  if (group && entryFeeSharePercent > 0) {
+    const totalEntryFees = allRanked.reduce((sum, e) => sum + e.tierDef.entryFee, 0)
+    const shareAmount = Math.floor(totalEntryFees * (entryFeeSharePercent / 100))
+
+    if (shareAmount > 0) {
+      const baseCurrency = await tx.currencyDef.findFirstOrThrow({
+        where: { gameId: competition.gameId, currencyType: "BASE" },
+        select: { id: true },
+      })
+
+      await tx.groupFinance.upsert({
+        where: { groupId_currencyDefId: { groupId: group.id, currencyDefId: baseCurrency.id } },
+        create: { groupId: group.id, currencyDefId: baseCurrency.id, balance: shareAmount },
+        update: { balance: { increment: shareAmount } },
+      })
+
+      await tx.transaction.create({
+        data: {
+          gameId: competition.gameId,
+          toGroupId: group.id,
+          currencyDefId: baseCurrency.id,
+          amount: shareAmount,
+          txnType: "GROUP_CONTRIBUTION",
+        },
+      })
+    }
+  }
+
+  const now = new Date()
+  const day = now.getUTCDay()
+  const weekStart = new Date(now)
+  weekStart.setUTCDate(now.getUTCDate() - (day === 0 ? 6 : day - 1))
+  weekStart.setUTCHours(0, 0, 0, 0)
+
+  for (const entry of allRanked) {
+    await tx.animalWeeklyPoints.upsert({
+      where: { animalId_disciplineDefId_weekStart: { animalId: entry.animalId, disciplineDefId: competition.disciplineDefId, weekStart } },
+      create: { animalId: entry.animalId, disciplineDefId: competition.disciplineDefId, weekStart, points: entry.score },
+      update: { points: { increment: entry.score } },
+    })
+  }
+
+  // tier advancement — check every competing animal's career total in the
+  // discipline against their tier's threshold. Deliberately not the weekly
+  // bucket written above: that exists for invitational eligibility and resets
+  // every Monday, which would wipe a horse's progress toward the next tier
+  // partway through earning it.
+  const uniqueAnimalIds = [...new Set(allRanked.map((e) => e.animalId))]
+  for (const animalId of uniqueAnimalIds) {
+    const animalTier = await tx.animalCompetitionTier.findUnique({
+      where: { animalId_disciplineDefId: { animalId, disciplineDefId: competition.disciplineDefId } },
+      include: {
+        tierDef: { select: { tierIndex: true, advancementThreshold: true } },
+      },
+    })
+    if (!animalTier || animalTier.tierDef.advancementThreshold == null) continue
+
+    const career = await tx.competitionResult.aggregate({
+      _sum: { score: true },
+      where: { entry: { animalId, competition: { disciplineDefId: competition.disciplineDefId } } },
+    })
+    if ((career._sum.score ?? 0) < animalTier.tierDef.advancementThreshold) continue
+
+    const nextTier = await tx.competitionTierDef.findFirst({
+      where: {
+        disciplineDefId: competition.disciplineDefId,
+        tierIndex: { gt: animalTier.tierDef.tierIndex },
+      },
+      orderBy: { tierIndex: "asc" },
+      select: { id: true, name: true },
+    })
+    if (!nextTier) continue
+
+    await tx.animalCompetitionTier.update({
+      where: { animalId_disciplineDefId: { animalId, disciplineDefId: competition.disciplineDefId } },
+      data: { tierDefId: nextTier.id },
     })
 
-    return allRanked
+    const entryForCycle = allRanked.find((e) => e.animalId === animalId)
+    const entryRecord = entryForCycle
+      ? competition.entries.find((e) => e.animalId === animalId)
+      : null
+    await tx.animalDailyLog.create({
+      data: {
+        animalId,
+        cycleNumber: (entryRecord as { cycleNumber?: number } | null)?.cycleNumber ?? 0,
+        eventType: "TIER_ADVANCED",
+        context: {
+          newTierName: nextTier.name,
+          disciplineName: competition.disciplineDef.name,
+        },
+      },
+    })
+  }
 
-  }, RESOLUTION_TX)
+  // Award titles based on placement matching rankOrder — max tier only
+  for (const entry of allRanked) {
+    if (entry.tierDef.advancementThreshold !== null) continue
+    const titleDef = await tx.titleDef.findFirst({
+      where: {
+        disciplineDefId: competition.disciplineDefId,
+        rankOrder: entry.placement,
+        animalTitles: { none: { animalId: entry.animalId } },
+      },
+      select: { id: true, requiredPlacements: true },
+    })
+    if (titleDef) {
+      const placingCount = await tx.competitionResult.count({
+        where: {
+          placement: entry.placement,
+          entry: {
+            animalId: entry.animalId,
+            tierDef: { advancementThreshold: null },
+            competition: { disciplineDefId: competition.disciplineDefId },
+          },
+        },
+      })
+      if (placingCount >= titleDef.requiredPlacements) {
+        const entryRecord = competition.entries.find((e) => e.animalId === entry.animalId)
+        await tx.animalTitle.create({
+          data: {
+            animalId: entry.animalId,
+            titleDefId: titleDef.id,
+            cycleNumber: (entryRecord as { cycleNumber?: number } | null)?.cycleNumber ?? 0,
+          },
+        })
+      }
+    }
+  }
+
+  await tx.competition.update({
+    where: { id: competitionId },
+    data: { status: "COMPLETED" },
+  })
+
+  return allRanked
+
 }
+
+/*
+ * There was a `runCompetition(client, input)` here, opening its own
+ * transaction for a caller that had none. It is gone, and the absence is the
+ * point: every caller is a writer in some game, and a writer that opens its
+ * own transaction has no way to join that game's maintenance lock — so it
+ * resolves placements into a game a nightly may have just taken.
+ *
+ * That is not hypothetical. The competition resolver used it, and a nightly
+ * starting mid-chunk took the game out from under a resolution that was
+ * halfway through writing into it. The resolver now opens the transaction
+ * itself, calls `enterGameplay` first and `runCompetitionTx` second, and the
+ * tutorial's conformation show has always done the same.
+ *
+ * Anything that needs this work does it the same way, and `RESOLUTION_TX` is
+ * exported for it: the allowance belongs to the work, not to whoever is
+ * calling it this time.
+ */

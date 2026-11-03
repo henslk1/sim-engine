@@ -1,5 +1,6 @@
 import { db } from "@sim-engine/db"
 import { router, publicProcedure } from "../trpc.js"
+import { assertParticipantsInGame, enterGameplay, enterGameplayForAnimal, enterGameplayForPregnancy } from "../maintenance.js"
 import { z } from "zod"
 import { generateOffspring, computePhenotypeDescription, computePhenotypeCodes, computeBreedingQuality, computeFixedFields, type BlendedAlleleFrequency, markAnimalActive, requireBreedingAllowed, loadMaterialInheritanceWeights } from "@sim-engine/engine"
 
@@ -74,6 +75,7 @@ export const breedingMaterialRouter = router({
     }))
     .mutation(async ({ input }) => {
       return db.$transaction(async (tx) => {
+        await enterGameplayForAnimal(tx, input.animalId)
         await requireBreedingAllowed(tx, [input.animalId])
         // Qualifying interaction: a player action that changes this animal's state.
         await markAnimalActive(tx, { animalId: input.animalId })
@@ -394,6 +396,18 @@ export const breedingMaterialRouter = router({
     }))
     .mutation(async ({ input }) => {
       return db.$transaction(async (tx) => {
+        // The material's game. Both samples and the owner have to be in it -
+        // stored genetics carry their own `gameId`, so an embryo could
+        // otherwise be assembled across two games while only one was locked.
+        const spermGame = await tx.geneticMaterial.findUniqueOrThrow({
+          where: { id: input.spermId },
+          select: { gameId: true },
+        })
+        await enterGameplay(tx, spermGame.gameId)
+        await assertParticipantsInGame(tx, spermGame.gameId, {
+          playerAccountIds: [input.playerAccountId],
+        })
+
         const sperm = await tx.geneticMaterial.findUniqueOrThrow({
           where: { id: input.spermId },
           select: { id: true, materialType: true, isUsed: true, gameId: true, animalId: true, donorSnapshot: true },
@@ -639,6 +653,7 @@ export const breedingMaterialRouter = router({
     }))
     .mutation(async ({ input }) => {
       return db.$transaction(async (tx) => {
+        await enterGameplayForAnimal(tx, input.damId)
         const sperm = await tx.geneticMaterial.findUniqueOrThrow({
           where: { id: input.spermId },
           select: { id: true, materialType: true, isUsed: true, gameId: true, animalId: true, donorSnapshot: true },
@@ -1043,6 +1058,7 @@ export const breedingMaterialRouter = router({
     .input(z.object({ pregnancyId: z.string() }))
     .mutation(async ({ input }) => {
       return db.$transaction(async (tx) => {
+        await enterGameplayForPregnancy(tx, input.pregnancyId)
         const pregnancy = await tx.pregnancy.findUniqueOrThrow({
           where: { id: input.pregnancyId },
           include: {
@@ -1153,6 +1169,7 @@ export const breedingMaterialRouter = router({
     }))
     .mutation(async ({ input }) => {
       return db.$transaction(async (tx) => {
+        await enterGameplayForAnimal(tx, input.surrogateAnimalId)
         const embryo = await tx.geneticMaterial.findUniqueOrThrow({
           where: { id: input.embryoId },
           select: {

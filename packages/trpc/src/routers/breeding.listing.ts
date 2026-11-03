@@ -1,6 +1,7 @@
 import { db } from "@sim-engine/db"
 import { markAnimalActive } from "@sim-engine/engine"
 import { router, publicProcedure } from "../trpc.js"
+import { enterGameplayForAnimal, enterGameplayForListing } from "../maintenance.js"
 import { z } from "zod"
 
 const restrictionInput = {
@@ -108,38 +109,46 @@ export const breedingListingRouter = router({
       description: z.any().optional(),
       ...restrictionInput,
     }))
-    .mutation(async ({ input }) => {
-      const animal = await db.animal.findUniqueOrThrow({
-        where: { id: input.animalId },
-        select: { gameId: true, playerAccountId: true, sex: true },
-      })
+    .mutation(async ({ input }) =>
+      db.$transaction(async (tx) => {
+        await enterGameplayForAnimal(tx, input.animalId)
 
-      if (animal.sex !== "MALE") throw new Error("Only males can have breeding listings")
+        // Both reads are decisions - whether this animal may be listed at all,
+        // and whether one already exists - so both belong under the lock, and
+        // the uniqueness check is only worth anything inside the transaction
+        // that then creates the row.
+        const animal = await tx.animal.findUniqueOrThrow({
+          where: { id: input.animalId },
+          select: { gameId: true, playerAccountId: true, sex: true },
+        })
 
-      const existing = await db.breedingListing.findFirst({
-        where: { animalId: input.animalId },
-        select: { id: true },
-      })
-      if (existing) throw new Error("Animal already has a breeding listing")
+        if (animal.sex !== "MALE") throw new Error("Only males can have breeding listings")
 
-      return db.breedingListing.create({
-        data: {
-          gameId: animal.gameId,
-          ownerPlayerId: animal.playerAccountId,
-          animalId: input.animalId,
-          title: input.title ?? null,
-          pureBredOnly: input.pureBredOnly,
-          requiredTitleDefId: input.requiredTitleDefId ?? null,
-          pricePerSlot: input.pricePerSlot,
-          currencyDefId: input.pricePerSlot > 0 ? (input.currencyDefId ?? null) : null,
-          description: input.description ?? null,
-          isActive: true,
-          breedRestrictions: { createMany: { data: input.breedRestrictions.map((breedId) => ({ breedId })) } },
-          statMinimums: { createMany: { data: input.statMinimums } },
-        },
-        select: { id: true, isActive: true },
+        const existing = await tx.breedingListing.findFirst({
+          where: { animalId: input.animalId },
+          select: { id: true },
+        })
+        if (existing) throw new Error("Animal already has a breeding listing")
+
+        return tx.breedingListing.create({
+          data: {
+            gameId: animal.gameId,
+            ownerPlayerId: animal.playerAccountId,
+            animalId: input.animalId,
+            title: input.title ?? null,
+            pureBredOnly: input.pureBredOnly,
+            requiredTitleDefId: input.requiredTitleDefId ?? null,
+            pricePerSlot: input.pricePerSlot,
+            currencyDefId: input.pricePerSlot > 0 ? (input.currencyDefId ?? null) : null,
+            description: input.description ?? null,
+            isActive: true,
+            breedRestrictions: { createMany: { data: input.breedRestrictions.map((breedId) => ({ breedId })) } },
+            statMinimums: { createMany: { data: input.statMinimums } },
+          },
+          select: { id: true, isActive: true },
+        })
       })
-    }),
+    ),
 
   update: publicProcedure
     .input(z.object({
@@ -154,6 +163,7 @@ export const breedingListingRouter = router({
     }))
     .mutation(async ({ input }) => {
       return db.$transaction(async (tx) => {
+        await enterGameplayForListing(tx, input.listingId)
         await tx.breedingListingBreedRestriction.deleteMany({ where: { listingId: input.listingId } })
         await tx.breedingListingStatMinimum.deleteMany({ where: { listingId: input.listingId } })
         return tx.breedingListing.update({
@@ -177,6 +187,7 @@ export const breedingListingRouter = router({
     .input(z.object({ listingId: z.string() }))
     .mutation(async ({ input }) => {
       return db.$transaction(async (tx) => {
+        await enterGameplayForListing(tx, input.listingId)
         const listing = await tx.breedingListing.findUniqueOrThrow({
           where: { id: input.listingId },
           select: {
@@ -238,15 +249,18 @@ export const breedingListingRouter = router({
 
   toggleActive: publicProcedure
     .input(z.object({ listingId: z.string() }))
-    .mutation(async ({ input }) => {
-      const listing = await db.breedingListing.findUniqueOrThrow({
-        where: { id: input.listingId },
-        select: { isActive: true },
+    .mutation(async ({ input }) =>
+      db.$transaction(async (tx) => {
+        await enterGameplayForListing(tx, input.listingId)
+        const listing = await tx.breedingListing.findUniqueOrThrow({
+          where: { id: input.listingId },
+          select: { isActive: true },
+        })
+        return tx.breedingListing.update({
+          where: { id: input.listingId },
+          data: { isActive: !listing.isActive },
+          select: { id: true, isActive: true },
+        })
       })
-      return db.breedingListing.update({
-        where: { id: input.listingId },
-        data: { isActive: !listing.isActive },
-        select: { id: true, isActive: true },
-      })
-    }),
+    ),
 })

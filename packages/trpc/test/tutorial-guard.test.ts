@@ -5,6 +5,11 @@ import assert from "node:assert/strict"
 // account, including if a guard unexpectedly falls through.
 const db = {
   playerAccount: { findMany: async () => [] as unknown[] },
+  // The maintenance guard runs ahead of the tutorial guard and now reads the
+  // run table rather than this process's memory, so a stub that omits it makes
+  // every guarded mutation fail as an internal error instead of a refusal.
+  // Nothing outstanding: these tests are about what the tutorial guard allows.
+  scheduledTaskRun: { findFirst: async (_input: unknown) => null as unknown },
   healthCertificateDef: { findUnique: async (_input: unknown) => null as unknown },
   animal: { findUnique: async (_input: unknown) => ({ disciplineDefId: "halter", secondaryDisciplineDefId: null }) },
   animalLongTermCareRecord: { findUnique: async (_input: unknown) => ({ animalId: "foal" }) },

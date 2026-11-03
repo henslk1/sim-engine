@@ -567,6 +567,33 @@ model GameConfig {
   // of these boundaries, which is the same rule that makes a competition
   // entered at 13:59 run at 14:00.
   shopRotationMinutes             Int             @default(60)
+  // How long a finished run's per-animal work and progress samples are kept.
+  //
+  // Only the detail expires. The run row itself, and the summary finalized
+  // onto it, are kept indefinitely - they are three rows a day and they are
+  // what the analytics history, the run comparisons and the timing baseline
+  // are built from. What grows is `NightlyAnimalWork`: one row per animal per
+  // night, so a hundred thousand animals is three million rows a month that
+  // nothing reads once the summary exists.
+  //
+  // Configurable because the right answer depends on how much detail is worth
+  // keeping for recovery and investigation, which is a judgement about the
+  // game rather than a property of the scheduler. Deliberately not derived
+  // from player count: a bigger game is the case where a failed animal is
+  // hardest to find, not the one where history matters least.
+  workRetentionDays               Int             @default(30)
+  // Where the last retention pass stopped scanning activity markers.
+  //
+  // Runtime state rather than configuration, living here because this is the
+  // per-game row retention already reads. Safe for an admin to clear: null
+  // just means "start from the beginning again".
+  //
+  // It exists because a marker that is protected stays protected. Scanning the
+  // first N candidates fresh every night starves everything behind a block of
+  // current-cycle markers larger than N - raising N moves the cliff, it does
+  // not remove it. Saving the position makes successive nights sweep the whole
+  // table, and reaching the end resets this to null to start the next sweep.
+  markerPruneCursor               String?
   tutorialMaleBaseTemplate        AnimalTemplate? @relation("GameConfigTutorialMale", fields: [tutorialMaleBaseTemplateId], references: [id])
   tutorialFemaleBaseTemplate      AnimalTemplate? @relation("GameConfigTutorialFemale", fields: [tutorialFemaleBaseTemplateId], references: [id])
   completeProfileTestCurrency     CurrencyDef?    @relation("CompletePrfCurrency", fields: [completeProfileTestCurrencyDefId], references: [id])

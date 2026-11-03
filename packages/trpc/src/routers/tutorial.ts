@@ -1,10 +1,48 @@
 import { z } from "zod"
+import { enterGameplay } from "../maintenance.js"
 import { TRPCError } from "@trpc/server"
 import { canTransitionTutorial, TUTORIAL_STEPS } from "../tutorial-policy.js"
 import { router, protectedProcedure } from "../trpc.js"
 import { db, AnimalSex } from "@sim-engine/db"
-import { generateFromTemplate, weightedSample, canonicalize, deleteAnimalsWithChildren, computeFixedFields, computePhenotypeDescription, computePhenotypeCodes, sampleBreedPersonality, initialImmunity, enterCompetition, runCompetition } from "@sim-engine/engine"
+import { generateFromTemplate, weightedSample, canonicalize, deleteAnimalsWithChildren, deleteAnimalsWithChildrenTx, computeFixedFields, computePhenotypeDescription, computePhenotypeCodes, sampleBreedPersonality, initialImmunity, enterCompetitionTx, runCompetitionTx } from "@sim-engine/engine"
 import type { ExpressionRuleForPhenotype } from "@sim-engine/engine"
+
+/**
+ * The conformation show creates a competition, enters the foal, resolves it
+ * and records the result, all under the game's lock.
+ *
+ * It used to undo a half-made competition by deleting it in a catch, which is
+ * what compensating for the absence of a transaction looks like. Inside one
+ * the rollback does that, and does it for every failure rather than the ones
+ * somebody remembered.
+ */
+const CONFORMATION_TX = { timeout: 20_000, maxWait: 5_000 } as const
+
+/**
+ * Competition entry builds a whole competition, its NPC field and its results
+ * in one go, which is more work than the default five seconds allows once all
+ * of it is inside the game's lock.
+ */
+const COMPETE_TX = { timeout: 20_000, maxWait: 5_000 } as const
+
+/**
+ * Tutorial setup creates a player's whole starting state - two ancestors from
+ * templates, their listing and slot, and the starter embryo - so it needs more
+ * than the default five seconds now that all of it is inside the lock.
+ */
+const SETUP_TX = { timeout: 30_000, maxWait: 5_000 } as const
+
+/**
+ * Finishing the tutorial deletes both simulation ancestors and everything
+ * hanging off them - roughly thirty tables each - inside the same transaction
+ * that records the completion.
+ *
+ * The deletion helper carries its own allowance, but only on the standalone
+ * wrapper that opens a transaction. Called as its `Tx` form on this one it
+ * inherits this allowance instead, and the default five seconds would have the
+ * last step of the tutorial roll back and retry whenever the database was slow.
+ */
+const COMPLETE_STEP_TX = { timeout: 30_000, maxWait: 5_000 } as const
 
 export const tutorialRouter = router({
   // The server owns the active Driver.js index. Older accounts import their
@@ -50,245 +88,249 @@ export const tutorialRouter = router({
     .input(z.object({ gameId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const { gameId } = input
+      return db.$transaction(async (tx) => {
+        await enterGameplay(tx, gameId)
 
-      // Batch 1
-      const [player, seniority] = await Promise.all([
-        db.playerAccount.findUnique({
-          where: { userId_gameId: { userId: ctx.userId, gameId } },
-          select: { id: true },
-        }),
-        db.playerSeniority.findFirst({
-          where: { playerAccount: { userId: ctx.userId, gameId } },
-          select: { starterBreedOptionId: true, starterColorOptionId: true, starterGender: true },
-        }),
-      ])
-
-      if (!player) throw new Error("Player not found")
-      if (!seniority?.starterBreedOptionId) throw new Error("Starter breed not selected")
-      
-      // Batch 2
-      const [
-        existingPair, 
-        starterOption,
-        colorOption,
-        allLoci,
-        ltcDefs,
-        lifeStages,
-        compTierDefs,
-        gameAccount,
-      ] = await Promise.all([
-        db.tutorialAnimalPair.findUnique({ where: { playerAccountId: player.id } }),
-        db.starterBreedOption.findUnique({
-          where: { id: seniority.starterBreedOptionId },
-          select: {
-            breedId: true,
-            breed: { select: { name: true } },
-            tutorialFemaleTemplate: {
-              select: {
-                breedId: true, breedName: true, sex: true, name: true, lore: true,
-                fertility: true, startingAgeInCycles: true,
-                statMode: true, statFloor: true,
-                personalityMode: true, personalityMin: true, personalityMax: true,
-                stats: { select: { statDefId: true, innateValue: true, trainedValue: true } },
-                compTiers: { select: { disciplineDefId: true, tier: true } },
-                genotype: { select: { locusId: true, alleleOneId: true, alleleTwoId: true, isTestedByOwner: true } },
-                personalityValues: { select: { traitDefId: true, value: true } },
-              },
-            },
-            tutorialMaleTemplate: {
-              select: {
-                breedId: true, breedName: true, sex: true, name: true, lore: true,
-                fertility: true, startingAgeInCycles: true,
-                statMode: true, statFloor: true,
-                personalityMode: true, personalityMin: true, personalityMax: true,
-                stats: { select: { statDefId: true, innateValue: true, trainedValue: true } },
-                compTiers: { select: { disciplineDefId: true, tier: true } },
-                genotype: { select: { locusId: true, alleleOneId: true, alleleTwoId: true, isTestedByOwner: true } },
-                personalityValues: { select: { traitDefId: true, value: true } },
-              },
-            },
-          },
-        }),
-        seniority.starterColorOptionId
-          ? db.starterColorOption.findUnique({
-              where: { id: seniority.starterColorOptionId },
-              select: { name: true, genotypes: { select: { locusId: true, alleleOneId: true, alleleTwoId: true } } },
-            })
-          : Promise.resolve(null),
-          db.locus.findMany({
-            where: { gameId },
-            select: { id: true, alleles: { select: { id: true, symbol: true } } },
-          }),
-          db.longTermCareActionDef.findMany({ where: { gameId }, select: { id: true, intervalCycles: true } }),
-          db.lifeStageDef.findMany({ where: { gameId }, select: { id: true, minCycle: true, stageIndex: true } }),
-          db.competitionTierDef.findMany({ where: { gameId }, select: { id: true, disciplineDefId: true, tierIndex: true } }),
-          db.playerAccount.findFirst({ where: { gameId }, select: { id: true } }),
-      ])
-
-      if (existingPair) {
-        const [listing, activePregnancy] = await Promise.all([
-          db.breedingListing.findFirst({
-            where: { animalId: existingPair.ancestorTwoId },
-            select: { id: true, isActive: true, slots: { where: { status: "AVAILABLE" }, select: { id: true }, take: 1 } },
-          }),
-          db.pregnancy.findFirst({
-            where: { animalId: existingPair.ancestorOneId, isCompleted: false },
+        const [player, seniority] = await Promise.all([
+          tx.playerAccount.findUnique({
+            where: { userId_gameId: { userId: ctx.userId, gameId } },
             select: { id: true },
           }),
+          tx.playerSeniority.findFirst({
+            where: { playerAccount: { userId: ctx.userId, gameId } },
+            select: { starterBreedOptionId: true, starterColorOptionId: true, starterGender: true },
+          }),
         ])
-        // Older tutorial pairs were created before the breeding phase existed
-        // and may have a listing with no usable slot. Repair it idempotently
-        // while the mare has not yet been bred.
-        if (listing && !activePregnancy) {
-          await db.$transaction([
-            ...(!listing.isActive
-              ? [db.breedingListing.update({ where: { id: listing.id }, data: { isActive: true } })]
-              : []),
-            ...(listing.slots.length === 0
-              ? [db.breedingSlot.create({ data: { listingId: listing.id, status: "AVAILABLE" } })]
-              : []),
+
+        if (!player) throw new Error("Player not found")
+        if (!seniority?.starterBreedOptionId) throw new Error("Starter breed not selected")
+      
+        // Batch 2
+        const [
+          existingPair, 
+          starterOption,
+          colorOption,
+          allLoci,
+          ltcDefs,
+          lifeStages,
+          compTierDefs,
+          gameAccount,
+        ] = await Promise.all([
+          tx.tutorialAnimalPair.findUnique({ where: { playerAccountId: player.id } }),
+          tx.starterBreedOption.findUnique({
+            where: { id: seniority.starterBreedOptionId },
+            select: {
+              breedId: true,
+              breed: { select: { name: true } },
+              tutorialFemaleTemplate: {
+                select: {
+                  breedId: true, breedName: true, sex: true, name: true, lore: true,
+                  fertility: true, startingAgeInCycles: true,
+                  statMode: true, statFloor: true,
+                  personalityMode: true, personalityMin: true, personalityMax: true,
+                  stats: { select: { statDefId: true, innateValue: true, trainedValue: true } },
+                  compTiers: { select: { disciplineDefId: true, tier: true } },
+                  genotype: { select: { locusId: true, alleleOneId: true, alleleTwoId: true, isTestedByOwner: true } },
+                  personalityValues: { select: { traitDefId: true, value: true } },
+                },
+              },
+              tutorialMaleTemplate: {
+                select: {
+                  breedId: true, breedName: true, sex: true, name: true, lore: true,
+                  fertility: true, startingAgeInCycles: true,
+                  statMode: true, statFloor: true,
+                  personalityMode: true, personalityMin: true, personalityMax: true,
+                  stats: { select: { statDefId: true, innateValue: true, trainedValue: true } },
+                  compTiers: { select: { disciplineDefId: true, tier: true } },
+                  genotype: { select: { locusId: true, alleleOneId: true, alleleTwoId: true, isTestedByOwner: true } },
+                  personalityValues: { select: { traitDefId: true, value: true } },
+                },
+              },
+            },
+          }),
+          seniority.starterColorOptionId
+            ? tx.starterColorOption.findUnique({
+                where: { id: seniority.starterColorOptionId },
+                select: { name: true, genotypes: { select: { locusId: true, alleleOneId: true, alleleTwoId: true } } },
+              })
+            : Promise.resolve(null),
+            tx.locus.findMany({
+              where: { gameId },
+              select: { id: true, alleles: { select: { id: true, symbol: true } } },
+            }),
+            tx.longTermCareActionDef.findMany({ where: { gameId }, select: { id: true, intervalCycles: true } }),
+            tx.lifeStageDef.findMany({ where: { gameId }, select: { id: true, minCycle: true, stageIndex: true } }),
+            tx.competitionTierDef.findMany({ where: { gameId }, select: { id: true, disciplineDefId: true, tierIndex: true } }),
+            tx.playerAccount.findFirst({ where: { gameId }, select: { id: true } }),
+        ])
+
+        if (existingPair) {
+          const [listing, activePregnancy] = await Promise.all([
+            tx.breedingListing.findFirst({
+              where: { animalId: existingPair.ancestorTwoId },
+              select: { id: true, isActive: true, slots: { where: { status: "AVAILABLE" }, select: { id: true }, take: 1 } },
+            }),
+            tx.pregnancy.findFirst({
+              where: { animalId: existingPair.ancestorOneId, isCompleted: false },
+              select: { id: true },
+            }),
           ])
+          // Older tutorial pairs were created before the breeding phase existed
+          // and may have a listing with no usable slot. Repair it idempotently
+          // while the mare has not yet been bred.
+          if (listing && !activePregnancy) {
+            // Part of the transaction holding the lock, not one of its own.
+            if (!listing.isActive) {
+              await tx.breedingListing.update({ where: { id: listing.id }, data: { isActive: true } })
+            }
+            if (listing.slots.length === 0) {
+              await tx.breedingSlot.create({ data: { listingId: listing.id, status: "AVAILABLE" } })
+            }
+          }
+          return
         }
-        return
-      }
-      if (!starterOption?.tutorialFemaleTemplate || !starterOption.tutorialMaleTemplate) {
-        throw new Error("Tutorial templates not configured")
-      }
-      if (!gameAccount) throw new Error("Game account not found")
+        if (!starterOption?.tutorialFemaleTemplate || !starterOption.tutorialMaleTemplate) {
+          throw new Error("Tutorial templates not configured")
+        }
+        if (!gameAccount) throw new Error("Game account not found")
 
-      const breedId = starterOption.breedId
+        const breedId = starterOption.breedId
 
-      // Batch 3
-      const [breedWeights, breedPersonalityProfiles, breedImmunity, gameConfigForGen, breedAlleleFreqs, gameInnateMaxRecord] = await Promise.all([
-        db.breedStatProfile.findMany({ where: { breedId }, select: { statDefId: true, weight: true } }),
-        db.breedPersonalityProfile.findMany({ where: { breedId }, select: { traitDefId: true, naturalMin: true, naturalMax: true, baseline: true } }),
-        db.breed.findUnique({ where: { id: breedId }, select: { immunityMin: true, immunityMax: true, lifeExpectancyBaseline: true } }),
-        db.gameConfig.findUnique({
-          where: { gameId },
-          select: {
-            lifeExpectancyBaseline: true,
-            defaultInnateRatio: true,
-            immunityMax: true,
-            tutorialMaleBaseTemplate: {
-              select: {
-                sex: true, fertility: true, startingAgeInCycles: true,
-                statMode: true, statFloor: true,
-                personalityMode: true, personalityMin: true, personalityMax: true,
-                stats: { select: { statDefId: true, innateValue: true, trainedValue: true } },
-                compTiers: { select: { disciplineDefId: true, tier: true } },
-                genotype: { select: { locusId: true, alleleOneId: true, alleleTwoId: true, isTestedByOwner: true } },
-                personalityValues: { select: { traitDefId: true, value: true } },
+        // Batch 3
+        const [breedWeights, breedPersonalityProfiles, breedImmunity, gameConfigForGen, breedAlleleFreqs, gameInnateMaxRecord] = await Promise.all([
+          tx.breedStatProfile.findMany({ where: { breedId }, select: { statDefId: true, weight: true } }),
+          tx.breedPersonalityProfile.findMany({ where: { breedId }, select: { traitDefId: true, naturalMin: true, naturalMax: true, baseline: true } }),
+          tx.breed.findUnique({ where: { id: breedId }, select: { immunityMin: true, immunityMax: true, lifeExpectancyBaseline: true } }),
+          tx.gameConfig.findUnique({
+            where: { gameId },
+            select: {
+              lifeExpectancyBaseline: true,
+              defaultInnateRatio: true,
+              immunityMax: true,
+              tutorialMaleBaseTemplate: {
+                select: {
+                  sex: true, fertility: true, startingAgeInCycles: true,
+                  statMode: true, statFloor: true,
+                  personalityMode: true, personalityMin: true, personalityMax: true,
+                  stats: { select: { statDefId: true, innateValue: true, trainedValue: true } },
+                  compTiers: { select: { disciplineDefId: true, tier: true } },
+                  genotype: { select: { locusId: true, alleleOneId: true, alleleTwoId: true, isTestedByOwner: true } },
+                  personalityValues: { select: { traitDefId: true, value: true } },
+                },
+              },
+              tutorialFemaleBaseTemplate: {
+                select: {
+                  sex: true, fertility: true, startingAgeInCycles: true,
+                  statMode: true, statFloor: true,
+                  personalityMode: true, personalityMin: true, personalityMax: true,
+                  stats: { select: { statDefId: true, innateValue: true, trainedValue: true } },
+                  compTiers: { select: { disciplineDefId: true, tier: true } },
+                  genotype: { select: { locusId: true, alleleOneId: true, alleleTwoId: true, isTestedByOwner: true } },
+                  personalityValues: { select: { traitDefId: true, value: true } },
+                },
               },
             },
-            tutorialFemaleBaseTemplate: {
-              select: {
-                sex: true, fertility: true, startingAgeInCycles: true,
-                statMode: true, statFloor: true,
-                personalityMode: true, personalityMin: true, personalityMax: true,
-                stats: { select: { statDefId: true, innateValue: true, trainedValue: true } },
-                compTiers: { select: { disciplineDefId: true, tier: true } },
-                genotype: { select: { locusId: true, alleleOneId: true, alleleTwoId: true, isTestedByOwner: true } },
-                personalityValues: { select: { traitDefId: true, value: true } },
-              },
-            },
-          },
-        }),
-        db.breedAlleleFrequency.findMany({
-          where: { breedId },
-          select: { alleleId: true, frequency: true, allele: { select: { locusId: true } } },
-        }),
-        db.gameInnateMax.findUnique({ where: { gameId }, select: { maxTotalInnate: true, averageTotalInnate: true } }),
-      ])
+          }),
+          tx.breedAlleleFrequency.findMany({
+            where: { breedId },
+            select: { alleleId: true, frequency: true, allele: { select: { locusId: true } } },
+          }),
+          tx.gameInnateMax.findUnique({ where: { gameId }, select: { maxTotalInnate: true, averageTotalInnate: true } }),
+        ])
 
-      // Build compTierLookup
-      const compTierLookup = new Map<string, string>()
-      for (const ct of compTierDefs) {
-        compTierLookup.set(`${ct.disciplineDefId}:${ct.tierIndex}`, ct.id)
-      }
-
-      // Build byLocus: breed frequencies where available, equal weight otherwise
-      const freqByLocusAllele = new Map<string, Map<string, number>>()
-      for (const freq of breedAlleleFreqs) {
-        const locusId = freq.allele.locusId
-        if (!freqByLocusAllele.has(locusId)) freqByLocusAllele.set(locusId, new Map())
-        freqByLocusAllele.get(locusId)!.set(freq.alleleId, freq.frequency)
-      }
-      const byLocus = new Map<string, { id: string; symbol: string; frequency: number }[]>()
-      for (const locus of allLoci) {
-        const locusFreqs = freqByLocusAllele.get(locus.id)
-        byLocus.set(locus.id, locus.alleles.map(a => ({
-          id: a.id,
-          symbol: a.symbol,
-          frequency: locusFreqs?.get(a.id) ?? 1,
-        })))
-      }
-
-      const femaleTpl = starterOption.tutorialFemaleTemplate
-      const maleTpl = starterOption.tutorialMaleTemplate
-      const maleBase = gameConfigForGen?.tutorialMaleBaseTemplate ?? null
-      const femaleBase = gameConfigForGen?.tutorialFemaleBaseTemplate ?? null
-
-      function mergeTemplate<T extends typeof femaleTpl>(base: typeof femaleBase, tpl: T) {
-        const tplGenotypeLoci = new Set(tpl.genotype.map(g => g.locusId))
-        return {
-          breedId: tpl.breedId,
-          breedName: tpl.breedName,
-          name: tpl.name,
-          lore: tpl.lore ?? null,
-          sex: tpl.sex,
-          fertility: tpl.fertility ?? base?.fertility ?? null,
-          startingAgeInCycles: tpl.startingAgeInCycles ?? base?.startingAgeInCycles ?? null,
-          statMode: tpl.statMode,
-          statFloor: tpl.statFloor ?? base?.statFloor ?? null,
-          personalityMode: tpl.personalityMode,
-          personalityMin: tpl.personalityMin ?? base?.personalityMin ?? null,
-          personalityMax: tpl.personalityMax ?? base?.personalityMax ?? null,
-          stats: Array.from(
-            new Map([
-              ...(base?.stats ?? []).map(s => [s.statDefId, s] as const),
-              ...(tpl.stats ?? []).map(s => [s.statDefId, s] as const),
-            ]).values()
-          ),
-          compTiers: tpl.compTiers?.length ? tpl.compTiers : (base?.compTiers ?? []),
-          personalityValues: tpl.personalityValues?.length ? tpl.personalityValues : (base?.personalityValues ?? []),
-          genotype: [
-            ...tpl.genotype,
-            ...(base?.genotype ?? []).filter(g => !tplGenotypeLoci.has(g.locusId)),
-          ],
+        // Build compTierLookup
+        const compTierLookup = new Map<string, string>()
+        for (const ct of compTierDefs) {
+          compTierLookup.set(`${ct.disciplineDefId}:${ct.tierIndex}`, ct.id)
         }
-      }
 
-      const sharedOpts = {
-        gameId,
-        isTutorialAnimal: true as const,
-        ownerPlayerAccountId: gameAccount.id,
-        breederId: gameAccount.id,
-        byLocus,
-        breedWeights,
-        defaultInnateRatio: gameConfigForGen?.defaultInnateRatio ?? 0.5,
-        gameInnateMax: gameInnateMaxRecord?.maxTotalInnate ?? null,
-        breedPersonalityProfiles,
-        immunityMin: breedImmunity?.immunityMin ?? null,
-        immunityMax: breedImmunity?.immunityMax ?? null,
-        gameConfigImmunityMax: gameConfigForGen?.immunityMax ?? null,
-        lifeExpectancyBaseline: breedImmunity?.lifeExpectancyBaseline ?? null,
-        gameConfigLifeExpectancyBaseline: gameConfigForGen?.lifeExpectancyBaseline ?? null,
-        ltcDefs,
-        lifeStages,
-        compTierLookup,
-      }
+        // Build byLocus: breed frequencies where available, equal weight otherwise
+        const freqByLocusAllele = new Map<string, Map<string, number>>()
+        for (const freq of breedAlleleFreqs) {
+          const locusId = freq.allele.locusId
+          if (!freqByLocusAllele.has(locusId)) freqByLocusAllele.set(locusId, new Map())
+          freqByLocusAllele.get(locusId)!.set(freq.alleleId, freq.frequency)
+        }
+        const byLocus = new Map<string, { id: string; symbol: string; frequency: number }[]>()
+        for (const locus of allLoci) {
+          const locusFreqs = freqByLocusAllele.get(locus.id)
+          byLocus.set(locus.id, locus.alleles.map(a => ({
+            id: a.id,
+            symbol: a.symbol,
+            frequency: locusFreqs?.get(a.id) ?? 1,
+          })))
+        }
 
-      // Pre-fetch equipment requirements for the tutorial female so we can equip her at setup.
-      const mergedFemaleTpl = mergeTemplate(femaleBase, femaleTpl)
-      const femaleDiscId = mergedFemaleTpl.compTiers[0]?.disciplineDefId ?? null
-      const femaleEquipReqs = femaleDiscId
-        ? await db.disciplineEquipmentRequirement.findMany({
-            where: { disciplineDefId: femaleDiscId },
-            select: { itemDefId: true },
-          })
-        : []
+        const femaleTpl = starterOption.tutorialFemaleTemplate
+        const maleTpl = starterOption.tutorialMaleTemplate
+        const maleBase = gameConfigForGen?.tutorialMaleBaseTemplate ?? null
+        const femaleBase = gameConfigForGen?.tutorialFemaleBaseTemplate ?? null
 
-      return await db.$transaction(async (tx) => {
+        function mergeTemplate<T extends typeof femaleTpl>(base: typeof femaleBase, tpl: T) {
+          const tplGenotypeLoci = new Set(tpl.genotype.map(g => g.locusId))
+          return {
+            breedId: tpl.breedId,
+            breedName: tpl.breedName,
+            name: tpl.name,
+            lore: tpl.lore ?? null,
+            sex: tpl.sex,
+            fertility: tpl.fertility ?? base?.fertility ?? null,
+            startingAgeInCycles: tpl.startingAgeInCycles ?? base?.startingAgeInCycles ?? null,
+            statMode: tpl.statMode,
+            statFloor: tpl.statFloor ?? base?.statFloor ?? null,
+            personalityMode: tpl.personalityMode,
+            personalityMin: tpl.personalityMin ?? base?.personalityMin ?? null,
+            personalityMax: tpl.personalityMax ?? base?.personalityMax ?? null,
+            stats: Array.from(
+              new Map([
+                ...(base?.stats ?? []).map(s => [s.statDefId, s] as const),
+                ...(tpl.stats ?? []).map(s => [s.statDefId, s] as const),
+              ]).values()
+            ),
+            compTiers: tpl.compTiers?.length ? tpl.compTiers : (base?.compTiers ?? []),
+            personalityValues: tpl.personalityValues?.length ? tpl.personalityValues : (base?.personalityValues ?? []),
+            genotype: [
+              ...tpl.genotype,
+              ...(base?.genotype ?? []).filter(g => !tplGenotypeLoci.has(g.locusId)),
+            ],
+          }
+        }
+
+        const sharedOpts = {
+          gameId,
+          isTutorialAnimal: true as const,
+          ownerPlayerAccountId: gameAccount.id,
+          breederId: gameAccount.id,
+          byLocus,
+          breedWeights,
+          defaultInnateRatio: gameConfigForGen?.defaultInnateRatio ?? 0.5,
+          gameInnateMax: gameInnateMaxRecord?.maxTotalInnate ?? null,
+          breedPersonalityProfiles,
+          immunityMin: breedImmunity?.immunityMin ?? null,
+          immunityMax: breedImmunity?.immunityMax ?? null,
+          gameConfigImmunityMax: gameConfigForGen?.immunityMax ?? null,
+          lifeExpectancyBaseline: breedImmunity?.lifeExpectancyBaseline ?? null,
+          gameConfigLifeExpectancyBaseline: gameConfigForGen?.lifeExpectancyBaseline ?? null,
+          ltcDefs,
+          lifeStages,
+          compTierLookup,
+        }
+
+        // Pre-fetch equipment requirements for the tutorial female so we can equip her at setup.
+        const mergedFemaleTpl = mergeTemplate(femaleBase, femaleTpl)
+        const femaleDiscId = mergedFemaleTpl.compTiers[0]?.disciplineDefId ?? null
+        const femaleEquipReqs = femaleDiscId
+          ? await tx.disciplineEquipmentRequirement.findMany({
+              where: { disciplineDefId: femaleDiscId },
+              select: { itemDefId: true },
+            })
+          : []
+
+        // Flattened into the transaction holding the lock. Opening another
+        // here would run on a second connection, outside that lock and
+        // outside its rollback - and `tx.$transaction` would simply throw,
+        // which the typecheck does not catch.
+        return await (async () => {
         // 1. Female ancestor (owned by game account)
         const femaleId = await generateFromTemplate(tx, {
           ...sharedOpts,
@@ -436,7 +478,9 @@ export const tutorialRouter = router({
         })
 
         return { embryoId: embryo.id }
-      })
+        })()
+      }, SETUP_TX)
+    
     }),
 
   completeStep: protectedProcedure
@@ -444,66 +488,78 @@ export const tutorialRouter = router({
     .mutation(async ({ ctx, input }) => {
       const { gameId, stepKey } = input
 
-      const [player, stepDef] = await Promise.all([
-        db.playerAccount.findUnique({
-          where: { userId_gameId: { userId: ctx.userId, gameId } },
-          select: { id: true },
-        }),
-        db.tutorialStepDef.findUnique({
-          where: { gameId_stepKey: { gameId, stepKey } },
-          select: { id: true },
-        }),
-      ])
+      const result = await db.$transaction(async (tx) => {
+        await enterGameplay(tx, gameId)
 
-      if (!player) throw new Error("Player not found")
-      // Optional admin milestones may lag behind the Driver.js tutorial. Its
-      // persisted index remains authoritative; unknown milestone keys still fail.
-      if (!stepDef && stepKey !== "tutorial_complete") {
-        if (TUTORIAL_STEPS.some(step => step.checkpoint === stepKey)) return
-        throw new Error("Step not found")
-      }
-
-      if (stepKey === "tutorial_complete") {
-        await db.$transaction([
-          ...(stepDef ? [db.tutorialProgress.upsert({
-            where: { playerAccountId_stepDefId: { playerAccountId: player.id, stepDefId: stepDef.id } },
-            create: { playerAccountId: player.id, stepDefId: stepDef.id, completedAt: new Date() },
-            update: { completedAt: new Date() },
-          })] : []),
-          db.playerSeniority.update({
-            where: { playerAccountId: player.id },
-            data: { tutorialCompleted: true },
+        const [player, stepDef] = await Promise.all([
+          tx.playerAccount.findUnique({
+            where: { userId_gameId: { userId: ctx.userId, gameId } },
+            select: { id: true },
+          }),
+          tx.tutorialStepDef.findUnique({
+            where: { gameId_stepKey: { gameId, stepKey } },
+            select: { id: true },
           }),
         ])
 
-        try {
-          const pair = await db.tutorialAnimalPair.findUnique({
+        if (!player) throw new Error("Player not found")
+        // Optional admin milestones may lag behind the Driver.js tutorial. Its
+        // persisted index remains authoritative; unknown milestone keys still fail.
+        if (!stepDef && stepKey !== "tutorial_complete") {
+          if (TUTORIAL_STEPS.some(step => step.checkpoint === stepKey)) return
+          throw new Error("Step not found")
+        }
+
+        if (stepKey === "tutorial_complete") {
+          // Was its own batch transaction; now part of the one holding the
+          // lock. `tx.$transaction` would have typechecked and thrown at
+          // runtime, which is why the coverage test looks for it.
+          if (stepDef) {
+            await tx.tutorialProgress.upsert({
+              where: { playerAccountId_stepDefId: { playerAccountId: player.id, stepDefId: stepDef.id } },
+              create: { playerAccountId: player.id, stepDefId: stepDef.id, completedAt: new Date() },
+              update: { completedAt: new Date() },
+            })
+          }
+          await tx.playerSeniority.update({
+            where: { playerAccountId: player.id },
+            data: { tutorialCompleted: true },
+          })
+
+          const pair = await tx.tutorialAnimalPair.findUnique({
             where: { playerAccountId: player.id },
             select: { ancestorOneId: true, ancestorTwoId: true },
           })
 
           if (pair) {
-            // Completion itself is already committed. Remove simulation-only
-            // ancestors as best-effort cleanup without trapping the player in
-            // a completed tutorial if cleanup encounters stale data.
-            // deleteAnimalsWithChildren clears the stud listing (and every other
-            // breeding record from the tutorial pairing) itself before deleting
-            // the animals — every player breeds with this same stallion, so this
-            // path runs for every completed tutorial, not just an edge case.
-            await db.tutorialAnimalPair.delete({ where: { playerAccountId: player.id } })
-            await deleteAnimalsWithChildren([pair.ancestorOneId, pair.ancestorTwoId])
+            // Pairing and ancestors go together, on this transaction.
+            //
+            // Two earlier shapes of this were both wrong. Calling the helper
+            // here while it opened its own connections blocked on this
+            // transaction's uncommitted delete of the pairing that names those
+            // animals - a deadlock with itself, resolved only by timeout. Moving
+            // it after the commit fixed that and introduced another: the lock is
+            // released at commit, so a nightly could start while the deletion
+            // ran, and a failure left the ids gone with the pairing.
+            //
+            // On the same transaction there is no second connection to block
+            // on, the lock is still held, and a failure rolls the whole
+            // completion back rather than stranding half of it.
+            await tx.tutorialAnimalPair.delete({ where: { playerAccountId: player.id } })
+            await deleteAnimalsWithChildrenTx(tx, [pair.ancestorOneId, pair.ancestorTwoId])
           }
-        } catch (error) {
-          console.error("Tutorial ancestor cleanup failed", error)
+          return
         }
-        return
-      }
 
-      await db.tutorialProgress.upsert({
-        where: { playerAccountId_stepDefId: { playerAccountId: player.id, stepDefId: stepDef!.id } },
-        create: { playerAccountId: player.id, stepDefId: stepDef!.id, completedAt: new Date() },
-        update: { completedAt: new Date() },
-      })
+        await tx.tutorialProgress.upsert({
+          where: { playerAccountId_stepDefId: { playerAccountId: player.id, stepDefId: stepDef!.id } },
+          create: { playerAccountId: player.id, stepDefId: stepDef!.id, completedAt: new Date() },
+          update: { completedAt: new Date() },
+        })
+      }, COMPLETE_STEP_TX)
+
+      return result
+    
     }),
 
   pairIds: protectedProcedure
@@ -599,53 +655,74 @@ export const tutorialRouter = router({
     .mutation(async ({ ctx, input }) => {
       const { gameId, amount } = input
 
-      const player = await db.playerAccount.findUnique({
-        where: { userId_gameId: { userId: ctx.userId, gameId } },
-        select: { id: true, seniority: { select: { tutorialDriverStep: true } } },
-      })
-      if (!player) throw new Error("Player not found")
+      // The grant id is needed by the catch below, which runs after the
+      // transaction has rolled back.
+      let attemptedGrantId: string | null = null
 
-      const baseCurrency = await db.currencyDef.findFirst({
-        where: { gameId, currencyType: "BASE" },
-        select: { id: true },
-      })
-      if (!baseCurrency) throw new Error("No base currency configured")
+      try {
+        await db.$transaction(async (tx) => {
+          await enterGameplay(tx, gameId)
 
-      const driverStep = player.seniority?.tutorialDriverStep
-      if (driverStep == null || TUTORIAL_STEPS[driverStep]?.gold !== amount) {
-        throw new TRPCError({ code: "FORBIDDEN" })
-      }
-      // Identify the grant by its step, since care and competition both give 100G.
-      // Count old transactions too so migrated accounts cannot claim them again.
-      const grantId = `tutorial-grant:${player.id}:${driverStep}`
-      const [sameGrant, previousGrants] = await Promise.all([
-        db.transaction.findUnique({ where: { id: grantId }, select: { id: true } }),
-        db.transaction.count({
-        where: { toPlayerAccountId: player.id, txnType: "TESTING_GRANT", amount },
-        }),
-      ])
-      const grantOrdinal = TUTORIAL_STEPS.slice(0, driverStep + 1).filter(step => step.gold === amount).length
-      if (sameGrant || previousGrants >= grantOrdinal) return
+          const player = await tx.playerAccount.findUnique({
+            where: { userId_gameId: { userId: ctx.userId, gameId } },
+            select: { id: true, seniority: { select: { tutorialDriverStep: true } } },
+          })
+          if (!player) throw new Error("Player not found")
 
-      try { await db.$transaction([
-        db.playerBalance.upsert({
-          where: { playerAccountId_currencyDefId: { playerAccountId: player.id, currencyDefId: baseCurrency.id } },
-          create: { playerAccountId: player.id, currencyDefId: baseCurrency.id, balance: amount },
-          update: { balance: { increment: amount } },
-        }),
-        db.transaction.create({
-          data: {
-            id: grantId,
-            gameId,
-            toPlayerAccountId: player.id,
-            currencyDefId: baseCurrency.id,
-            amount,
-            txnType: "TESTING_GRANT",
-          },
-        }),
-      ]) } catch (error) {
+          const baseCurrency = await tx.currencyDef.findFirst({
+            where: { gameId, currencyType: "BASE" },
+            select: { id: true },
+          })
+          if (!baseCurrency) throw new Error("No base currency configured")
+
+          const driverStep = player.seniority?.tutorialDriverStep
+          if (driverStep == null || TUTORIAL_STEPS[driverStep]?.gold !== amount) {
+            throw new TRPCError({ code: "FORBIDDEN" })
+          }
+          // Identify the grant by its step, since care and competition both give 100G.
+          // Count old transactions too so migrated accounts cannot claim them again.
+          const grantId = `tutorial-grant:${player.id}:${driverStep}`
+          attemptedGrantId = grantId
+          const [sameGrant, previousGrants] = await Promise.all([
+            tx.transaction.findUnique({ where: { id: grantId }, select: { id: true } }),
+            tx.transaction.count({
+            where: { toPlayerAccountId: player.id, txnType: "TESTING_GRANT", amount },
+            }),
+          ])
+          const grantOrdinal = TUTORIAL_STEPS.slice(0, driverStep + 1).filter(step => step.gold === amount).length
+          if (sameGrant || previousGrants >= grantOrdinal) return
+
+          // Part of the transaction holding the lock. The "another tab got here
+          // first" check cannot live in here with it: a unique-key collision
+          // aborts the transaction, and an aborted one cannot answer another
+          // query. It runs after the rollback instead, below.
+          await tx.playerBalance.upsert({
+            where: { playerAccountId_currencyDefId: { playerAccountId: player.id, currencyDefId: baseCurrency.id } },
+            create: { playerAccountId: player.id, currencyDefId: baseCurrency.id, balance: amount },
+            update: { balance: { increment: amount } },
+          })
+          await tx.transaction.create({
+            data: {
+              id: grantId,
+              gameId,
+              toPlayerAccountId: player.id,
+              currencyDefId: baseCurrency.id,
+              amount,
+              txnType: "TESTING_GRANT",
+            },
+          })
+        })
+      } catch (error) {
         // Another tab may have claimed the same step while this request waited.
-        if (!await db.transaction.findUnique({ where: { id: grantId }, select: { id: true } })) throw error
+        if (
+          !attemptedGrantId ||
+          !(await db.transaction.findUnique({
+            where: { id: attemptedGrantId },
+            select: { id: true },
+          }))
+        ) {
+          throw error
+        }
       }
     }),
 
@@ -902,40 +979,43 @@ export const tutorialRouter = router({
     .input(z.object({ gameId: z.string() }))
   .mutation(async ({ ctx, input }) => {
     const { gameId } = input
-    const player = await db.playerAccount.findUnique({
-      where: { userId_gameId: { userId: ctx.userId, gameId } },
-      select: { id: true },
-    })
-    if (!player) throw new Error("Player not found")
+      return db.$transaction(async (tx) => {
+        await enterGameplay(tx, gameId)
 
-    const [pair, config] = await Promise.all([
-      db.tutorialAnimalPair.findUnique({
-        where: { playerAccountId: player.id },
-        select: { ancestorOneId: true },
-      }),
-      db.gameConfig.findUnique({
-        where: { gameId },
-        select: { tutorialFemalePrice: true },
-      }),
-    ])
-    if (!pair) throw new Error("Tutorial not active")
-
-    const price = config?.tutorialFemalePrice ?? 0
-
-    if (price > 0) {
-      const baseCurrency = await db.currencyDef.findFirst({
-        where: { gameId, currencyType: "BASE" },
+        const player = await tx.playerAccount.findUnique({
+        where: { userId_gameId: { userId: ctx.userId, gameId } },
         select: { id: true },
       })
-      if (!baseCurrency) throw new Error("No base currency configured")
+      if (!player) throw new Error("Player not found")
 
-      await db.$transaction([
-        db.animal.update({ where: { id: pair.ancestorOneId }, data: { playerAccountId: player.id } }),
-        db.playerBalance.update({
+      const [pair, config] = await Promise.all([
+        tx.tutorialAnimalPair.findUnique({
+          where: { playerAccountId: player.id },
+          select: { ancestorOneId: true },
+        }),
+        tx.gameConfig.findUnique({
+          where: { gameId },
+          select: { tutorialFemalePrice: true },
+        }),
+      ])
+      if (!pair) throw new Error("Tutorial not active")
+
+      const price = config?.tutorialFemalePrice ?? 0
+
+      if (price > 0) {
+        const baseCurrency = await tx.currencyDef.findFirst({
+          where: { gameId, currencyType: "BASE" },
+          select: { id: true },
+        })
+        if (!baseCurrency) throw new Error("No base currency configured")
+
+        // Part of the transaction holding the lock, rather than one of its own.
+        await tx.animal.update({ where: { id: pair.ancestorOneId }, data: { playerAccountId: player.id } })
+        await tx.playerBalance.update({
           where: { playerAccountId_currencyDefId: { playerAccountId: player.id, currencyDefId: baseCurrency.id } },
           data: { balance: { decrement: price } },
-        }),
-        db.transaction.create({
+        })
+        await tx.transaction.create({
           data: {
             gameId,
             fromPlayerAccountId: player.id,
@@ -943,14 +1023,15 @@ export const tutorialRouter = router({
             amount: price,
             txnType: "STORE_PURCHASE",
           },
-        }),
-      ])
-    } else {
-      await db.animal.update({
-        where: { id: pair.ancestorOneId },
-        data: { playerAccountId: player.id },
+        })
+      } else {
+        await tx.animal.update({
+          where: { id: pair.ancestorOneId },
+          data: { playerAccountId: player.id },
+        })
+      }
       })
-    }
+    
   }),
 
   // TODO: remove before launch
@@ -1028,37 +1109,44 @@ export const tutorialRouter = router({
     .input(z.object({ gameId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const { gameId } = input
+      return db.$transaction(async (tx) => {
+        await enterGameplay(tx, gameId)
 
-      const player = await db.playerAccount.findUnique({
-        where: { userId_gameId: { userId: ctx.userId, gameId } },
-        select: { id: true },
-      })
-      if (!player) throw new Error("Player not found")
+        const player = await tx.playerAccount.findUnique({
+          where: { userId_gameId: { userId: ctx.userId, gameId } },
+          select: { id: true },
+        })
+        if (!player) throw new Error("Player not found")
 
-      const premiumCurrency = await db.currencyDef.findFirst({
-        where: { gameId, currencyType: "PREMIUM" },
-        select: { id: true },
-      })
-      if (!premiumCurrency) throw new Error("No premium currency configured")
+        const premiumCurrency = await tx.currencyDef.findFirst({
+          where: { gameId, currencyType: "PREMIUM" },
+          select: { id: true },
+        })
+        if (!premiumCurrency) throw new Error("No premium currency configured")
 
-      const AMOUNT = 3
+        const AMOUNT = 3
 
-      const existing = await db.playerBalance.findUnique({
-        where: { playerAccountId_currencyDefId: { playerAccountId: player.id, currencyDefId: premiumCurrency.id } },
-        select: { id: true, balance: true },
-      })
-      if (existing && existing.balance > 0) return
+        const existing = await tx.playerBalance.findUnique({
+          where: { playerAccountId_currencyDefId: { playerAccountId: player.id, currencyDefId: premiumCurrency.id } },
+          select: { id: true, balance: true },
+        })
+        if (existing && existing.balance > 0) return
 
-      await db.$transaction([
-        existing
-          ? db.playerBalance.update({
-              where: { playerAccountId_currencyDefId: { playerAccountId: player.id, currencyDefId: premiumCurrency.id } },
-              data: { balance: AMOUNT },
-            })
-          : db.playerBalance.create({
-              data: { playerAccountId: player.id, currencyDefId: premiumCurrency.id, balance: AMOUNT },
-            }),
-        db.transaction.create({
+        // Was a batch transaction of its own; now part of the one holding the
+        // lock, so the balance it read and the balance it writes are the same
+        // one no nightly can move in between.
+        if (existing) {
+          await tx.playerBalance.update({
+            where: { playerAccountId_currencyDefId: { playerAccountId: player.id, currencyDefId: premiumCurrency.id } },
+            data: { balance: AMOUNT },
+          })
+        } else {
+          await tx.playerBalance.create({
+            data: { playerAccountId: player.id, currencyDefId: premiumCurrency.id, balance: AMOUNT },
+          })
+        }
+
+        await tx.transaction.create({
           data: {
             gameId,
             toPlayerAccountId: player.id,
@@ -1066,8 +1154,9 @@ export const tutorialRouter = router({
             amount: AMOUNT,
             txnType: "TESTING_GRANT",
           },
-        }),
-      ])
+        })
+      })
+    
     }),
 
   // Generates a predictor result for the tutorial using the player's starter breed stats.
@@ -1200,182 +1289,187 @@ export const tutorialRouter = router({
     .input(z.object({ gameId: z.string(), venueId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const { gameId, venueId } = input
+      return db.$transaction(async (tx) => {
+        await enterGameplay(tx, gameId)
 
-      const player = await db.playerAccount.findUnique({
-        where: { userId_gameId: { userId: ctx.userId, gameId } },
-        select: { id: true, seniority: { select: { tutorialDriverStep: true } } },
-      })
-      if (!player) throw new Error("Player not found")
-
-      const isUnguidedPhase = player.seniority?.tutorialDriverStep === 96
-
-      if (!isUnguidedPhase) {
-        const priorCompetition = await db.competition.findFirst({
-          where: { tutorialPlayerAccountId: player.id },
-          select: { id: true },
+        const player = await tx.playerAccount.findUnique({
+          where: { userId_gameId: { userId: ctx.userId, gameId } },
+          select: { id: true, seniority: { select: { tutorialDriverStep: true } } },
         })
-        if (priorCompetition) return { competitionId: priorCompetition.id, alreadyEntered: true }
-      }
+        if (!player) throw new Error("Player not found")
 
-      const pair = await db.tutorialAnimalPair.findUnique({
-        where: { playerAccountId: player.id },
-        select: { ancestorOneId: true },
-      })
-      if (!pair) throw new Error("Tutorial not active")
+        const isUnguidedPhase = player.seniority?.tutorialDriverStep === 96
 
-      const mare = await db.animal.findUniqueOrThrow({
-        where: { id: pair.ancestorOneId },
-        select: {
-          id: true,
-          ageInCycles: true,
-          secondaryDisciplineDefId: true,
-          lifeStage: { select: { energyCostMultiplier: true } },
-        },
-      })
-      if (!mare.secondaryDisciplineDefId) throw new Error("Mare has no secondary discipline")
+        if (!isUnguidedPhase) {
+          const priorCompetition = await tx.competition.findFirst({
+            where: { tutorialPlayerAccountId: player.id },
+            select: { id: true },
+          })
+          if (priorCompetition) return { competitionId: priorCompetition.id, alreadyEntered: true }
+        }
 
-      const [competitionStep, tierTargetStep] = await Promise.all([
-        db.tutorialStepDef.findFirst({
-          where: { gameId, competitionNpcCount: { not: null } },
-          orderBy: { stepIndex: "desc" },
-          select: { competitionNpcCount: true },
-        }),
-        db.tutorialStepDef.findFirst({
-          where: { gameId, completionCondition: "COMPETITION_TIER" },
-          orderBy: { stepIndex: "desc" },
-          select: { completionTarget: true },
-        }),
-      ])
-      if (isUnguidedPhase && tierTargetStep?.completionTarget == null) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Set a competition tier completion target for the tutorial before continuing." })
-      }
-
-      const venue = await db.venue.findFirst({
-        where: { id: venueId, gameId },
-        select: { id: true, disciplines: { select: { disciplineDefId: true } } },
-      })
-      if (!venue) throw new Error("Venue not found in this game")
-      if (!venue.disciplines.some(d => d.disciplineDefId === mare.secondaryDisciplineDefId)) {
-        throw new Error("This venue does not host the mare's discipline")
-      }
-
-      const discipline = await db.disciplineDef.findUniqueOrThrow({
-        where: { id: mare.secondaryDisciplineDefId },
-        select: {
-          id: true,
-          name: true,
-          statWeights: { select: { statDefId: true, weight: true, statDef: { select: { name: true } } } },
-        },
-      })
-
-      let animalTier = await db.animalCompetitionTier.findUnique({
-        where: { animalId_disciplineDefId: { animalId: mare.id, disciplineDefId: discipline.id } },
-        include: {
-          tierDef: { select: { id: true, tierIndex: true, advancementThreshold: true, energyCost: true, entryFee: true, name: true } },
-        },
-      })
-      if (!animalTier) {
-        const lowestTier = await db.competitionTierDef.findFirstOrThrow({
-          where: { disciplineDefId: discipline.id },
-          orderBy: { tierIndex: "asc" },
-          select: { id: true, tierIndex: true, advancementThreshold: true, energyCost: true, entryFee: true, name: true },
+        const pair = await tx.tutorialAnimalPair.findUnique({
+          where: { playerAccountId: player.id },
+          select: { ancestorOneId: true },
         })
-        animalTier = await db.animalCompetitionTier.create({
-          data: { animalId: mare.id, disciplineDefId: discipline.id, tierDefId: lowestTier.id },
+        if (!pair) throw new Error("Tutorial not active")
+
+        const mare = await tx.animal.findUniqueOrThrow({
+          where: { id: pair.ancestorOneId },
+          select: {
+            id: true,
+            ageInCycles: true,
+            secondaryDisciplineDefId: true,
+            lifeStage: { select: { energyCostMultiplier: true } },
+          },
+        })
+        if (!mare.secondaryDisciplineDefId) throw new Error("Mare has no secondary discipline")
+
+        const [competitionStep, tierTargetStep] = await Promise.all([
+          tx.tutorialStepDef.findFirst({
+            where: { gameId, competitionNpcCount: { not: null } },
+            orderBy: { stepIndex: "desc" },
+            select: { competitionNpcCount: true },
+          }),
+          tx.tutorialStepDef.findFirst({
+            where: { gameId, completionCondition: "COMPETITION_TIER" },
+            orderBy: { stepIndex: "desc" },
+            select: { completionTarget: true },
+          }),
+        ])
+        if (isUnguidedPhase && tierTargetStep?.completionTarget == null) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Set a competition tier completion target for the tutorial before continuing." })
+        }
+
+        const venue = await tx.venue.findFirst({
+          where: { id: venueId, gameId },
+          select: { id: true, disciplines: { select: { disciplineDefId: true } } },
+        })
+        if (!venue) throw new Error("Venue not found in this game")
+        if (!venue.disciplines.some(d => d.disciplineDefId === mare.secondaryDisciplineDefId)) {
+          throw new Error("This venue does not host the mare's discipline")
+        }
+
+        const discipline = await tx.disciplineDef.findUniqueOrThrow({
+          where: { id: mare.secondaryDisciplineDefId },
+          select: {
+            id: true,
+            name: true,
+            statWeights: { select: { statDefId: true, weight: true, statDef: { select: { name: true } } } },
+          },
+        })
+
+        let animalTier = await tx.animalCompetitionTier.findUnique({
+          where: { animalId_disciplineDefId: { animalId: mare.id, disciplineDefId: discipline.id } },
           include: {
             tierDef: { select: { id: true, tierIndex: true, advancementThreshold: true, energyCost: true, entryFee: true, name: true } },
           },
         })
-      }
-
-      const energyCost = animalTier.tierDef.energyCost * mare.lifeStage.energyCostMultiplier
-      const energy = await db.animalEnergy.findUniqueOrThrow({ where: { animalId: mare.id } })
-
-      // Daily care is the only way to regain energy within a cycle, so it is the
-      // remedy for both energy guards below.
-      const [careTotal, careDone] = isUnguidedPhase
-        ? await Promise.all([
-            db.careActionDef.count({ where: { gameId } }),
-            db.careLog.count({ where: { animalId: mare.id, cycleNumber: mare.ageInCycles } }),
-          ])
-        : [0, 0]
-      const careOutstanding = careTotal > 0 && careDone < careTotal
-
-      if (energy.currentEnergy < energyCost) {
-        if (careOutstanding) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "Complete her daily care before entering another competition." })
+        if (!animalTier) {
+          const lowestTier = await tx.competitionTierDef.findFirstOrThrow({
+            where: { disciplineDefId: discipline.id },
+            orderBy: { tierIndex: "asc" },
+            select: { id: true, tierIndex: true, advancementThreshold: true, energyCost: true, entryFee: true, name: true },
+          })
+          animalTier = await tx.animalCompetitionTier.create({
+            data: { animalId: mare.id, disciplineDefId: discipline.id, tierDefId: lowestTier.id },
+            include: {
+              tierDef: { select: { id: true, tierIndex: true, advancementThreshold: true, energyCost: true, entryFee: true, name: true } },
+            },
+          })
         }
-        throw new Error("Not enough energy to compete")
-      }
 
-      // Spending energy carries no penalty by itself — the cost lands when she
-      // ages below the overwork threshold. So this only blocks once care has
-      // been used up and the player has no remaining way to raise her energy.
-      if (isUnguidedPhase && !careOutstanding) {
-        const gameConfig = await db.gameConfig.findFirstOrThrow({ where: { gameId }, select: { overworkInjuryThreshold: true } })
-        if (energy.currentEnergy - energyCost < gameConfig.overworkInjuryThreshold) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "Your mare needs rest before competing again. Advance her age to restore energy." })
+        const energyCost = animalTier.tierDef.energyCost * mare.lifeStage.energyCostMultiplier
+        const energy = await tx.animalEnergy.findUniqueOrThrow({ where: { animalId: mare.id } })
+
+        // Daily care is the only way to regain energy within a cycle, so it is the
+        // remedy for both energy guards below.
+        const [careTotal, careDone] = isUnguidedPhase
+          ? await Promise.all([
+              tx.careActionDef.count({ where: { gameId } }),
+              tx.careLog.count({ where: { animalId: mare.id, cycleNumber: mare.ageInCycles } }),
+            ])
+          : [0, 0]
+        const careOutstanding = careTotal > 0 && careDone < careTotal
+
+        if (energy.currentEnergy < energyCost) {
+          if (careOutstanding) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "Complete her daily care before entering another competition." })
+          }
+          throw new Error("Not enough energy to compete")
         }
-      }
 
-      const entryFee = animalTier.tierDef.entryFee
-      let baseCurrencyId: string | null = null
-      if (entryFee > 0) {
-        const baseCurrency = await db.currencyDef.findFirst({ where: { gameId, currencyType: "BASE" }, select: { id: true } })
-        if (!baseCurrency) throw new Error("No base currency configured")
-        baseCurrencyId = baseCurrency.id
-        const balance = await db.playerBalance.findUnique({
-          where: { playerAccountId_currencyDefId: { playerAccountId: player.id, currencyDefId: baseCurrency.id } },
-          select: { balance: true },
+        // Spending energy carries no penalty by itself — the cost lands when she
+        // ages below the overwork threshold. So this only blocks once care has
+        // been used up and the player has no remaining way to raise her energy.
+        if (isUnguidedPhase && !careOutstanding) {
+          const gameConfig = await tx.gameConfig.findFirstOrThrow({ where: { gameId }, select: { overworkInjuryThreshold: true } })
+          if (energy.currentEnergy - energyCost < gameConfig.overworkInjuryThreshold) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "Your mare needs rest before competing again. Advance her age to restore energy." })
+          }
+        }
+
+        const entryFee = animalTier.tierDef.entryFee
+        let baseCurrencyId: string | null = null
+        if (entryFee > 0) {
+          const baseCurrency = await tx.currencyDef.findFirst({ where: { gameId, currencyType: "BASE" }, select: { id: true } })
+          if (!baseCurrency) throw new Error("No base currency configured")
+          baseCurrencyId = baseCurrency.id
+          const balance = await tx.playerBalance.findUnique({
+            where: { playerAccountId_currencyDefId: { playerAccountId: player.id, currencyDefId: baseCurrency.id } },
+            select: { balance: true },
+          })
+          if (!balance || balance.balance < entryFee) throw new Error("Insufficient funds")
+        }
+
+        const statIds = discipline.statWeights.map(w => w.statDefId)
+        const mareStats = await tx.animalStat.findMany({
+          where: { animalId: mare.id, statDefId: { in: statIds } },
+          select: { statDefId: true, trainedValue: true },
         })
-        if (!balance || balance.balance < entryFee) throw new Error("Insufficient funds")
-      }
+        const mareStatMap = new Map(mareStats.map(s => [s.statDefId, s.trainedValue]))
 
-      const statIds = discipline.statWeights.map(w => w.statDefId)
-      const mareStats = await db.animalStat.findMany({
-        where: { animalId: mare.id, statDefId: { in: statIds } },
-        select: { statDefId: true, trainedValue: true },
-      })
-      const mareStatMap = new Map(mareStats.map(s => [s.statDefId, s.trainedValue]))
-
-      // Self-normalised: mare is the world max for tutorial purposes.
-      const mareScore = Math.max(0,
-        discipline.statWeights.reduce((sum, w) => {
-          const val = mareStatMap.get(w.statDefId) ?? 0
-          return sum + w.weight * (val / Math.max(val, 1))
-        }, 0) * 100,
-      )
-
-      const npcCount = competitionStep?.competitionNpcCount ?? 4
-      const npcEntries = Array.from({ length: npcCount }, (_, i) => {
-        const npcStats = discipline.statWeights.map(w => {
-          const mareVal = Math.max(mareStatMap.get(w.statDefId) ?? 0, 1)
-          const val = Math.random() * mareVal * 0.5
-          return { statDefId: w.statDefId, statName: w.statDef.name, trainedValue: Math.round(val * 100) / 100 }
-        })
-        const npcScore = Math.max(0,
+        // Self-normalised: mare is the world max for tutorial purposes.
+        const mareScore = Math.max(0,
           discipline.statWeights.reduce((sum, w) => {
-            const stat = npcStats.find(s => s.statDefId === w.statDefId)!
-            const mareVal = Math.max(mareStatMap.get(w.statDefId) ?? 0, 1)
-            return sum + w.weight * (stat.trainedValue / mareVal)
+            const val = mareStatMap.get(w.statDefId) ?? 0
+            return sum + w.weight * (val / Math.max(val, 1))
           }, 0) * 100,
         )
-        return { name: `Competitor ${i + 1}`, stats: npcStats, score: Math.round(npcScore * 100) / 100, placement: i + 2 }
-      })
 
-      // Monday-based UTC week, matching the engine's own bucketing in competition/run.ts.
-      const weekStartOf = (date: Date) => {
-        const day = date.getUTCDay()
-        const start = new Date(date)
-        start.setUTCDate(date.getUTCDate() - (day === 0 ? 6 : day - 1))
-        start.setUTCHours(0, 0, 0, 0)
-        return start
-      }
+        const npcCount = competitionStep?.competitionNpcCount ?? 4
+        const npcEntries = Array.from({ length: npcCount }, (_, i) => {
+          const npcStats = discipline.statWeights.map(w => {
+            const mareVal = Math.max(mareStatMap.get(w.statDefId) ?? 0, 1)
+            const val = Math.random() * mareVal * 0.5
+            return { statDefId: w.statDefId, statName: w.statDef.name, trainedValue: Math.round(val * 100) / 100 }
+          })
+          const npcScore = Math.max(0,
+            discipline.statWeights.reduce((sum, w) => {
+              const stat = npcStats.find(s => s.statDefId === w.statDefId)!
+              const mareVal = Math.max(mareStatMap.get(w.statDefId) ?? 0, 1)
+              return sum + w.weight * (stat.trainedValue / mareVal)
+            }, 0) * 100,
+          )
+          return { name: `Competitor ${i + 1}`, stats: npcStats, score: Math.round(npcScore * 100) / 100, placement: i + 2 }
+        })
 
-      const now = new Date()
-      const weekStart = weekStartOf(now)
+        // Monday-based UTC week, matching the engine's own bucketing in competition/run.ts.
+        const weekStartOf = (date: Date) => {
+          const day = date.getUTCDay()
+          const start = new Date(date)
+          start.setUTCDate(date.getUTCDate() - (day === 0 ? 6 : day - 1))
+          start.setUTCHours(0, 0, 0, 0)
+          return start
+        }
 
-      return db.$transaction(async (tx) => {
+        const now = new Date()
+        const weekStart = weekStartOf(now)
+
+        // Flattened into the transaction above rather than opening its own.
+        // A second `db.$transaction` here would run on another connection,
+        // outside the lock this mutation just took and outside its rollback -
+        // the inner `tx` shadowing the outer one made that easy to miss.
         const competition = await tx.competition.create({
           data: {
             gameId,
@@ -1511,7 +1605,8 @@ export const tutorialRouter = router({
           disciplineName: discipline.name,
           prizesAwarded,
         }
-      })
+      }, COMPETE_TX)
+    
     }),
 
   returnMare: protectedProcedure
@@ -1519,37 +1614,44 @@ export const tutorialRouter = router({
     .mutation(async ({ ctx, input }) => {
       const { gameId } = input
 
-      const player = await db.playerAccount.findUnique({
-        where: { userId_gameId: { userId: ctx.userId, gameId } },
-        select: { id: true },
-      })
-      if (!player) throw new Error("Player not found")
-
-      const [pair, baseCurrency] = await Promise.all([
-        db.tutorialAnimalPair.findUnique({
-          where: { playerAccountId: player.id },
-          select: { ancestorOneId: true, ancestorOne: { select: { breederId: true, playerAccountId: true } } },
-        }),
-        db.currencyDef.findFirst({ where: { gameId, currencyType: "BASE" }, select: { id: true } }),
-      ])
-      if (!pair) throw new TRPCError({ code: "FORBIDDEN", message: "Tutorial not active" })
-      if (!baseCurrency) throw new Error("No base currency configured")
-      if (!pair.ancestorOne.breederId) throw new Error("The tutorial mare has no return owner")
-      if (pair.ancestorOne.playerAccountId !== player.id) throw new TRPCError({ code: "CONFLICT", message: "The tutorial mare has already been returned" })
-
-      const RETURN_AMOUNT = 300
-      const grantId = `tutorial-return-mare:${player.id}`
-      const existing = await db.transaction.findUnique({ where: { id: grantId }, select: { id: true } })
-      if (existing) return
+      // Needed by the catch below, which runs after the transaction has gone.
+      let attemptedGrantId: string | null = null
 
       try {
-        await db.$transaction([
-          db.playerBalance.upsert({
+        await db.$transaction(async (tx) => {
+        await enterGameplay(tx, gameId)
+
+        const player = await tx.playerAccount.findUnique({
+          where: { userId_gameId: { userId: ctx.userId, gameId } },
+          select: { id: true },
+        })
+        if (!player) throw new Error("Player not found")
+
+        const [pair, baseCurrency] = await Promise.all([
+          tx.tutorialAnimalPair.findUnique({
+            where: { playerAccountId: player.id },
+            select: { ancestorOneId: true, ancestorOne: { select: { breederId: true, playerAccountId: true } } },
+          }),
+          tx.currencyDef.findFirst({ where: { gameId, currencyType: "BASE" }, select: { id: true } }),
+        ])
+        if (!pair) throw new TRPCError({ code: "FORBIDDEN", message: "Tutorial not active" })
+        if (!baseCurrency) throw new Error("No base currency configured")
+        if (!pair.ancestorOne.breederId) throw new Error("The tutorial mare has no return owner")
+        if (pair.ancestorOne.playerAccountId !== player.id) throw new TRPCError({ code: "CONFLICT", message: "The tutorial mare has already been returned" })
+
+        const RETURN_AMOUNT = 300
+        const grantId = `tutorial-return-mare:${player.id}`
+        attemptedGrantId = grantId
+        const existing = await tx.transaction.findUnique({ where: { id: grantId }, select: { id: true } })
+        if (existing) return
+
+          // Part of the transaction holding the lock, rather than one of its own.
+          await tx.playerBalance.upsert({
             where: { playerAccountId_currencyDefId: { playerAccountId: player.id, currencyDefId: baseCurrency.id } },
             create: { playerAccountId: player.id, currencyDefId: baseCurrency.id, balance: RETURN_AMOUNT },
             update: { balance: { increment: RETURN_AMOUNT } },
-          }),
-          db.transaction.create({
+          })
+          await tx.transaction.create({
             data: {
               id: grantId,
               gameId,
@@ -1558,14 +1660,27 @@ export const tutorialRouter = router({
               amount: RETURN_AMOUNT,
               txnType: "TESTING_GRANT",
             },
-          }),
-          db.animal.update({
+          })
+          await tx.animal.update({
             where: { id: pair.ancestorOneId },
             data: { playerAccountId: pair.ancestorOne.breederId },
-          }),
-        ])
+          })
+        })
       } catch (error) {
-        if (!await db.transaction.findUnique({ where: { id: grantId }, select: { id: true } })) throw error
+        // Two requests returning the mare at once collide on the grant's unique
+        // id. The loser's transaction is already aborted by the time we get
+        // here, so this check cannot go through `tx` - Postgres refuses every
+        // further statement on an aborted transaction, and the recovery query
+        // would fail along with the thing it was recovering from.
+        if (
+          !attemptedGrantId ||
+          !(await db.transaction.findUnique({
+            where: { id: attemptedGrantId },
+            select: { id: true },
+          }))
+        ) {
+          throw error
+        }
       }
     }),
 
@@ -1658,102 +1773,109 @@ export const tutorialRouter = router({
     .input(z.object({ gameId: z.string(), venueId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const { gameId, venueId } = input
+      return db.$transaction(async (tx) => {
+        await enterGameplay(tx, gameId)
 
-      const player = await db.playerAccount.findUnique({
-        where: { userId_gameId: { userId: ctx.userId, gameId } },
-        select: { id: true },
-      })
-      if (!player) throw new Error("Player not found")
+        const player = await tx.playerAccount.findUnique({
+          where: { userId_gameId: { userId: ctx.userId, gameId } },
+          select: { id: true },
+        })
+        if (!player) throw new Error("Player not found")
 
-      const pair = await db.tutorialAnimalPair.findUnique({
-        where: { playerAccountId: player.id },
-        select: {
-          embryo: {
-            select: {
-              id: true,
-              playerAccountId: true,
-              status: true,
-              ageInCycles: true,
-              disciplineDefId: true,
-              lifeStage: { select: { stageIndex: true } },
+        const pair = await tx.tutorialAnimalPair.findUnique({
+          where: { playerAccountId: player.id },
+          select: {
+            embryo: {
+              select: {
+                id: true,
+                playerAccountId: true,
+                status: true,
+                ageInCycles: true,
+                disciplineDefId: true,
+                lifeStage: { select: { stageIndex: true } },
+              },
             },
           },
-        },
-      })
-      const foal = pair?.embryo
-      if (!foal || foal.playerAccountId !== player.id || foal.status !== "ALIVE") throw new TRPCError({ code: "NOT_FOUND", message: "Foal not found" })
+        })
+        const foal = pair?.embryo
+        if (!foal || foal.playerAccountId !== player.id || foal.status !== "ALIVE") throw new TRPCError({ code: "NOT_FOUND", message: "Foal not found" })
 
-      const disciplineDefId = foal.disciplineDefId
-      if (!disciplineDefId) throw new TRPCError({ code: "BAD_REQUEST", message: "Foal has no discipline set" })
+        const disciplineDefId = foal.disciplineDefId
+        if (!disciplineDefId) throw new TRPCError({ code: "BAD_REQUEST", message: "Foal has no discipline set" })
 
-      const existing = await db.competition.findFirst({
-        where: { tutorialPlayerAccountId: player.id, disciplineDefId },
-        select: { id: true },
-      })
-      if (existing) return { competitionId: existing.id, alreadyEntered: true, disciplineName: "" }
+        const existing = await tx.competition.findFirst({
+          where: { tutorialPlayerAccountId: player.id, disciplineDefId },
+          select: { id: true },
+        })
+        if (existing) return { competitionId: existing.id, alreadyEntered: true, disciplineName: "" }
 
-      const [venue, discipline, animalTier, competitionStep] = await Promise.all([
-        db.venue.findFirst({
-          where: { id: venueId, gameId },
-          select: { id: true, disciplines: { select: { disciplineDefId: true } } },
-        }),
-        db.disciplineDef.findUnique({
-          where: { id: disciplineDefId },
-          select: { name: true, isConformation: true, minLifeStageIndex: true, maxLifeStageIndex: true },
-        }),
-        db.animalCompetitionTier.findUnique({
-          where: { animalId_disciplineDefId: { animalId: foal.id, disciplineDefId } },
-          include: { tierDef: { select: { id: true, name: true } } },
-        }),
-        db.tutorialStepDef.findFirst({
-          where: { gameId, competitionNpcCount: { not: null } },
-          orderBy: { stepIndex: "desc" },
-          select: { competitionNpcCount: true },
-        }),
-      ])
-      if (!venue) throw new TRPCError({ code: "NOT_FOUND", message: "Venue not found" })
-      if (!discipline) throw new TRPCError({ code: "NOT_FOUND", message: "Discipline not found" })
-      if (!discipline.isConformation || discipline.name !== "Weanling Halter") throw new TRPCError({ code: "BAD_REQUEST", message: "Choose Weanling Halter" })
-      if (!venue.disciplines.some(entry => entry.disciplineDefId === disciplineDefId)) throw new TRPCError({ code: "BAD_REQUEST", message: "This venue does not offer Weanling Halter" })
-      if ((discipline.minLifeStageIndex != null && foal.lifeStage.stageIndex < discipline.minLifeStageIndex) ||
-        (discipline.maxLifeStageIndex != null && foal.lifeStage.stageIndex > discipline.maxLifeStageIndex)) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "The foal is not in an eligible life stage" })
-      }
-      if (!animalTier) throw new TRPCError({ code: "NOT_FOUND", message: "No competition tier configured for this foal" })
+        const [venue, discipline, animalTier, competitionStep] = await Promise.all([
+          tx.venue.findFirst({
+            where: { id: venueId, gameId },
+            select: { id: true, disciplines: { select: { disciplineDefId: true } } },
+          }),
+          tx.disciplineDef.findUnique({
+            where: { id: disciplineDefId },
+            select: { name: true, isConformation: true, minLifeStageIndex: true, maxLifeStageIndex: true },
+          }),
+          tx.animalCompetitionTier.findUnique({
+            where: { animalId_disciplineDefId: { animalId: foal.id, disciplineDefId } },
+            include: { tierDef: { select: { id: true, name: true } } },
+          }),
+          tx.tutorialStepDef.findFirst({
+            where: { gameId, competitionNpcCount: { not: null } },
+            orderBy: { stepIndex: "desc" },
+            select: { competitionNpcCount: true },
+          }),
+        ])
+        if (!venue) throw new TRPCError({ code: "NOT_FOUND", message: "Venue not found" })
+        if (!discipline) throw new TRPCError({ code: "NOT_FOUND", message: "Discipline not found" })
+        if (!discipline.isConformation || discipline.name !== "Weanling Halter") throw new TRPCError({ code: "BAD_REQUEST", message: "Choose Weanling Halter" })
+        if (!venue.disciplines.some(entry => entry.disciplineDefId === disciplineDefId)) throw new TRPCError({ code: "BAD_REQUEST", message: "This venue does not offer Weanling Halter" })
+        if ((discipline.minLifeStageIndex != null && foal.lifeStage.stageIndex < discipline.minLifeStageIndex) ||
+          (discipline.maxLifeStageIndex != null && foal.lifeStage.stageIndex > discipline.maxLifeStageIndex)) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "The foal is not in an eligible life stage" })
+        }
+        if (!animalTier) throw new TRPCError({ code: "NOT_FOUND", message: "No competition tier configured for this foal" })
 
-      const npcCount = competitionStep?.competitionNpcCount ?? 4
-      const competition = await db.competition.create({
-        data: {
-          gameId,
-          venueId: venue.id,
-          disciplineDefId,
-          tierDefId: animalTier.tierDefId,
-          name: `${discipline.name} — ${animalTier.tierDef.name}`,
-          maxEntries: npcCount + 1,
-          maxWaitHours: 0,
-          status: "OPEN",
-          tutorialPlayerAccountId: player.id,
-          tutorialNpcData: [],
-          // Resolved by the lines below rather than by the sweep, which skips
-          // tutorial competitions entirely.
-          closesAt: new Date(),
-        },
-      })
-      try {
-        const { entry } = await enterCompetition(db, { competitionId: competition.id, animalId: foal.id, playerAccountId: player.id })
-        await runCompetition(db, { competitionId: competition.id })
-        const result = await db.competitionResult.findUniqueOrThrow({ where: { entryId: entry.id } })
+        const npcCount = competitionStep?.competitionNpcCount ?? 4
+        const competition = await tx.competition.create({
+          data: {
+            gameId,
+            venueId: venue.id,
+            disciplineDefId,
+            tierDefId: animalTier.tierDefId,
+            name: `${discipline.name} — ${animalTier.tierDef.name}`,
+            maxEntries: npcCount + 1,
+            maxWaitHours: 0,
+            status: "OPEN",
+            tutorialPlayerAccountId: player.id,
+            tutorialNpcData: [],
+            // Resolved by the lines below rather than by the sweep, which skips
+            // tutorial competitions entirely.
+            closesAt: new Date(),
+          },
+        })
+        // No try/catch any more. It existed to delete a half-made competition
+        // when anything after it failed, which is what compensating for the
+        // absence of a transaction looks like - inside one, the rollback undoes
+        // it, and undoes every other partial write with it.
+        const { entry } = await enterCompetitionTx(tx, {
+          competitionId: competition.id,
+          animalId: foal.id,
+          playerAccountId: player.id,
+        })
+        await runCompetitionTx(tx, { competitionId: competition.id })
+        const result = await tx.competitionResult.findUniqueOrThrow({ where: { entryId: entry.id } })
         const score = Math.round(result.score * 100) / 100
         const npcEntries = Array.from({ length: npcCount }, (_, i) => ({
           name: `Competitor ${i + 1}`,
           score: Math.round(Math.max(0, score * (0.55 + Math.random() * 0.35)) * 100) / 100,
           placement: i + 2,
         }))
-        await db.competition.update({ where: { id: competition.id }, data: { tutorialNpcData: npcEntries } })
+        await tx.competition.update({ where: { id: competition.id }, data: { tutorialNpcData: npcEntries } })
         return { competitionId: competition.id, placement: result.placement, score, npcEntries, disciplineName: discipline.name }
-      } catch (error) {
-        await db.competition.delete({ where: { id: competition.id } }).catch(() => undefined)
-        throw error
-      }
+      }, CONFORMATION_TX)
+    
     }),
 })

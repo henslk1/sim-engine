@@ -1,0 +1,17 @@
+-- Where the last retention pass stopped scanning activity markers.
+--
+-- A protected marker stays protected: it is kept because its animal is still on
+-- that cycle, and reading it does not change that. So a scan that both stops
+-- after a fixed amount of work and restarts from the beginning every night can
+-- never get past a block of current-cycle markers larger than one pass, and
+-- every consumed marker behind that block is unreachable for good. Raising the
+-- per-pass limit moves the cliff rather than removing it.
+--
+-- Saving the position lets consecutive nights sweep the whole table however
+-- much of it is protected. Null means "start from the beginning", which is also
+-- what a completed sweep resets it to, so clearing this by hand is safe.
+--
+-- Runtime state on a configuration row, which is not ideal, but this is the
+-- per-game row retention already reads for `workRetentionDays` and a dedicated
+-- table for one cursor is worse.
+ALTER TABLE "GameConfig" ADD COLUMN "markerPruneCursor" TEXT;

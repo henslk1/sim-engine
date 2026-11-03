@@ -1,4 +1,5 @@
 import { db } from "@sim-engine/db"
+import type { Prisma } from "@sim-engine/db"
 import { markAnimalActive } from "../animal/activity.js"
 
 type Client = typeof db
@@ -7,8 +8,16 @@ function labelForValue(value: number, ranges: { label: string; minValue: number;
   return ranges.find((r) => value >= r.minValue && value <= r.maxValue)?.label ?? null
 }
 
-export async function applyStageActivity(
-  client: Client,
+/**
+ * applyStageActivity, on a transaction the caller owns.
+ *
+ * Split out so a gameplay mutation can run it inside the transaction holding
+ * the game's maintenance lock. A helper that opens its own transaction escapes
+ * that lock however carefully the caller was written: its reads and writes land
+ * on another connection, outside both the lock and the caller's rollback.
+ */
+export async function applyStageActivityTx(
+  tx: Prisma.TransactionClient,
   input: {
     animalId: string
     stageActivityDefId: string
@@ -16,7 +25,6 @@ export async function applyStageActivity(
     cycleNumber: number
   }
 ) {
-  return client.$transaction(async (tx) => {
     const { animalId, stageActivityDefId, performedByPlayerId, cycleNumber } = input
 
     const activity = await tx.stageActivityDef.findUniqueOrThrow({
@@ -83,5 +91,17 @@ export async function applyStageActivity(
     return tx.stageActivityLog.create({
       data: { animalId, stageActivityDefId, cycleNumber, performedByPlayerId },
     })
-  })
+}
+
+/** The same work, for a caller with no transaction of its own. */
+export async function applyStageActivity(
+  client: Client,
+  input: {
+    animalId: string
+    stageActivityDefId: string
+    performedByPlayerId: string | null
+    cycleNumber: number
+  }
+) {
+  return client.$transaction((tx) => applyStageActivityTx(tx, input))
 }
