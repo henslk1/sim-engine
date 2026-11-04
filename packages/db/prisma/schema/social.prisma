@@ -122,63 +122,63 @@ model Notification {
 }
 
 model ChatServer {
-  id          String         @id @default(cuid())
-  gameId      String
-  serverType  ChatServerType
-  groupId     String?        @unique
+  id                    String         @id @default(cuid())
+  gameId                String
+  serverType            ChatServerType
+  groupId               String?        @unique
   /// Non-null stand-in for groupId: "GLOBAL" for the game-wide server, the
   /// group id for a group server. Postgres treats NULLs as distinct, so a
   /// unique key on (gameId, groupId) would happily allow a second global.
-  scopeKey    String
-  name        String
-  description String?
-  isArchived  Boolean        @default(false)
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  scopeKey              String
+  name                  String
+  description           String?
+  isArchived            Boolean        @default(false)
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
   /// Stable destination for staff broadcasts. Stored by id so renaming the
   /// visible channel does not disconnect the broadcast feature from it.
-  announcementChannelId String?      @unique
-  channels              ChatChannel[] @relation("ChatServerChannels")
-  announcementChannel   ChatChannel?  @relation("ChatServerAnnouncement", fields: [announcementChannelId], references: [id])
-  group       Group?         @relation(fields: [groupId], references: [id])
-  game        Game           @relation(fields: [gameId], references: [id])
+  announcementChannelId String?        @unique
+  channels              ChatChannel[]  @relation("ChatServerChannels")
+  announcementChannel   ChatChannel?   @relation("ChatServerAnnouncement", fields: [announcementChannelId], references: [id])
+  group                 Group?         @relation(fields: [groupId], references: [id])
+  game                  Game           @relation(fields: [gameId], references: [id])
 
   @@unique([gameId, scopeKey])
 }
 
 model ChatChannel {
-  id                String              @id @default(cuid())
-  gameId            String
+  id                    String              @id @default(cuid())
+  gameId                String
   /// Null only for DM channels. A server channel always has one.
-  serverId          String?
-  channelType       ChannelType
+  serverId              String?
+  channelType           ChannelType
   /// Stored already normalized: lowercase, hyphenated, unique within its
   /// server. Null only for DM channels.
-  name              String?
-  description       String?
-  displayOrder      Int?
+  name                  String?
+  description           String?
+  displayOrder          Int?
   /// False means staff post and everyone else reads. Applies to whoever can
   /// see the channel at all, which minimumStaffRole decides.
-  defaultCanPost    Boolean             @default(true)
+  defaultCanPost        Boolean             @default(true)
   /// Null means every player in the game can read this channel. Otherwise it is
   /// the lowest staff rank that may see it at all — MODERATOR for a staff room,
   /// ADMIN for an admin one. This gates *reading*; posting among those who can
   /// read is still defaultCanPost's question, so the two stay orthogonal.
-  minimumStaffRole  StaffRoleType?
-  isArchived        Boolean             @default(false)
-  createdByPlayerId String?
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
-  messages          ChatMessage[]
-  directMessage     DirectMessage?
-  readStatuses      MessageReadStatus[]
-  pinnedMessages    PinnedChatMessage[]
-  preparedMedia     MediaAsset[]
-  groupChannel      GroupChannel?
-  server            ChatServer?         @relation("ChatServerChannels", fields: [serverId], references: [id])
-  announcementForServer ChatServer?      @relation("ChatServerAnnouncement")
-  createdByPlayer   PlayerAccount?      @relation(fields: [createdByPlayerId], references: [id])
-  game              Game                @relation(fields: [gameId], references: [id])
+  minimumStaffRole      StaffRoleType?
+  isArchived            Boolean             @default(false)
+  createdByPlayerId     String?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  messages              ChatMessage[]
+  directMessage         DirectMessage?
+  readStatuses          MessageReadStatus[]
+  pinnedMessages        PinnedChatMessage[]
+  preparedMedia         MediaAsset[]
+  groupChannel          GroupChannel?
+  server                ChatServer?         @relation("ChatServerChannels", fields: [serverId], references: [id])
+  announcementForServer ChatServer?         @relation("ChatServerAnnouncement")
+  createdByPlayer       PlayerAccount?      @relation(fields: [createdByPlayerId], references: [id])
+  game                  Game                @relation(fields: [gameId], references: [id])
 
   @@unique([serverId, name])
   @@index([serverId, displayOrder])
@@ -258,15 +258,15 @@ model MessageReadStatus {
 }
 
 model ForumSection {
-  id           String        @id @default(cuid())
+  id           String              @id @default(cuid())
   gameId       String
   name         String
   description  String?
   threads      ForumThread[]
   pinnedIn     PinnedForumThread[]
   displayOrder Int?
-  isArchived   Boolean       @default(false)
-  game         Game          @relation(fields: [gameId], references: [id])
+  isArchived   Boolean             @default(false)
+  game         Game                @relation(fields: [gameId], references: [id])
 }
 
 model ForumThread {

@@ -304,6 +304,23 @@ model Competition {
   // the next nightly rather than the next sweep.
   closesAt                DateTime?
 
+  // The scoring rules this competition runs under, frozen when its FIRST
+  // entry is accepted and never rewritten.
+  //
+  // Everything in here is either configuration an administrator can edit or a
+  // number another player's training moves. Read live at resolution - as all
+  // of it was - a competition is scored against whatever the world looked like
+  // at the moment the resolver happened to reach it, which is not the world
+  // any of its entrants entered. Frozen here, every entrant is measured
+  // against one yardstick that was fixed before the first of them entered.
+  //
+  // Null is a competition that predates this, not an empty rule set. Whether
+  // a given entry's saved factors are real is `CompetitionEntry.scoredAt`'s
+  // question, not this column's.
+  //
+  // Shape and version in packages/engine/src/competition/scoring.ts.
+  scoringRules Json?
+
   resolutionWork CompetitionResolutionWork?
 
   // The sweep's query: this game's open competitions that have come due.
@@ -387,6 +404,27 @@ model CompetitionEntry {
   tierDefId       String
   enteredAt       DateTime               @default(now())
   cycleNumber     Int?
+
+  // What this entry scores on, worked out when it was accepted and never
+  // recomputed. Resolution multiplies these together and adds its variance;
+  // it does not look at the animal, because by then the animal may have been
+  // trained, bonded, inspected, aged or buried.
+  //
+  // `scoredAt` is the discriminator, and it has to be its own column: every
+  // number below has a legitimate zero - a disqualified conformation score IS
+  // 0, an untrained animal's stat score IS 0, a venue its genotype is
+  // indifferent to IS 0 - so no value here can tell a real zero apart from a
+  // snapshot that was never taken.
+  scoredAt              DateTime?
+  // Sum of weight x (trainedValue / the frozen worldMax). Null for
+  // conformation, which does not score on stats at all.
+  statScore             Float?
+  personalityMultiplier Float?
+  // Disqualification already collapsed to 0. Null outside conformation.
+  conformationScore     Float?
+  // A percentage, applied as (1 + environmentModifier / 100).
+  environmentModifier   Float?
+
   result          CompetitionResult?
   entryStats      CompetitionEntryStat[]
   tierDef         CompetitionTierDef     @relation(fields: [tierDefId], references: [id])
@@ -395,7 +433,6 @@ model CompetitionEntry {
   competition     Competition            @relation(fields: [competitionId], references: [id])
 
   @@unique([competitionId, animalId])
-
   @@index([animalId, cycleNumber])
 }
 

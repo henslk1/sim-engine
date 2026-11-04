@@ -101,29 +101,41 @@ model ScheduledTaskRun {
   // All nullable: a run from before this existed has no summary and never
   // will, which is a different thing from a run that genuinely did nothing.
 
-  /** Items that needed more than one attempt. Not `retriedCount`, which counts retries of the run itself. */
-  retriedItemCount    Int?
-  /** Pregnancies that came to term during this run. */
+  /**
+   * Items that needed more than one attempt. Not `retriedCount`, which counts retries of the run itself.
+   */
+  retriedItemCount     Int?
+  /**
+   * Pregnancies that came to term during this run.
+   */
   pregnanciesCompleted Int?
-  /** Best rate between two consecutive progress samples. */
-  peakRatePerSecond   Float?
-  /** Worker-seconds spent, which is what separates per-worker rate from wall-clock rate. */
-  workerSeconds       Float?
+  /**
+   * Best rate between two consecutive progress samples.
+   */
+  peakRatePerSecond    Float?
+  /**
+   * Worker-seconds spent, which is what separates per-worker rate from wall-clock rate.
+   */
+  workerSeconds        Float?
 
-  /** How many items contributed a measured duration. Zero-but-not-null means the run had none. */
-  durationMeasured    Int?
-  durationMinMs       Int?
-  durationAvgMs       Float?
-  durationP50Ms       Int?
-  durationP95Ms       Int?
-  durationP99Ms       Int?
-  durationMaxMs       Int?
+  /**
+   * How many items contributed a measured duration. Zero-but-not-null means the run had none.
+   */
+  durationMeasured Int?
+  durationMinMs    Int?
+  durationAvgMs    Float?
+  durationP50Ms    Int?
+  durationP95Ms    Int?
+  durationP99Ms    Int?
+  durationMaxMs    Int?
 
-  /** When this run's per-animal work and progress samples were deleted. */
-  detailPrunedAt      DateTime?
+  /**
+   * When this run's per-animal work and progress samples were deleted.
+   */
+  detailPrunedAt DateTime?
 
-  task           ScheduledTask          @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  game           Game                   @relation(fields: [gameId], references: [id])
+  task           ScheduledTask               @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  game           Game                        @relation(fields: [gameId], references: [id])
   animalWork     NightlyAnimalWork[]
   samples        ScheduledTaskRunSample[]
   nightlyLog     NightlyUpdateLog?

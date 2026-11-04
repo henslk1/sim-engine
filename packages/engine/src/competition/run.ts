@@ -1,14 +1,5 @@
 import type { Prisma } from "@sim-engine/db";
-
-function computePersonalityMultiplier(value: number, idealMin: number, idealMax: number): number {
-  if (value >= idealMin && value <= idealMax) return 1.0
-  if (value < idealMin) {
-    if (idealMin === 0) return 1.0
-    return (value / idealMin) * 2 - 1
-  }
-  if (idealMax === 100) return 1.0
-  return 1 - 2 * (value - idealMax) / (100 - idealMax)
-}
+import { finalScore, readEntrySnapshot, readScoringRules } from "./scoring.js"
 
 /**
  * How long one competition's resolution may hold its transaction.
@@ -17,12 +8,11 @@ function computePersonalityMultiplier(value: number, idealMin: number, idealMax:
  * a competition does — scoring, results, prizes, group finance, weekly points,
  * tier promotion, daily logs and titles — happens inside this one transaction,
  * and a full field can take longer than that. (Records and season rankings are
- * not among them: `recordEntry` is only *read* here, for world-max
- * normalisation, and nothing writes a season ranking yet.) Exceeding it is not
- * a slow success: the transaction is
- * closed underneath the work and the whole resolution rolls back, so a large
- * competition would have failed every time it was tried, durably and forever
- * once there was a work item recording it.
+ * not among them: records are written by training and read when an entry is
+ * accepted, and nothing writes a season ranking yet.) Exceeding it is not a
+ * slow success: the transaction is closed underneath the work and the whole
+ * resolution rolls back, so a large competition would have failed every time
+ * it was tried, durably and forever once there was a work item recording it.
  *
  * `maxWait` is how long to wait for a connection before giving up, which is a
  * queueing concern and stays short.
@@ -46,6 +36,36 @@ export async function runCompetitionTx(
 
   const { competitionId } = input
 
+  // Claim the competition before reading a single thing about it.
+  //
+  // Matching on the status makes the transition itself the claim: writing the
+  // row takes its exclusive lock, Postgres re-checks the `where` after any
+  // wait, and zero rows means somebody else is already running it. Believing a
+  // plain read would not do - under READ COMMITTED two callers can both see
+  // OPEN, both carry on, and both award prizes - and the scheduler's lease
+  // recovery re-runs an interrupted sweep, so duplicate execution is a path
+  // the system takes deliberately rather than a freak event.
+  //
+  // Claiming *first* is the other half, and the half that was missing. The
+  // field used to be read above this, which left a window with teeth in it: an
+  // entry transaction holds this row with its entry not yet committed, the
+  // resolver reads an empty field, queues behind the lock, the entry commits,
+  // and the resolver carries on with the list it took before the wait. It then
+  // marks the competition COMPLETED containing one accepted entry that has no
+  // result and never will. Reading on the far side of the lock is what makes
+  // the field this scores the field that actually ran.
+  //
+  // And once this succeeds the status is IN_PROGRESS, which `enterCompetitionTx`
+  // matches on too, so nothing can be added to the field after this line.
+  const { count } = await tx.competition.updateMany({
+    where: { id: competitionId, status: "OPEN" },
+    data: { status: "IN_PROGRESS" },
+  })
+
+  if (count !== 1) {
+    throw new Error("Competition is not open")
+  }
+
   const competition = await tx.competition.findUniqueOrThrow({
     where: { id: competitionId },
     include: {
@@ -58,150 +78,65 @@ export async function runCompetitionTx(
           }
         }
       },
-      disciplineDef: {
-        include: {
-          statWeights: true,
-          personalityWeights: true,
-        }
-      },
+      // The name, for the tier-advancement log. The weights were read here
+      // because resolution scored on them; it scores on what each entry saved
+      // instead, so the discipline's current configuration is none of its
+      // business any more.
+      disciplineDef: { select: { name: true } },
       entries: {
+        // No `animal` and no `entryStats`, for the same reason. Four joins
+        // resolution no longer makes, and - the point - four things it can no
+        // longer be accidentally scored on.
         include: {
           tierDef: { include: { tierPrizes: true } },
-          entryStats: true,
-          animal: {
-            include: {
-              personality: true,
-              conformationScores: { select: { score: true, breedId: true, isCoatDq: true, isTraitDq: true } },
-            }
-          }
         }
       },
     }
   })
 
-  if (competition.status !== "OPEN") {
-    throw new Error("Competition is not open")
-  }
-
-  // Claim the competition conditionally rather than reading OPEN above and
-  // trusting it. Under READ COMMITTED the read happens against a snapshot,
-  // so two callers can both see OPEN, both reach here, and both award prizes
-  // — the second UPDATE simply queues behind the first and then applies.
-  // Matching on the status makes the transition itself the claim: zero rows
-  // means somebody else is already running it.
+  // The rules this field was frozen under.
   //
-  // This matters more than it used to. The scheduler's lease recovery means a
-  // sweep that was interrupted is re-run, so duplicate execution is now a
-  // path the system takes deliberately rather than a freak event.
-  const { count } = await tx.competition.updateMany({
-    where: { id: competitionId, status: "OPEN" },
-    data: { status: "IN_PROGRESS" },
-  })
+  // Every entry carries its own four finished factors and the competition
+  // carries the rules they were worked out against, so resolution multiplies
+  // and ranks. It reads nothing about the animal, which is why burying one no
+  // longer empties the field it competed in.
+  //
+  // There was a second path here, scoring an entry out of the live world when
+  // it had saved nothing, for rows made before the snapshot existed. There are
+  // no such rows - every entry belongs to a competition that has already been
+  // resolved, and the open ones are empty - so what it kept alive was the one
+  // behaviour all of this removes: a field measured against a world that moved
+  // after it was entered. Reachable, too, by any later bug that left `scoredAt`
+  // unset, and silent when it was.
+  //
+  // An entry with no snapshot now stops the competition and names itself.
+  // `scoredAt` is what can say so, and has to be its own column: a disqualified
+  // conformation score IS 0, an untrained stat score IS 0 and an indifferent
+  // genotype IS 0, so no saved value can tell itself apart from its own absence.
+  const rules = readScoringRules(competition.scoringRules)
 
-  if (count !== 1) {
-    throw new Error("Competition is not open")
-  }
-
-  // pre-fetch world max trained value per stat for normalization
-  const statWorldMaxes = new Map<string, number>()
-  if (!competition.disciplineDef.isConformation) {
-    for (const weight of competition.disciplineDef.statWeights) {
-      const recordDef = await tx.recordDef.findFirst({
-        where: { statDefId: weight.statDefId, gameId: competition.gameId },
-        select: { id: true },
-      })
-      let worldMax: number | null = null
-      if (recordDef) {
-        const best = await tx.recordEntry.findFirst({
-          where: { recordDefId: recordDef.id },
-          orderBy: { value: "desc" },
-          select: { value: true },
-        })
-        worldMax = best?.value ?? null
-      }
-      if (!worldMax) {
-        const agg = await tx.animalStat.aggregate({
-          _max: { trainedValue: true },
-          where: { statDefId: weight.statDefId },
-        })
-        worldMax = agg._max.trainedValue ?? 1
-      }
-      statWorldMaxes.set(weight.statDefId, Math.max(worldMax, 1))
-    }
-  }
-
-  // pre-fetch climate/terrain modifiers per animal
-  const animalEnvMods = new Map<string, number>()
-  {
-    const expressionRulesWithMods = await tx.expressionRule.findMany({
-      where: {
-        OR: [
-          { climateModifiers: { some: { climate: competition.venue.climate } } },
-          { terrainModifiers: { some: { terrain: competition.venue.terrain } } },
-        ],
-      },
-      select: {
-        locusId: true,
-        alleleOneId: true,
-        alleleTwoId: true,
-        climateModifiers: { where: { climate: competition.venue.climate }, select: { modifier: true } },
-        terrainModifiers: { where: { terrain: competition.venue.terrain }, select: { modifier: true } },
-      },
-    })
-    const exprModMap = new Map<string, number>()
-    for (const rule of expressionRulesWithMods) {
-      const key = `${rule.locusId}:${rule.alleleOneId}:${rule.alleleTwoId}`
-      const climMod = rule.climateModifiers[0]?.modifier ?? 0
-      const terrMod = rule.terrainModifiers[0]?.modifier ?? 0
-      exprModMap.set(key, climMod + terrMod)
-    }
-    const animalIds = competition.entries.map((e) => e.animalId)
-    const genotypes = await tx.animalGenotype.findMany({
-      where: { animalId: { in: animalIds } },
-      select: { animalId: true, locusId: true, alleleOneId: true, alleleTwoId: true },
-    })
-    for (const g of genotypes) {
-      const mod = exprModMap.get(`${g.locusId}:${g.alleleOneId}:${g.alleleTwoId}`)
-      if (mod) animalEnvMods.set(g.animalId, (animalEnvMods.get(g.animalId) ?? 0) + mod)
-    }
-  }
-
-  // score all entries
   const scored = competition.entries.map((entry) => {
-    let score = 0
-
-    if (competition.disciplineDef.isConformation) {
-      const conformationScore = entry.animal.conformationScores.find(
-        s => s.breedId === entry.animal.breedId
-      )
-      const baseScore = (conformationScore?.isCoatDq || conformationScore?.isTraitDq) ? 0 : (conformationScore?.score ?? 0)
-      let personalityMultiplier = 1.0
-      for (const weight of competition.disciplineDef.personalityWeights) {
-        const trait = entry.animal.personality.find(p => p.traitDefId === weight.traitDefId)
-        const effectiveValue = trait ? Math.min(100, Math.max(0, trait.value + trait.personalityModifier)) : 50
-        const mult = computePersonalityMultiplier(effectiveValue, weight.idealMin, weight.idealMax)
-        personalityMultiplier += (weight.bonusPercent / 100) * mult
-      }
-      const envMod = animalEnvMods.get(entry.animalId) ?? 0
-      score = Math.max(0, baseScore * personalityMultiplier * (1 + envMod / 100))
-    } else {
-      let statScore = 0
-      for (const weight of competition.disciplineDef.statWeights) {
-        const stat = entry.entryStats.find(s => s.statDefId === weight.statDefId)
-        const worldMax = statWorldMaxes.get(weight.statDefId) ?? 1
-        statScore += weight.weight * ((stat?.trainedValue ?? 0) / worldMax)
-      }
-      let personalityMultiplier = 1.0
-      for (const weight of competition.disciplineDef.personalityWeights) {
-        const trait = entry.animal.personality.find(p => p.traitDefId === weight.traitDefId)
-        const effectiveValue = trait ? Math.min(100, Math.max(0, trait.value + trait.personalityModifier)) : 50
-        const mult = computePersonalityMultiplier(effectiveValue, weight.idealMin, weight.idealMax)
-        personalityMultiplier += (weight.bonusPercent / 100) * mult
-      }
-      const envMod = animalEnvMods.get(entry.animalId) ?? 0
-      score = Math.max(0, statScore * 100 * personalityMultiplier * (1 + envMod / 100))
+    if (rules === null) {
+      // The two writes came apart. A competition that froze nothing because
+      // nobody entered it never reaches here, having nothing to map over.
+      throw new Error(`Competition ${competitionId} has entries but no frozen scoring rules`)
     }
 
+    // `?? 1` and `?? 0` used to live inside this read, and were exactly wrong:
+    // a snapshot half-written by some future bug would have scored as though
+    // the animal had an average personality and an indifferent genotype, placed
+    // against horses that were scored properly, and left nothing behind to say
+    // so.
+    const snapshot = readEntrySnapshot(entry, rules.isConformation)
+    if (snapshot === null) {
+      throw new Error(`Competition entry ${entry.id} was never scored`)
+    }
+
+    const score = finalScore(snapshot, rules.isConformation)
+
+    // The one thing deliberately not frozen. Two horses with identical saved
+    // factors should still not be a foregone conclusion, and the roll happens
+    // at resolution because that is when the competition is run.
     const variance = (Math.random() - 0.5) * score * 0.2
     return {
       entryId: entry.id,

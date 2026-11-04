@@ -1,92 +1,92 @@
 model Game {
-  id                     String                  @id @default(cuid())
-  name                   String
-  slug                   String                  @unique
-  playerAccounts         PlayerAccount[]
-  subscriptionTiers      SubscriptionTier[]
-  staffRoles             StaffRole[]
-  liveOpsEvents          LiveOpsEvent[]
-  supportTickets         SupportTicket[]
-  bugReports             BugReport[]
-  adminActionLogs        AdminActionLog[]
-  gameConfig             GameConfig?
-  species                Species[]
-  breeds                 Breed[]
-  lifeStageDefs          LifeStageDef[]
-  statDefs               StatDef[]
-  animals                Animal[]
-  gameInnateMax          GameInnateMax?
-  locusDefs              Locus[]
-  geneticPanels          GeneticPanelDef[]
-  careActionDefs         CareActionDef[]
-  longTermCareActionDefs LongTermCareActionDef[]
-  healthConditionDefs    HealthConditionDef[]
-  healthCertificateDefs  HealthCertificateDef[]
-  trainingActionDefs     TrainingActionDef[]
-  intensityTierDefs      IntensityTierDef[]
-  stageActivityDefs      StageActivityDef[]
-  titleDefs              TitleDef[]
-  clinics                Clinic[]
-  breedingRecords        BreedingRecord[]
-  breedingListings       BreedingListing[]
-  coverOffers            CoverOffer[]
-  geneticMaterials       GeneticMaterial[]
-  disciplineDefs         DisciplineDef[]
-  compTierDefs           CompetitionTierDef[]
-  venues                 Venue[]
-  competitions           Competition[]
-  seasons                Season[]
-  recordDefs             RecordDef[]
-  directoryFilterDefs    DirectoryFilterDef[]
-  currencyDefs           CurrencyDef[]
-  transactions           Transaction[]
-  itemDefs               ItemDef[]
-  storeListings          StoreListing[]
-  vetServiceDefs         VetServiceDef[]
-  bundles                Bundle[]
-  shopBreedConfigs       GameShopBreedConfig[]
-  shopAnimals            GameShopAnimal[]
+  id                        String                      @id @default(cuid())
+  name                      String
+  slug                      String                      @unique
+  playerAccounts            PlayerAccount[]
+  subscriptionTiers         SubscriptionTier[]
+  staffRoles                StaffRole[]
+  liveOpsEvents             LiveOpsEvent[]
+  supportTickets            SupportTicket[]
+  bugReports                BugReport[]
+  adminActionLogs           AdminActionLog[]
+  gameConfig                GameConfig?
+  species                   Species[]
+  breeds                    Breed[]
+  lifeStageDefs             LifeStageDef[]
+  statDefs                  StatDef[]
+  animals                   Animal[]
+  gameInnateMax             GameInnateMax?
+  locusDefs                 Locus[]
+  geneticPanels             GeneticPanelDef[]
+  careActionDefs            CareActionDef[]
+  longTermCareActionDefs    LongTermCareActionDef[]
+  healthConditionDefs       HealthConditionDef[]
+  healthCertificateDefs     HealthCertificateDef[]
+  trainingActionDefs        TrainingActionDef[]
+  intensityTierDefs         IntensityTierDef[]
+  stageActivityDefs         StageActivityDef[]
+  titleDefs                 TitleDef[]
+  clinics                   Clinic[]
+  breedingRecords           BreedingRecord[]
+  breedingListings          BreedingListing[]
+  coverOffers               CoverOffer[]
+  geneticMaterials          GeneticMaterial[]
+  disciplineDefs            DisciplineDef[]
+  compTierDefs              CompetitionTierDef[]
+  venues                    Venue[]
+  competitions              Competition[]
+  seasons                   Season[]
+  recordDefs                RecordDef[]
+  directoryFilterDefs       DirectoryFilterDef[]
+  currencyDefs              CurrencyDef[]
+  transactions              Transaction[]
+  itemDefs                  ItemDef[]
+  storeListings             StoreListing[]
+  vetServiceDefs            VetServiceDef[]
+  bundles                   Bundle[]
+  shopBreedConfigs          GameShopBreedConfig[]
+  shopAnimals               GameShopAnimal[]
   competitionResolutionWork CompetitionResolutionWork[]
-  marketplaceListings    MarketplaceListing[]
-  currencyExchangeOrders CurrencyExchangeOrder[]
-  escrows                Escrow[]
-  gifts                  Gift[]
-  raffles                Raffle[]
-  playerStores           PlayerStore[]
-  jobListings            JobListing[]
-  jobContracts           JobContract[]
-  breedProposals         BreedProposal[]
-  breedCampaigns         BreedCampaign[]
-  animalTemplates        AnimalTemplate[]
-  groups                 Group[]
-  groupPrestigeTierDefs  GroupPrestigeTierDef[]
-  friendships            Friendship[]
-  friendRequests         FriendRequest[]
-  blockedPlayers         BlockedPlayer[]
-  follows                Follow[]
-  notificationTopicDefs  NotificationTopicDef[]
-  notifications          Notification[]
-  chatServers            ChatServer[]
-  chatChannels           ChatChannel[]
-  chatMessages           ChatMessage[]
-  directMessages         DirectMessage[]
-  mediaAssets            MediaAsset[]
-  forumSections          ForumSection[]
-  userReports            UserReport[]
-  tutorialStepDefs       TutorialStepDef[]
-  achievementDefs        AchievementDef[]
-  nightlyUpdateLogs      NightlyUpdateLog[]
-  scheduledTasks         ScheduledTask[]
-  scheduledTaskRuns      ScheduledTaskRun[]
-  animalCycleActivity    AnimalCycleActivity[]
-  personalityTraitDefs   PersonalityTraitDef[]
-  conformationSections   ConformationSection[]
-  predictorUsages        PlayerPredictorUsage[]
-  starterBreedOptions    StarterBreedOption[]
-  dailyAllowanceItems      DailyAllowanceItem[]
-  dailyAllowanceCurrencies DailyAllowanceCurrency[]
-  isActive                 Boolean                 @default(false)
-  createdAt              DateTime                @default(now())
+  marketplaceListings       MarketplaceListing[]
+  currencyExchangeOrders    CurrencyExchangeOrder[]
+  escrows                   Escrow[]
+  gifts                     Gift[]
+  raffles                   Raffle[]
+  playerStores              PlayerStore[]
+  jobListings               JobListing[]
+  jobContracts              JobContract[]
+  breedProposals            BreedProposal[]
+  breedCampaigns            BreedCampaign[]
+  animalTemplates           AnimalTemplate[]
+  groups                    Group[]
+  groupPrestigeTierDefs     GroupPrestigeTierDef[]
+  friendships               Friendship[]
+  friendRequests            FriendRequest[]
+  blockedPlayers            BlockedPlayer[]
+  follows                   Follow[]
+  notificationTopicDefs     NotificationTopicDef[]
+  notifications             Notification[]
+  chatServers               ChatServer[]
+  chatChannels              ChatChannel[]
+  chatMessages              ChatMessage[]
+  directMessages            DirectMessage[]
+  mediaAssets               MediaAsset[]
+  forumSections             ForumSection[]
+  userReports               UserReport[]
+  tutorialStepDefs          TutorialStepDef[]
+  achievementDefs           AchievementDef[]
+  nightlyUpdateLogs         NightlyUpdateLog[]
+  scheduledTasks            ScheduledTask[]
+  scheduledTaskRuns         ScheduledTaskRun[]
+  animalCycleActivity       AnimalCycleActivity[]
+  personalityTraitDefs      PersonalityTraitDef[]
+  conformationSections      ConformationSection[]
+  predictorUsages           PlayerPredictorUsage[]
+  starterBreedOptions       StarterBreedOption[]
+  dailyAllowanceItems       DailyAllowanceItem[]
+  dailyAllowanceCurrencies  DailyAllowanceCurrency[]
+  isActive                  Boolean                     @default(false)
+  createdAt                 DateTime                    @default(now())
 }
 
 model User {
@@ -474,7 +474,7 @@ model AdminActionLog {
 }
 
 model NightlyUpdateLog {
-  id                       String    @id @default(cuid())
+  id                       String            @id @default(cuid())
   gameId                   String
   // Which scheduled run produced this.
   //
@@ -483,82 +483,82 @@ model NightlyUpdateLog {
   // attempts it takes: a reclaimed run updates the row it already has rather
   // than leaving two partial accounts of the same night, which is also what
   // lets the outcome counters below be cumulative.
-  runId                    String?   @unique
-  startedAt                DateTime  @default(now())
+  runId                    String?           @unique
+  startedAt                DateTime          @default(now())
   completedAt              DateTime?
-  success                  Boolean   @default(true)
+  success                  Boolean           @default(true)
   errorMessage             String?
-  animalsAged              Int       @default(0)
-  animalDeaths             Int       @default(0)
-  lifeStageTransitions     Int       @default(0)
-  storeRotationsProcessed  Int       @default(0)
-  rafflesDrawn             Int       @default(0)
-  jobContractsProcessed    Int       @default(0)
-  seasonRewardsDistributed Int       @default(0)
-  campaignPhaseTransitions Int       @default(0)
-  subscriptionsExpired     Int       @default(0)
-  game                     Game      @relation(fields: [gameId], references: [id])
+  animalsAged              Int               @default(0)
+  animalDeaths             Int               @default(0)
+  lifeStageTransitions     Int               @default(0)
+  storeRotationsProcessed  Int               @default(0)
+  rafflesDrawn             Int               @default(0)
+  jobContractsProcessed    Int               @default(0)
+  seasonRewardsDistributed Int               @default(0)
+  campaignPhaseTransitions Int               @default(0)
+  subscriptionsExpired     Int               @default(0)
+  game                     Game              @relation(fields: [gameId], references: [id])
   // SetNull, not Cascade: if a run row is ever cleared out the record of what
   // that night did to the population should survive it.
   run                      ScheduledTaskRun? @relation(fields: [runId], references: [id], onDelete: SetNull)
 }
 
 model GameConfig {
-  id                              String          @id @default(cuid())
-  gameId                          String          @unique
-  defaultInnateRatio              Float
-  trainingCeilingMultiplier       Float
-  pedigreeDisplayDepth            Int
-  predictorDailyLimitFree         Int
-  containerLabel                  String?
-  subContainerLabel               String?
-  breedingEnergyCost              Float           @default(0)
-  gestationCycles                 Int             @default(12)
-  gestationRestrictCycle          Int             @default(0)
-  moodDecayRate                   Float           @default(0)
-  conditionDecayRate              Float           @default(0)
-  conditionWorkGain               Float           @default(0)
-  careScoreDecayRate              Float           @default(0)
-  careScoreFloor                  Float           @default(0)
-  careScoreCeiling                Float           @default(100)
-  careScoreRecoveryRate           Float           @default(0)
-  immunityDecayRate               Float           @default(0)
-  immunityRecoveryRate            Float           @default(0)
-  immunityMin                     Float           @default(0)
-  immunityMax                     Float           @default(100)
-  energyLowCareThreshold          Float           @default(0)
-  energyLowCarePenalty            Float           @default(0)
-  overworkInjuryThreshold         Float           @default(0)
-  overworkInjuryChance            Float           @default(0)
-  cyclesPerYear                   Int             @default(12)
-  lifeExpectancyBaseline          Int?
-  maxLocusTestsPerCycle           Int             @default(2)
-  ultrasoundOpenCycle             Int             @default(0)
-  maxBreedingSlots                Int?
-  breedingBaseGain                Float           @default(30)
-  breedingMinGain                 Float           @default(4)
-  breedingVarianceFactor          Float           @default(0)
-  gestationCareFloor              Float           @default(0.7)
-  predictorCost                   Int             @default(0)
-  predictorDailyLimitSubscriber   Int             @default(0)
-  multiplesBirthCap               Int             @default(1)
-  multiplesChance                 Float           @default(0)
-  identicalMultiplesChance        Float           @default(0)
-  breedingCooldownCycles          Int             @default(0)
-  geneticCollectionCooldownCycles Int             @default(0)
-  conformationInspectionMinCycle  Int             @default(0)
-  topGradeDoubleBonusChance       Float           @default(0.1)
-  defaultAnimalSlots              Int             @default(0)
-  defaultSubContainers            Int             @default(0)
-  tutorialMaleBaseTemplateId      String?
-  tutorialFemaleBaseTemplateId    String?
-  tutorialFemalePrice             Int             @default(0)
+  id                               String          @id @default(cuid())
+  gameId                           String          @unique
+  defaultInnateRatio               Float
+  trainingCeilingMultiplier        Float
+  pedigreeDisplayDepth             Int
+  predictorDailyLimitFree          Int
+  containerLabel                   String?
+  subContainerLabel                String?
+  breedingEnergyCost               Float           @default(0)
+  gestationCycles                  Int             @default(12)
+  gestationRestrictCycle           Int             @default(0)
+  moodDecayRate                    Float           @default(0)
+  conditionDecayRate               Float           @default(0)
+  conditionWorkGain                Float           @default(0)
+  careScoreDecayRate               Float           @default(0)
+  careScoreFloor                   Float           @default(0)
+  careScoreCeiling                 Float           @default(100)
+  careScoreRecoveryRate            Float           @default(0)
+  immunityDecayRate                Float           @default(0)
+  immunityRecoveryRate             Float           @default(0)
+  immunityMin                      Float           @default(0)
+  immunityMax                      Float           @default(100)
+  energyLowCareThreshold           Float           @default(0)
+  energyLowCarePenalty             Float           @default(0)
+  overworkInjuryThreshold          Float           @default(0)
+  overworkInjuryChance             Float           @default(0)
+  cyclesPerYear                    Int             @default(12)
+  lifeExpectancyBaseline           Int?
+  maxLocusTestsPerCycle            Int             @default(2)
+  ultrasoundOpenCycle              Int             @default(0)
+  maxBreedingSlots                 Int?
+  breedingBaseGain                 Float           @default(30)
+  breedingMinGain                  Float           @default(4)
+  breedingVarianceFactor           Float           @default(0)
+  gestationCareFloor               Float           @default(0.7)
+  predictorCost                    Int             @default(0)
+  predictorDailyLimitSubscriber    Int             @default(0)
+  multiplesBirthCap                Int             @default(1)
+  multiplesChance                  Float           @default(0)
+  identicalMultiplesChance         Float           @default(0)
+  breedingCooldownCycles           Int             @default(0)
+  geneticCollectionCooldownCycles  Int             @default(0)
+  conformationInspectionMinCycle   Int             @default(0)
+  topGradeDoubleBonusChance        Float           @default(0.1)
+  defaultAnimalSlots               Int             @default(0)
+  defaultSubContainers             Int             @default(0)
+  tutorialMaleBaseTemplateId       String?
+  tutorialFemaleBaseTemplateId     String?
+  tutorialFemalePrice              Int             @default(0)
   completeProfileTestCost          Int             @default(0)
   completeProfileTestCurrencyDefId String?
-  nightlyRunHour                  Int             @default(0)
-  nightlyRunMinute                Int             @default(0)
-  gameTimeZone                    String          @default("UTC")
-  competitionSweepMinutes         Int             @default(60)
+  nightlyRunHour                   Int             @default(0)
+  nightlyRunMinute                 Int             @default(0)
+  gameTimeZone                     String          @default("UTC")
+  competitionSweepMinutes          Int             @default(60)
   // How often the shop clears its unsold stock and generates a new set.
   //
   // Epoch-anchored like the competition sweep, so the shop turns over on the
@@ -566,7 +566,7 @@ model GameConfig {
   // with a `rotationStartsAt` / `rotationEndsAt` window joins and leaves on one
   // of these boundaries, which is the same rule that makes a competition
   // entered at 13:59 run at 14:00.
-  shopRotationMinutes             Int             @default(60)
+  shopRotationMinutes              Int             @default(60)
   // How long a finished run's per-animal work and progress samples are kept.
   //
   // Only the detail expires. The run row itself, and the summary finalized
@@ -581,7 +581,7 @@ model GameConfig {
   // game rather than a property of the scheduler. Deliberately not derived
   // from player count: a bigger game is the case where a failed animal is
   // hardest to find, not the one where history matters least.
-  workRetentionDays               Int             @default(30)
+  workRetentionDays                Int             @default(30)
   // Where the last retention pass stopped scanning activity markers.
   //
   // Runtime state rather than configuration, living here because this is the
@@ -593,13 +593,13 @@ model GameConfig {
   // current-cycle markers larger than N - raising N moves the cliff, it does
   // not remove it. Saving the position makes successive nights sweep the whole
   // table, and reaching the end resets this to null to start the next sweep.
-  markerPruneCursor               String?
-  tutorialMaleBaseTemplate        AnimalTemplate? @relation("GameConfigTutorialMale", fields: [tutorialMaleBaseTemplateId], references: [id])
-  tutorialFemaleBaseTemplate      AnimalTemplate? @relation("GameConfigTutorialFemale", fields: [tutorialFemaleBaseTemplateId], references: [id])
-  completeProfileTestCurrency     CurrencyDef?    @relation("CompletePrfCurrency", fields: [completeProfileTestCurrencyDefId], references: [id])
-  game                            Game            @relation(fields: [gameId], references: [id])
-  createdAt                       DateTime        @default(now())
-  updatedAt                       DateTime        @updatedAt
+  markerPruneCursor                String?
+  tutorialMaleBaseTemplate         AnimalTemplate? @relation("GameConfigTutorialMale", fields: [tutorialMaleBaseTemplateId], references: [id])
+  tutorialFemaleBaseTemplate       AnimalTemplate? @relation("GameConfigTutorialFemale", fields: [tutorialFemaleBaseTemplateId], references: [id])
+  completeProfileTestCurrency      CurrencyDef?    @relation("CompletePrfCurrency", fields: [completeProfileTestCurrencyDefId], references: [id])
+  game                             Game            @relation(fields: [gameId], references: [id])
+  createdAt                        DateTime        @default(now())
+  updatedAt                        DateTime        @updatedAt
 }
 
 model PlayerPredictorUsage {
@@ -629,25 +629,25 @@ model StarterBreedOption {
 }
 
 model StarterColorOption {
-  id                   String                      @id @default(cuid())
+  id                   String                       @id @default(cuid())
   starterBreedOptionId String
   name                 String
   image                String?
-  isActive             Boolean                     @default(true)
-  starterBreedOption   StarterBreedOption          @relation(fields: [starterBreedOptionId], references: [id])
+  isActive             Boolean                      @default(true)
+  starterBreedOption   StarterBreedOption           @relation(fields: [starterBreedOptionId], references: [id])
   genotypes            StarterColorOptionGenotype[]
 }
 
 model StarterColorOptionGenotype {
-  id                   String            @id @default(cuid())
+  id                   String             @id @default(cuid())
   starterColorOptionId String
   locusId              String
   alleleOneId          String
   alleleTwoId          String
   starterColorOption   StarterColorOption @relation(fields: [starterColorOptionId], references: [id], onDelete: Cascade)
-  locus                Locus             @relation(fields: [locusId], references: [id])
-  alleleOne            Allele            @relation("StarterAlleleOne", fields: [alleleOneId], references: [id])
-  alleleTwo            Allele            @relation("StarterAlleleTwo", fields: [alleleTwoId], references: [id])
+  locus                Locus              @relation(fields: [locusId], references: [id])
+  alleleOne            Allele             @relation("StarterAlleleOne", fields: [alleleOneId], references: [id])
+  alleleTwo            Allele             @relation("StarterAlleleTwo", fields: [alleleTwoId], references: [id])
 
   @@unique([starterColorOptionId, locusId])
 }

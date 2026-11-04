@@ -128,21 +128,21 @@ model GeneticMaterial {
 }
 
 model Pregnancy {
-  id                 String               @id @default(cuid())
-  animalId           String
-  breedingRecordId   String               @unique
-  isSurrogate        Boolean              @default(false)
-  gestationStartedAt DateTime             @default(now())
-  currentCycles      Int                  @default(0)
-  requiredCycles     Int
-  isCompleted        Boolean              @default(false)
-  completedAt        DateTime?
-  ultrasoundUsed       Boolean              @default(false)
+  id                   String                @id @default(cuid())
+  animalId             String
+  breedingRecordId     String                @unique
+  isSurrogate          Boolean               @default(false)
+  gestationStartedAt   DateTime              @default(now())
+  currentCycles        Int                   @default(0)
+  requiredCycles       Int
+  isCompleted          Boolean               @default(false)
+  completedAt          DateTime?
+  ultrasoundUsed       Boolean               @default(false)
   activityRestrictions ActivityRestriction[]
   offspring            PregnancyOffspring[]
-  surrogacyRecord    SurrogacyRecord?
-  breedingRecord     BreedingRecord       @relation(fields: [breedingRecordId], references: [id])
-  animal             Animal               @relation(fields: [animalId], references: [id])
+  surrogacyRecord      SurrogacyRecord?
+  breedingRecord       BreedingRecord        @relation(fields: [breedingRecordId], references: [id])
+  animal               Animal                @relation(fields: [animalId], references: [id])
 
   @@index([animalId, isCompleted])
 }

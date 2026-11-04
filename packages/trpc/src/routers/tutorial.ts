@@ -4,7 +4,7 @@ import { TRPCError } from "@trpc/server"
 import { canTransitionTutorial, TUTORIAL_STEPS } from "../tutorial-policy.js"
 import { router, protectedProcedure } from "../trpc.js"
 import { db, AnimalSex } from "@sim-engine/db"
-import { generateFromTemplate, weightedSample, canonicalize, deleteAnimalsWithChildren, deleteAnimalsWithChildrenTx, computeFixedFields, computePhenotypeDescription, computePhenotypeCodes, sampleBreedPersonality, initialImmunity, enterCompetitionTx, runCompetitionTx } from "@sim-engine/engine"
+import { generateFromTemplate, weightedSample, canonicalize, deleteAnimalsWithChildren, deleteAnimalsWithChildrenTx, computeFixedFields, computePhenotypeDescription, computePhenotypeCodes, sampleBreedPersonality, initialImmunity, enterCompetitionTx, runCompetitionTx, buildScoringRules, snapshotEntryScore, scoringRulesToJson, statScoreFrom, finalScore } from "@sim-engine/engine"
 import type { ExpressionRuleForPhenotype } from "@sim-engine/engine"
 
 /**
@@ -1319,6 +1319,7 @@ export const tutorialRouter = router({
           select: {
             id: true,
             ageInCycles: true,
+            breedId: true,
             secondaryDisciplineDefId: true,
             lifeStage: { select: { energyCostMultiplier: true } },
           },
@@ -1343,7 +1344,7 @@ export const tutorialRouter = router({
 
         const venue = await tx.venue.findFirst({
           where: { id: venueId, gameId },
-          select: { id: true, disciplines: { select: { disciplineDefId: true } } },
+          select: { id: true, climate: true, terrain: true, disciplines: { select: { disciplineDefId: true } } },
         })
         if (!venue) throw new Error("Venue not found in this game")
         if (!venue.disciplines.some(d => d.disciplineDefId === mare.secondaryDisciplineDefId)) {
@@ -1355,6 +1356,7 @@ export const tutorialRouter = router({
           select: {
             id: true,
             name: true,
+            isConformation: true,
             statWeights: { select: { statDefId: true, weight: true, statDef: { select: { name: true } } } },
           },
         })
@@ -1429,13 +1431,27 @@ export const tutorialRouter = router({
         })
         const mareStatMap = new Map(mareStats.map(s => [s.statDefId, s.trainedValue]))
 
-        // Self-normalised: mare is the world max for tutorial purposes.
-        const mareScore = Math.max(0,
-          discipline.statWeights.reduce((sum, w) => {
-            const val = mareStatMap.get(w.statDefId) ?? 0
-            return sum + w.weight * (val / Math.max(val, 1))
-          }, 0) * 100,
-        )
+        // Self-normalised: the mare is her own world max, so this step reads the
+        // same whatever the rest of the game has trained to. That divisor is the
+        // only thing special about this competition - it is handed to the same
+        // scorer every other entry goes through, rather than being a second copy
+        // of the formula living in the tutorial.
+        const rules = await buildScoringRules(tx, {
+          gameId,
+          disciplineDefId: discipline.id,
+          isConformation: discipline.isConformation,
+          climate: venue.climate,
+          terrain: venue.terrain,
+          worldMaxOverride: (statDefId) => Math.max(mareStatMap.get(statDefId) ?? 0, 1),
+        })
+
+        const mareSnapshot = await snapshotEntryScore(tx, {
+          animalId: mare.id,
+          breedId: mare.breedId,
+          rules,
+          stats: mareStats,
+        })
+        const mareScore = finalScore(mareSnapshot, rules.isConformation)
 
         const npcCount = competitionStep?.competitionNpcCount ?? 4
         const npcEntries = Array.from({ length: npcCount }, (_, i) => {
@@ -1444,12 +1460,13 @@ export const tutorialRouter = router({
             const val = Math.random() * mareVal * 0.5
             return { statDefId: w.statDefId, statName: w.statDef.name, trainedValue: Math.round(val * 100) / 100 }
           })
-          const npcScore = Math.max(0,
-            discipline.statWeights.reduce((sum, w) => {
-              const stat = npcStats.find(s => s.statDefId === w.statDefId)!
-              const mareVal = Math.max(mareStatMap.get(w.statDefId) ?? 0, 1)
-              return sum + w.weight * (stat.trainedValue / mareVal)
-            }, 0) * 100,
+          // Same scorer, same frozen rules, and the mare's own personality and
+          // environment, so that stats are the only thing separating them. That
+          // is the lesson the step teaches, and it is also what keeps her in
+          // front: an NPC's stats are capped at half of hers, so its score is.
+          const npcScore = finalScore(
+            { ...mareSnapshot, statScore: statScoreFrom(rules.statWeights, npcStats) },
+            rules.isConformation
           )
           return { name: `Competitor ${i + 1}`, stats: npcStats, score: Math.round(npcScore * 100) / 100, placement: i + 2 }
         })
@@ -1482,6 +1499,7 @@ export const tutorialRouter = router({
             status: "COMPLETED",
             tutorialPlayerAccountId: player.id,
             tutorialNpcData: npcEntries,
+            scoringRules: scoringRulesToJson(rules),
             // Already COMPLETED; the deadline is only a record of when.
             closesAt: now,
           },
@@ -1494,6 +1512,12 @@ export const tutorialRouter = router({
             playerAccountId: player.id,
             tierDefId: animalTier!.tierDefId,
             cycleNumber: mare.ageInCycles,
+            // This competition is written already COMPLETED and never reaches
+            // the resolver, but the entry is a real row that the mare's record
+            // and the venue page both read. It carries what it scored on for
+            // the same reason every other entry does.
+            scoredAt: now,
+            ...mareSnapshot,
           },
         })
         if (mareStats.length > 0) {

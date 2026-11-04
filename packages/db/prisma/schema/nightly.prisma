@@ -93,7 +93,7 @@ model NightlyAnimalWork {
   // `completedAt` is - a retried animal reports the attempt that succeeded.
   // Nothing backfills it, so it is only meaningful from the run that
   // introduced it onwards.
-  durationMs   Int?
+  durationMs Int?
 
   run    ScheduledTaskRun @relation(fields: [runId], references: [id], onDelete: Cascade)
   animal Animal           @relation(fields: [animalId], references: [id], onDelete: Cascade)

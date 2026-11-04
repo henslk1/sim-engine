@@ -12,15 +12,15 @@ enum LocusBiasTarget {
 }
 
 model Locus {
-  id                     String                      @id @default(cuid())
+  id                     String                       @id @default(cuid())
   gameId                 String
   name                   String
   displayGroup           String?
   description            Json?
-  biasTarget             LocusBiasTarget             @default(NONE)
+  biasTarget             LocusBiasTarget              @default(NONE)
   minTestCycle           Int?
-  isHiddenModifier       Boolean                     @default(false)
-  inheritanceWeight      Float                       @default(1.0)
+  isHiddenModifier       Boolean                      @default(false)
+  inheritanceWeight      Float                        @default(1.0)
   alleles                Allele[]
   expressionRules        ExpressionRule[]
   panelEntries           GeneticPanelLocus[]
@@ -31,23 +31,23 @@ model Locus {
   templateGenotypes      AnimalTemplateGenotype[]
   dqTraits               BreedDqTrait[]
   starterColorGenotypes  StarterColorOptionGenotype[]
-  game                   Game                        @relation(fields: [gameId], references: [id])
+  game                   Game                         @relation(fields: [gameId], references: [id])
 
   @@unique([gameId, name])
 }
 
 model Allele {
-  id                          String                   @id @default(cuid())
-  locusId                     String
-  symbol                      String
-  availabilityState           GeneAvailabilityState?
-  expressionRulesAsAlleleOne  ExpressionRule[]         @relation("AlleleOne")
-  expressionRulesAsAlleleTwo  ExpressionRule[]         @relation("AlleleTwo")
-  genotypesAsAlleleOne        AnimalGenotype[]         @relation("AlleleOne")
-  genotypesAsAlleleTwo        AnimalGenotype[]         @relation("AlleleTwo")
-  frequencies                 BreedAlleleFrequency[]
-  templateGenotypeAsAlleleOne  AnimalTemplateGenotype[]         @relation("TemplateAlleleOne")
-  templateGenotypeAsAlleleTwo  AnimalTemplateGenotype[]         @relation("TemplateAlleleTwo")
+  id                              String                       @id @default(cuid())
+  locusId                         String
+  symbol                          String
+  availabilityState               GeneAvailabilityState?
+  expressionRulesAsAlleleOne      ExpressionRule[]             @relation("AlleleOne")
+  expressionRulesAsAlleleTwo      ExpressionRule[]             @relation("AlleleTwo")
+  genotypesAsAlleleOne            AnimalGenotype[]             @relation("AlleleOne")
+  genotypesAsAlleleTwo            AnimalGenotype[]             @relation("AlleleTwo")
+  frequencies                     BreedAlleleFrequency[]
+  templateGenotypeAsAlleleOne     AnimalTemplateGenotype[]     @relation("TemplateAlleleOne")
+  templateGenotypeAsAlleleTwo     AnimalTemplateGenotype[]     @relation("TemplateAlleleTwo")
   starterColorGenotypeAsAlleleOne StarterColorOptionGenotype[] @relation("StarterAlleleOne")
   starterColorGenotypeAsAlleleTwo StarterColorOptionGenotype[] @relation("StarterAlleleTwo")
 

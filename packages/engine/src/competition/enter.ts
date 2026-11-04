@@ -5,6 +5,8 @@ import { nextBoundaryFor } from "../schedule/clock.js";
 import { enqueueCompetitionResolution } from "./queue.js";
 import { requireLifeStageAction } from "../animal/actionGuards.js"
 import { grantConditionWorkGain } from "../animal/conditionWork.js"
+import { buildScoringRules, readScoringRules, scoringRulesToJson, snapshotEntryScore } from "./scoring.js"
+import { seedDisciplineStatRecords } from "./records.js"
 
 type Client = typeof db
 
@@ -44,6 +46,7 @@ export async function enterCompetitionTx(
       where: { id: competitionId },
       include: {
         tierDef: true,
+        venue: { select: { climate: true, terrain: true } },
         disciplineDef: {
           include: {
             equipmentRequirements: true
@@ -53,7 +56,7 @@ export async function enterCompetitionTx(
     })
     const animal = await tx.animal.findUniqueOrThrow({
       where: { id: animalId },
-      select: { gameId: true, status: true, ageInCycles: true, lifeStage: { select: { canCompete: true, stageIndex: true, energyCostMultiplier: true } } },
+      select: { gameId: true, status: true, ageInCycles: true, breedId: true, lifeStage: { select: { canCompete: true, stageIndex: true, energyCostMultiplier: true } } },
     })
     requireLifeStageAction(animal, "canCompete")
     if (animal.gameId !== competition.gameId) throw new Error("Animal and competition must be in the same game")
@@ -96,27 +99,35 @@ export async function enterCompetitionTx(
     // Take the competition's row before anything else happens.
     //
     // Reading `status` and believing it is not enough, for the same reason
-    // `runCompetition` does not believe its own read: under READ COMMITTED two
-    // entries and a resolution can all see OPEN at the same moment. Writing the
-    // row - even writing back the status it already has - takes its exclusive
-    // lock, and because Postgres re-checks the `where` after the wait, the
-    // whole statement is a compare-and-swap. Zero rows means somebody else got
-    // there first and the competition is no longer open.
+    // `runCompetitionTx` does not believe its own read: under READ COMMITTED
+    // two entries and a resolution can all see OPEN at the same moment.
+    // Writing the row - even writing back the status it already has - takes
+    // its exclusive lock, and because Postgres re-checks the `where` after the
+    // wait, the whole statement is a compare-and-swap. Zero rows means somebody
+    // else got there first and the competition is no longer open.
     //
-    // This is also what orders the locks. `runCompetition` takes this row first
-    // and then touches balances, animals and records. An entry that validated,
-    // spent energy and debited a fee before reaching for this row would take
-    // the same locks in the opposite order, and the two would deadlock as soon
-    // as a competition filled up while somebody was entering it.
+    // This is also what orders the locks. `runCompetitionTx` takes this row
+    // first and then touches balances, animals and records. An entry that
+    // validated, spent energy and debited a fee before reaching for this row
+    // would take the same locks in the opposite order, and the two would
+    // deadlock as soon as a competition filled up while somebody was entering.
+    //
+    // And it is what makes the scoring freeze below safe. `scoringRules` comes
+    // out of this statement rather than out of the pre-lock fetch above: two
+    // players entering an empty competition at the same instant both read null
+    // there, but only one of them is inside this lock at a time, and the second
+    // re-reads the row the first committed. One competition, one rule set,
+    // whoever got there first.
     //
     // The wait is a resolution's transaction, which the benchmark put at about
     // 70ms per competition.
-    const claimed = await tx.competition.updateMany({
+    const claimed = await tx.competition.updateManyAndReturn({
       where: { id: competitionId, status: "OPEN" },
       data: { status: "OPEN" },
+      select: { scoringRules: true },
     })
 
-    if (claimed.count !== 1) {
+    if (claimed.length !== 1) {
       throw new Error("Competition is not open")
     }
 
@@ -225,11 +236,11 @@ export async function enterCompetitionTx(
       }
     }
 
-    if (competition.breedId) {
-      const animal = await tx.animal.findUniqueOrThrow({ where: { id: animalId }, select: { breedId: true } })
-      if (animal.breedId !== competition.breedId) {
-        throw new Error("This competition is restricted to a specific breed")
-      }
+    // Read off the animal already in hand. The second fetch this replaces
+    // shadowed the outer `animal`, which is how a binding two hundred lines long
+    // came to mean two different things inside one function.
+    if (competition.breedId && animal.breedId !== competition.breedId) {
+      throw new Error("This competition is restricted to a specific breed")
     }
 
     if (competition.disciplineDef.isConformation) {
@@ -317,6 +328,47 @@ export async function enterCompetitionTx(
       })
     }
 
+    // Freeze the competition's shared scoring rules, if this is the first entry
+    // to reach here. Every part of the set is either configuration an admin can
+    // edit or a number another player's training moves, so it is taken once and
+    // shared by the whole field. The row lock above is what makes "once" true.
+    let rules = readScoringRules(claimed[0]!.scoringRules)
+    if (!rules) {
+      rules = await buildScoringRules(tx, {
+        gameId: competition.gameId,
+        disciplineDefId: competition.disciplineDefId,
+        isConformation: competition.disciplineDef.isConformation,
+        climate: competition.venue.climate,
+        terrain: competition.venue.terrain,
+      })
+      await tx.competition.update({
+        where: { id: competitionId },
+        data: { scoringRules: scoringRulesToJson(rules) },
+      })
+    }
+
+    // Read once and used twice: written to CompetitionEntryStat, which the venue
+    // page renders as a column per discipline stat, and folded into the snapshot
+    // below. Reading them separately for each would let the number a player is
+    // shown drift from the number they are scored on.
+    //
+    // Driven off the frozen weights rather than the discipline's current ones,
+    // so a stat an admin adds mid-competition is not recorded for the entrants
+    // who arrive after the edit and missing for the ones who arrived before.
+    const entryStatValues = rules.statWeights.length > 0
+      ? await tx.animalStat.findMany({
+          where: { animalId, statDefId: { in: rules.statWeights.map((w) => w.statDefId) } },
+          select: { statDefId: true, trainedValue: true },
+        })
+      : []
+
+    const snapshot = await snapshotEntryScore(tx, {
+      animalId,
+      breedId: animal.breedId,
+      rules,
+      stats: entryStatValues,
+    })
+
     const entry = await tx.competitionEntry.create({
       data: {
         competitionId,
@@ -324,6 +376,11 @@ export async function enterCompetitionTx(
         playerAccountId,
         tierDefId: tier.tierDefId,
         cycleNumber: animal.ageInCycles,
+        // Written with the entry rather than updated onto it a statement later.
+        // An entry that exists without its snapshot, even briefly, is an entry
+        // resolution would have to guess about.
+        scoredAt: now,
+        ...snapshot,
       },
     })
 
@@ -331,26 +388,26 @@ export async function enterCompetitionTx(
     // the competition eventually runs, is marked separately.
     await markAnimalActive(tx, { gameId: competition.gameId, animalId, cycleNumber: animal.ageInCycles })
 
-    if (!competition.disciplineDef.isConformation) {
-      const statWeights = await tx.disciplineStatWeight.findMany({
-        where: { disciplineDefId: competition.disciplineDefId },
-        select: { statDefId: true },
+    // This is the moment the horse becomes a competitor in this discipline, so
+    // it is the moment the discipline's records come within its reach. They are
+    // filled from where it already stands rather than left until its next
+    // training session, because a horse at its training cap has no next one -
+    // and training is the only thing that writes a record.
+    await seedDisciplineStatRecords(tx, {
+      gameId: competition.gameId,
+      animalId,
+      breedId: animal.breedId,
+      disciplineDefId: competition.disciplineDefId,
+    })
+
+    if (entryStatValues.length > 0) {
+      await tx.competitionEntryStat.createMany({
+        data: entryStatValues.map((s) => ({
+          entryId: entry.id,
+          statDefId: s.statDefId,
+          trainedValue: s.trainedValue,
+        })),
       })
-      if (statWeights.length > 0) {
-        const animalStats = await tx.animalStat.findMany({
-          where: { animalId, statDefId: { in: statWeights.map((s) => s.statDefId) } },
-          select: { statDefId: true, trainedValue: true },
-        })
-        if (animalStats.length > 0) {
-          await tx.competitionEntryStat.createMany({
-            data: animalStats.map((s) => ({
-              entryId: entry.id,
-              statDefId: s.statDefId,
-              trainedValue: s.trainedValue,
-            })),
-          })
-        }
-      }
     }
 
     // No need to count again: the row lock taken at the top of this

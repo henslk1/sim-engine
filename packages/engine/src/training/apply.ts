@@ -3,6 +3,7 @@ import type { Prisma } from "@sim-engine/db"
 import { markAnimalActive } from "../animal/activity.js";
 import { requireLifeStageAction } from "../animal/actionGuards.js"
 import { grantConditionWorkGain } from "../animal/conditionWork.js"
+import { maintainStatRecords } from "../competition/records.js"
 
 type Client = typeof db
 
@@ -65,7 +66,15 @@ export async function applyTrainingActionTx(
 
     const animalStage = await tx.animal.findUniqueOrThrow({
       where: { id: animalId },
-      select: { gameId: true, status: true, ageInCycles: true, isTutorialAnimal: true, lifeStage: { select: { canTrain: true, energyCostMultiplier: true } } },
+      select: {
+        gameId: true,
+        status: true,
+        ageInCycles: true,
+        isTutorialAnimal: true,
+        // Which records this training can set, below.
+        breedId: true,
+        lifeStage: { select: { canTrain: true, energyCostMultiplier: true } },
+      },
     })
     requireLifeStageAction(animalStage, "canTrain")
     if (animalStage.gameId !== action.gameId) throw new Error("Training action belongs to another game")
@@ -119,26 +128,17 @@ export async function applyTrainingActionTx(
       data: { trainedValue: { increment: statGained } },
     })
 
-    const statRecordDef = await tx.recordDef.findFirst({
-      where: { statDefId: action.statDefId, gameId: action.gameId },
-      select: { id: true },
+    // Training is the only thing that moves a record, which is why this call
+    // is here and not anywhere more obvious. Which definitions it reaches -
+    // overall, this breed's, and those of the disciplines this horse has
+    // actually competed in - is `competition/records.ts`'s business.
+    await maintainStatRecords(tx, {
+      gameId: action.gameId,
+      animalId,
+      breedId: animalStage.breedId,
+      statDefId: action.statDefId,
+      value: stat.trainedValue,
     })
-    if (statRecordDef) {
-      const existingEntry = await tx.recordEntry.findFirst({
-        where: { recordDefId: statRecordDef.id, animalId },
-        select: { id: true, value: true },
-      })
-      if (!existingEntry) {
-        await tx.recordEntry.create({
-          data: { recordDefId: statRecordDef.id, animalId, value: stat.trainedValue },
-        })
-      } else if (stat.trainedValue > existingEntry.value) {
-        await tx.recordEntry.update({
-          where: { id: existingEntry.id },
-          data: { value: stat.trainedValue, setAt: new Date() },
-        })
-      }
-    }
 
     await tx.animalStatHistory.upsert({
       where: {

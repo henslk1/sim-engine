@@ -10,6 +10,37 @@ export { enterCompetition, enterCompetitionTx } from "./competition/enter.js"
 export { runCompetitionTx, RESOLUTION_TX } from "./competition/run.js"
 export { checkCompetitions, replenishOpenSet } from "./competition/auto.js"
 export {
+  buildScoringRules,
+  readScoringRules,
+  scoringRulesToJson,
+  snapshotEntryScore,
+  readEntrySnapshot,
+  statScoreFrom,
+  personalityMultiplierFrom,
+  environmentModifierFor,
+  environmentModifierFrom,
+  buildEnvModifiers,
+  expressionRuleKey,
+  worldMaxFor,
+  traitMultiplier,
+  finalScore,
+  SCORING_RULES_VERSION,
+} from "./competition/scoring.js"
+export {
+  globalStatRecordWhere,
+  statRecordAppliesTo,
+  disciplinesEnteredBy,
+  maintainStatRecords,
+  seedDisciplineStatRecords,
+} from "./competition/records.js"
+export type {
+  CompetitionScoringRules,
+  EntryScoreSnapshot,
+  FrozenStatWeight,
+  FrozenPersonalityWeight,
+  FrozenEnvModifiers,
+} from "./competition/scoring.js"
+export {
   enqueueCompetitionResolution,
   configureCompetitionResolver,
   signalCompetitionResolution,
