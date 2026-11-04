@@ -128,4 +128,6 @@ model DailyAllowanceItem {
   subscriberOnly Boolean @default(false)
   game           Game    @relation(fields: [gameId], references: [id])
   itemDef        ItemDef @relation(fields: [itemDefId], references: [id])
+
+  @@unique([gameId, itemDefId, subscriberOnly])
 }

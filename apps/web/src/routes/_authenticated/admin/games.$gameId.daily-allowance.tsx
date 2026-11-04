@@ -56,7 +56,12 @@ function DailyAllowancePage() {
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
 
   const usedCurrencyKeys = new Set((currencyRows ?? []).map((r) => `${r.currencyDef.id}:${r.subscriberOnly}`))
-  const usedItemIds = new Set((itemRows ?? []).map((r) => r.itemDef.id))
+  // Keyed on the row, not the item, exactly as the currency set above is: an
+  // open grant and a subscriber-only grant of the same item are two different
+  // rows, and the point of subscriber-only rows is that they stack on the open
+  // ones. Keying on the item alone hid whichever of the pair was configured
+  // first and made the combination unreachable.
+  const usedItemKeys = new Set((itemRows ?? []).map((r) => `${r.itemDef.id}:${r.subscriberOnly}`))
 
   const availableCurrencies = (currencies ?? []).filter((c) => {
     const key = `${c.id}:${currencyForm.subscriberOnly}`
@@ -66,7 +71,7 @@ function DailyAllowancePage() {
 
   const availableItems = (items ?? []).filter((i) => {
     if (editingItemId && itemForm.itemDefId === i.id) return true
-    return !usedItemIds.has(i.id)
+    return !usedItemKeys.has(`${i.id}:${itemForm.subscriberOnly}`)
   })
 
   function startEditCurrency(row: CurrencyRow) {

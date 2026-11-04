@@ -2,6 +2,8 @@ import { TRPCError } from "@trpc/server"
 import { db, ProfileFieldKey } from "@sim-engine/db"
 import { stableSortSchema, stableFiltersSchema, readStablePreferences } from "../stable-preferences.js"
 import { router, publicProcedure, protectedProcedure } from "../trpc.js"
+import { enterGameplay } from "../maintenance.js"
+import { recordDailyVisitTx } from "@sim-engine/engine"
 import { z } from "zod"
 
 export const playerRouter = router({
@@ -99,6 +101,43 @@ export const playerRouter = router({
           }
         })
         return account
+      })
+    }),
+
+  /**
+   * The player has opened the game. Claim the day if it is a new one.
+   *
+   * A mutation, and called on every page load, which sounds like a mistake
+   * twice over and is neither. It writes, so it cannot be a query - a query is
+   * cached, prefetched and retried by the client, and `player.me` is held for
+   * five minutes in one place and for ever in another, so a grant riding on it
+   * would be skipped on the days it mattered and repeated on the days it did
+   * not. And it is called unconditionally because the decision belongs to the
+   * server: the client does not know when the game's day turns over, and every
+   * call after the first of a day changes nothing.
+   *
+   * Null for a user with no account in this game - the setup screen is an
+   * authenticated page too, and nobody is owed an allowance before they exist.
+   *
+   * Refused during the nightly, like every other gameplay write. The allowance
+   * is still there afterwards: the day it belongs to has not been claimed, so
+   * the next visit claims it.
+   */
+  visit: protectedProcedure
+    .input(z.object({ gameId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      // The account is this user's, in this game. Both halves matter: the
+      // allowance is configured per game, and the seniority it counts belongs
+      // to one of this user's accounts rather than to the user.
+      const account = await db.playerAccount.findUnique({
+        where: { userId_gameId: { userId: ctx.userId, gameId: input.gameId } },
+        select: { id: true },
+      })
+      if (!account) return null
+
+      return db.$transaction(async (tx) => {
+        await enterGameplay(tx, input.gameId)
+        return recordDailyVisitTx(tx, { playerAccountId: account.id, gameId: input.gameId })
       })
     }),
 

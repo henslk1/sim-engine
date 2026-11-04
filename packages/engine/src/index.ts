@@ -73,6 +73,8 @@ export {
 export type { GameSchedule, ScheduledType, Clock } from "./schedule/clock.js"
 export { isLeaseLive, isClaimable, materializeTask, planGameRuns } from "./schedule/plan.js"
 export type { TaskRow, RunRow, Materialization, GamePlan } from "./schedule/plan.js"
+export { recordDailyVisitTx } from "./player/dailyVisit.js"
+export type { DailyVisitResult, DailyAllowanceGrant } from "./player/dailyVisit.js"
 export { runConformationInspection, applyConformationInspection } from "./animal/conformation.js"
 export { generateOffspring } from "./breeding/generateOffspring.js"
 export { computeCOI } from "./breeding/computeCOI.js"

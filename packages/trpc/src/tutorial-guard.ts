@@ -22,6 +22,13 @@ export async function guardTutorialMutation(userId: string | null, path: string,
   if (path.startsWith("messaging.")) return
   // Presentation preferences do not advance or bypass tutorial gameplay.
   if (path === "player.saveSubContainerPreferences") return
+  // Opening the game is not a move in it. `player.visit` resolves the account
+  // from the session rather than the input, takes no decision from the player,
+  // and does nothing at all on every call after the first of a game day. It is
+  // exempt because the alternative is worse than the risk: this gate would
+  // refuse it on every page load of the tutorial, so a player would finish
+  // several days in with no days recorded against their name.
+  if (path === "player.visit") return
   if (path.startsWith("admin.")) {
     if (!await db.staffRole.findFirst({ where: { userId } })) throw denied()
     return

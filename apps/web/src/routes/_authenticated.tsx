@@ -4,6 +4,7 @@ import { Header } from "@/components/header"
 import { trpc, trpcVanilla } from "@/lib/trpc"
 import { MessagingWidget } from "@/components/messaging-widget"
 import { NightlyBanner } from "@/components/nightly-banner"
+import { DailyAllowance } from "@/components/daily-allowance"
 import { authClient } from "@/lib/auth-client"
 import { isTourRunning, destroyActiveTour, startTutorial } from "@/lib/tutorial"
 import { endClientSession } from "@/lib/session-cleanup"
@@ -247,6 +248,9 @@ function AuthenticatedLayout() {
           header. The container is `h-dvh` with `overflow-hidden`, so this only
           shortens `main` rather than pushing anything off screen. */}
       {!isSetup && <NightlyBanner />}
+      {/* Same slot, same reason: one place beneath the nav that every
+          authenticated page shares, in the layout flow rather than over it. */}
+      {!isSetup && <DailyAllowance />}
       <main className="min-h-0 flex-1 overflow-auto">
         <Outlet />
       </main>
