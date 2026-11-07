@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server"
 import { z } from "zod"
-import { protectedProcedure } from "../trpc.js"
+import { authedProcedure } from "../trpc.js"
 import { resolveActor } from "./actor.js"
 import { canManageChannels, canModerateMessages } from "./permissions.js"
 import type { Denied, MessagingDenialCode } from "./result.js"
@@ -38,7 +38,8 @@ export function denialToTRPCError(denied: Denied): TRPCError {
 // It requires a gameId in the input and resolves the acting player from the
 // authenticated session plus that game — so a caller cannot name the player
 // account it wants to act as. Handlers read ctx.actor and never re-derive it.
-export const messagingProcedure = protectedProcedure
+export const messagingProcedure = authedProcedure
+  .meta({ tier: "messaging" })
   .input(z.object({ gameId: z.string() }))
   .use(async ({ ctx, input, next }) => {
     const decision = await resolveActor(ctx.userId, input.gameId)
@@ -52,14 +53,14 @@ export const messagingProcedure = protectedProcedure
 // any staff row for any game; this one resolves the role held in *this* game
 // and requires admin or owner, so a moderator does not quietly gain the ability
 // to restructure the server, and neither does an admin of a different game.
-export const channelAdminProcedure = messagingProcedure.use(({ ctx, next }) => {
+export const channelAdminProcedure = messagingProcedure.meta({ tier: "channelAdmin" }).use(({ ctx, next }) => {
   const check = canManageChannels(ctx.actor)
   if (!check.ok) throw denialToTRPCError(check)
   return next()
 })
 
 // Content moderation: delete other players' messages, pin, review reports.
-export const messageModerationProcedure = messagingProcedure.use(({ ctx, next }) => {
+export const messageModerationProcedure = messagingProcedure.meta({ tier: "messageModeration" }).use(({ ctx, next }) => {
   const check = canModerateMessages(ctx.actor)
   if (!check.ok) throw denialToTRPCError(check)
   return next()

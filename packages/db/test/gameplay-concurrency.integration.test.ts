@@ -609,3 +609,393 @@ test("concurrent mare returns pay once and transfer ownership once", { skip }, a
     await restore()
   }
 })
+
+// ---------------------------------------------------------------------------
+// Waiting on a transaction without waiting for ever
+// ---------------------------------------------------------------------------
+
+/**
+ * Hold a promise nobody is awaiting *yet*.
+ *
+ * Node reports a rejection that has no handler at the moment it rejects, so a
+ * background transaction that fails while the test is still setting up takes
+ * the whole run down with `ERR_UNHANDLED_REJECTION` - before the assertion that
+ * would have explained it. Attaching a handler now swallows nothing: the
+ * original promise is what gets awaited later, and it still throws there.
+ */
+function background<T>(work: Promise<T>): Promise<T> {
+  work.catch(() => {})
+  return work
+}
+
+/**
+ * Wait for a signal sent from inside a transaction, or fail with whatever
+ * stopped it reaching the point it was meant to signal from.
+ *
+ * Each test below hands a resolver to a background transaction and then waits
+ * to be told it got somewhere - past the lock, past the read. If that
+ * transaction rejects on the way, nothing ever resolves the signal: the helper
+ * under test throwing, which is the thing these tests exist to catch, instead
+ * reads as a suite that hangs forever with no output. Racing the two reports
+ * the real error at the real moment.
+ *
+ * A transaction that *returns* without signalling is also a failure, and one
+ * worth naming rather than waiting out.
+ */
+async function reached<T>(
+  signal: Promise<void>,
+  transaction: Promise<T>,
+  point: string
+): Promise<void> {
+  const guard = background(
+    transaction.then(() => {
+      throw new Error(`the transaction returned without reaching ${point}`)
+    })
+  )
+  await Promise.race([signal, guard])
+}
+
+/**
+ * Ownership against a transfer, both ways round.
+ *
+ * `assertOwnsAnimal` locks the animal row with `SELECT ... FOR UPDATE`, and the
+ * property it is meant to have is not "refuse whenever a transfer is nearby" -
+ * an action that took the lock first is entitled to finish, and failing it
+ * would be a bug of its own. The property is that **no decision rests on a read
+ * taken outside the lock**, which only shows up as two different outcomes in
+ * two different orderings.
+ *
+ * The cross-game half of the same helper - an owner of record whose account
+ * lives in another game - needs no concurrency and is covered by
+ * `packages/trpc/test/authorization-ownership.test.ts`.
+ */
+
+/** A second account in the fixture's game, to transfer the animal to. */
+async function otherAccount(): Promise<{ id: string }> {
+  const other = await db.playerAccount.findFirst({
+    where: { gameId: fixture.gameId, id: { not: fixture.playerAccountId } },
+    select: { id: true },
+  })
+  assert.ok(other, "this suite needs a second account in the fixture game to transfer to")
+  return other
+}
+
+test("a transfer that commits first decides it, not the earlier read", { skip }, async () => {
+  const { enterGameplay } = await import("../../trpc/src/maintenance.ts")
+  const { assertOwnsAnimal } = await import("../../trpc/src/authz.ts")
+  const other = await otherAccount()
+  const gameplay = client()
+
+  let opened!: () => void
+  const hasRead = new Promise<void>((resolve) => { opened = resolve })
+  let transferred!: () => void
+  const transferDone = new Promise<void>((resolve) => { transferred = resolve })
+
+  const action = background(
+    gameplay.$transaction(
+      async (tx) => {
+        await enterGameplay(tx, fixture.gameId)
+        // The stale read: taken before the transfer, outside any row lock, and
+        // saying the animal is still the caller's.
+        const early = await tx.animal.findUniqueOrThrow({
+          where: { id: fixture.animalId },
+          select: { playerAccountId: true },
+        })
+        assert.equal(early.playerAccountId, fixture.playerAccountId)
+        opened()
+        await transferDone
+
+        // And the authorization, taken under the lock, which must disagree.
+        await assertOwnsAnimal(tx as never, userId, fixture.animalId)
+      },
+      { timeout: 30_000 }
+    )
+  )
+
+  try {
+    await reached(hasRead, action, "the stale read")
+    await db.animal.update({
+      where: { id: fixture.animalId },
+      data: { playerAccountId: other.id },
+    })
+    transferred()
+
+    await assert.rejects(action, /do not own this animal/)
+  } finally {
+    // Release whatever the transaction is still waiting on and let it end
+    // before the row is touched again. Resolving a settled barrier is a no-op,
+    // so this costs nothing on the path where the test passed.
+    transferred()
+    await action.catch(() => {})
+    await db.animal.update({
+      where: { id: fixture.animalId },
+      data: { playerAccountId: fixture.playerAccountId },
+    })
+    await gameplay.$disconnect()
+  }
+})
+
+test("an action that took the lock first finishes, and the transfer waits", { skip }, async () => {
+  const { enterGameplay } = await import("../../trpc/src/maintenance.ts")
+  const { assertOwnsAnimal } = await import("../../trpc/src/authz.ts")
+  const other = await otherAccount()
+  const gameplay = client()
+  const transferrer = client()
+
+  const order: string[] = []
+  let locked!: () => void
+  const holdingRow = new Promise<void>((resolve) => { locked = resolve })
+  let release!: () => void
+  const released = new Promise<void>((resolve) => { release = resolve })
+  let transfer: Promise<unknown> = Promise.resolve()
+
+  const action = background(
+    gameplay.$transaction(
+      async (tx) => {
+        await enterGameplay(tx, fixture.gameId)
+        await assertOwnsAnimal(tx as never, userId, fixture.animalId)
+        order.push("action-holds-the-row")
+        locked()
+        await released
+        order.push("action-callback-returned")
+      },
+      { timeout: 30_000 }
+    )
+  )
+
+  try {
+    await reached(holdingRow, action, "the row lock")
+
+    let moved!: () => void
+    const transferDone = new Promise<void>((resolve) => { moved = resolve })
+    transfer = background(
+      transferrer.$transaction(
+        async (tx) => {
+          await tx.animal.update({
+            where: { id: fixture.animalId },
+            data: { playerAccountId: other.id },
+          })
+          order.push("transfer-committed")
+          moved()
+        },
+        { timeout: 30_000 }
+      )
+    )
+
+    // No signal exists for "has not happened", so one bounded wait. It can only
+    // ever make this weaker, never falsely strict.
+    await Promise.race([transferDone, new Promise((r) => setTimeout(r, 500))])
+    assert.deepEqual(
+      order,
+      ["action-holds-the-row"],
+      "the transfer must not move an animal an authorized action is holding"
+    )
+
+    release()
+    await action
+    await transfer
+
+    assert.deepEqual(order, [
+      "action-holds-the-row",
+      "action-callback-returned",
+      "transfer-committed",
+    ])
+  } finally {
+    // That assertion runs while this transaction is holding the animal row, so
+    // a failure must not skip the release: the restore below writes the same
+    // row and would queue behind it until the transaction timed out, turning a
+    // readable failure into a stalled suite.
+    release()
+    await action.catch(() => {})
+    await transfer.catch(() => {})
+    await db.animal.update({
+      where: { id: fixture.animalId },
+      data: { playerAccountId: fixture.playerAccountId },
+    })
+    await gameplay.$disconnect()
+    await transferrer.$disconnect()
+  }
+})
+
+/**
+ * A role change cannot land while a rank decision is in flight.
+ *
+ * `requireRankOver` calls `lockStaffSubjects` before it reads, and that helper
+ * makes a claim worth proving rather than asserting in a comment: **`FOR
+ * UPDATE` on the `User` row blocks a `StaffRole` insert that has not happened
+ * yet.** It does so indirectly - inserting a referencing row takes `FOR KEY
+ * SHARE` on the referenced one to enforce the foreign key, and `FOR UPDATE`
+ * conflicts with that - and no lock on `StaffRole` itself can stop a row that
+ * does not exist. The second statement, over the `StaffRole` rows, stops the
+ * opposite move: a revocation of a row that does.
+ *
+ * Both halves matter and they stop different things, so both are checked.
+ *
+ * These own their subject rather than borrowing one. An earlier draft took the
+ * first user holding no staff role, which worked until a failing run left a row
+ * behind - after which there was no such user, and the next run failed for that
+ * reason instead of the one under test. A test that can consume the fixture it
+ * depends on fails in a way that looks like a different bug.
+ */
+const LOCK_TEST_EMAIL = "authz-lock-test@example.invalid"
+
+/** A user who exists only for one of these tests, cleaned up either way. */
+async function withSubject(run: (userId: string) => Promise<void>): Promise<void> {
+  await db.staffRole.deleteMany({ where: { user: { email: LOCK_TEST_EMAIL } } })
+  await db.user.deleteMany({ where: { email: LOCK_TEST_EMAIL } })
+  const subject = await db.user.create({
+    data: { email: LOCK_TEST_EMAIL, emailVerified: true },
+    select: { id: true },
+  })
+  try {
+    await run(subject.id)
+  } finally {
+    await db.staffRole.deleteMany({ where: { userId: subject.id } })
+    await db.user.delete({ where: { id: subject.id } })
+  }
+}
+
+/**
+ * Hold the subject locks for the length of `body`, then let go.
+ *
+ * Three things have to hold for a failure in here to be readable:
+ *
+ *   - **The wait for the locks must fail when the lock fails.** If
+ *     `lockStaffSubjects` throws, nothing resolves `holding`, so the bug under
+ *     test would present as a suite that never finishes. `reached` races the
+ *     two and reports the throw.
+ *   - **The release must happen whatever `body` did.** A failed assertion that
+ *     skipped it would leave a connection holding row locks until the pool was
+ *     torn down, with every later test queued behind them.
+ *   - **The release path must not rethrow.** `body`'s failure is the one worth
+ *     reading, and awaiting the transaction from a `finally` would replace it
+ *     with whatever the rollback said.
+ */
+async function whileHoldingRanks(
+  c: PrismaClient,
+  userIds: string[],
+  body: () => Promise<void>
+): Promise<void> {
+  const { lockStaffSubjects } = await import("../../trpc/src/authz.ts")
+  let held!: () => void
+  const holding = new Promise<void>((resolve) => { held = resolve })
+  let release!: () => void
+  const released = new Promise<void>((resolve) => { release = resolve })
+
+  const transaction = background(
+    c.$transaction(
+      async (tx) => {
+        await lockStaffSubjects(tx as never, userIds)
+        held()
+        await released
+      },
+      { timeout: 30_000 }
+    )
+  )
+
+  try {
+    await reached(holding, transaction, "the subject locks")
+    await body()
+  } catch (error) {
+    release()
+    // Wait for the locks to actually go before letting the failure out, and
+    // say nothing about how the rollback went.
+    await transaction.catch(() => {})
+    throw error
+  }
+  release()
+  await transaction
+}
+
+test("a promotion cannot land while the ranks are held", { skip }, async () => {
+  await withSubject(async (subjectId) => {
+    const holder = client()
+    const promoter = client()
+    const order: string[] = []
+    // Outside the `try`, because the cleanup has to wait for it.
+    let promotion: Promise<void> | null = null
+    try {
+      await whileHoldingRanks(holder, [subjectId], async () => {
+        order.push("ranks-held")
+        let promoted!: () => void
+        const done = new Promise<void>((resolve) => { promoted = resolve })
+        promotion = background(
+          promoter.$transaction(
+            async (tx) => {
+              await tx.staffRole.create({
+                data: { userId: subjectId, gameId: fixture.gameId, role: "MODERATOR" },
+              })
+              order.push("promotion-committed")
+              promoted()
+            },
+            { timeout: 30_000 }
+          )
+        )
+
+        // No signal exists for "has not happened", so one bounded wait. It can
+        // only ever make this weaker, never falsely strict.
+        await Promise.race([done, new Promise((r) => setTimeout(r, 500))])
+        assert.deepEqual(
+          order,
+          ["ranks-held"],
+          "a new staff role must not appear while a decision about this user is in flight"
+        )
+      })
+
+      await promotion
+      assert.deepEqual(order, ["ranks-held", "promotion-committed"])
+    } finally {
+      // The locks are already released by here, so this only waits for a
+      // promotion that was queued behind them to finish - before the subject
+      // it references is deleted.
+      await (promotion as Promise<void> | null)?.catch(() => {})
+      await holder.$disconnect()
+      await promoter.$disconnect()
+    }
+  })
+})
+
+test("a revocation cannot land while the ranks are held", { skip }, async () => {
+  await withSubject(async (subjectId) => {
+    const holder = client()
+    const revoker = client()
+    const existing = await db.staffRole.create({
+      data: { userId: subjectId, gameId: fixture.gameId, role: "MODERATOR" },
+      select: { id: true },
+    })
+    const order: string[] = []
+    // Outside the `try`, because the cleanup has to wait for it.
+    let revocation: Promise<void> | null = null
+    try {
+      await whileHoldingRanks(holder, [subjectId], async () => {
+        order.push("ranks-held")
+        let done_!: () => void
+        const done = new Promise<void>((resolve) => { done_ = resolve })
+        revocation = background(
+          revoker.$transaction(
+            async (tx) => {
+              await tx.staffRole.delete({ where: { id: existing.id } })
+              order.push("revocation-committed")
+              done_()
+            },
+            { timeout: 30_000 }
+          )
+        )
+
+        await Promise.race([done, new Promise((r) => setTimeout(r, 500))])
+        assert.deepEqual(
+          order,
+          ["ranks-held"],
+          "a staff role must not be removed while a decision about this user is in flight"
+        )
+      })
+
+      await revocation
+      assert.deepEqual(order, ["ranks-held", "revocation-committed"])
+    } finally {
+      await (revocation as Promise<void> | null)?.catch(() => {})
+      await holder.$disconnect()
+      await revoker.$disconnect()
+    }
+  })
+})

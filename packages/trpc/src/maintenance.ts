@@ -35,6 +35,12 @@
 
 import { TRPCError } from "@trpc/server"
 import { db, type Prisma } from "@sim-engine/db"
+import type {
+  AcceptsTransactionClient,
+  Assert,
+  InTransaction,
+  RefusesGlobalClient,
+} from "./tx.js"
 
 export type MaintenanceWindow = {
   runId: string
@@ -436,9 +442,28 @@ export function isMaintenanceBlock(error: unknown): boolean {
   return error instanceof Error && error.message.includes("GAME_UPDATE_IN_PROGRESS")
 }
 
-/** What `enterGameplay` needs: the shared lock, and the recheck under it. */
-type GameplayTx = RawClient &
+/**
+ * What `enterGameplay` needs: the shared lock, and the recheck under it.
+ *
+ * Transaction-only, and `InTransaction` is the part that enforces it. The lock
+ * here is `pg_advisory_xact_lock`, which is released when its *transaction*
+ * ends - so taken through the global client it is released at the end of the
+ * SELECT that took it, and the mutation then runs against a nightly with no
+ * lock at all and nothing to show for it. `Prisma.TransactionClient` alone does
+ * not refuse `db`; see `tx.ts`.
+ */
+type GameplayTx = InTransaction &
+  RawClient &
   Pick<Prisma.TransactionClient, "scheduledTaskRun" | "animal" | "playerAccount">
+
+/**
+ * Refuses `db`, still accepts a transaction client. Checked at compile time.
+ * Exported only so `noUnusedLocals` leaves them alone: the web app typechecks
+ * this file through its import graph under that flag, and an unexported proof
+ * fails the build there. Nothing imports them.
+ */
+export type _GameplayTxRefusesGlobal = Assert<RefusesGlobalClient<GameplayTx>>
+export type _GameplayTxAcceptsTransaction = Assert<AcceptsTransactionClient<GameplayTx>>
 
 /**
  * Open a gameplay write for one game, inside the caller's transaction.
